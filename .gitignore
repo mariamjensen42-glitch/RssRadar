@@ -12,4 +12,10 @@
 /captures
 .externalNativeBuild
 .cxx
+.gradle-home/
 local.properties
+
+# 工具与缓存目录（不入库）
+.gradle.bad/
+.idea/
+.workbuddy/
