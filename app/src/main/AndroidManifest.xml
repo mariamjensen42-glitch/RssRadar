@@ -2,7 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- RSS 生态仍有 http 源，MVP 阶段放行明文流量 -->
     <application
+        android:usesCleartextTraffic="true"
+        android:name=".RssRadarApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
