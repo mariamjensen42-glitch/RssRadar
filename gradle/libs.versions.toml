@@ -12,6 +12,8 @@ ksp = "2.2.10-2.0.2"
 room = "2.8.4"
 rome = "2.1.0"
 jsoup = "1.18.3"
+readability4j = "1.0.8"
+coil = "2.7.0"
 composablesIcons = "2.2.1"
 
 [libraries]
@@ -36,6 +38,8 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 rome = { group = "com.rometools", name = "rome", version.ref = "rome" }
 rome-modules = { group = "com.rometools", name = "rome-modules", version.ref = "rome" }
 jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
+readability4j = { group = "net.dankito.readability4j", name = "readability4j", version.ref = "readability4j" }
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 compose-icons-lucide = { group = "com.composables", name = "icons-lucide-cmp", version.ref = "composablesIcons" }
 
 [plugins]
