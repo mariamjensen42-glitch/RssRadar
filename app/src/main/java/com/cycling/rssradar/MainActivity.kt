@@ -79,6 +79,7 @@ class MainActivity : ComponentActivity() {
                         addVm = addVm,
                         searchVm = searchVm,
                         articleVm = articleVm,
+                        settingsVm = settingsVm,
                     )
                 }
             }
@@ -93,6 +94,7 @@ private fun RssRadarApp(
     addVm: AddSubscriptionViewModel,
     searchVm: SearchViewModel,
     articleVm: ArticleDetailViewModel,
+    settingsVm: RssHubSettingsViewModel,
 ) {
     // 加订阅是低频动作：不占路由，也不占整页，从信息流 FAB / 订阅页入口唤起底部抽屉。
     var currentTab by rememberSaveable { mutableStateOf(MainTab.Feed) }

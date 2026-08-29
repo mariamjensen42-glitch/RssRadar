@@ -81,7 +81,8 @@ class RssParser {
         return ParsedArticle(
             link = link,
             title = title.ifEmpty { link },
-            summary = summarySource?.let(::toPlainText)?.take(SUMMARY_MAX_LENGTH)?.takeIf { it.isNotBlank() },
+            summary = summarySource?.let(::toPlainText)?.take(SUMMARY_MAX_LENGTH)
+                ?.takeIf { it.isNotBlank() },
             contentHtml = contentHtml,
             contentText = contentText,
             author = author?.trim()?.takeIf { it.isNotEmpty() },
@@ -97,8 +98,9 @@ class RssParser {
      */
     private fun rawFullText(entry: SyndEntry): String? {
         val atomContent = entry.contents.orEmpty().joinToString("\n") { it.value.orEmpty() }
-        val encoded = (entry.getModule(CONTENT_MODULE_URI) as? com.rometools.rome.feed.module.content.ContentModule)
-            ?.contents.orEmpty().joinToString("\n") { it.value.orEmpty() }
+        val encoded =
+            (entry.getModule(CONTENT_MODULE_URI) as? com.rometools.modules.content.ContentModule)
+                ?.contents.orEmpty().joinToString("\n") { it }
         return when {
             textLength(atomContent) >= textLength(encoded) -> atomContent
             else -> encoded
@@ -114,9 +116,9 @@ class RssParser {
         entry.enclosures.orEmpty().firstOrNull { it.url != null && it.type.orEmpty().startsWith("image") }
             ?.let { return it.url }
 
-        (entry.getModule(MEDIA_MODULE_URI) as? com.rometools.rome.feed.module.mediarss.MediaEntryModule)
+        (entry.getModule(MEDIA_MODULE_URI) as? com.rometools.modules.mediarss.MediaEntryModule)
             ?.mediaContents.orEmpty().firstNotNullOfOrNull { mc ->
-                mc.metadata?.plugin?.thumbnails.orEmpty().firstOrNull()?.url?.toString()
+                mc.metadata?.thumbnail.orEmpty().firstOrNull()?.url?.toString()
             }
             ?.let { return it }
 

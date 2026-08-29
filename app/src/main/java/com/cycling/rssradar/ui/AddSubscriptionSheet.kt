@@ -297,7 +297,7 @@ private fun ColumnScope.CatalogContent(
             SearchField(
                 value = state.query,
                 onChange = viewModel::onQueryChange,
-                modifier = Modifier.padding(horizontal = 20.dp, bottom = 10.dp),
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 10.dp),
             )
         }
 
@@ -404,7 +404,7 @@ private fun CategoryChips(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, bottom = 8.dp),
+            .padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         categories.forEach { name ->
@@ -430,7 +430,7 @@ private fun ColumnScope.ParamsContent(
             .weight(1f)
             .fillMaxWidth()
             .imePadding(),
-        contentPadding = PaddingValues(horizontal = 20.dp, bottom = 16.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
