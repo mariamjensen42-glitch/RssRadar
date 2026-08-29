@@ -249,10 +249,16 @@ private fun ArticleWebView(html: String, modifier: Modifier = Modifier) {
  * 这里再包一层静态 CSS：深色黑底白字 / 浅色白底黑字，图片限宽，链接用主题紫。
  */
 private fun buildStyledContentHtml(contentHtml: String, darkTheme: Boolean): String {
-    val (bg, fg, muted, codeBg, border, link) = if (darkTheme) {
-        "#000000" to "#FFFFFF" to "#B0B0B6" to "#1C1C1E" to "#3A3A3C" to "#9B9CFF"
+    val bg: String
+    val fg: String
+    val muted: String
+    val codeBg: String
+    val border: String
+    val link: String
+    if (darkTheme) {
+        bg = "#000000"; fg = "#FFFFFF"; muted = "#B0B0B6"; codeBg = "#1C1C1E"; border = "#3A3A3C"; link = "#9B9CFF"
     } else {
-        "#FFFFFF" to "#1A1A1E" to "#55555C" to "#F0F0F4" to "#D9D9E0" to "#5B5BD6"
+        bg = "#FFFFFF"; fg = "#1A1A1E"; muted = "#55555C"; codeBg = "#F0F0F4"; border = "#D9D9E0"; link = "#5B5BD6"
     }
     return """
     <!DOCTYPE html>

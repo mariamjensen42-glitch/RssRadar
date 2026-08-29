@@ -111,7 +111,7 @@ class RssParser {
     private fun sanitizePublishedAt(ts: Long?): Long? =
         ts?.takeIf { it <= System.currentTimeMillis() + ONE_DAY_MS }
 
-    /** 封面三级取：enclosure（image/*）→ media:thumbnail → 正文首个 img。 */
+    /** 封面三级取：enclosure（image 类型）→ media:thumbnail → 正文首个 img。 */
     private fun extractCover(entry: SyndEntry, contentHtml: String?): String? {
         entry.enclosures.orEmpty().firstOrNull { it.url != null && it.type.orEmpty().startsWith("image") }
             ?.let { return it.url }
