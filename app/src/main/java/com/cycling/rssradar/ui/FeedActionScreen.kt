@@ -99,7 +99,7 @@ fun FeedActionScreen(
                                 Surface(
                                     shape = RoundedCornerShape(50),
                                     color = if (selected) Accent else Surface2,
-                                    modifier = Modifier.clickable { viewModel.moveFeed(f.id, group); onDismiss() },
+                                    modifier = Modifier.clickable { viewModel.onIntent(SubscriptionsIntent.MoveFeed(f.id, group)); onDismiss() },
                                 ) {
                                     Text(
                                         text = group,
@@ -135,7 +135,7 @@ fun FeedActionScreen(
                     color = Surface2,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { viewModel.deleteFeed(f.id, f.title); onDismiss() },
+                        .clickable { viewModel.onIntent(SubscriptionsIntent.DeleteFeed(f.id, f.title)); onDismiss() },
                 ) {
                     Row(
                         Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -175,7 +175,7 @@ fun FeedActionScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { viewModel.renameFeed(feedId, value); renameTarget = null; onDismiss() }) {
+                TextButton(onClick = { viewModel.onIntent(SubscriptionsIntent.RenameFeed(feedId, value)); renameTarget = null; onDismiss() }) {
                     Text("保存", color = Accent, fontWeight = FontWeight.SemiBold)
                 }
             },

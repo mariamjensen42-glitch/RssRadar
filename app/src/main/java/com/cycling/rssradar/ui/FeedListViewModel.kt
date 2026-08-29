@@ -9,6 +9,7 @@ import com.cycling.rssradar.data.AddFeedResult
 import com.cycling.rssradar.data.ArticleWithFeed
 import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.GroupStore
+import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -22,11 +23,23 @@ import kotlinx.coroutines.launch
 /** 信息流页内的 4 个过滤 tab。 */
 enum class FeedTab { All, Unread, Starred, Bookmarked }
 
+/** 信息流事件（候选 A，ADR-0003）。 */
+sealed interface FeedListIntent {
+    data object ConsumeMessage : FeedListIntent
+    data class SelectTab(val tab: FeedTab) : FeedListIntent
+    data class SelectGroup(val group: String?) : FeedListIntent
+    data class ToggleStarred(val articleId: Long) : FeedListIntent
+    data class MarkRead(val articleId: Long) : FeedListIntent
+    data object Refresh : FeedListIntent
+    data object LoadMore : FeedListIntent
+    data class AddFeed(val rawUrl: String, val groupName: String) : FeedListIntent
+}
+
 @HiltViewModel
 class FeedListViewModel @Inject constructor(
     private val repository: FeedRepository,
     groupStore: GroupStore,
-) : ViewModel() {
+) : ViewModel(), MviViewModel<FeedListIntent> {
 
     private val _selectedTab = MutableStateFlow(FeedTab.All)
     val selectedTab: StateFlow<FeedTab> = _selectedTab.asStateFlow()
@@ -80,34 +93,49 @@ class FeedListViewModel @Inject constructor(
         viewModelScope.launch { loadFirstPage() }
     }
 
-    fun onMessageShown() {
-        uiMessage = null
+    override fun onIntent(intent: FeedListIntent) {
+        when (intent) {
+            FeedListIntent.ConsumeMessage -> uiMessage = null
+            is FeedListIntent.SelectTab -> selectTab(intent.tab)
+            is FeedListIntent.SelectGroup -> selectGroup(intent.group)
+            is FeedListIntent.ToggleStarred -> toggleStarred(intent.articleId)
+            is FeedListIntent.MarkRead -> markRead(intent.articleId)
+            FeedListIntent.Refresh -> refresh()
+            FeedListIntent.LoadMore -> loadMore()
+            is FeedListIntent.AddFeed -> addFeed(intent.rawUrl, intent.groupName)
+        }
     }
 
-    fun selectTab(tab: FeedTab) {
+    private fun selectTab(tab: FeedTab) {
         _selectedTab.value = tab
     }
 
-    fun selectGroup(group: String?) {
+    private fun selectGroup(group: String?) {
         _selectedGroup.value = group
     }
 
-    /** 按当前分组筛选后的列表（null = 全部，直接透传）。 */
+    /** 按当前分组筛选后的列表（null = 全部，直接透传）。保持 fun：纯投影，非事件。 */
     fun filterByGroup(articles: List<ArticleWithFeed>): List<ArticleWithFeed> {
         val group = _selectedGroup.value ?: return articles
         return articles.filter { it.feedGroup == group }
     }
 
-    fun toggleStarred(articleId: Long, current: Boolean) {
+    private fun toggleStarred(articleId: Long) {
+        val current = starredOf(articleId)
         viewModelScope.launch { repository.setStarred(articleId, !current) }
     }
 
-    fun markRead(articleId: Long) {
+    /** 从自身缓存列表读当前收藏态再翻转（MVI：状态由 VM 持有，不靠 UI 回传 current）。 */
+    private fun starredOf(articleId: Long): Boolean =
+        (_allArticles.value + unreadArticles.value + starredArticles.value + bookmarkedArticles.value)
+            .firstOrNull { it.article.id == articleId }?.article?.isStarred ?: false
+
+    private fun markRead(articleId: Long) {
         viewModelScope.launch { repository.markRead(articleId) }
     }
 
     /** 下拉刷新：全源抓取 + 重载第一页。失败保留现有数据并提示。 */
-    fun refresh() {
+    private fun refresh() {
         if (isRefreshing) return
         viewModelScope.launch {
             isRefreshing = true
@@ -124,7 +152,7 @@ class FeedListViewModel @Inject constructor(
     }
 
     /** 滚动到列表尾部时调用：拉下一页追加。 */
-    fun loadMore() {
+    private fun loadMore() {
         if (isLoadingMore || !hasMore) return
         if (loadMoreJob?.isActive == true) return
         loadMoreJob = viewModelScope.launch {
@@ -143,7 +171,7 @@ class FeedListViewModel @Inject constructor(
         hasMore = page.size == PAGE_SIZE
     }
 
-    fun addFeed(rawUrl: String, groupName: String) {
+    private fun addFeed(rawUrl: String, groupName: String) {
         if (isAddingFeed) return
         viewModelScope.launch {
             isAddingFeed = true

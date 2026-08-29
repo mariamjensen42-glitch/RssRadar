@@ -12,6 +12,7 @@ import com.cycling.rssradar.data.GROUP_DESIGN
 import com.cycling.rssradar.data.GROUP_DEV
 import com.cycling.rssradar.data.GROUP_TECH
 import com.cycling.rssradar.data.GroupStore
+import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,11 +30,25 @@ data class FeedWithUnread(val feed: FeedEntity, val unreadCount: Int)
 /** 一个分组下的所有订阅。 */
 data class GroupSectionUi(val group: String, val feeds: List<FeedWithUnread>)
 
+/** 订阅页事件（候选 A，ADR-0003）。 */
+sealed interface SubscriptionsIntent {
+    data class ToggleGroup(val group: String) : SubscriptionsIntent
+    data object MarkAllRead : SubscriptionsIntent
+    data object ToggleSort : SubscriptionsIntent
+    data object ConsumeMessage : SubscriptionsIntent
+    data class CreateGroup(val name: String) : SubscriptionsIntent
+    data class RenameGroup(val oldName: String, val newName: String) : SubscriptionsIntent
+    data class DeleteGroup(val name: String) : SubscriptionsIntent
+    data class MoveFeed(val feedId: Long, val targetGroup: String) : SubscriptionsIntent
+    data class RenameFeed(val feedId: Long, val title: String) : SubscriptionsIntent
+    data class DeleteFeed(val feedId: Long, val feedTitle: String) : SubscriptionsIntent
+}
+
 @HiltViewModel
 class SubscriptionsViewModel @Inject constructor(
     private val repository: FeedRepository,
     private val groupStore: GroupStore,
-) : ViewModel() {
+) : ViewModel(), MviViewModel<SubscriptionsIntent> {
 
     private val _expandedIds = MutableStateFlow(setOf(GROUP_TECH, GROUP_DEV, GROUP_DESIGN))
     val expandedGroupIds: StateFlow<Set<String>> = _expandedIds.asStateFlow()
@@ -53,7 +68,7 @@ class SubscriptionsViewModel @Inject constructor(
     val totalUnread: StateFlow<Int> = repository.observeUnreadCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
-    /** 按 id 取单条订阅（#31 FeedAction 目的地解析 feed 用）。 */
+    /** 按 id 取单条订阅（#31 FeedAction 目的地解析 feed 用）。保持 fun：状态 producer，非事件。 */
     fun getFeed(feedId: Long): StateFlow<FeedEntity?> =
         repository.observeFeeds()
             .map { list -> list.find { it.id == feedId } }
@@ -62,38 +77,49 @@ class SubscriptionsViewModel @Inject constructor(
     var uiMessage by mutableStateOf<String?>(null)
         private set
 
-    fun toggleGroup(group: String) {
+    override fun onIntent(intent: SubscriptionsIntent) {
+        when (intent) {
+            is SubscriptionsIntent.ToggleGroup -> toggleGroup(intent.group)
+            SubscriptionsIntent.MarkAllRead -> markAllRead()
+            SubscriptionsIntent.ToggleSort -> toggleSort()
+            SubscriptionsIntent.ConsumeMessage -> uiMessage = null
+            is SubscriptionsIntent.CreateGroup -> createGroup(intent.name)
+            is SubscriptionsIntent.RenameGroup -> renameGroup(intent.oldName, intent.newName)
+            is SubscriptionsIntent.DeleteGroup -> deleteGroup(intent.name)
+            is SubscriptionsIntent.MoveFeed -> moveFeed(intent.feedId, intent.targetGroup)
+            is SubscriptionsIntent.RenameFeed -> renameFeed(intent.feedId, intent.title)
+            is SubscriptionsIntent.DeleteFeed -> deleteFeed(intent.feedId, intent.feedTitle)
+        }
+    }
+
+    private fun toggleGroup(group: String) {
         _expandedIds.value = _expandedIds.value.toMutableSet().also { set ->
             if (!set.add(group)) set.remove(group)
         }
     }
 
-    fun markAllRead() {
+    private fun markAllRead() {
         viewModelScope.launch {
             repository.markAllRead()
             uiMessage = "已全部标记为已读"
         }
     }
 
-    fun toggleSort() {
+    private fun toggleSort() {
         uiMessage = "排序方式已切换"
-    }
-
-    fun onMessageShown() {
-        uiMessage = null
     }
 
     // —— 分组 CRUD ——
 
     /** 新建分组：仅注册表加名；已有同名返回 false。 */
-    fun createGroup(name: String) {
+    private fun createGroup(name: String) {
         val ok = groupStore.addGroup(name)
         refreshGroups()
         uiMessage = if (ok) "已创建分组「${name.trim()}」" else "分组已存在或名称为空"
     }
 
     /** 重命名分组：注册表改名 + feeds.groupName 批量改。 */
-    fun renameGroup(oldName: String, newName: String) {
+    private fun renameGroup(oldName: String, newName: String) {
         val ok = groupStore.renameGroup(oldName, newName)
         refreshGroups()
         if (!ok) {
@@ -107,7 +133,7 @@ class SubscriptionsViewModel @Inject constructor(
     }
 
     /** 删除分组：注册表删名 + 该组 feed 移回默认组。 */
-    fun deleteGroup(name: String) {
+    private fun deleteGroup(name: String) {
         if (name == DEFAULT_GROUP) {
             uiMessage = "默认分组不可删除"
             return
@@ -121,7 +147,7 @@ class SubscriptionsViewModel @Inject constructor(
     }
 
     /** 移动订阅源到分组。 */
-    fun moveFeed(feedId: Long, targetGroup: String) {
+    private fun moveFeed(feedId: Long, targetGroup: String) {
         viewModelScope.launch {
             repository.moveFeed(feedId, targetGroup)
             uiMessage = "已移动订阅"
@@ -129,7 +155,7 @@ class SubscriptionsViewModel @Inject constructor(
     }
 
     /** 重命名订阅源标题。 */
-    fun renameFeed(feedId: Long, title: String) {
+    private fun renameFeed(feedId: Long, title: String) {
         if (title.isBlank()) {
             uiMessage = "标题不能为空"
             return
@@ -141,7 +167,7 @@ class SubscriptionsViewModel @Inject constructor(
     }
 
     /** 删除订阅源（文章级联删除）。 */
-    fun deleteFeed(feedId: Long, feedTitle: String) {
+    private fun deleteFeed(feedId: Long, feedTitle: String) {
         viewModelScope.launch {
             repository.deleteFeed(feedId)
             uiMessage = "已删除「$feedTitle」"

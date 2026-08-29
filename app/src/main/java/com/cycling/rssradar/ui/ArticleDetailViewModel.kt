@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.data.ArticleEntity
 import com.cycling.rssradar.data.ArticleWithFeed
 import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,10 +13,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** 文章详情事件（候选 A，ADR-0003）。load 为生命周期，留 init，不进 Intent。 */
+sealed interface ArticleDetailIntent {
+    data object ToggleStarred : ArticleDetailIntent
+    data object ToggleBookmarked : ArticleDetailIntent
+}
+
 @HiltViewModel
 class ArticleDetailViewModel @Inject constructor(
     private val repository: FeedRepository,
-) : ViewModel() {
+) : ViewModel(), MviViewModel<ArticleDetailIntent> {
 
     private val _article = MutableStateFlow<ArticleWithFeed?>(null)
     val article: StateFlow<ArticleWithFeed?> = _article.asStateFlow()
@@ -24,6 +31,7 @@ class ArticleDetailViewModel @Inject constructor(
     private val _isFetchingContent = MutableStateFlow(false)
     val isFetchingContent: StateFlow<Boolean> = _isFetchingContent.asStateFlow()
 
+    /** init 由调用方在拿到 articleId 后触发（从 nav args / savedStateHandle 读）。 */
     fun load(articleId: Long) {
         viewModelScope.launch {
             _article.value = repository.getArticle(articleId)
@@ -47,7 +55,14 @@ class ArticleDetailViewModel @Inject constructor(
         _article.value = repository.getArticle(articleId)
     }
 
-    fun toggleStarred() {
+    override fun onIntent(intent: ArticleDetailIntent) {
+        when (intent) {
+            ArticleDetailIntent.ToggleStarred -> toggleStarred()
+            ArticleDetailIntent.ToggleBookmarked -> toggleBookmarked()
+        }
+    }
+
+    private fun toggleStarred() {
         val current = _article.value?.article ?: return
         viewModelScope.launch {
             repository.setStarred(current.id, !current.isStarred)
@@ -57,7 +72,7 @@ class ArticleDetailViewModel @Inject constructor(
         }
     }
 
-    fun toggleBookmarked() {
+    private fun toggleBookmarked() {
         val current = _article.value?.article ?: return
         viewModelScope.launch {
             repository.setBookmarked(current.id, !current.isBookmarked)

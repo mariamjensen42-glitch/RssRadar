@@ -100,7 +100,7 @@ fun AddSubscriptionSheet(
     LaunchedEffect(message) {
         message?.let {
             snackbarHostState.showSnackbar(it)
-            viewModel.onMessageShown()
+            viewModel.onIntent(AddSubscriptionIntent.ConsumeMessage)
         }
     }
 
@@ -132,7 +132,7 @@ fun AddSubscriptionSheet(
                             // 理论上不可达：step 与 selectedRouteId 由同一处写入
                             SheetHeader(title = "添加订阅", subtitle = null, onClose = onDismiss)
                         } else {
-                            ParamsHeader(route = route, onBack = viewModel::onBackToCatalog)
+                            ParamsHeader(route = route, onBack = { viewModel.onIntent(AddSubscriptionIntent.BackToCatalog) })
                             ParamsContent(
                                 state = state,
                                 route = route,
@@ -252,7 +252,7 @@ private fun ColumnScope.CatalogContent(
                 Spacer(Modifier.height(8.dp))
                 UrlField(
                     value = state.url,
-                    onChange = viewModel::onUrlChange,
+                    onChange = { viewModel.onIntent(AddSubscriptionIntent.UrlChange(it)) },
                     isLoading = state.isValidating,
                 )
                 ValidationBanner(info = state.validation)
@@ -261,14 +261,14 @@ private fun ColumnScope.CatalogContent(
                     GroupChips(
                         options = viewModel.groupOptions,
                         selected = state.selectedGroup,
-                        onSelect = viewModel::onGroupSelected,
+                        onSelect = { viewModel.onIntent(AddSubscriptionIntent.GroupSelected(it)) },
                     )
                     Spacer(Modifier.height(12.dp))
                     PrimaryButton(
                         text = "添加订阅",
                         enabled = state.canSubmit,
                         loading = state.isAdding,
-                        onClick = viewModel::submit,
+                        onClick = { viewModel.onIntent(AddSubscriptionIntent.Submit) },
                     )
                 }
             }
@@ -296,7 +296,7 @@ private fun ColumnScope.CatalogContent(
         item {
             SearchField(
                 value = state.query,
-                onChange = viewModel::onQueryChange,
+                onChange = { viewModel.onIntent(AddSubscriptionIntent.QueryChange(it)) },
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 10.dp),
             )
         }
@@ -305,12 +305,12 @@ private fun ColumnScope.CatalogContent(
                     CategoryChips(
                         categories = RssHubRoutes.categories,
                 selected = state.category,
-                onSelect = viewModel::onCategoryChange,
+                onSelect = { viewModel.onIntent(AddSubscriptionIntent.CategoryChange(it)) },
             )
         }
 
         items(state.visibleRoutes, key = { it.id }) { route ->
-            RouteRow(route = route, onClick = { viewModel.onRouteSelected(route) })
+            RouteRow(route = route, onClick = { viewModel.onIntent(AddSubscriptionIntent.RouteSelected(route)) })
         }
 
         if (state.visibleRoutes.isEmpty()) {
@@ -450,14 +450,14 @@ private fun ColumnScope.ParamsContent(
                 ParamField(
                     param = param,
                     value = state.paramValues[param.key].orEmpty(),
-                    onChange = { viewModel.onParamChange(param.key, it) },
+                    onChange = { viewModel.onIntent(AddSubscriptionIntent.ParamChange(param.key, it)) },
                 )
             }
         }
 
         item {
             Button(
-                onClick = viewModel::onPreviewRoute,
+                onClick = { viewModel.onIntent(AddSubscriptionIntent.PreviewRoute) },
                 enabled = state.canPreview,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -494,14 +494,14 @@ private fun ColumnScope.ParamsContent(
                     GroupChips(
                         options = viewModel.groupOptions,
                         selected = state.selectedGroup,
-                        onSelect = viewModel::onGroupSelected,
+                        onSelect = { viewModel.onIntent(AddSubscriptionIntent.GroupSelected(it)) },
                     )
                     Spacer(Modifier.height(12.dp))
                     PrimaryButton(
                         text = "订阅",
                         enabled = state.canSubmit,
                         loading = state.isAdding,
-                        onClick = viewModel::submit,
+                        onClick = { viewModel.onIntent(AddSubscriptionIntent.Submit) },
                     )
                 }
             }
