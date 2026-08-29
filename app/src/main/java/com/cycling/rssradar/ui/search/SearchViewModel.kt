@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-import com.cycling.rssradar.ui.subscriptions.String
 
 data class SearchUiState(
     val query: String = "",

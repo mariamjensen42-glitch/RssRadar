@@ -1,8 +1,11 @@
+package com.cycling.rssradar.data.rsshub
+
 import com.cycling.rssradar.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.data.db.GROUP_DEV
 import com.cycling.rssradar.data.db.GROUP_TECH
-import com.cycling.rssradar.ui.subscriptions.String
-package com.cycling.rssradar.data.rsshub
+import java.net.URLEncoder
+
+
 
 /**
  * RSSHub 路由目录。
@@ -208,5 +211,5 @@ object RssHubRoutes {
 
     /** 只编码参数值，path 的 `/` 结构必须原样保留。 */
     private fun encodePathSegment(value: String): String =
-        java.net.URLEncoder.encode(value, Charsets.UTF_8.name()).replace("+", "%20")
+        URLEncoder.encode(value, Charsets.UTF_8.name()).replace("+", "%20")
 }

@@ -52,7 +52,6 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.X
 
-import com.cycling.rssradar.ui.subscriptions.String
 
 @Composable
 fun SearchScreen(

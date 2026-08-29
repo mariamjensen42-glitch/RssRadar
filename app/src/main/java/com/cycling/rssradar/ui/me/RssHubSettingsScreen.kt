@@ -57,7 +57,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-import com.cycling.rssradar.ui.subscriptions.String
 
 data class RssHubSettingsUiState(
     /** 当前生效的实例。 */

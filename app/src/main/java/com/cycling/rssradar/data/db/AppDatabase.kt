@@ -16,7 +16,6 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
-import com.cycling.rssradar.ui.subscriptions.String
 
 /** 默认分组名。 */
 const val DEFAULT_GROUP = "默认"

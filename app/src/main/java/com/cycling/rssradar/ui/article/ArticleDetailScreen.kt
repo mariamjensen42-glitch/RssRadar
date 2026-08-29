@@ -63,7 +63,6 @@ import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Star
 
-import com.cycling.rssradar.ui.subscriptions.String
 
 @Composable
 fun ArticleDetailScreen(

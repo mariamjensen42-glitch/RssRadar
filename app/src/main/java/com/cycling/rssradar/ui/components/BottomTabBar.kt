@@ -38,7 +38,6 @@ import com.composables.icons.lucide.Rss
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.User
 
-import com.cycling.rssradar.ui.subscriptions.String
 
 /** 底部 TabBar 的 4 个主屏条目，与 Nav 路由一一对应（key 用于选中态判定）。 */
 private data class TabDef(val key: String, val title: String, val icon: ImageVector)

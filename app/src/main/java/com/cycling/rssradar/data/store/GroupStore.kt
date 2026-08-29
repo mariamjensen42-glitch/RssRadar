@@ -6,8 +6,6 @@ import com.cycling.rssradar.data.db.GROUP_TECH
 import com.cycling.rssradar.data.db.GROUP_DEV
 import com.cycling.rssradar.data.db.GROUP_DESIGN
 
-import com.cycling.rssradar.Context
-import com.cycling.rssradar.ui.subscriptions.String
 
 /**
  * 分组注册表：分组名清单（SharedPreferences）。
