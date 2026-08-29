@@ -27,6 +27,17 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- 外部直达：rssradar://article/{id} → NavHost 解析落到 ArticleDetailRoute（issue #32） -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="article"
+                    android:scheme="rssradar" />
+            </intent-filter>
         </activity>
     </application>
 
