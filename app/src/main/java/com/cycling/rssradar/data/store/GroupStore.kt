@@ -1,10 +1,13 @@
-package com.cycling.rssradar.data
+package com.cycling.rssradar.data.store
 
 import android.content.Context
-import com.cycling.rssradar.data.DEFAULT_GROUP
-import com.cycling.rssradar.data.GROUP_TECH
-import com.cycling.rssradar.data.GROUP_DEV
-import com.cycling.rssradar.data.GROUP_DESIGN
+import com.cycling.rssradar.data.db.DEFAULT_GROUP
+import com.cycling.rssradar.data.db.GROUP_TECH
+import com.cycling.rssradar.data.db.GROUP_DEV
+import com.cycling.rssradar.data.db.GROUP_DESIGN
+
+import com.cycling.rssradar.Context
+import com.cycling.rssradar.ui.subscriptions.String
 
 /**
  * 分组注册表：分组名清单（SharedPreferences）。

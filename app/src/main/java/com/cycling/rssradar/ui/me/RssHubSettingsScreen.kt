@@ -1,4 +1,4 @@
-package com.cycling.rssradar.ui
+package com.cycling.rssradar.ui.me
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,9 +35,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.data.RssHubInstanceStore
-import com.cycling.rssradar.data.ThemeMode
-import com.cycling.rssradar.data.ThemeStore
+import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
+import com.cycling.rssradar.data.store.ThemeMode
+import com.cycling.rssradar.data.store.ThemeStore
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.OnAccent
@@ -56,6 +56,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+
+import com.cycling.rssradar.ui.subscriptions.String
 
 data class RssHubSettingsUiState(
     /** 当前生效的实例。 */

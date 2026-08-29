@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.sp
 import com.cycling.rssradar.ui.theme.Surface3
 import com.cycling.rssradar.ui.theme.TextTertiary
 
+import com.cycling.rssradar.ui.subscriptions.String
+
 /**
  * 订阅源 / 站点的彩色占位图标：用 title 的稳定 hash 在 12 色调色板中取色，
  * 居中显示首个字符。

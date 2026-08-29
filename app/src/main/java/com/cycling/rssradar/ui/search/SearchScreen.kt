@@ -1,4 +1,4 @@
-package com.cycling.rssradar.ui
+package com.cycling.rssradar.ui.search
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
@@ -38,7 +38,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.data.ArticleWithFeed
+import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
@@ -51,6 +51,8 @@ import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.X
+
+import com.cycling.rssradar.ui.subscriptions.String
 
 @Composable
 fun SearchScreen(

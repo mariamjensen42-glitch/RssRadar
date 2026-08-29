@@ -1,4 +1,4 @@
-package com.cycling.rssradar.ui
+package com.cycling.rssradar.ui.subscriptions
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,7 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.data.DEFAULT_GROUP
+import com.cycling.rssradar.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.OnAccent
 import com.cycling.rssradar.ui.theme.Surface1
@@ -44,6 +44,7 @@ import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Trash2
+
 
 /**
  * 订阅源操作（重命名 / 移动分组 / 删除）的 Nav 目的地内容。

@@ -1,17 +1,17 @@
-package com.cycling.rssradar.ui
+package com.cycling.rssradar.ui.subscriptions
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.data.DEFAULT_GROUP
-import com.cycling.rssradar.data.FeedEntity
+import com.cycling.rssradar.data.db.DEFAULT_GROUP
+import com.cycling.rssradar.data.db.FeedEntity
 import com.cycling.rssradar.data.FeedRepository
-import com.cycling.rssradar.data.GROUP_DESIGN
-import com.cycling.rssradar.data.GROUP_DEV
-import com.cycling.rssradar.data.GROUP_TECH
-import com.cycling.rssradar.data.GroupStore
+import com.cycling.rssradar.data.db.GROUP_DESIGN
+import com.cycling.rssradar.data.db.GROUP_DEV
+import com.cycling.rssradar.data.db.GROUP_TECH
+import com.cycling.rssradar.data.store.GroupStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
 
 /** 订阅 + 未读数，UI 直接消费。 */
 data class FeedWithUnread(val feed: FeedEntity, val unreadCount: Int)

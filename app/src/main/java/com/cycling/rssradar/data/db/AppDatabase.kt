@@ -1,4 +1,4 @@
-package com.cycling.rssradar.data
+package com.cycling.rssradar.data.db
 
 import androidx.room.ColumnInfo
 import androidx.room.Dao
@@ -15,6 +15,8 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
+
+import com.cycling.rssradar.ui.subscriptions.String
 
 /** 默认分组名。 */
 const val DEFAULT_GROUP = "默认"

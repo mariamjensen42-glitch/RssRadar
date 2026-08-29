@@ -1,4 +1,4 @@
-package com.cycling.rssradar.data
+package com.cycling.rssradar.data.parser
 
 import kotlinx.coroutines.withContext
 import net.dankito.readability4j.Readability4J
@@ -8,6 +8,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 import kotlin.text.Charsets
+
+import com.cycling.rssradar.ui.subscriptions.String
 
 /** 抓取结果。 */
 data class FetchedContent(
