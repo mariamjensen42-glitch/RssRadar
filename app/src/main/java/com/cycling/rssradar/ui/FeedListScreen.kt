@@ -44,12 +44,14 @@ import com.cycling.rssradar.data.ArticleWithFeed
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
+import com.cycling.rssradar.ui.theme.OnAccent
 import com.cycling.rssradar.ui.theme.Surface1
 import com.cycling.rssradar.ui.theme.TextPrimary
 import com.cycling.rssradar.ui.theme.TextSecondary
 import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.SlidersHorizontal
 
@@ -58,6 +60,7 @@ fun FeedListScreen(
     viewModel: FeedListViewModel,
     onOpenSearch: () -> Unit = {},
     onOpenArticle: (ArticleWithFeed) -> Unit = {},
+    onAddSubscription: () -> Unit = {},
 ) {
     val selectedTab by viewModel.selectedTab.collectAsState()
     val allArticles by viewModel.allArticles.collectAsState()
@@ -85,6 +88,13 @@ fun FeedListScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             FeedListTopBar(onOpenSearch = onOpenSearch)
+        },
+        // 加源是低频动作，收进 FAB，不占主屏。抬高是为了让开底部胶囊 TabBar。
+        floatingActionButton = {
+            AddSubscriptionFab(
+                onClick = onAddSubscription,
+                modifier = Modifier.padding(bottom = FAB_BOTTOM_OFFSET),
+            )
         },
     ) { padding ->
         Column(
@@ -142,6 +152,31 @@ private fun FeedListTopBar(onOpenSearch: () -> Unit) {
         }
         IconButton(onClick = { /* TODO: 打开筛选/排序 */ }) {
             Icon(Lucide.SlidersHorizontal, contentDescription = "排序", tint = TextPrimary)
+        }
+    }
+}
+
+/** 让开底部胶囊 TabBar 的抬升量：TabBar 高约 56 + 外边距 12 + 间距 20。 */
+private val FAB_BOTTOM_OFFSET = 88.dp
+
+@Composable
+private fun AddSubscriptionFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = Accent,
+        tonalElevation = 0.dp,
+        shadowElevation = 8.dp,
+        modifier = modifier
+            .size(56.dp)
+            .clickable(onClick = onClick),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Lucide.Plus,
+                contentDescription = "添加订阅",
+                tint = OnAccent,
+                modifier = Modifier.size(26.dp),
+            )
         }
     }
 }
