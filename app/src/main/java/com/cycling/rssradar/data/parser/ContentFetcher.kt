@@ -9,7 +9,6 @@ import java.net.URL
 import java.security.MessageDigest
 import kotlin.text.Charsets
 
-import com.cycling.rssradar.ui.subscriptions.String
 
 /** 抓取结果。 */
 data class FetchedContent(

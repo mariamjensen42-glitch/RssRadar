@@ -65,8 +65,6 @@ import com.cycling.rssradar.ui.theme.RssRadarTheme
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 
-import com.cycling.rssradar.ui.subscriptions.String
-
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 

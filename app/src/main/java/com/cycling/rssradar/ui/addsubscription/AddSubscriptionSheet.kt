@@ -76,8 +76,6 @@ import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.X
 import com.composables.icons.lucide.Zap
 
-import com.cycling.rssradar.ui.subscriptions.String
-
 /** RSSHub 品牌橙，只用在「这是 RSSHub 能力」的标识上，与紫色主色区分开。 */
 private val RssHubOrange = Color(0xFFFF6B00)
 

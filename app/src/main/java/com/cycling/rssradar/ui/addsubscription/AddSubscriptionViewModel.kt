@@ -26,9 +26,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-import com.cycling.rssradar.ui.subscriptions.String
-import com.cycling.rssradar.ui.theme.Success
-
 /** 链接校验结果。 */
 sealed interface ValidationInfo {
     val message: String

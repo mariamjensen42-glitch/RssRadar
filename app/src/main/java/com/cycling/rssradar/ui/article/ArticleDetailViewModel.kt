@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-import com.cycling.rssradar.ui.subscriptions.String
 
 /** 文章详情事件（候选 A，ADR-0003）。load 为生命周期，留 init，不进 Intent。 */
 sealed interface ArticleDetailIntent {

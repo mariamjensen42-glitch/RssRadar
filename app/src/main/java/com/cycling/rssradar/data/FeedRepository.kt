@@ -17,7 +17,6 @@ import com.cycling.rssradar.data.db.FeedEntity
 import com.cycling.rssradar.data.parser.ContentFetcher
 import com.cycling.rssradar.data.parser.FeedProbeResult
 import com.cycling.rssradar.data.parser.RssParser
-import com.cycling.rssradar.ui.subscriptions.String
 import com.cycling.rssradar.ui.theme.Success
 /** 订阅结果，供 UI 层区分提示文案。 */
 sealed interface AddFeedResult {
