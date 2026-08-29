@@ -27,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
-import androidx.navigation.popUpTo
 import androidx.navigation.compose.NavHost
 import androidx.navigation.toRoute
 import androidx.navigation.compose.composable
@@ -70,7 +69,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             RssRadarThemeHost {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    RssRadarApp()
+                    RssRadarAppContent()
                 }
             }
         }
@@ -108,7 +107,7 @@ val LocalDarkTheme = staticCompositionLocalOf { true }
 
 @SuppressLint("RestrictedApi")
 @Composable
-private fun RssRadarApp() {
+private fun RssRadarAppContent() {
     val navController = rememberNavController()
     val context = LocalContext.current
 

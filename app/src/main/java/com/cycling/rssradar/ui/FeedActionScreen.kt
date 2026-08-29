@@ -97,7 +97,7 @@ fun FeedActionScreen(
                             row.forEach { group ->
                                 val selected = group == f.groupName.ifBlank { DEFAULT_GROUP }
                                 Surface(
-                                    shape = androidx.compose.foundation.layout.RoundedCornerShape(50),
+                                    shape = RoundedCornerShape(50),
                                     color = if (selected) Accent else Surface2,
                                     modifier = Modifier.clickable { viewModel.moveFeed(f.id, group); onDismiss() },
                                 ) {
@@ -114,7 +114,7 @@ fun FeedActionScreen(
                 }
                 Spacer(Modifier.height(16.dp))
                 Surface(
-                    shape = androidx.compose.foundation.layout.RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(12.dp),
                     color = Surface2,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -131,7 +131,7 @@ fun FeedActionScreen(
                 }
                 Spacer(Modifier.height(8.dp))
                 Surface(
-                    shape = androidx.compose.foundation.layout.RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(12.dp),
                     color = Surface2,
                     modifier = Modifier
                         .fillMaxWidth()
