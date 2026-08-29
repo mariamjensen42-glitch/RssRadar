@@ -11,6 +11,7 @@ composeBom = "2026.02.01"
 ksp = "2.2.10-2.0.2"
 room = "2.8.4"
 rome = "2.1.0"
+jsoup = "1.18.3"
 composablesIcons = "2.2.1"
 
 [libraries]
@@ -33,6 +34,8 @@ androidx-room-runtime = { group = "androidx.room", name = "room-runtime", versio
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 rome = { group = "com.rometools", name = "rome", version.ref = "rome" }
+rome-modules = { group = "com.rometools", name = "rome-modules", version.ref = "rome" }
+jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 compose-icons-lucide = { group = "com.composables", name = "icons-lucide-cmp", version.ref = "composablesIcons" }
 
 [plugins]

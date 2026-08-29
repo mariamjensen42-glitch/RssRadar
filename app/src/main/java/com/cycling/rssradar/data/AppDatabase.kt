@@ -54,9 +54,18 @@ data class ArticleEntity(
     val feedId: Long,
     val link: String,
     val title: String,
+    /** 短摘要：列表与搜索用。由正文提纯截断而来，不是正文的替代品。 */
     val summary: String?,
     val publishedAt: Long?,
     val fetchedAt: Long,
+    /** 正文 HTML（净化后），来自 feed 自带全文字段；无则说明需按需抓取原网页。 */
+    val content: String? = null,
+    /** 正文纯文本副本，供检索与阅读时长计算。 */
+    val contentText: String? = null,
+    /** 作者，feed 自带，可能为空。 */
+    val author: String? = null,
+    /** 正文来源：0=无 1=feed 自带 2=原网页抓取。 */
+    @ColumnInfo(defaultValue = "0") val contentSource: Int = CONTENT_SOURCE_NONE,
     /** 是否已读。 */
     @ColumnInfo(defaultValue = "0") val isRead: Boolean = false,
     /** 是否收藏（星标）。 */
@@ -67,7 +76,13 @@ data class ArticleEntity(
     val readingMinutes: Int? = null,
     /** 封面图 URL。 */
     val coverUrl: String? = null,
-)
+) {
+    companion object {
+        const val CONTENT_SOURCE_NONE = 0
+        const val CONTENT_SOURCE_FEED = 1
+        const val CONTENT_SOURCE_WEB = 2
+    }
+}
 
 /** 文章 + 所属订阅的扁平视图，方便 UI 直接渲染。 */
 data class ArticleWithFeed(
@@ -90,6 +105,9 @@ interface FeedDao {
 
     @Query("SELECT id FROM feeds WHERE url = :url LIMIT 1")
     suspend fun findIdByUrl(url: String): Long?
+
+    @Query("SELECT * FROM feeds WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): FeedEntity?
 
     @Query("SELECT * FROM feeds ORDER BY groupName ASC, title ASC")
     fun observeAll(): Flow<List<FeedEntity>>
@@ -151,7 +169,8 @@ interface ArticleDao {
         SELECT articles.*, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
-        WHERE (articles.title LIKE :query OR articles.summary LIKE :query OR feeds.title LIKE :query)
+        WHERE (articles.title LIKE :query OR articles.summary LIKE :query
+            OR articles.contentText LIKE :query OR feeds.title LIKE :query)
         ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
         """,
     )
@@ -172,6 +191,53 @@ interface ArticleDao {
         """,
     )
     fun observeUnreadCountByFeed(): Flow<List<FeedUnreadCount>>
+
+    @Query("SELECT id FROM articles WHERE feedId = :feedId AND link = :link LIMIT 1")
+    suspend fun findIdByLink(feedId: Long, link: String): Long?
+
+    /**
+     * 增量刷新：只更新内容状态（标题/时间/摘要/正文），绝不触碰用户状态
+     * （isRead/isStarred/isBookmarked）。见 CONTEXT.md「用户状态」。
+     */
+    @Query(
+        """
+        UPDATE articles SET
+            title = :title, summary = :summary, content = :content, contentText = :contentText,
+            author = :author, publishedAt = :publishedAt, coverUrl = :coverUrl,
+            readingMinutes = :readingMinutes, contentSource = :contentSource, fetchedAt = :fetchedAt
+        WHERE id = :id
+        """,
+    )
+    suspend fun updateContentState(
+        id: Long,
+        title: String,
+        summary: String?,
+        content: String?,
+        contentText: String?,
+        author: String?,
+        publishedAt: Long?,
+        coverUrl: String?,
+        readingMinutes: Int?,
+        contentSource: Int,
+        fetchedAt: Long,
+    )
+
+    /** 抓取原网页正文后回填。同样不触碰用户状态。 */
+    @Query(
+        """
+        UPDATE articles SET
+            content = :content, contentText = :contentText, contentSource = :contentSource,
+            readingMinutes = :readingMinutes
+        WHERE id = :id
+        """,
+    )
+    suspend fun updateFetchedContent(
+        id: Long,
+        content: String?,
+        contentText: String?,
+        contentSource: Int,
+        readingMinutes: Int?,
+    )
 
     @Query("UPDATE articles SET isRead = 1 WHERE id = :id")
     suspend fun markRead(id: Long)
@@ -202,9 +268,22 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
+/**
+ * v2 → v3：文章增加正文列（content/contentText/author/contentSource）。
+ * 依据 ADR-0001：正文与摘要分离，summary 回归"短摘要"语义。
+ */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE articles ADD COLUMN content TEXT")
+        db.execSQL("ALTER TABLE articles ADD COLUMN contentText TEXT")
+        db.execSQL("ALTER TABLE articles ADD COLUMN author TEXT")
+        db.execSQL("ALTER TABLE articles ADD COLUMN contentSource INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 @Database(
     entities = [FeedEntity::class, ArticleEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

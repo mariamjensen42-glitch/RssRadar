@@ -53,6 +53,8 @@ dependencies {
     implementation(libs.compose.icons.lucide)
     ksp(libs.androidx.room.compiler)
     implementation(libs.rome)
+    implementation(libs.rome.modules)
+    implementation(libs.jsoup)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
