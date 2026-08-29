@@ -38,11 +38,11 @@ sealed interface ValidationInfo {
 }
 
 /**
- * 添加订阅抽屉的两个阶段。
+ * 加订阅两步流的两阶段。
  * Catalog = 路由目录（搜索 + 分类 + 列表）；Params = 选中路由后填参数。
+ * 注意：步骤切换由导航承担（嵌套 nav graph，issue #33）——Catalog→Params 是
+ * 目的地跳转（popBackStack 返回），不再走 VM 状态；本 state 只承载两步共享的数据。
  */
-enum class AddSheetStep { Catalog, Params }
-
 data class AddSubscriptionUiState(
     /** 最终要订阅的地址：可能来自手填，也可能由 RSSHub 路由拼出。 */
     val url: String = "",
@@ -50,7 +50,6 @@ data class AddSubscriptionUiState(
     val validation: ValidationInfo = ValidationInfo.Idle,
     val selectedGroup: String = GROUP_TECH,
     val isAdding: Boolean = false,
-    val step: AddSheetStep = AddSheetStep.Catalog,
     val query: String = "",
     val category: String = RouteCategory.ALL,
     val selectedRouteId: String? = null,
@@ -75,9 +74,7 @@ sealed interface AddSubscriptionIntent {
     data class CategoryChange(val category: String) : AddSubscriptionIntent
     data class RouteSelected(val route: RssHubRoute) : AddSubscriptionIntent
     data class ParamChange(val key: String, val value: String) : AddSubscriptionIntent
-    data object BackToCatalog : AddSubscriptionIntent
     data object PreviewRoute : AddSubscriptionIntent
-    data object Reset : AddSubscriptionIntent
     data object Submit : AddSubscriptionIntent
     data object ConsumeMessage : AddSubscriptionIntent
 }
@@ -107,9 +104,7 @@ class AddSubscriptionViewModel @Inject constructor(
             is AddSubscriptionIntent.CategoryChange -> categoryChange(intent.category)
             is AddSubscriptionIntent.RouteSelected -> routeSelected(intent.route)
             is AddSubscriptionIntent.ParamChange -> paramChange(intent.key, intent.value)
-            AddSubscriptionIntent.BackToCatalog -> backToCatalog()
             AddSubscriptionIntent.PreviewRoute -> previewRoute()
-            AddSubscriptionIntent.Reset -> reset()
             AddSubscriptionIntent.Submit -> submit()
             AddSubscriptionIntent.ConsumeMessage -> uiMessage = null
         }
@@ -147,10 +142,9 @@ class AddSubscriptionViewModel @Inject constructor(
         _state.value = _state.value.copy(category = category)
     }
 
-    /** 选中路由 → 进入参数阶段。参数留空，由 placeholder 兜底出示例值。 */
+    /** 选中路由 → 记录所选路由并清空手填痕迹；进入 Params 阶段由导航（目的地跳转）承担。参数留空，由 placeholder 兜底出示例值。 */
     private fun routeSelected(route: RssHubRoute) {
         _state.value = _state.value.copy(
-            step = AddSheetStep.Params,
             selectedRouteId = route.id,
             paramValues = emptyMap(),
             url = "",
@@ -171,25 +165,13 @@ class AddSubscriptionViewModel @Inject constructor(
         )
     }
 
-    /** 从参数阶段退回目录。 */
-    private fun backToCatalog() {
-        validationJob?.cancel()
-        _state.value = _state.value.copy(
-            step = AddSheetStep.Catalog,
-            selectedRouteId = null,
-            paramValues = emptyMap(),
-            url = "",
-            validation = ValidationInfo.Idle,
-        )
-    }
-
     /** 把拼好的地址塞进统一的 url 通道，走与手填完全相同的校验。 */
     private fun previewRoute() {
         val built = _state.value.builtUrl ?: return
         urlChange(built)
     }
 
-    /** 抽屉关闭 / 添加成功后调用，避免下次打开残留上一次的状态。 */
+    /** 订阅成功后清空状态；抽屉关闭（graph 出栈）时整个 VM 销毁，状态天然重置。 */
     private fun reset() {
         validationJob?.cancel()
         _state.value = AddSubscriptionUiState()
