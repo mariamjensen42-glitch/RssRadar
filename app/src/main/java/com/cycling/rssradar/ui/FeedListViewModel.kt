@@ -11,6 +11,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cycling.rssradar.data.AddFeedResult
 import com.cycling.rssradar.data.ArticleWithFeed
 import com.cycling.rssradar.data.FeedRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -26,8 +27,9 @@ class FeedListViewModel(private val repository: FeedRepository) : ViewModel() {
     private val _selectedTab = MutableStateFlow(FeedTab.All)
     val selectedTab: StateFlow<FeedTab> = _selectedTab.asStateFlow()
 
-    val allArticles: StateFlow<List<ArticleWithFeed>> = repository.observeAllArticles()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /** All tab 用分页累积列表（量大，只取已加载部分）；其余 tab 用实时 Flow。 */
+    private val _allArticles = MutableStateFlow<List<ArticleWithFeed>>(emptyList())
+    val allArticles: StateFlow<List<ArticleWithFeed>> = _allArticles.asStateFlow()
 
     val unreadArticles: StateFlow<List<ArticleWithFeed>> = repository.observeUnreadArticles()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -41,12 +43,31 @@ class FeedListViewModel(private val repository: FeedRepository) : ViewModel() {
     val unreadCount: StateFlow<Int> = repository.observeUnreadCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+    /** 是否还有下一页（仅 All tab 分页生效）。 */
+    var hasMore by mutableStateOf(false)
+        private set
+
+    /** 是否正在加载下一页。 */
+    var isLoadingMore by mutableStateOf(false)
+        private set
+
+    /** 下拉刷新进行中。 */
+    var isRefreshing by mutableStateOf(false)
+        private set
+
     var isAddingFeed by mutableStateOf(false)
         private set
 
     /** 一次性提示消息（Snackbar），消费后置空。 */
     var uiMessage by mutableStateOf<String?>(null)
         private set
+
+    private var loadMoreJob: Job? = null
+
+    init {
+        // 首屏拉第一页；空库/异常静默，用户可下拉重试
+        viewModelScope.launch { loadFirstPage() }
+    }
 
     fun onMessageShown() {
         uiMessage = null
@@ -64,6 +85,43 @@ class FeedListViewModel(private val repository: FeedRepository) : ViewModel() {
         viewModelScope.launch { repository.markRead(articleId) }
     }
 
+    /** 下拉刷新：全源抓取 + 重载第一页。失败保留现有数据并提示。 */
+    fun refresh() {
+        if (isRefreshing) return
+        viewModelScope.launch {
+            isRefreshing = true
+            val successCount = repository.refreshAllFeeds()
+            loadFirstPage()
+            isRefreshing = false
+            when {
+                repository.hasFeeds() && successCount == 0 ->
+                    uiMessage = "刷新失败，展示的是上次内容"
+                successCount > 0 ->
+                    uiMessage = "已更新 $successCount 个订阅源"
+            }
+        }
+    }
+
+    /** 滚动到列表尾部时调用：拉下一页追加。 */
+    fun loadMore() {
+        if (isLoadingMore || !hasMore) return
+        if (loadMoreJob?.isActive == true) return
+        loadMoreJob = viewModelScope.launch {
+            isLoadingMore = true
+            val current = _allArticles.value
+            val page = repository.loadArticlesPage(PAGE_SIZE, current.size)
+            _allArticles.value = current + page
+            hasMore = page.size == PAGE_SIZE
+            isLoadingMore = false
+        }
+    }
+
+    private suspend fun loadFirstPage() {
+        val page = repository.loadArticlesPage(PAGE_SIZE, 0)
+        _allArticles.value = page
+        hasMore = page.size == PAGE_SIZE
+    }
+
     fun addFeed(rawUrl: String, groupName: String) {
         if (isAddingFeed) return
         viewModelScope.launch {
@@ -75,10 +133,15 @@ class FeedListViewModel(private val repository: FeedRepository) : ViewModel() {
                 AddFeedResult.NetworkError -> "网络错误，请检查链接后重试"
             }
             isAddingFeed = false
+            // 订阅成功后新源文章可能出现在首屏，重载第一页让列表可见
+            if (repository.hasFeeds()) loadFirstPage()
         }
     }
 
     companion object {
+        /** 信息流分页大小。 */
+        const val PAGE_SIZE = 30
+
         fun factory(container: com.cycling.rssradar.AppContainer): ViewModelProvider.Factory =
             viewModelFactory {
                 initializer { FeedListViewModel(container.repository) }
