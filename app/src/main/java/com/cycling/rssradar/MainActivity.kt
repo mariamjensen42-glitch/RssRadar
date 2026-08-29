@@ -28,13 +28,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
+import androidx.navigation.navigation
 import androidx.navigation.toRoute
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.cycling.rssradar.data.ThemeMode
 import com.cycling.rssradar.di.AppEntryPoint
-import com.cycling.rssradar.ui.AddSubscriptionSheet
+import com.cycling.rssradar.ui.AddSubscriptionCatalogScreen
+import com.cycling.rssradar.ui.AddSubscriptionParamsScreen
 import com.cycling.rssradar.ui.AddSubscriptionViewModel
 import com.cycling.rssradar.ui.ArticleDetailScreen
 import com.cycling.rssradar.ui.ArticleDetailViewModel
@@ -48,6 +50,8 @@ import com.cycling.rssradar.ui.SearchViewModel
 import com.cycling.rssradar.ui.SubscriptionsScreen
 import com.cycling.rssradar.ui.SubscriptionsViewModel
 import com.cycling.rssradar.ui.components.FloatingBottomBar
+import com.cycling.rssradar.ui.navigation.AddSubscriptionCatalogRoute
+import com.cycling.rssradar.ui.navigation.AddSubscriptionParamsRoute
 import com.cycling.rssradar.ui.navigation.AddSubscriptionRoute
 import com.cycling.rssradar.ui.navigation.ArticleDetailRoute
 import com.cycling.rssradar.ui.navigation.FeedActionRoute
@@ -161,11 +165,28 @@ private fun RssRadarAppContent() {
                     onOpenOriginal = { url -> context.openUrl(url) },
                 )
             }
-            composable<AddSubscriptionRoute> {
-                AddSubscriptionSheet(
-                    viewModel = hiltViewModel<AddSubscriptionViewModel>(),
-                    onDismiss = { navController.popBackStack() },
-                )
+            // 加订阅两步流：嵌套 nav graph（issue #33）。graph route 即 AddSubscriptionRoute，
+            // AddSubscriptionViewModel 作用域在 graph 上，两步共享、graph 出栈销毁。
+            navigation<AddSubscriptionRoute>(startDestination = AddSubscriptionCatalogRoute) {
+                composable<AddSubscriptionCatalogRoute> {
+                    // navGraph 作用域共享：跨目的地取同一 VM 实例
+                    val parentEntry = remember { navController.getBackStackEntry<AddSubscriptionRoute>() }
+                    val vm = hiltViewModel<AddSubscriptionViewModel>(parentEntry)
+                    AddSubscriptionCatalogScreen(
+                        viewModel = vm,
+                        onDismiss = { navController.popBackStack() },
+                        onOpenParams = { navController.navigate(AddSubscriptionParamsRoute) },
+                    )
+                }
+                composable<AddSubscriptionParamsRoute> {
+                    val parentEntry = remember { navController.getBackStackEntry<AddSubscriptionRoute>() }
+                    val vm = hiltViewModel<AddSubscriptionViewModel>(parentEntry)
+                    AddSubscriptionParamsScreen(
+                        viewModel = vm,
+                        onDismiss = { navController.popBackStack() },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
             }
             composable<FeedActionRoute> { backStackEntry ->
                 val feedId = backStackEntry.toRoute<FeedActionRoute>().feedId

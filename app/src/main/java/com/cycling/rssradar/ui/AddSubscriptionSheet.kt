@@ -84,15 +84,20 @@ private val RssHubOrange = Color(0xFFFF6B00)
  *
  * 依据：日常动作是读信息流，「加源」是低频动作，不该占掉主屏。
  * 抽屉内部两阶段：Catalog（搜索 / 分类 / 路由列表）→ Params（填参数 → 预览 → 订阅）。
- * 手填普通 RSS 链接也在 Catalog 顶部，与路由构建共用同一条校验 / 订阅链路。
+ * 两阶段由嵌套 nav graph 表达为两个目的地（issue #33）——
+ * [AddSubscriptionCatalogScreen] 与 [AddSubscriptionParamsScreen]，ViewModel 为 navGraph
+ * 作用域共享（MainActivity 装配处 hiltViewModel(parentEntry)）。
+ * 手填普通 RSS 链接在 Catalog 顶部，与路由构建共用同一条校验 / 订阅链路。
  */
+
+/** 共享外壳：ModalBottomSheet + Snackbar 消费。两步目的地共用，保证观感与消息行为一致。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddSubscriptionSheet(
+private fun AddSheetShell(
     viewModel: AddSubscriptionViewModel,
     onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
-    val state by viewModel.state.collectAsState()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val snackbarHostState = remember { SnackbarHostState() }
     val message = viewModel.uiMessage
@@ -113,34 +118,7 @@ fun AddSubscriptionSheet(
     ) {
         Box(modifier = Modifier.fillMaxHeight(0.92f)) {
             Column(modifier = Modifier.fillMaxSize()) {
-                when (state.step) {
-                    AddSheetStep.Catalog -> {
-                        SheetHeader(
-                            title = "添加订阅",
-                            subtitle = "粘贴链接，或从 RSSHub 路由构建",
-                            onClose = onDismiss,
-                        )
-                        CatalogContent(
-                            state = state,
-                            viewModel = viewModel,
-                            onDismiss = onDismiss,
-                        )
-                    }
-                    AddSheetStep.Params -> {
-                        val route = state.selectedRoute
-                        if (route == null) {
-                            // 理论上不可达：step 与 selectedRouteId 由同一处写入
-                            SheetHeader(title = "添加订阅", subtitle = null, onClose = onDismiss)
-                        } else {
-                            ParamsHeader(route = route, onBack = { viewModel.onIntent(AddSubscriptionIntent.BackToCatalog) })
-                            ParamsContent(
-                                state = state,
-                                route = route,
-                                viewModel = viewModel,
-                            )
-                        }
-                    }
-                }
+                content()
             }
             SnackbarHost(
                 hostState = snackbarHostState,
@@ -148,6 +126,52 @@ fun AddSubscriptionSheet(
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
                     .padding(bottom = 12.dp),
+            )
+        }
+    }
+}
+
+/** 第一步：路由目录（搜索 / 分类 / 路由列表 + 手填链接）。选路由后跳转 Params 目的地。 */
+@Composable
+fun AddSubscriptionCatalogScreen(
+    viewModel: AddSubscriptionViewModel,
+    onDismiss: () -> Unit,
+    onOpenParams: () -> Unit,
+) {
+    val state by viewModel.state.collectAsState()
+    AddSheetShell(viewModel = viewModel, onDismiss = onDismiss) {
+        SheetHeader(
+            title = "添加订阅",
+            subtitle = "粘贴链接，或从 RSSHub 路由构建",
+            onClose = onDismiss,
+        )
+        CatalogContent(
+            state = state,
+            viewModel = viewModel,
+            onOpenParams = onOpenParams,
+        )
+    }
+}
+
+/** 第二步：填参数 → 预览 → 订阅。返回目录由导航（popBackStack）承担。 */
+@Composable
+fun AddSubscriptionParamsScreen(
+    viewModel: AddSubscriptionViewModel,
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val state by viewModel.state.collectAsState()
+    AddSheetShell(viewModel = viewModel, onDismiss = onDismiss) {
+        val route = state.selectedRoute
+        if (route == null) {
+            // 理论上不可达：进入本目的地前必先 RouteSelected；防御性回退
+            SheetHeader(title = "添加订阅", subtitle = null, onClose = onDismiss)
+        } else {
+            ParamsHeader(route = route, onBack = onBack)
+            ParamsContent(
+                state = state,
+                route = route,
+                viewModel = viewModel,
             )
         }
     }
@@ -238,7 +262,7 @@ private fun ParamsHeader(route: RssHubRoute, onBack: () -> Unit) {
 private fun ColumnScope.CatalogContent(
     state: AddSubscriptionUiState,
     viewModel: AddSubscriptionViewModel,
-    onDismiss: () -> Unit,
+    onOpenParams: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -310,7 +334,13 @@ private fun ColumnScope.CatalogContent(
         }
 
         items(state.visibleRoutes, key = { it.id }) { route ->
-            RouteRow(route = route, onClick = { viewModel.onIntent(AddSubscriptionIntent.RouteSelected(route)) })
+            RouteRow(
+                route = route,
+                onClick = {
+                    viewModel.onIntent(AddSubscriptionIntent.RouteSelected(route))
+                    onOpenParams()
+                },
+            )
         }
 
         if (state.visibleRoutes.isEmpty()) {
