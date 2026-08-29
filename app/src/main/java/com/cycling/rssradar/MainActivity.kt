@@ -1,5 +1,6 @@
 package com.cycling.rssradar
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
 import android.content.Intent
@@ -9,38 +10,36 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.Alignment
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.popUpTo
 import androidx.navigation.compose.NavHost
+import androidx.navigation.toRoute
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.hasRoute
-import androidx.navigation.popUpTo
 import com.cycling.rssradar.data.ThemeMode
 import com.cycling.rssradar.di.AppEntryPoint
 import com.cycling.rssradar.ui.AddSubscriptionSheet
 import com.cycling.rssradar.ui.AddSubscriptionViewModel
 import com.cycling.rssradar.ui.ArticleDetailScreen
 import com.cycling.rssradar.ui.ArticleDetailViewModel
+import com.cycling.rssradar.ui.FeedActionScreen
 import com.cycling.rssradar.ui.FeedListScreen
 import com.cycling.rssradar.ui.FeedListViewModel
 import com.cycling.rssradar.ui.RssHubSettingsScreen
@@ -50,6 +49,9 @@ import com.cycling.rssradar.ui.SearchViewModel
 import com.cycling.rssradar.ui.SubscriptionsScreen
 import com.cycling.rssradar.ui.SubscriptionsViewModel
 import com.cycling.rssradar.ui.components.FloatingBottomBar
+import com.cycling.rssradar.ui.navigation.AddSubscriptionRoute
+import com.cycling.rssradar.ui.navigation.ArticleDetailRoute
+import com.cycling.rssradar.ui.navigation.FeedActionRoute
 import com.cycling.rssradar.ui.navigation.FeedRoute
 import com.cycling.rssradar.ui.navigation.MeRoute
 import com.cycling.rssradar.ui.navigation.SearchRoute
@@ -62,17 +64,13 @@ import dagger.hilt.android.EntryPointAccessors
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    // 加订阅 / 详情浮层在其成为 Nav 目的地（#30 / #31）前，暂由 Activity 级 VM 驱动。
-    private val addVm: AddSubscriptionViewModel by viewModels()
-    private val articleVm: ArticleDetailViewModel by viewModels()
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             RssRadarThemeHost {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    RssRadarApp(addVm = addVm, articleVm = articleVm)
+                    RssRadarApp()
                 }
             }
         }
@@ -108,12 +106,10 @@ private fun RssRadarThemeHost(content: @Composable () -> Unit) {
 /** 当前应用的实际深色状态（跟随系统或用户强制）。 */
 val LocalDarkTheme = staticCompositionLocalOf { true }
 
+@SuppressLint("RestrictedApi")
 @Composable
-private fun RssRadarApp(addVm: AddSubscriptionViewModel, articleVm: ArticleDetailViewModel) {
+private fun RssRadarApp() {
     val navController = rememberNavController()
-    // TODO(#30/#31): 详情 / 加订阅改为 Nav 目的地后删除这两个状态。
-    var detailArticleId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var showAddSheet by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -133,43 +129,56 @@ private fun RssRadarApp(addVm: AddSubscriptionViewModel, articleVm: ArticleDetai
                 FeedListScreen(
                     viewModel = vm,
                     onOpenSearch = { navController.navigate(SearchRoute) },
-                    onOpenArticle = { detailArticleId = it.article.id },
-                    onAddSubscription = { showAddSheet = true },
+                    onOpenArticle = { navController.navigate(ArticleDetailRoute(it.article.id)) },
+                    onAddSubscription = { navController.navigate(AddSubscriptionRoute) },
                 )
             }
             composable<SubscriptionsRoute> {
                 val vm = hiltViewModel<SubscriptionsViewModel>()
                 SubscriptionsScreen(
                     viewModel = vm,
-                    onAddSubscription = { showAddSheet = true },
+                    onAddSubscription = { navController.navigate(AddSubscriptionRoute) },
                     onCreateGroup = { /* TODO */ },
+                    onFeedAction = { navController.navigate(FeedActionRoute(it)) },
                 )
             }
             composable<SearchRoute> {
                 val vm = hiltViewModel<SearchViewModel>()
                 SearchScreen(
                     viewModel = vm,
-                    onOpenArticle = { detailArticleId = it.article.id },
+                    onOpenArticle = { navController.navigate(ArticleDetailRoute(it.article.id)) },
                 )
             }
             composable<MeRoute> {
                 val vm = hiltViewModel<RssHubSettingsViewModel>()
                 RssHubSettingsScreen(viewModel = vm)
             }
-        }
-
-        // 文章详情是全屏浮层，浮层期间隐藏底部 TabBar（#30 改为 Nav composable 目的地）。
-        val articleId = detailArticleId
-        if (articleId != null) {
-            Box(modifier = Modifier.fillMaxSize().background(BgRoot)) {
+            composable<ArticleDetailRoute> { backStackEntry ->
+                val articleId = backStackEntry.toRoute<ArticleDetailRoute>().articleId
                 ArticleDetailScreen(
-                    viewModel = articleVm,
+                    viewModel = hiltViewModel<ArticleDetailViewModel>(),
                     articleId = articleId,
-                    onBack = { detailArticleId = null },
+                    onBack = { navController.popBackStack() },
                     onOpenOriginal = { url -> context.openUrl(url) },
                 )
             }
-        } else {
+            composable<AddSubscriptionRoute> {
+                AddSubscriptionSheet(
+                    viewModel = hiltViewModel<AddSubscriptionViewModel>(),
+                    onDismiss = { navController.popBackStack() },
+                )
+            }
+            composable<FeedActionRoute> { backStackEntry ->
+                val feedId = backStackEntry.toRoute<FeedActionRoute>().feedId
+                FeedActionScreen(
+                    feedId = feedId,
+                    viewModel = hiltViewModel<SubscriptionsViewModel>(),
+                    onDismiss = { navController.popBackStack() },
+                )
+            }
+        }
+
+        if (selectedTab != null) {
             FloatingBottomBar(
                 currentRoute = selectedTab,
                 onTabSelected = { key ->
@@ -187,16 +196,6 @@ private fun RssRadarApp(addVm: AddSubscriptionViewModel, articleVm: ArticleDetai
                     }
                 },
                 modifier = Modifier.align(Alignment.BottomCenter),
-            )
-        }
-
-        if (showAddSheet) {
-            AddSubscriptionSheet(
-                viewModel = addVm,
-                onDismiss = {
-                    showAddSheet = false
-                    addVm.reset()
-                },
             )
         }
     }

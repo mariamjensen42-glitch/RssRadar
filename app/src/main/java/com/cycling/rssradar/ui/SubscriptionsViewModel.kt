@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -51,6 +52,12 @@ class SubscriptionsViewModel @Inject constructor(
 
     val totalUnread: StateFlow<Int> = repository.observeUnreadCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    /** 按 id 取单条订阅（#31 FeedAction 目的地解析 feed 用）。 */
+    fun getFeed(feedId: Long): StateFlow<FeedEntity?> =
+        repository.observeFeeds()
+            .map { list -> list.find { it.id == feedId } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     var uiMessage by mutableStateOf<String?>(null)
         private set

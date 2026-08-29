@@ -18,12 +18,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -46,7 +44,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.data.DEFAULT_GROUP
-import com.cycling.rssradar.data.FeedEntity
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
@@ -67,26 +64,23 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.CornerUpRight
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
-import com.composables.icons.lucide.Trash2
 
 @Composable
 fun SubscriptionsScreen(
     viewModel: SubscriptionsViewModel,
     onAddSubscription: () -> Unit = {},
     onCreateGroup: () -> Unit = {},
+    onFeedAction: (Long) -> Unit = {},
 ) {
     val groups by viewModel.groups.collectAsState()
     val expandedIds by viewModel.expandedGroupIds.collectAsState()
     val totalUnread by viewModel.totalUnread.collectAsState()
-    val groupOptions by viewModel.groupsList.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val message = viewModel.uiMessage
 
     // 对话框状态
     var createGroupDialog by remember { mutableStateOf(false) }
     var renameGroupTarget by remember { mutableStateOf<String?>(null) }
-    var feedMenuTarget by remember { mutableStateOf<FeedEntity?>(null) }
-    var renameFeedTarget by remember { mutableStateOf<FeedEntity?>(null) }
 
     LaunchedEffect(message) {
         message?.let {
@@ -130,7 +124,7 @@ fun SubscriptionsScreen(
                     expanded = group.group in expandedIds,
                     onToggle = { viewModel.toggleGroup(group.group) },
                     onEdit = { renameGroupTarget = group.group },
-                    onFeedMore = { feedMenuTarget = it },
+                    onFeedMore = { onFeedAction(it.id) },
                 )
             }
 
@@ -177,39 +171,6 @@ fun SubscriptionsScreen(
         )
     }
 
-    feedMenuTarget?.let { feed ->
-        FeedActionSheet(
-            feed = feed,
-            groupOptions = groupOptions,
-            onDismiss = { feedMenuTarget = null },
-            onRename = {
-                feedMenuTarget = null
-                renameFeedTarget = feed
-            },
-            onMove = { group ->
-                viewModel.moveFeed(feed.id, group)
-                feedMenuTarget = null
-            },
-            onDelete = {
-                viewModel.deleteFeed(feed.id, feed.title)
-                feedMenuTarget = null
-            },
-        )
-    }
-
-    renameFeedTarget?.let { feed ->
-        TextInputDialog(
-            title = "重命名订阅",
-            placeholder = "新标题",
-            initialValue = feed.title,
-            confirmText = "保存",
-            onDismiss = { renameFeedTarget = null },
-            onConfirm = { name ->
-                viewModel.renameFeed(feed.id, name)
-                renameFeedTarget = null
-            },
-        )
-    }
 }
 
 @Composable
@@ -501,95 +462,3 @@ private fun TextInputDialog(
     )
 }
 
-/** 订阅源操作弹层：重命名 / 移动分组 / 删除。 */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun FeedActionSheet(
-    feed: FeedEntity,
-    groupOptions: List<String>,
-    onDismiss: () -> Unit,
-    onRename: () -> Unit,
-    onMove: (String) -> Unit,
-    onDelete: () -> Unit,
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = Surface1,
-    ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
-            Text(
-                text = feed.title,
-                color = TextPrimary,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = feed.url.withoutScheme(),
-                color = TextTertiary,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = "移动到分组",
-                color = TextTertiary,
-                style = MaterialTheme.typography.labelMedium,
-            )
-            Spacer(Modifier.height(8.dp))
-            // 分组选择（chips 流式换行）
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                groupOptions.chunked(3).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        row.forEach { group ->
-                            val selected = group == feed.groupName.ifBlank { DEFAULT_GROUP }
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = if (selected) Accent else Surface2,
-                                modifier = Modifier.clickable { onMove(group) },
-                            ) {
-                                Text(
-                                    text = group,
-                                    color = if (selected) OnAccent else TextPrimary,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Surface2,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onRename),
-            ) {
-                Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Lucide.Pencil, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("重命名", color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Surface2,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onDelete),
-            ) {
-                Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Lucide.Trash2, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("删除订阅（含其文章）", color = TextTertiary, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
-    }
-}
