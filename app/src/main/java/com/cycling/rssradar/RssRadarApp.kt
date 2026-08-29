@@ -1,6 +1,7 @@
 package com.cycling.rssradar
 
 import android.app.Application
+import dagger.hilt.android.HiltAndroidApp
 import androidx.room.Room
 import com.cycling.rssradar.data.AppDatabase
 import com.cycling.rssradar.data.ContentFetcher
@@ -38,6 +39,7 @@ class AppContainer(app: Application) {
     )
 }
 
+@HiltAndroidApp
 class RssRadarApp : Application() {
     lateinit var container: AppContainer
         private set
