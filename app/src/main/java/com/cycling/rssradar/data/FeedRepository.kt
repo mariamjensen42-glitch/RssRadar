@@ -24,6 +24,8 @@ class FeedRepository(
     private val database: AppDatabase,
     private val parser: RssParser,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    /** 为 null 时按需抓取不可用（见 [fetchFullContent]）。 */
+    private val contentFetcher: ContentFetcher? = null,
 ) {
     private val feedDao = database.feedDao()
     private val articleDao = database.articleDao()
@@ -64,6 +66,30 @@ class FeedRepository(
     suspend fun markAllRead() = articleDao.markAllRead()
 
     suspend fun getArticle(id: Long): ArticleWithFeed? = articleDao.getWithFeed(id)
+
+    /**
+     * 按需抓取原网页正文（ADR-0001）：文章没有 feed 自带正文时调用。
+     * 失败返回 false，调用方静默降级——这是常态（反爬/JS 页），不是错误。
+     */
+    suspend fun fetchFullContent(id: Long): Boolean = withContext(ioDispatcher) {
+        val fetcher = contentFetcher ?: return@withContext false
+        val item = articleDao.getWithFeed(id) ?: return@withContext false
+        // 已有正文（feed 自带或之前抓取过）就不重复抓
+        if (item.article.contentSource != ArticleEntity.CONTENT_SOURCE_NONE && item.article.content != null) {
+            return@withContext true
+        }
+        val fetched = fetcher.fetch(item.article.link) ?: return@withContext false
+        val readingMinutes = fetched.contentText.let { estimateReadingMinutes(it) }
+        articleDao.updateFetchedContent(
+            id = id,
+            content = fetched.contentHtml,
+            contentText = fetched.contentText,
+            contentSource = ArticleEntity.CONTENT_SOURCE_WEB,
+            readingMinutes = readingMinutes,
+            coverUrl = fetched.coverUrl,
+        )
+        true
+    }
 
     suspend fun addFeed(rawUrl: String, groupName: String = DEFAULT_GROUP): AddFeedResult = withContext(ioDispatcher) {
         val url = normalizeUrl(rawUrl) ?: return@withContext AddFeedResult.InvalidFeed

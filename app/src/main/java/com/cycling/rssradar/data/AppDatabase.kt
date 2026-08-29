@@ -222,12 +222,13 @@ interface ArticleDao {
         fetchedAt: Long,
     )
 
-    /** 抓取原网页正文后回填。同样不触碰用户状态。 */
+    /** 抓取原网页正文后回填。同样不触碰用户状态；封面只在原本没有时才补 og:image。 */
     @Query(
         """
         UPDATE articles SET
             content = :content, contentText = :contentText, contentSource = :contentSource,
-            readingMinutes = :readingMinutes
+            readingMinutes = :readingMinutes,
+            coverUrl = COALESCE(coverUrl, :coverUrl)
         WHERE id = :id
         """,
     )
@@ -237,6 +238,7 @@ interface ArticleDao {
         contentText: String?,
         contentSource: Int,
         readingMinutes: Int?,
+        coverUrl: String?,
     )
 
     @Query("UPDATE articles SET isRead = 1 WHERE id = :id")

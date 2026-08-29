@@ -1,6 +1,7 @@
 package com.cycling.rssradar.ui
 
 import android.text.format.DateUtils
+import android.webkit.WebView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,8 +39,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
 import com.cycling.rssradar.data.ArticleWithFeed
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.theme.Accent
@@ -64,6 +70,7 @@ fun ArticleDetailScreen(
     onOpenOriginal: (String) -> Unit = {},
 ) {
     val article by viewModel.article.collectAsState()
+    val isFetchingContent by viewModel.isFetchingContent.collectAsState()
     LaunchedEffect(articleId) { viewModel.load(articleId) }
 
     Scaffold(
@@ -95,10 +102,10 @@ fun ArticleDetailScreen(
         }
         ArticleDetailContent(
             article = current,
+            isFetchingContent = isFetchingContent,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState()),
+                .padding(padding),
         )
     }
 }
@@ -123,7 +130,11 @@ private fun ArticleDetailTopBar(onBack: () -> Unit) {
 }
 
 @Composable
-private fun ArticleDetailContent(article: ArticleWithFeed, modifier: Modifier = Modifier) {
+private fun ArticleDetailContent(
+    article: ArticleWithFeed,
+    isFetchingContent: Boolean,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier.padding(horizontal = 20.dp, vertical = 8.dp),
     ) {
@@ -135,6 +146,9 @@ private fun ArticleDetailContent(article: ArticleWithFeed, modifier: Modifier = 
                 color = TextPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
             Spacer(Modifier.width(8.dp))
             Text("·", color = TextTertiary)
@@ -144,14 +158,17 @@ private fun ArticleDetailContent(article: ArticleWithFeed, modifier: Modifier = 
                 color = TextTertiary,
                 style = MaterialTheme.typography.labelMedium,
             )
-            Spacer(Modifier.width(8.dp))
-            Text("·", color = TextTertiary)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "阅读约 ${article.article.readingMinutes ?: estimateReadingMinutes(article.article.summary)} 分钟",
-                color = TextTertiary,
-                style = MaterialTheme.typography.labelMedium,
-            )
+            // 阅读时长：只有真实正文字数算出来的才显示。取不到就不显示，不虚构。
+            article.article.readingMinutes?.let { minutes ->
+                Spacer(Modifier.width(8.dp))
+                Text("·", color = TextTertiary)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "阅读约 $minutes 分钟",
+                    color = TextTertiary,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
         }
 
         Spacer(Modifier.height(16.dp))
@@ -162,19 +179,103 @@ private fun ArticleDetailContent(article: ArticleWithFeed, modifier: Modifier = 
             fontWeight = FontWeight.Bold,
         )
 
-        Spacer(Modifier.height(16.dp))
-        BodyParagraph(article.article.summary ?: "正文内容")
-
-        if (article.article.coverUrl != null) {
-            Spacer(Modifier.height(20.dp))
-            ArticleCoverPlaceholder()
+        // 封面：取到了就显示真图，取不到就什么都不显示
+        article.article.coverUrl?.let { url ->
+            Spacer(Modifier.height(16.dp))
+            ArticleCoverImage(url = url)
         }
 
-        Spacer(Modifier.height(20.dp))
-        BodyParagraph(article.article.summary ?: "本文转自 ${article.feedTitle}。")
-
-        Spacer(Modifier.height(120.dp)) // 避让底部操作栏
+        Spacer(Modifier.height(16.dp))
+        when {
+            // feed 自带或已抓取的正文：WebView 渲染净化 HTML（内部滚动，模板注入深色主题）
+            article.article.content != null -> ArticleWebView(
+                html = article.article.content!!,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            )
+            // 无正文：显示摘要；按需抓取中给出轻提示，失败静默（"查看原文"兜底）
+            else -> Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                BodyParagraph(text = article.article.summary ?: "本文没有可显示的正文，可查看原文。")
+                if (isFetchingContent) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            color = Accent,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "正在获取全文…",
+                            color = TextTertiary,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp)) // 避让底部操作栏
     }
+}
+
+/** 净化后的正文 HTML 用 WebView 渲染：模板注入深色主题，样式与全局一致。 */
+@Composable
+private fun ArticleWebView(html: String, modifier: Modifier = Modifier) {
+    val styledHtml = remember(html) { buildStyledContentHtml(html) }
+    AndroidView(
+        factory = { context ->
+            WebView(context).apply {
+                settings.javaScriptEnabled = false
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            }
+        },
+        update = { webView ->
+            webView.loadDataWithBaseURL(null, styledHtml, "text/html", "utf-8", null)
+        },
+        modifier = modifier,
+    )
+}
+
+/**
+ * 渲染模板。正文 HTML 在解析层已经净化（去 script/style/iframe/事件属性，见 RssParser），
+ * 这里再包一层静态 CSS：黑底、白字、图片限宽、链接用主题紫。
+ */
+private fun buildStyledContentHtml(contentHtml: String): String = """
+    <!DOCTYPE html>
+    <html><head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { background:#000000; color:#FFFFFF; font-size:16px; line-height:1.7;
+               font-family:-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+               margin:0; padding:0; word-break:break-word; }
+        img { max-width:100%; height:auto; border-radius:8px; }
+        a { color:#9B9CFF; text-decoration:none; }
+        p { margin:0 0 1em 0; }
+        blockquote { margin:0 0 1em 0; padding:4px 12px; border-left:3px solid #3A3A3C; color:#B0B0B6; }
+        pre { background:#1C1C1E; padding:10px; border-radius:8px; overflow-x:auto; }
+        code { font-family:Menlo,Consolas,monospace; font-size:13px; }
+        h1,h2,h3 { line-height:1.4; }
+        figure { margin:0 0 1em 0; }
+    </style></head>
+    <body>$contentHtml</body></html>
+""".trimIndent()
+
+@Composable
+private fun ArticleCoverImage(url: String) {
+    AsyncImage(
+        model = url,
+        contentDescription = "文章封面",
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(180.dp)
+            .clip(RoundedCornerShape(12.dp)),
+    )
 }
 
 @Composable
@@ -184,21 +285,6 @@ private fun BodyParagraph(text: String) {
         color = TextPrimary,
         style = MaterialTheme.typography.bodyLarge,
     )
-}
-
-@Composable
-private fun ArticleCoverPlaceholder() {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = Surface1,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(180.dp),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text("文章配图", color = TextTertiary, style = MaterialTheme.typography.titleMedium)
-        }
-    }
 }
 
 @Composable
@@ -278,8 +364,3 @@ private fun ActionIcon(
 
 private fun formatDate(ts: Long?): String =
     ts?.let { DateUtils.getRelativeTimeSpanString(it).toString() } ?: "未知时间"
-
-private fun estimateReadingMinutes(summary: String?): Int {
-    val len = summary?.length ?: 0
-    return ((len / 200) + 1).coerceAtLeast(1)
-}
