@@ -4,14 +4,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cycling.rssradar.data.AddFeedResult
 import com.cycling.rssradar.data.ArticleWithFeed
 import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.GroupStore
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,7 +22,8 @@ import kotlinx.coroutines.launch
 /** 信息流页内的 4 个过滤 tab。 */
 enum class FeedTab { All, Unread, Starred, Bookmarked }
 
-class FeedListViewModel(
+@HiltViewModel
+class FeedListViewModel @Inject constructor(
     private val repository: FeedRepository,
     groupStore: GroupStore,
 ) : ViewModel() {
@@ -162,10 +162,5 @@ class FeedListViewModel(
     companion object {
         /** 信息流分页大小。 */
         const val PAGE_SIZE = 30
-
-        fun factory(container: com.cycling.rssradar.AppContainer): ViewModelProvider.Factory =
-            viewModelFactory {
-                initializer { FeedListViewModel(container.repository, container.groupStore) }
-            }
     }
 }

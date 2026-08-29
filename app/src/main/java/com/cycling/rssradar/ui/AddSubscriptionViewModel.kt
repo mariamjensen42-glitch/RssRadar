@@ -4,11 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
-import com.cycling.rssradar.AppContainer
 import com.cycling.rssradar.data.AddFeedResult
 import com.cycling.rssradar.data.FeedEntity
 import com.cycling.rssradar.data.FeedProbeResult
@@ -17,8 +13,11 @@ import com.cycling.rssradar.data.GROUP_DESIGN
 import com.cycling.rssradar.data.GROUP_DEV
 import com.cycling.rssradar.data.GROUP_TECH
 import com.cycling.rssradar.data.RouteCategory
+import com.cycling.rssradar.data.RssHubInstanceStore
 import com.cycling.rssradar.data.RssHubRoute
 import com.cycling.rssradar.data.RssHubRoutes
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,13 +66,13 @@ data class AddSubscriptionUiState(
     val canSubmit: Boolean get() = url.isNotBlank() && validation is ValidationInfo.Valid && !isAdding
 }
 
-class AddSubscriptionViewModel(
+@HiltViewModel
+class AddSubscriptionViewModel @Inject constructor(
     private val repository: FeedRepository,
-    /** 当前 RSSHub 实例。由宿主注入（实例探测见 issue #14），默认官方实例。 */
-    hostProvider: () -> String = { RssHubRoutes.DEFAULT_HOST },
+    private val instanceStore: RssHubInstanceStore,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(AddSubscriptionUiState(host = hostProvider()))
+    private val _state = MutableStateFlow(AddSubscriptionUiState(host = instanceStore.currentOrDefault()))
     val state: StateFlow<AddSubscriptionUiState> = _state.asStateFlow()
 
     /** 分组选项。与订阅页保持一致，避免两处各写一份。 */
@@ -189,17 +188,5 @@ class AddSubscriptionViewModel(
 
     fun onMessageShown() {
         uiMessage = null
-    }
-
-    companion object {
-        fun factory(container: AppContainer): ViewModelProvider.Factory =
-            viewModelFactory {
-                initializer {
-                    AddSubscriptionViewModel(
-                        repository = container.repository,
-                        hostProvider = { container.instanceStore.currentOrDefault() },
-                    )
-                }
-            }
     }
 }

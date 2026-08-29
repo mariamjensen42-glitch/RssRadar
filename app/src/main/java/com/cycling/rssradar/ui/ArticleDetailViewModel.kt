@@ -1,20 +1,21 @@
 package com.cycling.rssradar.ui
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
-import com.cycling.rssradar.AppContainer
 import com.cycling.rssradar.data.ArticleEntity
 import com.cycling.rssradar.data.ArticleWithFeed
 import com.cycling.rssradar.data.FeedRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class ArticleDetailViewModel(private val repository: FeedRepository) : ViewModel() {
+@HiltViewModel
+class ArticleDetailViewModel @Inject constructor(
+    private val repository: FeedRepository,
+) : ViewModel() {
 
     private val _article = MutableStateFlow<ArticleWithFeed?>(null)
     val article: StateFlow<ArticleWithFeed?> = _article.asStateFlow()
@@ -64,12 +65,5 @@ class ArticleDetailViewModel(private val repository: FeedRepository) : ViewModel
                 article = current.copy(isBookmarked = !current.isBookmarked),
             )
         }
-    }
-
-    companion object {
-        fun factory(container: AppContainer): ViewModelProvider.Factory =
-            viewModelFactory {
-                initializer { ArticleDetailViewModel(container.repository) }
-            }
     }
 }
