@@ -35,7 +35,14 @@ data class FeedEntity(
     @ColumnInfo(defaultValue = "默认") val groupName: String = DEFAULT_GROUP,
     /** 站点图标 URL（favicon），由订阅信息或网络抓取得到。 */
     val iconUrl: String? = null,
-)
+    /** 订阅源类型：0=常规 RSS/Atom，1=RSSHub 路由。 */
+    @ColumnInfo(defaultValue = "0") val sourceType: Int = SOURCE_TYPE_RSS,
+) {
+    companion object {
+        const val SOURCE_TYPE_RSS = 0
+        const val SOURCE_TYPE_RSSHUB = 1
+    }
+}
 
 @Entity(
     tableName = "articles",
@@ -294,9 +301,18 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+/**
+ * v3 → v4：feeds 增加订阅源类型（sourceType）。
+ */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE feeds ADD COLUMN sourceType INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 @Database(
     entities = [FeedEntity::class, ArticleEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

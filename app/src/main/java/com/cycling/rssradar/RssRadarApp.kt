@@ -8,6 +8,7 @@ import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.RssHubInstanceStore
 import com.cycling.rssradar.data.MIGRATION_1_2
 import com.cycling.rssradar.data.MIGRATION_2_3
+import com.cycling.rssradar.data.MIGRATION_3_4
 import com.cycling.rssradar.data.RssParser
 
 /** 轻量手写 DI 容器，后续规模上来再考虑引入 Hilt。 */
@@ -17,7 +18,7 @@ class AppContainer(app: Application) {
         AppDatabase::class.java,
         "rssradar.db",
     )
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
         .build()
 
     val contentFetcher: ContentFetcher = ContentFetcher(cacheDir = app.cacheDir)

@@ -267,6 +267,18 @@ private fun FeedRow(item: FeedWithUnread, onMore: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            // 类型标记：RSSHub 路由和常规 RSS 一眼区分
+            if (item.feed.sourceType == FeedEntity.SOURCE_TYPE_RSSHUB) {
+                Spacer(Modifier.width(6.dp))
+                Surface(shape = RoundedCornerShape(50), color = Surface2) {
+                    Text(
+                        text = "RSSHub",
+                        color = TextTertiary,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+            }
             UnreadBadge(count = item.unreadCount)
             Spacer(Modifier.width(4.dp))
             IconButton(onClick = onMore, modifier = Modifier.size(32.dp)) {

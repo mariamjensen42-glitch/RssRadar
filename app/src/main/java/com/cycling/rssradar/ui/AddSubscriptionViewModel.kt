@@ -10,6 +10,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cycling.rssradar.AppContainer
 import com.cycling.rssradar.data.AddFeedResult
+import com.cycling.rssradar.data.FeedEntity
 import com.cycling.rssradar.data.FeedProbeResult
 import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.GROUP_DESIGN
@@ -167,7 +168,14 @@ class AddSubscriptionViewModel(
         if (!_state.value.canSubmit) return
         viewModelScope.launch {
             _state.value = _state.value.copy(isAdding = true)
-            val result = repository.addFeed(_state.value.url.trim(), _state.value.selectedGroup)
+            val state = _state.value
+            // 路由拼出来的地址标记为 RSSHub 类型；手填 URL 一律按常规 RSS/Atom。
+            val sourceType = if (state.isUrlFromRoute) {
+                FeedEntity.SOURCE_TYPE_RSSHUB
+            } else {
+                FeedEntity.SOURCE_TYPE_RSS
+            }
+            val result = repository.addFeed(state.url.trim(), state.selectedGroup, sourceType)
             _state.value = _state.value.copy(isAdding = false)
             uiMessage = when (result) {
                 AddFeedResult.Success -> "订阅成功"

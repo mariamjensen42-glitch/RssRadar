@@ -92,7 +92,11 @@ class FeedRepository(
         true
     }
 
-    suspend fun addFeed(rawUrl: String, groupName: String = DEFAULT_GROUP): AddFeedResult = withContext(ioDispatcher) {
+    suspend fun addFeed(
+        rawUrl: String,
+        groupName: String = DEFAULT_GROUP,
+        sourceType: Int = FeedEntity.SOURCE_TYPE_RSS,
+    ): AddFeedResult = withContext(ioDispatcher) {
         val url = normalizeUrl(rawUrl) ?: return@withContext AddFeedResult.InvalidFeed
 
         if (feedDao.findIdByUrl(url) != null) return@withContext AddFeedResult.Duplicate
@@ -106,7 +110,15 @@ class FeedRepository(
         }
 
         val now = System.currentTimeMillis()
-        val feedId = feedDao.insert(FeedEntity(url = url, title = parsed.title, createdAt = now, groupName = groupName.ifBlank { DEFAULT_GROUP }))
+        val feedId = feedDao.insert(
+            FeedEntity(
+                url = url,
+                title = parsed.title,
+                createdAt = now,
+                groupName = groupName.ifBlank { DEFAULT_GROUP },
+                sourceType = sourceType,
+            ),
+        )
         val resolvedFeedId = feedId.takeIf { it != -1L } ?: feedDao.findIdByUrl(url) ?: return@withContext AddFeedResult.Duplicate
 
         upsertArticles(resolvedFeedId, parsed.articles, now)
