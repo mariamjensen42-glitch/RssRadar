@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
+import com.cycling.rssradar.LocalDarkTheme
 import com.cycling.rssradar.data.ArticleWithFeed
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.theme.Accent
@@ -223,10 +224,12 @@ private fun ArticleDetailContent(
     }
 }
 
-/** 净化后的正文 HTML 用 WebView 渲染：模板注入深色主题，样式与全局一致。 */
+/** 净化后的正文 HTML 用 WebView 渲染：模板注入主题样式，与全局一致。 */
 @Composable
 private fun ArticleWebView(html: String, modifier: Modifier = Modifier) {
-    val styledHtml = remember(html) { buildStyledContentHtml(html) }
+    // 用主题宿主注入的实际深色状态（跟随系统或用户强制），不是系统值
+    val darkTheme = LocalDarkTheme.current
+    val styledHtml = remember(html, darkTheme) { buildStyledContentHtml(html, darkTheme) }
     AndroidView(
         factory = { context ->
             WebView(context).apply {
@@ -243,27 +246,34 @@ private fun ArticleWebView(html: String, modifier: Modifier = Modifier) {
 
 /**
  * 渲染模板。正文 HTML 在解析层已经净化（去 script/style/iframe/事件属性，见 RssParser），
- * 这里再包一层静态 CSS：黑底、白字、图片限宽、链接用主题紫。
+ * 这里再包一层静态 CSS：深色黑底白字 / 浅色白底黑字，图片限宽，链接用主题紫。
  */
-private fun buildStyledContentHtml(contentHtml: String): String = """
+private fun buildStyledContentHtml(contentHtml: String, darkTheme: Boolean): String {
+    val (bg, fg, muted, codeBg, border, link) = if (darkTheme) {
+        "#000000" to "#FFFFFF" to "#B0B0B6" to "#1C1C1E" to "#3A3A3C" to "#9B9CFF"
+    } else {
+        "#FFFFFF" to "#1A1A1E" to "#55555C" to "#F0F0F4" to "#D9D9E0" to "#5B5BD6"
+    }
+    return """
     <!DOCTYPE html>
     <html><head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { background:#000000; color:#FFFFFF; font-size:16px; line-height:1.7;
+        body { background:$bg; color:$fg; font-size:16px; line-height:1.7;
                font-family:-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
                margin:0; padding:0; word-break:break-word; }
         img { max-width:100%; height:auto; border-radius:8px; }
-        a { color:#9B9CFF; text-decoration:none; }
+        a { color:$link; text-decoration:none; }
         p { margin:0 0 1em 0; }
-        blockquote { margin:0 0 1em 0; padding:4px 12px; border-left:3px solid #3A3A3C; color:#B0B0B6; }
-        pre { background:#1C1C1E; padding:10px; border-radius:8px; overflow-x:auto; }
+        blockquote { margin:0 0 1em 0; padding:4px 12px; border-left:3px solid $border; color:$muted; }
+        pre { background:$codeBg; padding:10px; border-radius:8px; overflow-x:auto; }
         code { font-family:Menlo,Consolas,monospace; font-size:13px; }
         h1,h2,h3 { line-height:1.4; }
         figure { margin:0 0 1em 0; }
     </style></head>
     <body>$contentHtml</body></html>
 """.trimIndent()
+}
 
 @Composable
 private fun ArticleCoverImage(url: String) {
