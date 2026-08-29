@@ -34,6 +34,7 @@ class FeedRepository(
     fun observeAllArticles(): Flow<List<ArticleWithFeed>> = articleDao.observeAllWithFeed()
     fun observeUnreadArticles(): Flow<List<ArticleWithFeed>> = articleDao.observeUnreadWithFeed()
     fun observeStarredArticles(): Flow<List<ArticleWithFeed>> = articleDao.observeStarredWithFeed()
+    fun observeBookmarkedArticles(): Flow<List<ArticleWithFeed>> = articleDao.observeBookmarkedWithFeed()
     fun search(query: String): Flow<List<ArticleWithFeed>> = articleDao.search("%$query%")
 
     fun observeFeedCount(): Flow<Int> = articleDao.observeCount()
