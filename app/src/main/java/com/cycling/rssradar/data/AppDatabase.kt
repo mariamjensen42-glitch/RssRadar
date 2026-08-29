@@ -119,6 +119,9 @@ interface FeedDao {
     @Query("SELECT * FROM feeds ORDER BY groupName ASC, title ASC")
     fun observeAll(): Flow<List<FeedEntity>>
 
+    @Query("SELECT * FROM feeds")
+    suspend fun getAll(): List<FeedEntity>
+
     @Query("UPDATE feeds SET groupName = :groupName WHERE id = :feedId")
     suspend fun updateGroup(feedId: Long, groupName: String)
 
@@ -227,6 +230,21 @@ interface ArticleDao {
 
     @Query("SELECT id FROM articles WHERE feedId = :feedId AND link = :link LIMIT 1")
     suspend fun findIdByLink(feedId: Long, link: String): Long?
+
+    /**
+     * 分页加载全部文章（信息流 All tab）。OFFSET 分页在个人订阅量级足够，
+     * 若未来文章量大再换 keyset（按 publishedAt 游标）。
+     */
+    @Query(
+        """
+        SELECT articles.*, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    suspend fun loadAllWithFeedPaged(limit: Int, offset: Int): List<ArticleWithFeed>
 
     /**
      * 增量刷新：只更新内容状态（标题/时间/摘要/正文），绝不触碰用户状态

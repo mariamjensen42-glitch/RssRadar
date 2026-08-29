@@ -37,6 +37,21 @@ class FeedRepository(
     fun observeBookmarkedArticles(): Flow<List<ArticleWithFeed>> = articleDao.observeBookmarkedWithFeed()
     fun search(query: String): Flow<List<ArticleWithFeed>> = articleDao.search("%$query%")
 
+    /** 信息流分页：一次取一页，All tab 用。 */
+    suspend fun loadArticlesPage(limit: Int, offset: Int): List<ArticleWithFeed> =
+        articleDao.loadAllWithFeedPaged(limit, offset)
+
+    /**
+     * 刷新全部订阅源，返回成功刷新的源数。失败源静默跳过（保留已有数据），
+     * 供下拉刷新调用。
+     */
+    suspend fun refreshAllFeeds(): Int = withContext(ioDispatcher) {
+        feedDao.getAll().count { refreshFeed(it.id) }
+    }
+
+    /** 是否已有订阅源。供 UI 区分「没有源」和「刷新失败」。 */
+    suspend fun hasFeeds(): Boolean = feedDao.getAll().isNotEmpty()
+
     fun observeFeedCount(): Flow<Int> = articleDao.observeCount()
     fun observeUnreadCount(): Flow<Int> = articleDao.observeUnreadCount()
 

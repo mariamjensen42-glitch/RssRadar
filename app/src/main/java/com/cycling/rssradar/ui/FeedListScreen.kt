@@ -18,9 +18,11 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,9 +31,11 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -72,6 +76,9 @@ fun FeedListScreen(
     val unreadCount by viewModel.unreadCount.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val message = viewModel.uiMessage
+    val isRefreshing = viewModel.isRefreshing
+    val isLoadingMore = viewModel.isLoadingMore
+    val hasMore = viewModel.hasMore
 
     LaunchedEffect(message) {
         message?.let {
@@ -123,23 +130,41 @@ fun FeedListScreen(
                 )
             }
             Spacer(Modifier.height(8.dp))
-            if (currentList.isEmpty()) {
-                EmptyState(selectedTab = selectedTab, modifier = Modifier.fillMaxSize())
-            } else {
-                ArticleCardList(
-                    articles = currentList,
-                    onArticleClick = { item ->
-                        viewModel.markRead(item.article.id)
-                        onOpenArticle(item)
-                    },
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    LoadMoreHint()
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = viewModel::refresh,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                if (currentList.isEmpty()) {
+                    EmptyState(selectedTab = selectedTab, modifier = Modifier.fillMaxSize())
+                } else {
+                    ArticleCardList(
+                        articles = currentList,
+                        onArticleClick = { item ->
+                            viewModel.markRead(item.article.id)
+                            onOpenArticle(item)
+                        },
+                        // 只有 All tab 分页；滚动到底自动加载下一页
+                        onScrolledToEnd = {
+                            if (selectedTab == FeedTab.All) viewModel.loadMore()
+                        },
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (isLoadingMore) {
+                            CircularProgressIndicator(
+                                color = Accent,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        } else if (hasMore) {
+                            LoadMoreHint()
+                        }
+                    }
                 }
             }
         }
@@ -266,8 +291,20 @@ private fun GroupFilterRow(
 private fun ArticleCardList(
     articles: List<ArticleWithFeed>,
     onArticleClick: (ArticleWithFeed) -> Unit,
+    onScrolledToEnd: () -> Unit,
 ) {
+    val listState = rememberLazyListState()
+    val shouldLoadMore = remember {
+        derivedStateOf {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            lastVisible >= listState.layoutInfo.totalItemsCount - LOAD_MORE_THRESHOLD
+        }
+    }
+    LaunchedEffect(shouldLoadMore.value) {
+        if (shouldLoadMore.value) onScrolledToEnd()
+    }
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -277,6 +314,9 @@ private fun ArticleCardList(
         }
     }
 }
+
+/** 距列表尾部还剩这么多项时预加载下一页。 */
+private const val LOAD_MORE_THRESHOLD = 5
 
 @Composable
 fun ArticleCard(item: ArticleWithFeed, onClick: () -> Unit) {
@@ -374,8 +414,11 @@ private fun EmptyState(selectedTab: FeedTab, modifier: Modifier = Modifier) {
         FeedTab.Starred -> "还没有收藏" to "阅读时点击星标，把好文章留下来"
         FeedTab.Bookmarked -> "暂无稍后读" to "阅读时点击书签，稍后再看"
     }
+    // verticalScroll 让空态页也能响应下拉刷新手势
     Column(
-        modifier = modifier.padding(32.dp),
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

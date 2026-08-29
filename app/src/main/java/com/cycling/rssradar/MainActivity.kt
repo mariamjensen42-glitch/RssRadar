@@ -13,20 +13,25 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
+import com.cycling.rssradar.data.ThemeMode
 import com.cycling.rssradar.ui.AddSubscriptionSheet
 import com.cycling.rssradar.ui.AddSubscriptionViewModel
 import com.cycling.rssradar.ui.ArticleDetailScreen
@@ -71,7 +76,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            RssRadarTheme {
+            RssRadarThemeHost {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     RssRadarApp(
                         feedVm = feedVm,
@@ -86,6 +91,34 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+/**
+ * 主题宿主：读持久化的主题偏好（ThemeStore flow），跟随系统时用
+ * isSystemInDarkTheme 实时感知，把 darkTheme 交给 RssRadarTheme。
+ * 设置页通过同一个 store 改模式，flow 更新后这里自动重组。
+ * 同时把当前 darkTheme 注入 CompositionLocal，供 WebView 正文模板等
+ * 需要感知主题的非 Material 组件使用。
+ */
+@Composable
+private fun RssRadarThemeHost(content: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val themeStore = remember { (context.applicationContext as RssRadarApp).container.themeStore }
+    val themeMode by themeStore.mode.collectAsState()
+    val systemDark = isSystemInDarkTheme()
+    val darkTheme = when (themeMode) {
+        ThemeMode.SYSTEM -> systemDark
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
+    CompositionLocalProvider(LocalDarkTheme provides darkTheme) {
+        RssRadarTheme(darkTheme = darkTheme) {
+            content()
+        }
+    }
+}
+
+/** 当前应用的实际深色状态（跟随系统或用户强制）。 */
+val LocalDarkTheme = staticCompositionLocalOf { true }
 
 @Composable
 private fun RssRadarApp(

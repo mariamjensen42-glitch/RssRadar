@@ -11,6 +11,7 @@ import com.cycling.rssradar.data.MIGRATION_1_2
 import com.cycling.rssradar.data.MIGRATION_2_3
 import com.cycling.rssradar.data.MIGRATION_3_4
 import com.cycling.rssradar.data.RssParser
+import com.cycling.rssradar.data.ThemeStore
 
 /** 轻量手写 DI 容器，后续规模上来再考虑引入 Hilt。 */
 class AppContainer(app: Application) {
@@ -25,6 +26,8 @@ class AppContainer(app: Application) {
     val contentFetcher: ContentFetcher = ContentFetcher(cacheDir = app.cacheDir)
 
     val instanceStore = RssHubInstanceStore(app)
+
+    val themeStore = ThemeStore(app)
 
     val groupStore = GroupStore(app)
 

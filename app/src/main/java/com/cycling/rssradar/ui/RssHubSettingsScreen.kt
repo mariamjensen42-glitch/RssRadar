@@ -40,6 +40,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cycling.rssradar.AppContainer
 import com.cycling.rssradar.data.RssHubInstanceStore
+import com.cycling.rssradar.data.ThemeMode
+import com.cycling.rssradar.data.ThemeStore
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.OnAccent
@@ -65,16 +67,35 @@ data class RssHubSettingsUiState(
     val probing: Boolean = false,
     /** 最近一次探测的提示文案；null 表示没有要展示的提示。 */
     val probeMessage: String? = null,
+    /** 当前主题模式。 */
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
 )
 
 /**
- * 「我的」页的 RSSHub 实例设置：查看当前实例、修改自定义实例、并发探测可达性。
- * 背景：rsshub.app 在部分网络环境完全不可达，实例可配置是必需品（issue #14）。
+ * 「我的」页：RSSHub 实例设置 + 主题设置。
+ * 实例：查看当前实例、修改自定义实例、并发探测可达性（issue #14）。
+ * 主题：浅色 / 深色 / 跟随系统（issue #9）。
  */
-class RssHubSettingsViewModel(private val store: RssHubInstanceStore) : ViewModel() {
+class RssHubSettingsViewModel(
+    private val store: RssHubInstanceStore,
+    private val themeStore: ThemeStore,
+) : ViewModel() {
 
     private val _state = MutableStateFlow(RssHubSettingsUiState(activeHost = store.currentOrDefault()))
     val state: StateFlow<RssHubSettingsUiState> = _state.asStateFlow()
+
+    init {
+        // 主题模式跟随 ThemeStore 的 flow，设置页外（系统切换）也同步
+        viewModelScope.launch {
+            themeStore.mode.collect { mode ->
+                _state.value = _state.value.copy(themeMode = mode)
+            }
+        }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        themeStore.setMode(mode)
+    }
 
     fun onCustomInputChange(value: String) {
         _state.value = _state.value.copy(customInput = value)
@@ -127,7 +148,7 @@ class RssHubSettingsViewModel(private val store: RssHubInstanceStore) : ViewMode
     companion object {
         fun factory(container: AppContainer): ViewModelProvider.Factory =
             viewModelFactory {
-                initializer { RssHubSettingsViewModel(container.instanceStore) }
+                initializer { RssHubSettingsViewModel(container.instanceStore, container.themeStore) }
             }
     }
 }
@@ -153,6 +174,50 @@ fun RssHubSettingsScreen(
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(vertical = 12.dp),
         )
+
+        Text(
+            text = "外观",
+            color = TextSecondary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(8.dp))
+        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+            Column(Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "主题",
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ThemeMode.entries.forEach { mode ->
+                            val selected = state.themeMode == mode
+                            val bg = if (selected) Accent else Surface2
+                            val fg = if (selected) OnAccent else TextPrimary
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = bg,
+                                modifier = Modifier.clickable { viewModel.setThemeMode(mode) },
+                            ) {
+                                Text(
+                                    text = when (mode) {
+                                        ThemeMode.SYSTEM -> "跟随系统"
+                                        ThemeMode.LIGHT -> "浅色"
+                                        ThemeMode.DARK -> "深色"
+                                    },
+                                    color = fg,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
 
         Text(
             text = "RSSHub 实例",
