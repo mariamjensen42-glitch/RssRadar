@@ -82,19 +82,77 @@ class FeedRepository(
         val feedId = feedDao.insert(FeedEntity(url = url, title = parsed.title, createdAt = now, groupName = groupName.ifBlank { DEFAULT_GROUP }))
         val resolvedFeedId = feedId.takeIf { it != -1L } ?: feedDao.findIdByUrl(url) ?: return@withContext AddFeedResult.Duplicate
 
-        articleDao.insertAll(
-            parsed.articles.map { article ->
-                ArticleEntity(
-                    feedId = resolvedFeedId,
-                    link = article.link,
+        upsertArticles(resolvedFeedId, parsed.articles, now)
+        AddFeedResult.Success
+    }
+
+    /**
+     * 增量刷新：重新抓取并按 link 更新文章的内容状态。
+     * 绝不覆盖用户状态（已读/收藏/稍后读），见 CONTEXT.md「用户状态」。
+     * 返回是否成功抓取（网络失败 / 源失效返回 false，由调用方决定提示）。
+     */
+    suspend fun refreshFeed(feedId: Long): Boolean = withContext(ioDispatcher) {
+        val feed = feedDao.getById(feedId) ?: return@withContext false
+        val parsed = try {
+            fetch(feed.url).use { parser.parse(it) }
+        } catch (_: IllegalArgumentException) {
+            return@withContext false
+        } catch (_: IOException) {
+            return@withContext false
+        }
+        upsertArticles(feedId, parsed.articles, System.currentTimeMillis())
+        true
+    }
+
+    /** 同一 link：只更新内容状态字段，用户状态原样保留。 */
+    private suspend fun upsertArticles(feedId: Long, articles: List<RssParser.ParsedArticle>, now: Long) {
+        articles.forEach { article ->
+            val existingId = articleDao.findIdByLink(feedId, article.link)
+            val readingMinutes = article.contentText?.let { estimateReadingMinutes(it) }
+            val contentSource = if (article.contentHtml != null) ArticleEntity.CONTENT_SOURCE_FEED else ArticleEntity.CONTENT_SOURCE_NONE
+            if (existingId != null) {
+                articleDao.updateContentState(
+                    id = existingId,
                     title = article.title,
                     summary = article.summary,
+                    content = article.contentHtml,
+                    contentText = article.contentText,
+                    author = article.author,
                     publishedAt = article.publishedAt,
+                    coverUrl = article.coverUrl,
+                    readingMinutes = readingMinutes,
+                    contentSource = contentSource,
                     fetchedAt = now,
                 )
-            },
-        )
-        AddFeedResult.Success
+            } else {
+                articleDao.insertAll(
+                    listOf(
+                        ArticleEntity(
+                            feedId = feedId,
+                            link = article.link,
+                            title = article.title,
+                            summary = article.summary,
+                            content = article.contentHtml,
+                            contentText = article.contentText,
+                            author = article.author,
+                            publishedAt = article.publishedAt,
+                            fetchedAt = now,
+                            coverUrl = article.coverUrl,
+                            readingMinutes = readingMinutes,
+                            contentSource = contentSource,
+                        ),
+                    ),
+                )
+            }
+        }
+    }
+
+    /** 中文按 300 字/分钟，非 CJK 按 200 词/分钟，混排取较大值。来自真实正文字数，不虚构。 */
+    internal fun estimateReadingMinutes(text: String): Int {
+        val cjkChars = text.count { it.code in 0x4E00..0x9FFF }
+        val otherWords = text.count { !((it.code in 0x4E00..0x9FFF) || it.isWhitespace()) } / 6
+        val minutes = maxOf(cjkChars / 300, otherWords / 200)
+        return (minutes + 1).coerceAtLeast(1)
     }
 
     private fun normalizeUrl(raw: String): String? {
