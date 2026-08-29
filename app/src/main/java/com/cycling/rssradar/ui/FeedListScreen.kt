@@ -83,7 +83,7 @@ fun FeedListScreen(
     LaunchedEffect(message) {
         message?.let {
             snackbarHostState.showSnackbar(it)
-            viewModel.onMessageShown()
+            viewModel.onIntent(FeedListIntent.ConsumeMessage)
         }
     }
 
@@ -118,7 +118,7 @@ fun FeedListScreen(
             FeedListTabRow(
                 selected = selectedTab,
                 unreadCount = unreadCount,
-                onSelect = viewModel::selectTab,
+                onSelect = { viewModel.onIntent(FeedListIntent.SelectTab(it)) },
             )
             // 分组筛选：仅 All tab 显示，其余 tab 是全量视图
             if (selectedTab == FeedTab.All && groupOptions.isNotEmpty()) {
@@ -126,13 +126,13 @@ fun FeedListScreen(
                 GroupFilterRow(
                     groups = groupOptions,
                     selected = selectedGroup,
-                    onSelect = viewModel::selectGroup,
+                    onSelect = { viewModel.onIntent(FeedListIntent.SelectGroup(it)) },
                 )
             }
             Spacer(Modifier.height(8.dp))
             PullToRefreshBox(
                 isRefreshing = isRefreshing,
-                onRefresh = viewModel::refresh,
+                onRefresh = { viewModel.onIntent(FeedListIntent.Refresh) },
                 modifier = Modifier.fillMaxSize(),
             ) {
                 if (currentList.isEmpty()) {
@@ -141,12 +141,12 @@ fun FeedListScreen(
                     ArticleCardList(
                         articles = currentList,
                         onArticleClick = { item ->
-                            viewModel.markRead(item.article.id)
+                            viewModel.onIntent(FeedListIntent.MarkRead(item.article.id))
                             onOpenArticle(item)
                         },
                         // 只有 All tab 分页；滚动到底自动加载下一页
                         onScrolledToEnd = {
-                            if (selectedTab == FeedTab.All) viewModel.loadMore()
+                            if (selectedTab == FeedTab.All) viewModel.onIntent(FeedListIntent.LoadMore)
                         },
                     )
                     Box(

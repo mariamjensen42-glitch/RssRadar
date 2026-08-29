@@ -1,12 +1,12 @@
 package com.cycling.rssradar.ui
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cycling.rssradar.data.ArticleWithFeed
 import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.ui.mvi.MviViewModel
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,8 +26,18 @@ data class SearchUiState(
 
 private val defaultHistory = listOf("RSSHub 自部署", "Flutter 3.32", "周刊 305")
 
+/** 搜索事件（候选 A，ADR-0003）。 */
+sealed interface SearchIntent {
+    data class QueryChange(val value: String) : SearchIntent
+    data object Submit : SearchIntent
+    data object ClearHistory : SearchIntent
+}
+
 @OptIn(FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-class SearchViewModel(private val repository: FeedRepository) : ViewModel() {
+@HiltViewModel
+class SearchViewModel @Inject constructor(
+    private val repository: FeedRepository,
+) : ViewModel(), MviViewModel<SearchIntent> {
 
     private val _state = MutableStateFlow(SearchUiState())
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
@@ -49,12 +59,20 @@ class SearchViewModel(private val repository: FeedRepository) : ViewModel() {
         }
     }
 
-    fun onQueryChange(value: String) {
+    override fun onIntent(intent: SearchIntent) {
+        when (intent) {
+            is SearchIntent.QueryChange -> queryChange(intent.value)
+            SearchIntent.Submit -> submit()
+            SearchIntent.ClearHistory -> clearHistory()
+        }
+    }
+
+    private fun queryChange(value: String) {
         _state.value = _state.value.copy(query = value)
         queryFlow.value = value
     }
 
-    fun submit() {
+    private fun submit() {
         val current = _state.value.query.trim()
         if (current.isEmpty()) return
         val newHistory = (listOf(current) + _state.value.history.filter { it != current })
@@ -62,14 +80,7 @@ class SearchViewModel(private val repository: FeedRepository) : ViewModel() {
         _state.value = _state.value.copy(history = newHistory)
     }
 
-    fun clearHistory() {
+    private fun clearHistory() {
         _state.value = _state.value.copy(history = emptyList())
-    }
-
-    companion object {
-        fun factory(container: com.cycling.rssradar.AppContainer): ViewModelProvider.Factory =
-            viewModelFactory {
-                initializer { SearchViewModel(container.repository) }
-            }
     }
 }

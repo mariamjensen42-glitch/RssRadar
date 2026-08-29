@@ -4,11 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
-import com.cycling.rssradar.AppContainer
 import com.cycling.rssradar.data.AddFeedResult
 import com.cycling.rssradar.data.FeedEntity
 import com.cycling.rssradar.data.FeedProbeResult
@@ -17,8 +13,12 @@ import com.cycling.rssradar.data.GROUP_DESIGN
 import com.cycling.rssradar.data.GROUP_DEV
 import com.cycling.rssradar.data.GROUP_TECH
 import com.cycling.rssradar.data.RouteCategory
+import com.cycling.rssradar.data.RssHubInstanceStore
 import com.cycling.rssradar.data.RssHubRoute
 import com.cycling.rssradar.data.RssHubRoutes
+import com.cycling.rssradar.ui.mvi.MviViewModel
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,13 +67,28 @@ data class AddSubscriptionUiState(
     val canSubmit: Boolean get() = url.isNotBlank() && validation is ValidationInfo.Valid && !isAdding
 }
 
-class AddSubscriptionViewModel(
-    private val repository: FeedRepository,
-    /** 当前 RSSHub 实例。由宿主注入（实例探测见 issue #14），默认官方实例。 */
-    hostProvider: () -> String = { RssHubRoutes.DEFAULT_HOST },
-) : ViewModel() {
+/** 加订阅抽屉事件（候选 A，ADR-0003）。 */
+sealed interface AddSubscriptionIntent {
+    data class UrlChange(val raw: String) : AddSubscriptionIntent
+    data class GroupSelected(val group: String) : AddSubscriptionIntent
+    data class QueryChange(val query: String) : AddSubscriptionIntent
+    data class CategoryChange(val category: String) : AddSubscriptionIntent
+    data class RouteSelected(val route: RssHubRoute) : AddSubscriptionIntent
+    data class ParamChange(val key: String, val value: String) : AddSubscriptionIntent
+    data object BackToCatalog : AddSubscriptionIntent
+    data object PreviewRoute : AddSubscriptionIntent
+    data object Reset : AddSubscriptionIntent
+    data object Submit : AddSubscriptionIntent
+    data object ConsumeMessage : AddSubscriptionIntent
+}
 
-    private val _state = MutableStateFlow(AddSubscriptionUiState(host = hostProvider()))
+@HiltViewModel
+class AddSubscriptionViewModel @Inject constructor(
+    private val repository: FeedRepository,
+    private val instanceStore: RssHubInstanceStore,
+) : ViewModel(), MviViewModel<AddSubscriptionIntent> {
+
+    private val _state = MutableStateFlow(AddSubscriptionUiState(host = instanceStore.currentOrDefault()))
     val state: StateFlow<AddSubscriptionUiState> = _state.asStateFlow()
 
     /** 分组选项。与订阅页保持一致，避免两处各写一份。 */
@@ -84,7 +99,23 @@ class AddSubscriptionViewModel(
 
     private var validationJob: Job? = null
 
-    fun onUrlChange(raw: String) {
+    override fun onIntent(intent: AddSubscriptionIntent) {
+        when (intent) {
+            is AddSubscriptionIntent.UrlChange -> urlChange(intent.raw)
+            is AddSubscriptionIntent.GroupSelected -> groupSelected(intent.group)
+            is AddSubscriptionIntent.QueryChange -> queryChange(intent.query)
+            is AddSubscriptionIntent.CategoryChange -> categoryChange(intent.category)
+            is AddSubscriptionIntent.RouteSelected -> routeSelected(intent.route)
+            is AddSubscriptionIntent.ParamChange -> paramChange(intent.key, intent.value)
+            AddSubscriptionIntent.BackToCatalog -> backToCatalog()
+            AddSubscriptionIntent.PreviewRoute -> previewRoute()
+            AddSubscriptionIntent.Reset -> reset()
+            AddSubscriptionIntent.Submit -> submit()
+            AddSubscriptionIntent.ConsumeMessage -> uiMessage = null
+        }
+    }
+
+    private fun urlChange(raw: String) {
         _state.value = _state.value.copy(url = raw, validation = ValidationInfo.Idle)
         validationJob?.cancel()
         if (raw.isBlank()) return
@@ -104,20 +135,20 @@ class AddSubscriptionViewModel(
         }
     }
 
-    fun onGroupSelected(group: String) {
+    private fun groupSelected(group: String) {
         _state.value = _state.value.copy(selectedGroup = group)
     }
 
-    fun onQueryChange(query: String) {
+    private fun queryChange(query: String) {
         _state.value = _state.value.copy(query = query)
     }
 
-    fun onCategoryChange(category: String) {
+    private fun categoryChange(category: String) {
         _state.value = _state.value.copy(category = category)
     }
 
     /** 选中路由 → 进入参数阶段。参数留空，由 placeholder 兜底出示例值。 */
-    fun onRouteSelected(route: RssHubRoute) {
+    private fun routeSelected(route: RssHubRoute) {
         _state.value = _state.value.copy(
             step = AddSheetStep.Params,
             selectedRouteId = route.id,
@@ -129,7 +160,7 @@ class AddSubscriptionViewModel(
         validationJob?.cancel()
     }
 
-    fun onParamChange(key: String, value: String) {
+    private fun paramChange(key: String, value: String) {
         val next = _state.value.paramValues.toMutableMap().apply { put(key, value) }
         // 参数一改，之前那次预览/校验就作废了
         validationJob?.cancel()
@@ -141,7 +172,7 @@ class AddSubscriptionViewModel(
     }
 
     /** 从参数阶段退回目录。 */
-    fun onBackToCatalog() {
+    private fun backToCatalog() {
         validationJob?.cancel()
         _state.value = _state.value.copy(
             step = AddSheetStep.Catalog,
@@ -153,18 +184,18 @@ class AddSubscriptionViewModel(
     }
 
     /** 把拼好的地址塞进统一的 url 通道，走与手填完全相同的校验。 */
-    fun onPreviewRoute() {
+    private fun previewRoute() {
         val built = _state.value.builtUrl ?: return
-        onUrlChange(built)
+        urlChange(built)
     }
 
     /** 抽屉关闭 / 添加成功后调用，避免下次打开残留上一次的状态。 */
-    fun reset() {
+    private fun reset() {
         validationJob?.cancel()
         _state.value = AddSubscriptionUiState()
     }
 
-    fun submit() {
+    private fun submit() {
         if (!_state.value.canSubmit) return
         viewModelScope.launch {
             _state.value = _state.value.copy(isAdding = true)
@@ -185,21 +216,5 @@ class AddSubscriptionViewModel(
             }
             if (result == AddFeedResult.Success) reset()
         }
-    }
-
-    fun onMessageShown() {
-        uiMessage = null
-    }
-
-    companion object {
-        fun factory(container: AppContainer): ViewModelProvider.Factory =
-            viewModelFactory {
-                initializer {
-                    AddSubscriptionViewModel(
-                        repository = container.repository,
-                        hostProvider = { container.instanceStore.currentOrDefault() },
-                    )
-                }
-            }
     }
 }

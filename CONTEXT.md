@@ -83,3 +83,17 @@ _Avoid_: 容器、provider、component
 **作用域 ViewModel（Scoped ViewModel）**:
 绑定到某个导航图作用域、在该图内多个目的地间共享的 ViewModel（如加订阅两步流）。
 _Avoid_: 共享 VM、图级 VM
+
+## State Management (MVI)
+
+**意图（Intent）**:
+封装一次用户动作或一次性触发（如切换分组、提交订阅、标记已读、消费提示）的不可变值，用 per-ViewModel 的 `sealed interface XxxIntent` 表达，经单一 `onIntent(intent)` 进入 ViewModel。
+_Avoid_: 事件、action、动作、命令、command
+
+**一次性效应（Effect）**:
+只应发生一次、不应留在界面状态里的副作用（如弹出 Snackbar、导航）。计划由候选 B 引入专用通道；当前 `uiMessage` 仍置于 `UiState` 内、由 `Intent.ConsumeMessage` 消费。
+_Avoid_: 事件、SideEffect
+
+**界面状态（UiState）**:
+驱动界面渲染的不可变快照。当前仅 AddSubscription / Search 已聚合为单一 `UiState`；其余 VM 仍是碎片 `StateFlow`，由候选 C 统一。
+_Avoid_: state、视图状态

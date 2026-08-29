@@ -63,9 +63,9 @@ fun SearchScreen(
     Column(modifier = Modifier.fillMaxSize().background(BgRoot)) {
         SearchBar(
             query = state.query,
-            onQueryChange = viewModel::onQueryChange,
-            onClear = { viewModel.onQueryChange("") },
-            onSubmit = viewModel::submit,
+            onQueryChange = { viewModel.onIntent(SearchIntent.QueryChange(it)) },
+            onClear = { viewModel.onIntent(SearchIntent.QueryChange("")) },
+            onSubmit = { viewModel.onIntent(SearchIntent.Submit) },
             modifier = Modifier
                 .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp)
@@ -75,8 +75,8 @@ fun SearchScreen(
         if (state.query.isBlank()) {
             RecentSearches(
                 history = state.history,
-                onPick = { viewModel.onQueryChange(it) },
-                onClear = viewModel::clearHistory,
+                onPick = { viewModel.onIntent(SearchIntent.QueryChange(it)) },
+                onClear = { viewModel.onIntent(SearchIntent.ClearHistory) },
             )
         } else {
             SearchResults(

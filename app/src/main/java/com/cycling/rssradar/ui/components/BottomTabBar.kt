@@ -38,30 +38,25 @@ import com.composables.icons.lucide.Rss
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.User
 
-/** 主导航 4 个 tab，与底部 TabBar 一一对应。 */
-enum class MainTab(val title: String) {
-    Feed("文章"),
-    Subscriptions("订阅"),
-    Search("搜索"),
-    Me("我的"),
-}
+/** 底部 TabBar 的 4 个主屏条目，与 Nav 路由一一对应（key 用于选中态判定）。 */
+private data class TabDef(val key: String, val title: String, val icon: ImageVector)
 
-/** 单一图标源：未选中/选中都用同一线性图标，靠 tint 区分。 */
-private fun iconFor(tab: MainTab): ImageVector = when (tab) {
-    MainTab.Feed -> Lucide.Rss
-    MainTab.Subscriptions -> Lucide.Library
-    MainTab.Search -> Lucide.Search
-    MainTab.Me -> Lucide.User
-}
+private val TOP_LEVEL_TABS = listOf(
+    TabDef("feed", "文章", Lucide.Rss),
+    TabDef("subs", "订阅", Lucide.Library),
+    TabDef("search", "搜索", Lucide.Search),
+    TabDef("me", "我的", Lucide.User),
+)
 
 /**
  * 悬浮胶囊底部 TabBar：选中 tab 是紫色填充胶囊；未选中是透明 + 灰字。
  * 通过 [WindowInsets.navigationBars] 适配系统手势条。
+ * 选中态由 [currentRoute] 决定（来自 NavController 当前目的地，route 即单一真相源）。
  */
 @Composable
 fun FloatingBottomBar(
-    current: MainTab,
-    onTabSelected: (MainTab) -> Unit,
+    currentRoute: String?,
+    onTabSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val insets = WindowInsets.navigationBars.asPaddingValues()
@@ -86,11 +81,11 @@ fun FloatingBottomBar(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                MainTab.entries.forEach { tab ->
+                TOP_LEVEL_TABS.forEach { tab ->
                     TabItem(
                         tab = tab,
-                        selected = tab == current,
-                        onClick = { onTabSelected(tab) },
+                        selected = tab.key == currentRoute,
+                        onClick = { onTabSelected(tab.key) },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -101,7 +96,7 @@ fun FloatingBottomBar(
 
 @Composable
 private fun TabItem(
-    tab: MainTab,
+    tab: TabDef,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -130,7 +125,7 @@ private fun TabItem(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                imageVector = iconFor(tab),
+                imageVector = tab.icon,
                 contentDescription = tab.title,
                 tint = foreground,
                 modifier = Modifier.size(20.dp),
