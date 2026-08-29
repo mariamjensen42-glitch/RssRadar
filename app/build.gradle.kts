@@ -36,6 +36,17 @@ android {
     buildFeatures {
         compose = true
     }
+    // rome 2.1.0 用 OSGi bnd 打包（Embed-Dependency）：
+    //   rome.jar          内嵌 rome-utils-2.1.0.jar
+    //   rome-modules.jar  内嵌 rome-2.1.0.jar + rome-utils-2.1.0.jar
+    // 两个 rome-utils-2.1.0.jar 同名资源导致 AGP "2 files found with path"。
+    // 内嵌 jar 仅 OSGi 运行时使用；Android 类路径下类由独立依赖提供
+    // （rome POM 声明 com.rometools:rome-utils compile 依赖），内嵌副本冗余，全部排除。
+    packaging {
+        resources {
+            excludes += setOf("rome-utils-2.1.0.jar", "rome-2.1.0.jar")
+        }
+    }
 }
 
 dependencies {
