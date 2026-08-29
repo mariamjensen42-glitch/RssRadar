@@ -27,7 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
-import com.cycling.rssradar.ui.AddSubscriptionScreen
+import com.cycling.rssradar.ui.AddSubscriptionSheet
 import com.cycling.rssradar.ui.AddSubscriptionViewModel
 import com.cycling.rssradar.ui.ArticleDetailScreen
 import com.cycling.rssradar.ui.ArticleDetailViewModel
@@ -89,8 +89,10 @@ private fun RssRadarApp(
     searchVm: SearchViewModel,
     articleVm: ArticleDetailViewModel,
 ) {
+    // 加订阅是低频动作：不占路由，也不占整页，从信息流 FAB / 订阅页入口唤起底部抽屉。
     var currentTab by rememberSaveable { mutableStateOf(MainTab.Feed) }
-    var overlay by rememberSaveable(stateSaver = OverlayRouteSaver) { mutableStateOf<OverlayRoute?>(null) }
+    var detailArticleId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var showAddSheet by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
     Box(modifier = Modifier.fillMaxSize().background(BgRoot)) {
@@ -98,43 +100,47 @@ private fun RssRadarApp(
             MainTab.Feed -> FeedListScreen(
                 viewModel = feedVm,
                 onOpenSearch = { currentTab = MainTab.Search },
-                onOpenArticle = { overlay = OverlayRoute.ArticleDetail(it.article.id) },
+                onOpenArticle = { detailArticleId = it.article.id },
+                onAddSubscription = { showAddSheet = true },
             )
             MainTab.Subscriptions -> SubscriptionsScreen(
                 viewModel = subsVm,
-                onAddSubscription = { overlay = OverlayRoute.AddSubscription },
+                onAddSubscription = { showAddSheet = true },
                 onCreateGroup = { /* TODO */ },
             )
             MainTab.Search -> SearchScreen(
                 viewModel = searchVm,
-                onOpenArticle = { overlay = OverlayRoute.ArticleDetail(it.article.id) },
+                onOpenArticle = { detailArticleId = it.article.id },
             )
             MainTab.Me -> MeTabPlaceholder()
         }
 
-        // 顶层浮层：详情 / 添加订阅。底部 TabBar 在浮层时隐藏。
-        if (overlay != null) {
+        // 文章详情是全屏浮层，浮层期间隐藏底部 TabBar。
+        val articleId = detailArticleId
+        if (articleId != null) {
             Box(modifier = Modifier.fillMaxSize().background(BgRoot)) {
-                when (val o = overlay) {
-                    is OverlayRoute.ArticleDetail -> ArticleDetailScreen(
-                        viewModel = articleVm,
-                        articleId = o.articleId,
-                        onBack = { overlay = null },
-                        onOpenOriginal = { url -> context.openUrl(url) },
-                    )
-                    OverlayRoute.AddSubscription -> AddSubscriptionScreen(
-                        viewModel = addVm,
-                        onBack = { overlay = null },
-                    )
-
-                    else -> {}
-                }
+                ArticleDetailScreen(
+                    viewModel = articleVm,
+                    articleId = articleId,
+                    onBack = { detailArticleId = null },
+                    onOpenOriginal = { url -> context.openUrl(url) },
+                )
             }
         } else {
             FloatingBottomBar(
                 current = currentTab,
                 onTabSelected = { currentTab = it },
                 modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
+
+        if (showAddSheet) {
+            AddSubscriptionSheet(
+                viewModel = addVm,
+                onDismiss = {
+                    showAddSheet = false
+                    addVm.reset()
+                },
             )
         }
     }
@@ -157,11 +163,6 @@ private fun MeTabPlaceholder() {
     }
 }
 
-private sealed interface OverlayRoute {
-    data class ArticleDetail(val articleId: Long) : OverlayRoute
-    data object AddSubscription : OverlayRoute
-}
-
 /** 用系统浏览器打开外链。失败要让用户看见，不能静默吞掉。 */
 private fun Context.openUrl(url: String) {
     if (url.isBlank()) {
@@ -173,21 +174,3 @@ private fun Context.openUrl(url: String) {
     runCatching { startActivity(intent) }
         .onFailure { Toast.makeText(this, "无法打开链接", Toast.LENGTH_SHORT).show() }
 }
-
-private val OverlayRouteSaver: androidx.compose.runtime.saveable.Saver<OverlayRoute?, Any> =
-    androidx.compose.runtime.saveable.listSaver(
-        save = { route ->
-            when (route) {
-                null -> emptyList()
-                is OverlayRoute.ArticleDetail -> listOf("article", route.articleId)
-                OverlayRoute.AddSubscription -> listOf("add")
-            }
-        },
-        restore = { values ->
-            when (values.firstOrNull()) {
-                "article" -> OverlayRoute.ArticleDetail((values.getOrNull(1) as? Long) ?: 0L)
-                "add" -> OverlayRoute.AddSubscription
-                else -> null
-            }
-        },
-    )

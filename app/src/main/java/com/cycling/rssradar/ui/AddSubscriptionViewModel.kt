@@ -1,28 +1,26 @@
 package com.cycling.rssradar.ui
 
-import android.text.format.DateUtils
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.cycling.rssradar.AppContainer
 import com.cycling.rssradar.data.AddFeedResult
-import com.cycling.rssradar.data.FeedEntity
+import com.cycling.rssradar.data.FeedProbeResult
 import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.GROUP_DESIGN
 import com.cycling.rssradar.data.GROUP_DEV
 import com.cycling.rssradar.data.GROUP_TECH
+import com.cycling.rssradar.data.RouteCategory
+import com.cycling.rssradar.data.RssHubRoute
+import com.cycling.rssradar.data.RssHubRoutes
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** 链接校验结果。 */
@@ -36,51 +34,43 @@ sealed interface ValidationInfo {
     data class Network(override val message: String) : ValidationInfo
 }
 
-/** RSSHub 路由示例。 */
-data class RouteSample(
-    val path: String,
-    val suggestedTitle: String,
-    val suggestedGroup: String,
-)
-
-/** 最近添加的订阅 + 显示用时间。 */
-data class RecentlyAdded(val feed: FeedEntity, val relativeTime: String)
+/**
+ * 添加订阅抽屉的两个阶段。
+ * Catalog = 路由目录（搜索 + 分类 + 列表）；Params = 选中路由后填参数。
+ */
+enum class AddSheetStep { Catalog, Params }
 
 data class AddSubscriptionUiState(
+    /** 最终要订阅的地址：可能来自手填，也可能由 RSSHub 路由拼出。 */
     val url: String = "",
     val isValidating: Boolean = false,
     val validation: ValidationInfo = ValidationInfo.Idle,
     val selectedGroup: String = GROUP_TECH,
-    val routeSamples: List<RouteSample> = defaultRouteSamples(),
     val isAdding: Boolean = false,
+    val step: AddSheetStep = AddSheetStep.Catalog,
+    val query: String = "",
+    val category: String = RouteCategory.ALL,
+    val selectedRouteId: String? = null,
+    val paramValues: Map<String, String> = emptyMap(),
+    val host: String = RssHubRoutes.DEFAULT_HOST,
 ) {
+    val selectedRoute: RssHubRoute? get() = selectedRouteId?.let { RssHubRoutes.byId(it) }
+    val visibleRoutes: List<RssHubRoute> get() = RssHubRoutes.search(query, category)
+    /** 当前参数拼出来的完整地址；没选路由时为 null。 */
+    val builtUrl: String? get() = selectedRoute?.let { RssHubRoutes.buildUrl(it, paramValues, host) }
+    /** 内置路由表里没有「必填且没兜底值」的参数，所以选了路由就能预览。 */
+    val canPreview: Boolean get() = selectedRoute != null
+    val isUrlFromRoute: Boolean get() = selectedRoute != null && url.isNotBlank()
     val canSubmit: Boolean get() = url.isNotBlank() && validation is ValidationInfo.Valid && !isAdding
 }
-
-private fun defaultRouteSamples(): List<RouteSample> = listOf(
-    RouteSample("/sspai/matrix", "少数派 · 矩阵", GROUP_TECH),
-    RouteSample("/36kr/newsflashes", "36氪 · 快讯", GROUP_TECH),
-    RouteSample("/hackernews/best", "Hacker News · 精选", GROUP_DEV),
-)
 
 class AddSubscriptionViewModel(private val repository: FeedRepository) : ViewModel() {
 
     private val _state = MutableStateFlow(AddSubscriptionUiState())
     val state: StateFlow<AddSubscriptionUiState> = _state.asStateFlow()
 
-    val recentlyAdded: StateFlow<List<RecentlyAdded>> = repository.observeFeeds()
-        .map { feeds ->
-            feeds
-                .sortedByDescending { it.createdAt }
-                .take(3)
-                .map { feed ->
-                    RecentlyAdded(
-                        feed = feed,
-                        relativeTime = DateUtils.getRelativeTimeSpanString(feed.createdAt).toString(),
-                    )
-                }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /** 分组选项。与订阅页保持一致，避免两处各写一份。 */
+    val groupOptions: List<String> = listOf(GROUP_TECH, GROUP_DEV, GROUP_DESIGN)
 
     var uiMessage by mutableStateOf<String?>(null)
         private set
@@ -98,14 +88,10 @@ class AddSubscriptionViewModel(private val repository: FeedRepository) : ViewMod
             _state.value = _state.value.copy(
                 isValidating = false,
                 validation = when (probe) {
-                    is com.cycling.rssradar.data.FeedProbeResult.Valid ->
-                        ValidationInfo.Valid(probe.articleCount)
-                    com.cycling.rssradar.data.FeedProbeResult.InvalidUrl ->
-                        ValidationInfo.Invalid("链接格式不正确")
-                    com.cycling.rssradar.data.FeedProbeResult.InvalidFeed ->
-                        ValidationInfo.Invalid("不是有效的 RSS/Atom 源")
-                    com.cycling.rssradar.data.FeedProbeResult.NetworkError ->
-                        ValidationInfo.Network("无法访问链接，请检查网络")
+                    is FeedProbeResult.Valid -> ValidationInfo.Valid(probe.articleCount)
+                    FeedProbeResult.InvalidUrl -> ValidationInfo.Invalid("链接格式不正确")
+                    FeedProbeResult.InvalidFeed -> ValidationInfo.Invalid("不是有效的 RSS/Atom 源")
+                    FeedProbeResult.NetworkError -> ValidationInfo.Network("无法访问链接，请检查网络")
                 },
             )
         }
@@ -113,6 +99,62 @@ class AddSubscriptionViewModel(private val repository: FeedRepository) : ViewMod
 
     fun onGroupSelected(group: String) {
         _state.value = _state.value.copy(selectedGroup = group)
+    }
+
+    fun onQueryChange(query: String) {
+        _state.value = _state.value.copy(query = query)
+    }
+
+    fun onCategoryChange(category: String) {
+        _state.value = _state.value.copy(category = category)
+    }
+
+    /** 选中路由 → 进入参数阶段。参数留空，由 placeholder 兜底出示例值。 */
+    fun onRouteSelected(route: RssHubRoute) {
+        _state.value = _state.value.copy(
+            step = AddSheetStep.Params,
+            selectedRouteId = route.id,
+            paramValues = emptyMap(),
+            url = "",
+            validation = ValidationInfo.Idle,
+            selectedGroup = route.suggestedGroup,
+        )
+        validationJob?.cancel()
+    }
+
+    fun onParamChange(key: String, value: String) {
+        val next = _state.value.paramValues.toMutableMap().apply { put(key, value) }
+        // 参数一改，之前那次预览/校验就作废了
+        validationJob?.cancel()
+        _state.value = _state.value.copy(
+            paramValues = next,
+            url = "",
+            validation = ValidationInfo.Idle,
+        )
+    }
+
+    /** 从参数阶段退回目录。 */
+    fun onBackToCatalog() {
+        validationJob?.cancel()
+        _state.value = _state.value.copy(
+            step = AddSheetStep.Catalog,
+            selectedRouteId = null,
+            paramValues = emptyMap(),
+            url = "",
+            validation = ValidationInfo.Idle,
+        )
+    }
+
+    /** 把拼好的地址塞进统一的 url 通道，走与手填完全相同的校验。 */
+    fun onPreviewRoute() {
+        val built = _state.value.builtUrl ?: return
+        onUrlChange(built)
+    }
+
+    /** 抽屉关闭 / 添加成功后调用，避免下次打开残留上一次的状态。 */
+    fun reset() {
+        validationJob?.cancel()
+        _state.value = AddSubscriptionUiState()
     }
 
     fun submit() {
@@ -127,9 +169,7 @@ class AddSubscriptionViewModel(private val repository: FeedRepository) : ViewMod
                 AddFeedResult.InvalidFeed -> "不是有效的 RSS/Atom 源"
                 AddFeedResult.NetworkError -> "网络错误，请检查链接后重试"
             }
-            if (result == AddFeedResult.Success) {
-                _state.value = _state.value.copy(url = "", validation = ValidationInfo.Idle)
-            }
+            if (result == AddFeedResult.Success) reset()
         }
     }
 
@@ -138,7 +178,7 @@ class AddSubscriptionViewModel(private val repository: FeedRepository) : ViewMod
     }
 
     companion object {
-        fun factory(container: com.cycling.rssradar.AppContainer): ViewModelProvider.Factory =
+        fun factory(container: AppContainer): ViewModelProvider.Factory =
             viewModelFactory {
                 initializer { AddSubscriptionViewModel(container.repository) }
             }
