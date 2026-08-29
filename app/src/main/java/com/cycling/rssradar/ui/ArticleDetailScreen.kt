@@ -44,7 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import coil.compose.AsyncImage
+import coil3.compose.SubcomposeAsyncImage
 import com.cycling.rssradar.LocalDarkTheme
 import com.cycling.rssradar.data.ArticleWithFeed
 import com.cycling.rssradar.ui.components.FeedIcon
@@ -82,8 +82,8 @@ fun ArticleDetailScreen(
                 ArticleActionsBar(
                     isStarred = item.article.isStarred,
                     isBookmarked = item.article.isBookmarked,
-                    onStar = { viewModel.toggleStarred() },
-                    onBookmark = { viewModel.toggleBookmarked() },
+                    onStar = { viewModel.onIntent(ArticleDetailIntent.ToggleStarred) },
+                    onBookmark = { viewModel.onIntent(ArticleDetailIntent.ToggleBookmarked) },
                     onOpenOriginal = { onOpenOriginal(item.article.link) },
                 )
             }
@@ -140,7 +140,7 @@ private fun ArticleDetailContent(
         modifier = modifier.padding(horizontal = 20.dp, vertical = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            FeedIcon(title = article.feedTitle, size = 24.dp, cornerRadius = 6.dp)
+            FeedIcon(title = article.feedTitle, size = 22.dp, cornerRadius = 6.dp)
             Spacer(Modifier.width(8.dp))
             Text(
                 text = article.feedTitle,
@@ -172,21 +172,22 @@ private fun ArticleDetailContent(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        // 压薄头部：标题用 titleLarge（比 headlineSmall 矮一档），间距收紧，减少固定占用
+        Spacer(Modifier.height(10.dp))
         Text(
             text = article.article.title,
             color = TextPrimary,
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
         )
 
-        // 封面：取到了就显示真图，取不到就什么都不显示
-        article.article.coverUrl?.let { url ->
-            Spacer(Modifier.height(16.dp))
+        // 封面：取到了且为有效地址才显示真图；否则整块不渲染（不留空白占位）
+        article.article.coverUrl?.takeIf { it.isNotBlank() }?.let { url ->
+            Spacer(Modifier.height(12.dp))
             ArticleCoverImage(url = url)
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
         when {
             // feed 自带或已抓取的正文：WebView 渲染净化 HTML（内部滚动，模板注入深色主题）
             article.article.content != null -> ArticleWebView(
@@ -283,14 +284,17 @@ private fun buildStyledContentHtml(contentHtml: String, darkTheme: Boolean): Str
 
 @Composable
 private fun ArticleCoverImage(url: String) {
-    AsyncImage(
+    SubcomposeAsyncImage(
         model = url,
         contentDescription = "文章封面",
         contentScale = ContentScale.Crop,
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp)
+            .height(160.dp)
             .clip(RoundedCornerShape(12.dp)),
+        // 加载中 / 失败：画可见的 Surface2 占位，避免透明空洞（Coil 3 默认加载态不绘制）
+        loading = { Box(Modifier.fillMaxSize().background(Surface2)) },
+        error = { Box(Modifier.fillMaxSize().background(Surface2)) },
     )
 }
 

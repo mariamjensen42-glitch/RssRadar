@@ -64,6 +64,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.CornerUpRight
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
+import com.cycling.rssradar.data.FeedEntity
 
 @Composable
 fun SubscriptionsScreen(
@@ -85,7 +86,7 @@ fun SubscriptionsScreen(
     LaunchedEffect(message) {
         message?.let {
             snackbarHostState.showSnackbar(it)
-            viewModel.onMessageShown()
+            viewModel.onIntent(SubscriptionsIntent.ConsumeMessage)
         }
     }
 
@@ -94,7 +95,7 @@ fun SubscriptionsScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             SubscriptionsTopBar(
-                onSort = { viewModel.toggleSort() },
+                onSort = { viewModel.onIntent(SubscriptionsIntent.ToggleSort) },
                 onAdd = onAddSubscription,
             )
         },
@@ -122,7 +123,7 @@ fun SubscriptionsScreen(
                     feedCount = group.feeds.size,
                     feeds = group.feeds,
                     expanded = group.group in expandedIds,
-                    onToggle = { viewModel.toggleGroup(group.group) },
+                    onToggle = { viewModel.onIntent(SubscriptionsIntent.ToggleGroup(group.group)) },
                     onEdit = { renameGroupTarget = group.group },
                     onFeedMore = { onFeedAction(it.id) },
                 )
@@ -136,7 +137,7 @@ fun SubscriptionsScreen(
             if (totalUnread > 0) {
                 item {
                     Spacer(Modifier.height(8.dp))
-                    MarkAllReadRow(onClick = { viewModel.markAllRead() })
+                    MarkAllReadRow(onClick = { viewModel.onIntent(SubscriptionsIntent.MarkAllRead) })
                 }
             }
 
@@ -151,7 +152,7 @@ fun SubscriptionsScreen(
             confirmText = "创建",
             onDismiss = { createGroupDialog = false },
             onConfirm = { name ->
-                viewModel.createGroup(name)
+                viewModel.onIntent(SubscriptionsIntent.CreateGroup(name))
                 createGroupDialog = false
             },
         )
@@ -165,7 +166,7 @@ fun SubscriptionsScreen(
             confirmText = "保存",
             onDismiss = { renameGroupTarget = null },
             onConfirm = { name ->
-                viewModel.renameGroup(old, name)
+                viewModel.onIntent(SubscriptionsIntent.RenameGroup(old, name))
                 renameGroupTarget = null
             },
         )

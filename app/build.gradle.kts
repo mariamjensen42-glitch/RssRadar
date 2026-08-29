@@ -54,7 +54,9 @@ android {
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.runtime.saveable)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.hilt.android)
@@ -75,6 +77,7 @@ dependencies {
     implementation(libs.jsoup)
     implementation(libs.readability4j)
     implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

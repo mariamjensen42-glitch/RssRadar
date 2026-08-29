@@ -13,12 +13,14 @@ room = "2.8.4"
 rome = "2.1.0"
 jsoup = "1.18.3"
 readability4j = "1.0.8"
-coil = "2.7.0"
+coil = "3.3.0"
 composablesIcons = "2.2.1"
 navigation = "2.10.0"
 kotlinxSerialization = "1.7.3"
 hilt = "2.60.1"
 hiltNavigationCompose = "1.4.0"
+runtimeSaveable = "1.12.0"
+foundation = "1.12.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -43,13 +45,16 @@ rome = { group = "com.rometools", name = "rome", version.ref = "rome" }
 rome-modules = { group = "com.rometools", name = "rome-modules", version.ref = "rome" }
 jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 readability4j = { group = "net.dankito.readability4j", name = "readability4j", version.ref = "readability4j" }
-coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
+coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 compose-icons-lucide = { group = "com.composables", name = "icons-lucide-cmp", version.ref = "composablesIcons" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
 androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+androidx-compose-runtime-saveable = { group = "androidx.compose.runtime", name = "runtime-saveable", version.ref = "runtimeSaveable" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
