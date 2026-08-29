@@ -39,3 +39,47 @@ _Avoid_: 文章字段、元数据
 **用户状态（User state）**:
 读者对一篇文章的标记：已读、收藏、稍后读。只由用户操作改变，**刷新订阅源永不覆盖**。
 _Avoid_: 阅读状态、标记、flag
+
+## Navigation
+
+**路由（Route）**:
+一个屏幕或浮层的类型安全标识（Kotlin `@Serializable` 对象或数据类），作为导航图中的一个目的地。
+_Avoid_: 页面、screen、destination id、路径
+
+**目的地（Destination）**:
+导航图中由某个 Route 声明、可被导航到的可组合项。
+_Avoid_: 页面、screen
+
+**导航图（NavGraph）**:
+应用所有 Route 及其关系的集中声明，定义于 `NavHost`。
+_Avoid_: 路由表
+
+**底部栏（Bottom bar）**:
+主界面底部 4 个顶层目的地的切换栏；选中态由当前 Route 决定。
+_Avoid_: 底部导航、tab bar、导航条
+
+**返回栈（Back stack）**:
+`NavController` 维护的目的地栈，驱动系统返回与预测性返回。
+_Avoid_: 历史栈
+
+**预测性返回（Predictive back）**:
+Android 13+ 上系统返回手势的预览动画，由导航库内置支持。
+_Avoid_: 边缘返回、手势返回
+
+**深链接（Deep link）**:
+通过 URI（如 `rssradar://article/{id}`）直接导航到某目的地的机制。
+_Avoid_: 外部链接、web link
+
+## Dependency Injection
+
+**Hilt**:
+官方依赖注入框架，接管原手写 `AppContainer`；通过 `@HiltAndroidApp`、`@AndroidEntryPoint`、`@HiltViewModel` 标注接入。
+_Avoid_: Dagger、Koin、AppContainer
+
+**模块（Module）**:
+用 `@Module @InstallIn` 声明、提供依赖（Room 数据库、解析器等）的 Hilt 装配类。
+_Avoid_: 容器、provider、component
+
+**作用域 ViewModel（Scoped ViewModel）**:
+绑定到某个导航图作用域、在该图内多个目的地间共享的 ViewModel（如加订阅两步流）。
+_Avoid_: 共享 VM、图级 VM
