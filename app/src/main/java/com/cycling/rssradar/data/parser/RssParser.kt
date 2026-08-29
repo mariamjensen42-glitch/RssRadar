@@ -1,4 +1,4 @@
-package com.cycling.rssradar.data
+package com.cycling.rssradar.data.parser
 
 import com.rometools.rome.feed.synd.SyndEntry
 import com.rometools.rome.feed.synd.SyndFeed
@@ -7,6 +7,8 @@ import com.rometools.rome.io.XmlReader
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.io.InputStream
+
+import com.cycling.rssradar.ui.subscriptions.String
 
 /**
  * 解析 RSS 2.0 / Atom 流的纯 JVM 组件，是订阅链路的 TDD 测试缝。

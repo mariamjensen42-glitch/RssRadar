@@ -1,4 +1,4 @@
-package com.cycling.rssradar.ui
+package com.cycling.rssradar.ui.addsubscription
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -6,16 +6,16 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.data.AddFeedResult
-import com.cycling.rssradar.data.FeedEntity
-import com.cycling.rssradar.data.FeedProbeResult
+import com.cycling.rssradar.data.db.FeedEntity
+import com.cycling.rssradar.data.parser.FeedProbeResult
 import com.cycling.rssradar.data.FeedRepository
-import com.cycling.rssradar.data.GROUP_DESIGN
-import com.cycling.rssradar.data.GROUP_DEV
-import com.cycling.rssradar.data.GROUP_TECH
-import com.cycling.rssradar.data.RouteCategory
-import com.cycling.rssradar.data.RssHubInstanceStore
-import com.cycling.rssradar.data.RssHubRoute
-import com.cycling.rssradar.data.RssHubRoutes
+import com.cycling.rssradar.data.db.GROUP_DESIGN
+import com.cycling.rssradar.data.db.GROUP_DEV
+import com.cycling.rssradar.data.db.GROUP_TECH
+import com.cycling.rssradar.data.rsshub.RouteCategory
+import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
+import com.cycling.rssradar.data.rsshub.RssHubRoute
+import com.cycling.rssradar.data.rsshub.RssHubRoutes
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -25,6 +25,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+
+import com.cycling.rssradar.ui.subscriptions.String
+import com.cycling.rssradar.ui.theme.Success
 
 /** 链接校验结果。 */
 sealed interface ValidationInfo {

@@ -1,4 +1,4 @@
-package com.cycling.rssradar.data
+package com.cycling.rssradar.data.parser
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

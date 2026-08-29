@@ -1,4 +1,4 @@
-package com.cycling.rssradar.ui
+package com.cycling.rssradar.ui.addsubscription
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -51,9 +51,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.data.RouteParam
-import com.cycling.rssradar.data.RssHubRoute
-import com.cycling.rssradar.data.RssHubRoutes
+import com.cycling.rssradar.data.rsshub.RouteParam
+import com.cycling.rssradar.data.rsshub.RssHubRoute
+import com.cycling.rssradar.data.rsshub.RssHubRoutes
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.Divider
@@ -75,6 +75,8 @@ import com.composables.icons.lucide.Rss
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.X
 import com.composables.icons.lucide.Zap
+
+import com.cycling.rssradar.ui.subscriptions.String
 
 /** RSSHub 品牌橙，只用在「这是 RSSHub 能力」的标识上，与紫色主色区分开。 */
 private val RssHubOrange = Color(0xFFFF6B00)

@@ -34,22 +34,22 @@ import androidx.navigation.toRoute
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.cycling.rssradar.data.ThemeMode
+import com.cycling.rssradar.data.store.ThemeMode
 import com.cycling.rssradar.di.AppEntryPoint
-import com.cycling.rssradar.ui.AddSubscriptionCatalogScreen
-import com.cycling.rssradar.ui.AddSubscriptionParamsScreen
-import com.cycling.rssradar.ui.AddSubscriptionViewModel
-import com.cycling.rssradar.ui.ArticleDetailScreen
-import com.cycling.rssradar.ui.ArticleDetailViewModel
-import com.cycling.rssradar.ui.FeedActionScreen
-import com.cycling.rssradar.ui.FeedListScreen
-import com.cycling.rssradar.ui.FeedListViewModel
-import com.cycling.rssradar.ui.RssHubSettingsScreen
-import com.cycling.rssradar.ui.RssHubSettingsViewModel
-import com.cycling.rssradar.ui.SearchScreen
-import com.cycling.rssradar.ui.SearchViewModel
-import com.cycling.rssradar.ui.SubscriptionsScreen
-import com.cycling.rssradar.ui.SubscriptionsViewModel
+import com.cycling.rssradar.ui.addsubscription.AddSubscriptionCatalogScreen
+import com.cycling.rssradar.ui.addsubscription.AddSubscriptionParamsScreen
+import com.cycling.rssradar.ui.addsubscription.AddSubscriptionViewModel
+import com.cycling.rssradar.ui.article.ArticleDetailScreen
+import com.cycling.rssradar.ui.article.ArticleDetailViewModel
+import com.cycling.rssradar.ui.subscriptions.FeedActionScreen
+import com.cycling.rssradar.ui.feed.FeedListScreen
+import com.cycling.rssradar.ui.feed.FeedListViewModel
+import com.cycling.rssradar.ui.me.RssHubSettingsScreen
+import com.cycling.rssradar.ui.me.RssHubSettingsViewModel
+import com.cycling.rssradar.ui.search.SearchScreen
+import com.cycling.rssradar.ui.search.SearchViewModel
+import com.cycling.rssradar.ui.subscriptions.SubscriptionsScreen
+import com.cycling.rssradar.ui.subscriptions.SubscriptionsViewModel
 import com.cycling.rssradar.ui.components.FloatingBottomBar
 import com.cycling.rssradar.ui.navigation.AddSubscriptionCatalogRoute
 import com.cycling.rssradar.ui.navigation.AddSubscriptionParamsRoute
@@ -64,6 +64,8 @@ import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.RssRadarTheme
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.EntryPointAccessors
+
+import com.cycling.rssradar.ui.subscriptions.String
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {

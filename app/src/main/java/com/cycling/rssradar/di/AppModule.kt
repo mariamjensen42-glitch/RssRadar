@@ -3,16 +3,16 @@ package com.cycling.rssradar.di
 import android.app.Application
 import android.content.Context
 import androidx.room.Room
-import com.cycling.rssradar.data.AppDatabase
-import com.cycling.rssradar.data.ContentFetcher
+import com.cycling.rssradar.data.db.AppDatabase
+import com.cycling.rssradar.data.parser.ContentFetcher
 import com.cycling.rssradar.data.FeedRepository
-import com.cycling.rssradar.data.GroupStore
-import com.cycling.rssradar.data.MIGRATION_1_2
-import com.cycling.rssradar.data.MIGRATION_2_3
-import com.cycling.rssradar.data.MIGRATION_3_4
-import com.cycling.rssradar.data.RssHubInstanceStore
-import com.cycling.rssradar.data.RssParser
-import com.cycling.rssradar.data.ThemeStore
+import com.cycling.rssradar.data.store.GroupStore
+import com.cycling.rssradar.data.db.MIGRATION_1_2
+import com.cycling.rssradar.data.db.MIGRATION_2_3
+import com.cycling.rssradar.data.db.MIGRATION_3_4
+import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
+import com.cycling.rssradar.data.parser.RssParser
+import com.cycling.rssradar.data.store.ThemeStore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.EntryPoint
@@ -20,6 +20,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
+
+import com.cycling.rssradar.Context
 
 /**
  * Hilt 依赖图（ADR-0002）：原手写 AppContainer 的 Room DB / 解析器 / 各 Store
