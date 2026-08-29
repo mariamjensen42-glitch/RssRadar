@@ -32,11 +32,6 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideApplication(@ApplicationContext context: Context): Application =
-        context.applicationContext as Application
-
-    @Provides
-    @Singleton
     fun provideAppDatabase(app: Application): AppDatabase =
         Room.databaseBuilder(app, AppDatabase::class.java, "rssradar.db")
             .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
