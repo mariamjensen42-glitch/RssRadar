@@ -67,6 +67,8 @@ fun FeedListScreen(
     val unreadArticles by viewModel.unreadArticles.collectAsState()
     val starredArticles by viewModel.starredArticles.collectAsState()
     val bookmarkedArticles by viewModel.bookmarkedArticles.collectAsState()
+    val selectedGroup by viewModel.selectedGroup.collectAsState()
+    val groupOptions by viewModel.groupOptions.collectAsState()
     val unreadCount by viewModel.unreadCount.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val message = viewModel.uiMessage
@@ -78,12 +80,14 @@ fun FeedListScreen(
         }
     }
 
-    val currentList = when (selectedTab) {
-        FeedTab.All -> allArticles
-        FeedTab.Unread -> unreadArticles
-        FeedTab.Starred -> starredArticles
-        FeedTab.Bookmarked -> bookmarkedArticles
-    }
+    val currentList = viewModel.filterByGroup(
+        when (selectedTab) {
+            FeedTab.All -> allArticles
+            FeedTab.Unread -> unreadArticles
+            FeedTab.Starred -> starredArticles
+            FeedTab.Bookmarked -> bookmarkedArticles
+        },
+    )
 
     Scaffold(
         containerColor = BgRoot,
@@ -109,6 +113,15 @@ fun FeedListScreen(
                 unreadCount = unreadCount,
                 onSelect = viewModel::selectTab,
             )
+            // 分组筛选：仅 All tab 显示，其余 tab 是全量视图
+            if (selectedTab == FeedTab.All && groupOptions.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                GroupFilterRow(
+                    groups = groupOptions,
+                    selected = selectedGroup,
+                    onSelect = viewModel::selectGroup,
+                )
+            }
             Spacer(Modifier.height(8.dp))
             if (currentList.isEmpty()) {
                 EmptyState(selectedTab = selectedTab, modifier = Modifier.fillMaxSize())
@@ -226,6 +239,26 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
         )
+    }
+}
+
+/** 分组筛选栏：「全部」+ 各分组。 */
+@Composable
+private fun GroupFilterRow(
+    groups: List<String>,
+    selected: String?,
+    onSelect: (String?) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilterChip(label = "全部", selected = selected == null, onClick = { onSelect(null) })
+        groups.take(4).forEach { group ->
+            FilterChip(label = group, selected = selected == group, onClick = { onSelect(group) })
+        }
     }
 }
 

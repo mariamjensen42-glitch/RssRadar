@@ -66,6 +66,27 @@ class FeedRepository(
     suspend fun setBookmarked(id: Long, bookmarked: Boolean) = articleDao.setBookmarked(id, bookmarked)
     suspend fun markAllRead() = articleDao.markAllRead()
 
+    // —— 订阅源 / 分组管理（issue #6） ——
+
+    /** 移动订阅源到其他分组。 */
+    suspend fun moveFeed(feedId: Long, groupName: String) = feedDao.updateGroup(feedId, groupName)
+
+    /** 重命名订阅源标题。 */
+    suspend fun renameFeed(feedId: Long, title: String) = feedDao.updateTitle(feedId, title)
+
+    /** 删除订阅源（其文章级联删除）。 */
+    suspend fun deleteFeed(feedId: Long) = feedDao.deleteFeed(feedId)
+
+    /** 分组重命名：注册表 + feeds.groupName 批量更新。 */
+    suspend fun renameGroup(oldName: String, newName: String) {
+        feedDao.renameGroup(oldName, newName)
+    }
+
+    /** 删除分组：注册表删名 + feed 移回默认组。 */
+    suspend fun deleteGroup(groupName: String) {
+        feedDao.moveGroupToDefault(groupName, DEFAULT_GROUP)
+    }
+
     suspend fun getArticle(id: Long): ArticleWithFeed? = articleDao.getWithFeed(id)
 
     /**
