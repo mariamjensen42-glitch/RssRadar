@@ -66,6 +66,7 @@ fun FeedListScreen(
     val allArticles by viewModel.allArticles.collectAsState()
     val unreadArticles by viewModel.unreadArticles.collectAsState()
     val starredArticles by viewModel.starredArticles.collectAsState()
+    val bookmarkedArticles by viewModel.bookmarkedArticles.collectAsState()
     val unreadCount by viewModel.unreadCount.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val message = viewModel.uiMessage
@@ -81,6 +82,7 @@ fun FeedListScreen(
         FeedTab.All -> allArticles
         FeedTab.Unread -> unreadArticles
         FeedTab.Starred -> starredArticles
+        FeedTab.Bookmarked -> bookmarkedArticles
     }
 
     Scaffold(
@@ -198,6 +200,7 @@ private fun FeedListTabRow(
                 FeedTab.All -> "全部"
                 FeedTab.Unread -> "未读 $unreadCount"
                 FeedTab.Starred -> "收藏"
+                FeedTab.Bookmarked -> "稍后读"
             }
             FilterChip(
                 label = label,
@@ -336,6 +339,7 @@ private fun EmptyState(selectedTab: FeedTab, modifier: Modifier = Modifier) {
         FeedTab.All -> "还没有订阅" to "去订阅页添加你的第一个 RSS / Atom 源"
         FeedTab.Unread -> "没有未读文章" to "所有文章都看完了，休息一下"
         FeedTab.Starred -> "还没有收藏" to "阅读时点击星标，把好文章留下来"
+        FeedTab.Bookmarked -> "暂无稍后读" to "阅读时点击书签，稍后再看"
     }
     Column(
         modifier = modifier.padding(32.dp),

@@ -158,6 +158,17 @@ interface ArticleDao {
         SELECT articles.*, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.isBookmarked = 1
+        ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
+        """,
+    )
+    fun observeBookmarkedWithFeed(): Flow<List<ArticleWithFeed>>
+
+    @Query(
+        """
+        SELECT articles.*, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
         WHERE articles.id = :id
         LIMIT 1
         """,

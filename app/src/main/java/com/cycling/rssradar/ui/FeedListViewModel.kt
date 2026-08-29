@@ -18,8 +18,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** 信息流页内的 3 个过滤 tab。 */
-enum class FeedTab { All, Unread, Starred }
+/** 信息流页内的 4 个过滤 tab。 */
+enum class FeedTab { All, Unread, Starred, Bookmarked }
 
 class FeedListViewModel(private val repository: FeedRepository) : ViewModel() {
 
@@ -33,6 +33,9 @@ class FeedListViewModel(private val repository: FeedRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val starredArticles: StateFlow<List<ArticleWithFeed>> = repository.observeStarredArticles()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val bookmarkedArticles: StateFlow<List<ArticleWithFeed>> = repository.observeBookmarkedArticles()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val unreadCount: StateFlow<Int> = repository.observeUnreadCount()
