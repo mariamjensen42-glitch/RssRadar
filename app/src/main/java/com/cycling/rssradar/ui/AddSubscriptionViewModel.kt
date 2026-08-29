@@ -1,6 +1,8 @@
 package com.cycling.rssradar.ui
 
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -64,9 +66,13 @@ data class AddSubscriptionUiState(
     val canSubmit: Boolean get() = url.isNotBlank() && validation is ValidationInfo.Valid && !isAdding
 }
 
-class AddSubscriptionViewModel(private val repository: FeedRepository) : ViewModel() {
+class AddSubscriptionViewModel(
+    private val repository: FeedRepository,
+    /** 当前 RSSHub 实例。由宿主注入（实例探测见 issue #14），默认官方实例。 */
+    hostProvider: () -> String = { RssHubRoutes.DEFAULT_HOST },
+) : ViewModel() {
 
-    private val _state = MutableStateFlow(AddSubscriptionUiState())
+    private val _state = MutableStateFlow(AddSubscriptionUiState(host = hostProvider()))
     val state: StateFlow<AddSubscriptionUiState> = _state.asStateFlow()
 
     /** 分组选项。与订阅页保持一致，避免两处各写一份。 */
@@ -180,7 +186,12 @@ class AddSubscriptionViewModel(private val repository: FeedRepository) : ViewMod
     companion object {
         fun factory(container: AppContainer): ViewModelProvider.Factory =
             viewModelFactory {
-                initializer { AddSubscriptionViewModel(container.repository) }
+                initializer {
+                    AddSubscriptionViewModel(
+                        repository = container.repository,
+                        hostProvider = { container.instanceStore.currentOrDefault() },
+                    )
+                }
             }
     }
 }

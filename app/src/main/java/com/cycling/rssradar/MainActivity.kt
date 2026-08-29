@@ -33,6 +33,8 @@ import com.cycling.rssradar.ui.ArticleDetailScreen
 import com.cycling.rssradar.ui.ArticleDetailViewModel
 import com.cycling.rssradar.ui.FeedListScreen
 import com.cycling.rssradar.ui.FeedListViewModel
+import com.cycling.rssradar.ui.RssHubSettingsScreen
+import com.cycling.rssradar.ui.RssHubSettingsViewModel
 import com.cycling.rssradar.ui.SearchScreen
 import com.cycling.rssradar.ui.SearchViewModel
 import com.cycling.rssradar.ui.SubscriptionsScreen
@@ -61,6 +63,9 @@ class MainActivity : ComponentActivity() {
     private val articleVm: ArticleDetailViewModel by viewModels {
         ArticleDetailViewModel.factory((application as RssRadarApp).container)
     }
+    private val settingsVm: RssHubSettingsViewModel by viewModels {
+        RssHubSettingsViewModel.factory((application as RssRadarApp).container)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,6 +79,7 @@ class MainActivity : ComponentActivity() {
                         addVm = addVm,
                         searchVm = searchVm,
                         articleVm = articleVm,
+                        settingsVm = settingsVm,
                     )
                 }
             }
@@ -88,6 +94,7 @@ private fun RssRadarApp(
     addVm: AddSubscriptionViewModel,
     searchVm: SearchViewModel,
     articleVm: ArticleDetailViewModel,
+    settingsVm: RssHubSettingsViewModel,
 ) {
     // 加订阅是低频动作：不占路由，也不占整页，从信息流 FAB / 订阅页入口唤起底部抽屉。
     var currentTab by rememberSaveable { mutableStateOf(MainTab.Feed) }
@@ -112,7 +119,7 @@ private fun RssRadarApp(
                 viewModel = searchVm,
                 onOpenArticle = { detailArticleId = it.article.id },
             )
-            MainTab.Me -> MeTabPlaceholder()
+            MainTab.Me -> RssHubSettingsScreen(viewModel = settingsVm)
         }
 
         // 文章详情是全屏浮层，浮层期间隐藏底部 TabBar。
@@ -143,23 +150,6 @@ private fun RssRadarApp(
                 },
             )
         }
-    }
-}
-
-@Composable
-private fun MeTabPlaceholder() {
-    Box(modifier = Modifier.fillMaxSize().padding(bottom = 80.dp), contentAlignment = Alignment.Center) {
-        Text(
-            text = "「我的」页面正在搭建中",
-            color = TextSecondary,
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(
-            text = "后续会展示：设置、阅读统计、同步",
-            color = TextTertiary,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = 6.dp),
-        )
     }
 }
 

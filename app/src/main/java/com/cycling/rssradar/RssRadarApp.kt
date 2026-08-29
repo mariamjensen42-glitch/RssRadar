@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.cycling.rssradar.data.AppDatabase
 import com.cycling.rssradar.data.ContentFetcher
 import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.data.RssHubInstanceStore
 import com.cycling.rssradar.data.MIGRATION_1_2
 import com.cycling.rssradar.data.MIGRATION_2_3
 import com.cycling.rssradar.data.RssParser
@@ -20,6 +21,8 @@ class AppContainer(app: Application) {
         .build()
 
     val contentFetcher: ContentFetcher = ContentFetcher(cacheDir = app.cacheDir)
+
+    val instanceStore = RssHubInstanceStore(app)
 
     val repository: FeedRepository = FeedRepository(
         database = database,
