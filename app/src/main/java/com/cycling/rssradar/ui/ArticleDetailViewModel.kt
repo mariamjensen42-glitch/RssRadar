@@ -1,5 +1,6 @@
 package com.cycling.rssradar.ui
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.data.ArticleEntity
@@ -19,8 +20,12 @@ sealed interface ArticleDetailIntent {
     data object ToggleBookmarked : ArticleDetailIntent
 }
 
+/** nav args 在 SavedStateHandle 里的键，与 ArticleDetailRoute 的参数名一致。 */
+private const val KEY_ARTICLE_ID = "articleId"
+
 @HiltViewModel
 class ArticleDetailViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     private val repository: FeedRepository,
 ) : ViewModel(), MviViewModel<ArticleDetailIntent> {
 
@@ -31,7 +36,16 @@ class ArticleDetailViewModel @Inject constructor(
     private val _isFetchingContent = MutableStateFlow(false)
     val isFetchingContent: StateFlow<Boolean> = _isFetchingContent.asStateFlow()
 
-    /** init 由调用方在拿到 articleId 后触发（从 nav args / savedStateHandle 读）。 */
+    init {
+        // articleId 来自 nav args（类型安全路由写入 SavedStateHandle，issue #32）。
+        // 进程重建时 NavController 恢复 back stack 并重放 args，本 init 重新触发 → 当前文章不丢。
+        // 兼容 Long / String 两种存法（Navigation 版本对 bundle 内类型处理有差异）。
+        val articleId = savedStateHandle.get<Long>(KEY_ARTICLE_ID)
+            ?: savedStateHandle.get<String>(KEY_ARTICLE_ID)?.toLongOrNull()
+        if (articleId != null) load(articleId)
+    }
+
+    /** 幂等：init 自加载后，screen 生命周期处重复调用只是重查 DB。 */
     fun load(articleId: Long) {
         viewModelScope.launch {
             _article.value = repository.getArticle(articleId)

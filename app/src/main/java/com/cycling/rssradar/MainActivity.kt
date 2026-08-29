@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
+import androidx.navigation.navDeepLink
 import androidx.navigation.navigation
 import androidx.navigation.toRoute
 import androidx.navigation.compose.composable
@@ -156,7 +157,11 @@ private fun RssRadarAppContent() {
                 val vm = hiltViewModel<RssHubSettingsViewModel>()
                 RssHubSettingsScreen(viewModel = vm)
             }
-            composable<ArticleDetailRoute> { backStackEntry ->
+            // deepLink rssradar://article/{id}（issue #32）：manifest intent-filter 把
+            // 外部 intent 送进本 Activity，NavHost 自动解析 initial intent 落到此目的地。
+            composable<ArticleDetailRoute>(
+                deepLinks = listOf(navDeepLink { uriPattern = "rssradar://article/{articleId}" }),
+            ) { backStackEntry ->
                 val articleId = backStackEntry.toRoute<ArticleDetailRoute>().articleId
                 ArticleDetailScreen(
                     viewModel = hiltViewModel<ArticleDetailViewModel>(),
