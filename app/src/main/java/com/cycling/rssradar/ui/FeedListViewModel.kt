@@ -11,6 +11,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cycling.rssradar.data.AddFeedResult
 import com.cycling.rssradar.data.ArticleWithFeed
 import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.data.GroupStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,10 +23,17 @@ import kotlinx.coroutines.launch
 /** 信息流页内的 4 个过滤 tab。 */
 enum class FeedTab { All, Unread, Starred, Bookmarked }
 
-class FeedListViewModel(private val repository: FeedRepository) : ViewModel() {
+class FeedListViewModel(
+    private val repository: FeedRepository,
+    groupStore: GroupStore,
+) : ViewModel() {
 
     private val _selectedTab = MutableStateFlow(FeedTab.All)
     val selectedTab: StateFlow<FeedTab> = _selectedTab.asStateFlow()
+
+    /** 分组筛选：null = 全部。仅 All tab 生效。 */
+    private val _selectedGroup = MutableStateFlow<String?>(null)
+    val selectedGroup: StateFlow<String?> = _selectedGroup.asStateFlow()
 
     /** All tab 用分页累积列表（量大，只取已加载部分）；其余 tab 用实时 Flow。 */
     private val _allArticles = MutableStateFlow<List<ArticleWithFeed>>(emptyList())
@@ -42,6 +50,9 @@ class FeedListViewModel(private val repository: FeedRepository) : ViewModel() {
 
     val unreadCount: StateFlow<Int> = repository.observeUnreadCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    /** 分组清单（注册表），供筛选栏使用。 */
+    val groupOptions: StateFlow<List<String>> = MutableStateFlow(groupStore.getGroups())
 
     /** 是否还有下一页（仅 All tab 分页生效）。 */
     var hasMore by mutableStateOf(false)
@@ -75,6 +86,16 @@ class FeedListViewModel(private val repository: FeedRepository) : ViewModel() {
 
     fun selectTab(tab: FeedTab) {
         _selectedTab.value = tab
+    }
+
+    fun selectGroup(group: String?) {
+        _selectedGroup.value = group
+    }
+
+    /** 按当前分组筛选后的列表（null = 全部，直接透传）。 */
+    fun filterByGroup(articles: List<ArticleWithFeed>): List<ArticleWithFeed> {
+        val group = _selectedGroup.value ?: return articles
+        return articles.filter { it.feedGroup == group }
     }
 
     fun toggleStarred(articleId: Long, current: Boolean) {
@@ -144,7 +165,7 @@ class FeedListViewModel(private val repository: FeedRepository) : ViewModel() {
 
         fun factory(container: com.cycling.rssradar.AppContainer): ViewModelProvider.Factory =
             viewModelFactory {
-                initializer { FeedListViewModel(container.repository) }
+                initializer { FeedListViewModel(container.repository, container.groupStore) }
             }
     }
 }

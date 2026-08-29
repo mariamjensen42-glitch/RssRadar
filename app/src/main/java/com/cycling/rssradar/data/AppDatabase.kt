@@ -124,6 +124,21 @@ interface FeedDao {
 
     @Query("UPDATE feeds SET groupName = :groupName WHERE id = :feedId")
     suspend fun updateGroup(feedId: Long, groupName: String)
+
+    /** 重命名分组：该组所有 feed 的 groupName 批量改。 */
+    @Query("UPDATE feeds SET groupName = :newName WHERE groupName = :oldName")
+    suspend fun renameGroup(oldName: String, newName: String)
+
+    /** 删除分组：该组 feed 全部移回默认组（不删源）。 */
+    @Query("UPDATE feeds SET groupName = :defaultGroup WHERE groupName = :groupName")
+    suspend fun moveGroupToDefault(groupName: String, defaultGroup: String = DEFAULT_GROUP)
+
+    @Query("UPDATE feeds SET title = :title WHERE id = :feedId")
+    suspend fun updateTitle(feedId: Long, title: String)
+
+    /** 删除订阅源：articles 经外键 CASCADE 级联删除。 */
+    @Query("DELETE FROM feeds WHERE id = :feedId")
+    suspend fun deleteFeed(feedId: Long)
 }
 
 @Dao

@@ -14,6 +14,7 @@ import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.GROUP_DESIGN
 import com.cycling.rssradar.data.GROUP_DEV
 import com.cycling.rssradar.data.GROUP_TECH
+import com.cycling.rssradar.data.GroupStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,16 +29,24 @@ data class FeedWithUnread(val feed: FeedEntity, val unreadCount: Int)
 /** 一个分组下的所有订阅。 */
 data class GroupSectionUi(val group: String, val feeds: List<FeedWithUnread>)
 
-class SubscriptionsViewModel(private val repository: FeedRepository) : ViewModel() {
+class SubscriptionsViewModel(
+    private val repository: FeedRepository,
+    private val groupStore: GroupStore,
+) : ViewModel() {
 
     private val _expandedIds = MutableStateFlow(setOf(GROUP_TECH, GROUP_DEV, GROUP_DESIGN))
     val expandedGroupIds: StateFlow<Set<String>> = _expandedIds.asStateFlow()
 
+    /** 分组注册表：保证空分组也显示。 */
+    private val _groupsList = MutableStateFlow(groupStore.getGroups())
+    val groupsList: StateFlow<List<String>> = _groupsList.asStateFlow()
+
     val groups: StateFlow<List<GroupSectionUi>> = combine(
         repository.observeFeeds(),
         repository.observeFeedUnreadCounts(),
-    ) { feeds, unreadMap ->
-        groupFeeds(feeds, unreadMap)
+        _groupsList,
+    ) { feeds, unreadMap, registered ->
+        groupFeeds(feeds, unreadMap, registered)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val totalUnread: StateFlow<Int> = repository.observeUnreadCount()
@@ -67,35 +76,96 @@ class SubscriptionsViewModel(private val repository: FeedRepository) : ViewModel
         uiMessage = null
     }
 
+    // —— 分组 CRUD ——
+
+    /** 新建分组：仅注册表加名；已有同名返回 false。 */
+    fun createGroup(name: String) {
+        val ok = groupStore.addGroup(name)
+        refreshGroups()
+        uiMessage = if (ok) "已创建分组「${name.trim()}」" else "分组已存在或名称为空"
+    }
+
+    /** 重命名分组：注册表改名 + feeds.groupName 批量改。 */
+    fun renameGroup(oldName: String, newName: String) {
+        val ok = groupStore.renameGroup(oldName, newName)
+        refreshGroups()
+        if (!ok) {
+            uiMessage = "新名称无效或已存在"
+            return
+        }
+        viewModelScope.launch {
+            repository.renameGroup(oldName, newName.trim())
+            uiMessage = "已重命名为「${newName.trim()}」"
+        }
+    }
+
+    /** 删除分组：注册表删名 + 该组 feed 移回默认组。 */
+    fun deleteGroup(name: String) {
+        if (name == DEFAULT_GROUP) {
+            uiMessage = "默认分组不可删除"
+            return
+        }
+        groupStore.removeGroup(name)
+        refreshGroups()
+        viewModelScope.launch {
+            repository.deleteGroup(name)
+            uiMessage = "已删除分组「$name」，其中的订阅移入默认分组"
+        }
+    }
+
+    /** 移动订阅源到分组。 */
+    fun moveFeed(feedId: Long, targetGroup: String) {
+        viewModelScope.launch {
+            repository.moveFeed(feedId, targetGroup)
+            uiMessage = "已移动订阅"
+        }
+    }
+
+    /** 重命名订阅源标题。 */
+    fun renameFeed(feedId: Long, title: String) {
+        if (title.isBlank()) {
+            uiMessage = "标题不能为空"
+            return
+        }
+        viewModelScope.launch {
+            repository.renameFeed(feedId, title.trim())
+            uiMessage = "已重命名"
+        }
+    }
+
+    /** 删除订阅源（文章级联删除）。 */
+    fun deleteFeed(feedId: Long, feedTitle: String) {
+        viewModelScope.launch {
+            repository.deleteFeed(feedId)
+            uiMessage = "已删除「$feedTitle」"
+        }
+    }
+
+    private fun refreshGroups() {
+        _groupsList.value = groupStore.getGroups()
+    }
+
     private fun groupFeeds(
         feeds: List<FeedEntity>,
         unreadMap: Map<Long, Int>,
+        registered: List<String>,
     ): List<GroupSectionUi> {
-        if (feeds.isEmpty()) {
-            // 即使没有订阅，也展示 3 个示例分组占位（科技 / 开发 / 设计），与设计稿空态保持一致
-            return listOf(
-                GroupSectionUi(GROUP_TECH, emptyList()),
-                GroupSectionUi(GROUP_DEV, emptyList()),
-                GroupSectionUi(GROUP_DESIGN, emptyList()),
-            )
-        }
-        return feeds
+        // 注册表里没有 feed 的分组也要显示（空分组）
+        val byName = feeds
             .groupBy { it.groupName.ifBlank { DEFAULT_GROUP } }
-            .toSortedMap(compareBy<String> { it })
-            .map { (group, list) ->
-                GroupSectionUi(
-                    group = group,
-                    feeds = list
-                        .sortedBy { it.title }
-                        .map { FeedWithUnread(it, unreadMap[it.id] ?: 0) },
-                )
+            .mapValues { (_, list) ->
+                list.sortedBy { it.title }.map { FeedWithUnread(it, unreadMap[it.id] ?: 0) }
             }
+        val ordered = registered.distinct() + byName.keys.filterNot { it in registered }
+        return ordered.map { group ->
+            GroupSectionUi(group = group, feeds = byName[group].orEmpty())
+        }
     }
 
     companion object {
         fun factory(container: com.cycling.rssradar.AppContainer): ViewModelProvider.Factory =
             viewModelFactory {
-                initializer { SubscriptionsViewModel(container.repository) }
+                initializer { SubscriptionsViewModel(container.repository, container.groupStore) }
             }
     }
 }
