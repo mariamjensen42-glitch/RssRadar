@@ -1,5 +1,6 @@
 package com.cycling.rssradar
 
+import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -30,8 +31,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModelProvider
 import com.cycling.rssradar.data.ThemeMode
+import com.cycling.rssradar.di.AppEntryPoint
 import com.cycling.rssradar.ui.AddSubscriptionSheet
 import com.cycling.rssradar.ui.AddSubscriptionViewModel
 import com.cycling.rssradar.ui.ArticleDetailScreen
@@ -50,27 +51,18 @@ import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.RssRadarTheme
 import com.cycling.rssradar.ui.theme.TextSecondary
 import com.cycling.rssradar.ui.theme.TextTertiary
+import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.EntryPointAccessors
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    private val feedVm: FeedListViewModel by viewModels {
-        FeedListViewModel.factory((application as RssRadarApp).container)
-    }
-    private val subsVm: SubscriptionsViewModel by viewModels {
-        SubscriptionsViewModel.factory((application as RssRadarApp).container)
-    }
-    private val addVm: AddSubscriptionViewModel by viewModels {
-        AddSubscriptionViewModel.factory((application as RssRadarApp).container)
-    }
-    private val searchVm: SearchViewModel by viewModels {
-        SearchViewModel.factory((application as RssRadarApp).container)
-    }
-    private val articleVm: ArticleDetailViewModel by viewModels {
-        ArticleDetailViewModel.factory((application as RssRadarApp).container)
-    }
-    private val settingsVm: RssHubSettingsViewModel by viewModels {
-        RssHubSettingsViewModel.factory((application as RssRadarApp).container)
-    }
+    private val feedVm: FeedListViewModel by viewModels()
+    private val subsVm: SubscriptionsViewModel by viewModels()
+    private val addVm: AddSubscriptionViewModel by viewModels()
+    private val searchVm: SearchViewModel by viewModels()
+    private val articleVm: ArticleDetailViewModel by viewModels()
+    private val settingsVm: RssHubSettingsViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -102,7 +94,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun RssRadarThemeHost(content: @Composable () -> Unit) {
     val context = LocalContext.current
-    val themeStore = remember { (context.applicationContext as RssRadarApp).container.themeStore }
+    val app = context.applicationContext as Application
+    val themeStore = remember { EntryPointAccessors.fromApplication(app, AppEntryPoint::class.java).themeStore() }
     val themeMode by themeStore.mode.collectAsState()
     val systemDark = isSystemInDarkTheme()
     val darkTheme = when (themeMode) {

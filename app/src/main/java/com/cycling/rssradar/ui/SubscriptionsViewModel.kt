@@ -4,10 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cycling.rssradar.data.DEFAULT_GROUP
 import com.cycling.rssradar.data.FeedEntity
 import com.cycling.rssradar.data.FeedRepository
@@ -15,6 +12,8 @@ import com.cycling.rssradar.data.GROUP_DESIGN
 import com.cycling.rssradar.data.GROUP_DEV
 import com.cycling.rssradar.data.GROUP_TECH
 import com.cycling.rssradar.data.GroupStore
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,7 +28,8 @@ data class FeedWithUnread(val feed: FeedEntity, val unreadCount: Int)
 /** 一个分组下的所有订阅。 */
 data class GroupSectionUi(val group: String, val feeds: List<FeedWithUnread>)
 
-class SubscriptionsViewModel(
+@HiltViewModel
+class SubscriptionsViewModel @Inject constructor(
     private val repository: FeedRepository,
     private val groupStore: GroupStore,
 ) : ViewModel() {
@@ -160,12 +160,5 @@ class SubscriptionsViewModel(
         return ordered.map { group ->
             GroupSectionUi(group = group, feeds = byName[group].orEmpty())
         }
-    }
-
-    companion object {
-        fun factory(container: com.cycling.rssradar.AppContainer): ViewModelProvider.Factory =
-            viewModelFactory {
-                initializer { SubscriptionsViewModel(container.repository, container.groupStore) }
-            }
     }
 }

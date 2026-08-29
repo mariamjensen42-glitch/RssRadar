@@ -34,11 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
-import com.cycling.rssradar.AppContainer
 import com.cycling.rssradar.data.RssHubInstanceStore
 import com.cycling.rssradar.data.ThemeMode
 import com.cycling.rssradar.data.ThemeStore
@@ -51,9 +47,11 @@ import com.cycling.rssradar.ui.theme.Surface3
 import com.cycling.rssradar.ui.theme.TextPrimary
 import com.cycling.rssradar.ui.theme.TextSecondary
 import com.cycling.rssradar.ui.theme.TextTertiary
+import com.composables.icons.lucide.CircleAlert
 import com.composables.icons.lucide.CircleCheckBig
 import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.CircleAlert
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -76,7 +74,8 @@ data class RssHubSettingsUiState(
  * 实例：查看当前实例、修改自定义实例、并发探测可达性（issue #14）。
  * 主题：浅色 / 深色 / 跟随系统（issue #9）。
  */
-class RssHubSettingsViewModel(
+@HiltViewModel
+class RssHubSettingsViewModel @Inject constructor(
     private val store: RssHubInstanceStore,
     private val themeStore: ThemeStore,
 ) : ViewModel() {
@@ -143,13 +142,6 @@ class RssHubSettingsViewModel(
         return runCatching {
             java.net.URL(withScheme).let { it.protocol + "://" + it.host + (it.port.takeIf { p -> p != -1 }?.let { p -> ":$p" } ?: "") }
         }.getOrNull()
-    }
-
-    companion object {
-        fun factory(container: AppContainer): ViewModelProvider.Factory =
-            viewModelFactory {
-                initializer { RssHubSettingsViewModel(container.instanceStore, container.themeStore) }
-            }
     }
 }
 

@@ -1,12 +1,11 @@
 package com.cycling.rssradar.ui
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cycling.rssradar.data.ArticleWithFeed
 import com.cycling.rssradar.data.FeedRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -27,7 +26,10 @@ data class SearchUiState(
 private val defaultHistory = listOf("RSSHub 自部署", "Flutter 3.32", "周刊 305")
 
 @OptIn(FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-class SearchViewModel(private val repository: FeedRepository) : ViewModel() {
+@HiltViewModel
+class SearchViewModel @Inject constructor(
+    private val repository: FeedRepository,
+) : ViewModel() {
 
     private val _state = MutableStateFlow(SearchUiState())
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
@@ -64,12 +66,5 @@ class SearchViewModel(private val repository: FeedRepository) : ViewModel() {
 
     fun clearHistory() {
         _state.value = _state.value.copy(history = emptyList())
-    }
-
-    companion object {
-        fun factory(container: com.cycling.rssradar.AppContainer): ViewModelProvider.Factory =
-            viewModelFactory {
-                initializer { SearchViewModel(container.repository) }
-            }
     }
 }
