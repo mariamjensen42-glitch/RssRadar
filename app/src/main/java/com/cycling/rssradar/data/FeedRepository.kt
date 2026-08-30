@@ -1,22 +1,13 @@
 package com.cycling.rssradar.data
 
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.io.InputStream
-import java.net.HttpURLConnection
 import java.net.URL
-import androidx.room.withTransaction
 import com.cycling.rssradar.data.db.AppDatabase
 import com.cycling.rssradar.data.db.ArticleEntity
 import com.cycling.rssradar.data.db.ArticleWithFeed
@@ -25,10 +16,8 @@ import com.cycling.rssradar.data.db.FeedEntity
 import com.cycling.rssradar.data.opml.OpmlParser
 import com.cycling.rssradar.data.parser.ContentFetcher
 import com.cycling.rssradar.data.parser.FeedProbeResult
-import com.cycling.rssradar.data.parser.RssParser
-import com.cycling.rssradar.data.rss.BestIconFinder
 import com.cycling.rssradar.data.store.KeepArchived
-import com.cycling.rssradar.ui.theme.Success
+
 /** 订阅结果，供 UI 层区分提示文案。 */
 sealed interface AddFeedResult {
     data object Success : AddFeedResult
@@ -48,32 +37,19 @@ data class OpmlImportResult(
 )
 
 /**
- * 订阅链路仓库：抓取 → 解析 → 持久化 → 观察文章流。
- * 所有数字与内容均来自真实抓取与数据库，不做任何本地捏造。
+ * 订阅链路仓库（深化后的门面）：观察文章流、用户状态标记、订阅源/分组管理、
+ * 添加订阅与 OPML 盲导。刷新子系统的全部规则（双路径、用户状态保护、并发、
+ * 图标回填）已下沉 [RefreshEngine]，本类只做转发，不再承担刷新规则。
  */
 class FeedRepository(
     private val database: AppDatabase,
-    private val parser: RssParser,
+    private val engine: RefreshEngine,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     /** 为 null 时按需抓取不可用（见 [fetchFullContent]）。 */
     private val contentFetcher: ContentFetcher? = null,
-    /** 为 null 时站点图标抓取不可用（见 [fetchIconInBackground]）。 */
-    private val iconFinder: BestIconFinder? = null,
-    /** fire-and-forget 图标抓取的外部作用域，为 null 时同样不抓。 */
-    private val externalScope: CoroutineScope? = null,
 ) {
     private val feedDao = database.feedDao()
     private val articleDao = database.articleDao()
-
-    companion object {
-        /** 刷新的有界并发度（#48）：8 路并行，几百个源不再串行排队几十分钟。 */
-        private const val REFRESH_CONCURRENCY = 8
-        private const val CONNECT_TIMEOUT_MS = 10_000
-        private const val READ_TIMEOUT_MS = 15_000
-        private const val USER_AGENT = "Mozilla/5.0 (Android) RssRadar/1.0"
-    }
-
-    private val refreshSemaphore = Semaphore(REFRESH_CONCURRENCY)
 
     fun search(query: String): Flow<List<ArticleWithFeed>> = articleDao.search("%$query%")
 
@@ -102,24 +78,25 @@ class FeedRepository(
     /** 单个订阅源实体（订阅源文章列表的顶栏标题用）。 */
     suspend fun getFeed(feedId: Long): FeedEntity? = feedDao.getById(feedId)
 
+    // —— 刷新：全部转发 [RefreshEngine]，规则（双路径/屏蔽/并发/状态保护）在那边 ——
+
     /** 单源刷新（订阅源文章列表顶栏动作用），返回是否成功。 */
-    suspend fun refreshSingleFeed(feedId: Long): Boolean = refreshFeed(feedId)
+    suspend fun refreshSingleFeed(feedId: Long): Boolean = engine.refreshSingle(feedId)
 
     /**
      * 刷新全部订阅源，返回成功刷新的源数。失败源静默跳过（保留已有数据），
      * 供下拉刷新调用。
      */
-    suspend fun refreshAllFeeds(): Int {
-        val feeds = feedDao.getAll()
-        return refreshInParallel(feeds.map { it.id })
-    }
+    suspend fun refreshAllFeeds(): Int = engine.refreshAll()
 
     /**
      * 自动同步路径（issue #58）：只刷新参与自动同步的源（syncEnabled = 1）。
      * 与手动路径 refreshAllFeeds 的唯一差别是屏蔽源过滤；失败源静默跳过。
      */
-    suspend fun refreshAutoSyncFeeds(): Int =
-        refreshInParallel(feedDao.getSyncEnabledFeedIds())
+    suspend fun refreshAutoSyncFeeds(): Int = engine.refreshAutoSyncFeeds()
+
+    /** 定向刷新一批订阅源（盲导后补文章用），返回成功的源数。失败静默跳过。 */
+    suspend fun refreshFeeds(feedIds: List<Long>): Int = engine.refreshFeeds(feedIds)
 
     /** 更新单源的自动同步开关（issue #58）。 */
     suspend fun setSyncEnabled(feedId: Long, enabled: Boolean) =
@@ -153,7 +130,7 @@ class FeedRepository(
         val url = normalizeUrl(rawUrl)
             ?: return@withContext FeedProbeResult.InvalidUrl
         val parsed = try {
-            fetch(url).use { parser.parse(it) }
+            engine.fetchAndParse(url)
         } catch (_: IllegalArgumentException) {
             return@withContext FeedProbeResult.InvalidFeed
         } catch (_: IOException) {
@@ -243,7 +220,7 @@ class FeedRepository(
         if (feedDao.findIdByUrl(url) != null) return@withContext AddFeedResult.Duplicate
 
         val parsed = try {
-            fetch(url).use { parser.parse(it) }
+            engine.fetchAndParse(url)
         } catch (_: IllegalArgumentException) {
             return@withContext AddFeedResult.InvalidFeed
         } catch (_: IOException) {
@@ -262,8 +239,8 @@ class FeedRepository(
         )
         val resolvedFeedId = feedId.takeIf { it != -1L } ?: feedDao.findIdByUrl(url) ?: return@withContext AddFeedResult.Duplicate
 
-        upsertArticles(resolvedFeedId, parsed.articles, now)
-        fetchIconInBackground(resolvedFeedId, parsed.siteUrl)
+        engine.persistArticles(resolvedFeedId, parsed.articles, now)
+        engine.backfillIcon(resolvedFeedId, parsed.siteUrl)
         AddFeedResult.Success
     }
 
@@ -303,120 +280,6 @@ class FeedRepository(
         )
     }
 
-    /**
-     * 定向刷新一批订阅源（盲导后补文章用），返回成功的源数。
-     * 失败静默跳过，语义同 [refreshAllFeeds]。
-     */
-    suspend fun refreshFeeds(feedIds: List<Long>): Int = refreshInParallel(feedIds)
-
-    /**
-     * 有界并发刷新（#48）：Semaphore(8) 同时处理 8 个源。
-     * HttpURLConnection 无状态、Room 写入天然串行，并发安全；
-     * 几百个源的总耗时从「串行累加」降为约 1/8。
-     * 整体跑在 ioDispatcher 上，不让并发骨架占用调用方（Main）线程。
-     */
-    private suspend fun refreshInParallel(feedIds: List<Long>): Int = withContext(ioDispatcher) {
-        coroutineScope {
-            feedIds.map { feedId ->
-                async {
-                    refreshSemaphore.withPermit { refreshFeed(feedId) }
-                }
-            }.awaitAll().count { it }
-        }
-    }
-
-    /**
-     * 增量刷新：重新抓取并按 link 更新文章的内容状态。
-     * 绝不覆盖用户状态（已读/收藏/稍后读），见 CONTEXT.md「用户状态」。
-     * 返回是否成功抓取（网络失败 / 源失效返回 false，由调用方决定提示）。
-     */
-    suspend fun refreshFeed(feedId: Long): Boolean = withContext(ioDispatcher) {
-        val feed = feedDao.getById(feedId) ?: return@withContext false
-        val parsed = try {
-            fetch(feed.url).use { parser.parse(it) }
-        } catch (_: IllegalArgumentException) {
-            return@withContext false
-        } catch (_: IOException) {
-            return@withContext false
-        }
-        upsertArticles(feedId, parsed.articles, System.currentTimeMillis())
-        // 图标 backfill：老源 / 盲导源 / 早期订阅的源补齐（仅 null 时抓，见 CONTEXT.md「站点图标」）
-        if (feed.iconUrl == null) fetchIconInBackground(feedId, parsed.siteUrl)
-        true
-    }
-
-    /**
-     * 站点图标后台回填：fire-and-forget，不阻塞订阅 / 刷新返回（也不占用刷新 Semaphore 名额），
-     * 抓到即写库，UI 由 Room Flow 自动刷新。仅 [CONTEXT.md]「站点图标」语义：null 才抓，永不覆盖。
-     * 任何失败静默放弃——图标是装饰性资产。
-     */
-    private fun fetchIconInBackground(feedId: Long, siteUrl: String) {
-        val finder = iconFinder ?: return
-        val scope = externalScope ?: return
-        if (siteUrl.isBlank()) return
-        scope.launch {
-            try {
-                finder.findIcon(siteUrl)?.let { feedDao.updateIconUrl(feedId, it) }
-            } catch (_: Exception) {
-                // 静默放弃
-            }
-        }
-    }
-
-    /** 同一 link：只更新内容状态字段，用户状态原样保留。整源一次事务（#48）。 */
-    private suspend fun upsertArticles(feedId: Long, articles: List<RssParser.ParsedArticle>, now: Long) {
-        if (articles.isEmpty()) return
-        database.withTransaction {
-            // 一次查询建 link→id 映射，替代逐篇 findIdByLink（#48：消除 N+1 写放大）
-            val existing = articleDao.getIdLinkPairsByFeed(feedId).associate { it.link to it.id }
-            val newArticles = mutableListOf<ArticleEntity>()
-            articles.forEach { article ->
-                val readingMinutes = article.contentText?.let { estimateReadingMinutes(it) }
-                val contentSource = if (article.contentHtml != null) ArticleEntity.CONTENT_SOURCE_FEED else ArticleEntity.CONTENT_SOURCE_NONE
-                val existingId = existing[article.link]
-                if (existingId == null) {
-                    newArticles += ArticleEntity(
-                        feedId = feedId,
-                        link = article.link,
-                        title = article.title,
-                        summary = article.summary,
-                        content = article.contentHtml,
-                        contentText = article.contentText,
-                        author = article.author,
-                        publishedAt = article.publishedAt,
-                        fetchedAt = now,
-                        coverUrl = article.coverUrl,
-                        readingMinutes = readingMinutes,
-                        contentSource = contentSource,
-                    )
-                } else {
-                    articleDao.updateContentState(
-                        id = existingId,
-                        title = article.title,
-                        summary = article.summary,
-                        content = article.contentHtml,
-                        contentText = article.contentText,
-                        author = article.author,
-                        publishedAt = article.publishedAt,
-                        coverUrl = article.coverUrl,
-                        readingMinutes = readingMinutes,
-                        contentSource = contentSource,
-                        fetchedAt = now,
-                    )
-                }
-            }
-            if (newArticles.isNotEmpty()) articleDao.insertAll(newArticles)
-        }
-    }
-
-    /** 中文按 300 字/分钟，非 CJK 按 200 词/分钟，混排取较大值。来自真实正文字数，不虚构。 */
-    internal fun estimateReadingMinutes(text: String): Int {
-        val cjkChars = text.count { it.code in 0x4E00..0x9FFF }
-        val otherWords = text.count { !((it.code in 0x4E00..0x9FFF) || it.isWhitespace()) } / 6
-        val minutes = maxOf(cjkChars / 300, otherWords / 200)
-        return (minutes + 1).coerceAtLeast(1)
-    }
-
     private fun normalizeUrl(raw: String): String? {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return null
@@ -430,18 +293,5 @@ class FeedRepository(
         } catch (_: Exception) {
             null
         }
-    }
-
-    private fun fetch(url: String): java.io.InputStream {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = CONNECT_TIMEOUT_MS
-        connection.readTimeout = READ_TIMEOUT_MS
-        connection.instanceFollowRedirects = true
-        connection.setRequestProperty("User-Agent", USER_AGENT)
-        if (connection.responseCode !in 200..299) {
-            connection.disconnect()
-            throw IOException("HTTP ${connection.responseCode}")
-        }
-        return connection.inputStream
     }
 }

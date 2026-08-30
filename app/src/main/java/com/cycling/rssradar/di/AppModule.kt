@@ -8,6 +8,8 @@ import com.cycling.rssradar.data.ai.DeepSeekClient
 import com.cycling.rssradar.data.db.AppDatabase
 import com.cycling.rssradar.data.parser.ContentFetcher
 import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.data.RefreshEngine
+import com.cycling.rssradar.data.TransactionRunner
 import com.cycling.rssradar.data.store.AiStore
 import com.cycling.rssradar.data.store.ArchiveStore
 import com.cycling.rssradar.data.store.GroupStore
@@ -23,6 +25,8 @@ import com.cycling.rssradar.data.db.MIGRATION_5_6
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.parser.RssParser
 import com.cycling.rssradar.data.rss.BestIconFinder
+import com.cycling.rssradar.data.rss.HttpFetcher
+import com.cycling.rssradar.data.rss.HttpUrlFetcher
 import com.cycling.rssradar.data.store.ThemeStore
 import com.cycling.rssradar.sync.AutoSync
 import dagger.Module
@@ -62,6 +66,35 @@ object AppModule {
     @Singleton
     fun provideRssParser(): RssParser = RssParser()
 
+    @Provides
+    @Singleton
+    fun provideHttpFetcher(): HttpFetcher = HttpUrlFetcher()
+
+    /** 真 Room 事务；JVM 测试用 DirectTransactionRunner 直跑。 */
+    @Provides
+    @Singleton
+    fun provideTransactionRunner(db: AppDatabase): TransactionRunner =
+        RoomTransactionRunner(db)
+
+    @Provides
+    @Singleton
+    fun provideRefreshEngine(
+        db: AppDatabase,
+        parser: RssParser,
+        http: HttpFetcher,
+        transactionRunner: TransactionRunner,
+        iconFinder: BestIconFinder,
+        externalScope: CoroutineScope,
+    ): RefreshEngine = RefreshEngine(
+        feedDao = db.feedDao(),
+        articleDao = db.articleDao(),
+        parser = parser,
+        http = http,
+        transactionRunner = transactionRunner,
+        iconFinder = iconFinder,
+        externalScope = externalScope,
+    )
+
     /** 应用级外部作用域：fire-and-forget 任务（站点图标抓取等）不随任何 ViewModel/刷新协程死亡。 */
     @Provides
     @Singleton
@@ -76,16 +109,12 @@ object AppModule {
     @Singleton
     fun provideFeedRepository(
         db: AppDatabase,
-        parser: RssParser,
+        engine: RefreshEngine,
         contentFetcher: ContentFetcher,
-        iconFinder: BestIconFinder,
-        externalScope: CoroutineScope,
     ): FeedRepository = FeedRepository(
         db,
-        parser,
+        engine,
         contentFetcher = contentFetcher,
-        iconFinder = iconFinder,
-        externalScope = externalScope,
     )
 
     /** 各 Store 构造只吃 SharedPreferences：Hilt 在此取一次，测试塞内存实例即可。 */
@@ -146,7 +175,12 @@ object AppModule {
         syncStore: SyncStore,
         archiveStore: ArchiveStore,
         feedRepository: FeedRepository,
-    ): AutoSync = AutoSync(syncStore, archiveStore, feedRepository)
+    ): AutoSync = AutoSync(
+        syncStore = syncStore,
+        archiveStore = archiveStore,
+        refreshAutoSyncFeeds = feedRepository::refreshAutoSyncFeeds,
+        archiveExpired = feedRepository::archiveExpired,
+    )
 }
 
 /**
@@ -164,4 +198,10 @@ interface AppEntryPoint {
     fun feedRepository(): FeedRepository
     fun autoSync(): AutoSync
     fun applicationScope(): CoroutineScope
+}
+
+/** 生产事务 adapter：委托 Room 的 withTransaction。 */
+private class RoomTransactionRunner(private val db: AppDatabase) : TransactionRunner {
+    override suspend fun <T> inTransaction(block: suspend () -> T): T =
+        androidx.room.withTransaction(db) { block() }
 }
