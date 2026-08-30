@@ -27,6 +27,7 @@ import com.cycling.rssradar.data.parser.ContentFetcher
 import com.cycling.rssradar.data.parser.FeedProbeResult
 import com.cycling.rssradar.data.parser.RssParser
 import com.cycling.rssradar.data.rss.BestIconFinder
+import com.cycling.rssradar.data.store.KeepArchived
 import com.cycling.rssradar.ui.theme.Success
 /** 订阅结果，供 UI 层区分提示文案。 */
 sealed interface AddFeedResult {
@@ -115,6 +116,16 @@ class FeedRepository(
 
     /** 是否已有订阅源。供 UI 区分「没有源」和「刷新失败」。 */
     suspend fun hasFeeds(): Boolean = feedDao.getAll().isNotEmpty()
+
+    /**
+     * 归档清理（issue #57）：按保留档位真删到期文章（starred/bookmarked 豁免，
+     * 见 ArticleDao.deleteExpiredArticles）。ALWAYS 不清理。返回删除条数。
+     * 只在自动同步完成后调用，手动刷新后不清理（避免手动刷新突兀少文章）。
+     */
+    suspend fun archiveExpired(keep: KeepArchived): Int {
+        val cutoff = keep.cutoffMillis(System.currentTimeMillis()) ?: return 0
+        return withContext(ioDispatcher) { articleDao.deleteExpiredArticles(cutoff) }
+    }
 
     fun observeFeedCount(): Flow<Int> = articleDao.observeCount()
     fun observeUnreadCount(): Flow<Int> = articleDao.observeUnreadCount()

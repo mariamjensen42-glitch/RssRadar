@@ -364,6 +364,17 @@ interface ArticleDao {
     /** 写入 AI 摘要。生成物不参与内容状态刷新，只由 AI 功能写入/清空。 */
     @Query("UPDATE articles SET aiSummary = :aiSummary WHERE id = :id")
     suspend fun updateAiSummary(id: Long, aiSummary: String?)
+
+    /**
+     * 归档清理（issue #57）：删除早于 cutoff 的文章，真删。
+     * 豁免 = 用户主动标记（收藏/稍后读）永不自动删除；已读状态不豁免。
+     * 保留期基准 = COALESCE(publishedAt, fetchedAt)，与 KeepArchived.cutoffMillis 一致。
+     */
+    @Query(
+        "DELETE FROM articles WHERE isStarred = 0 AND isBookmarked = 0 " +
+            "AND COALESCE(publishedAt, fetchedAt) < :cutoff",
+    )
+    suspend fun deleteExpiredArticles(cutoff: Long): Int
 }
 
 /**

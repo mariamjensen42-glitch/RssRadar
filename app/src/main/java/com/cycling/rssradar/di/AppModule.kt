@@ -9,6 +9,7 @@ import com.cycling.rssradar.data.db.AppDatabase
 import com.cycling.rssradar.data.parser.ContentFetcher
 import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.store.AiStore
+import com.cycling.rssradar.data.store.ArchiveStore
 import com.cycling.rssradar.data.store.GroupStore
 import com.cycling.rssradar.data.store.ListDisplayStore
 import com.cycling.rssradar.data.store.ReadingStyleStore
@@ -107,6 +108,11 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideArchiveStore(@ApplicationContext context: Context): ArchiveStore =
+        ArchiveStore(context)
+
+    @Provides
+    @Singleton
     fun provideAiStore(app: Application): AiStore = AiStore(app)
 
     /** Key 经 provider 惰性读取，保证 AiStore 里改完 Key 后下一次调用即刻生效。 */
@@ -131,4 +137,5 @@ interface AppEntryPoint {
     fun themeStore(): ThemeStore
     fun readingStyleStore(): ReadingStyleStore
     fun listDisplayStore(): ListDisplayStore
+    fun archiveStore(): ArchiveStore
 }

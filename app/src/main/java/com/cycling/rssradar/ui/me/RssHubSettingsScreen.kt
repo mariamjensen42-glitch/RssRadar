@@ -19,7 +19,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -30,6 +33,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,6 +45,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.store.AiStore
+import com.cycling.rssradar.data.store.ArchiveStore
+import com.cycling.rssradar.data.store.KeepArchived
 import com.cycling.rssradar.data.store.ListDescMode
 import com.cycling.rssradar.data.store.ListDisplayState
 import com.cycling.rssradar.data.store.ListDisplayStore
@@ -54,6 +62,7 @@ import com.cycling.rssradar.ui.theme.Surface3
 import com.cycling.rssradar.ui.theme.TextPrimary
 import com.cycling.rssradar.ui.theme.TextSecondary
 import com.cycling.rssradar.ui.theme.TextTertiary
+import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.CircleAlert
 import com.composables.icons.lucide.CircleCheckBig
 import com.composables.icons.lucide.Lucide
@@ -83,6 +92,8 @@ data class RssHubSettingsUiState(
     val aiMessage: String? = null,
     /** 信息流列表显示项（issue #56）。 */
     val listDisplay: ListDisplayState = ListDisplayState(),
+    /** 归档保留档位（issue #57）。 */
+    val keepArchived: KeepArchived = KeepArchived.ALWAYS,
 )
 
 /**
@@ -98,6 +109,7 @@ class RssHubSettingsViewModel @Inject constructor(
     private val themeStore: ThemeStore,
     private val aiStore: AiStore,
     private val listDisplayStore: ListDisplayStore,
+    private val archiveStore: ArchiveStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -122,10 +134,21 @@ class RssHubSettingsViewModel @Inject constructor(
                 _state.value = _state.value.copy(listDisplay = display)
             }
         }
+        // 归档保留档位跟随 ArchiveStore 的 flow（issue #57）
+        viewModelScope.launch {
+            archiveStore.state.collect { keep ->
+                _state.value = _state.value.copy(keepArchived = keep)
+            }
+        }
     }
 
     fun setThemeMode(mode: ThemeMode) {
         themeStore.setMode(mode)
+    }
+
+    /** 归档保留档位（issue #57）。 */
+    fun setKeepArchived(keep: KeepArchived) {
+        archiveStore.set(keep)
     }
 
     /** 列表显示项：转交 ListDisplayStore（持久化 + StateFlow 广播，列表即改即见）。 */
@@ -228,6 +251,7 @@ fun RssHubSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsState()
+    var showKeepSheet by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -368,6 +392,44 @@ fun RssHubSettingsScreen(
                     label = "已读弱化",
                     checked = display.dimRead,
                     onChange = { v -> viewModel.updateListDisplay { it.copy(dimRead = v) } },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ---- 文章保留（issue #57）----
+        Text(
+            text = "文章保留",
+            color = TextSecondary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "超过保留期的文章在自动同步后被清理；收藏与稍后读的文章永不清理。",
+            color = TextTertiary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+        )
+        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showKeepSheet = true }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "保留天数",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = state.keepArchived.label,
+                    color = Accent,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
         }
@@ -555,5 +617,69 @@ fun RssHubSettingsScreen(
             }
         }
         Spacer(Modifier.height(32.dp))
+    }
+
+    if (showKeepSheet) {
+        OptionPickerSheet(
+            title = "保留天数",
+            options = KeepArchived.entries.toList(),
+            selected = state.keepArchived,
+            label = { it.label },
+            onSelect = viewModel::setKeepArchived,
+            onDismiss = { showKeepSheet = false },
+        )
+    }
+}
+
+/** 通用档位选择弹层（GroupFilterSheet 同款形态），归档/间隔档位共用。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> OptionPickerSheet(
+    title: String,
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Surface1) {
+        Column(modifier = Modifier.padding(bottom = 24.dp)) {
+            Text(
+                text = title,
+                color = TextPrimary,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
+            options.forEach { option ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onSelect(option)
+                            onDismiss()
+                        }
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = label(option),
+                        color = if (option == selected) Accent else TextPrimary,
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (option == selected) {
+                        Icon(
+                            imageVector = Lucide.Check,
+                            contentDescription = "已选",
+                            tint = Accent,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+        }
     }
 }
