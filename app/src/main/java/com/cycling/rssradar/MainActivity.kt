@@ -161,7 +161,6 @@ private fun RssRadarAppContent() {
                     viewModel = vm,
                     onOpenSearch = { navController.navigate(SearchRoute) },
                     onOpenArticle = { navController.navigate(ArticleDetailRoute(it.article.id)) },
-                    onAddSubscription = { showAddSheet = true },
                 )
             }
             composable<SubscriptionsRoute> {

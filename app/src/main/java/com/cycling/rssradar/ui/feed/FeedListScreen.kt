@@ -65,11 +65,9 @@ import com.cycling.rssradar.ui.components.ArticleContextMenu
 import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.ArticleMenuActions
 import com.cycling.rssradar.ui.components.FeedIcon
-import com.cycling.rssradar.ui.components.FloatingTabBarFabOffset
 import com.cycling.rssradar.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
-import com.cycling.rssradar.ui.theme.OnAccent
 import com.cycling.rssradar.ui.theme.Surface1
 import com.cycling.rssradar.ui.theme.TextPrimary
 import com.cycling.rssradar.ui.theme.TextSecondary
@@ -78,7 +76,6 @@ import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.SlidersHorizontal
 import com.cycling.rssradar.ui.theme.Surface2
@@ -89,7 +86,6 @@ fun FeedListScreen(
     viewModel: FeedListViewModel,
     onOpenSearch: () -> Unit = {},
     onOpenArticle: (ArticleWithFeed) -> Unit = {},
-    onAddSubscription: () -> Unit = {},
 ) {
     val selectedTab by viewModel.selectedTab.collectAsState()
     val pagedArticles by viewModel.pagedArticles.collectAsState()
@@ -137,13 +133,6 @@ fun FeedListScreen(
                 onOpenSearch = onOpenSearch,
                 onOpenFilter = { showGroupSheet = true },
                 filterActive = selectedGroup != null,
-            )
-        },
-        // 加源是低频动作，收进 FAB，不占主屏。抬高是为了让开底部胶囊 TabBar。
-        floatingActionButton = {
-            AddSubscriptionFab(
-                onClick = onAddSubscription,
-                modifier = Modifier.padding(bottom = FAB_BOTTOM_OFFSET),
             )
         },
     ) { padding ->
@@ -257,31 +246,6 @@ private fun FeedListTopBar(
                     )
                 }
             }
-        }
-    }
-}
-
-/** 让开底部胶囊 TabBar 的抬升量，与 FloatingBottomBar 实际占位联动（BottomTabBar.kt）。 */
-private val FAB_BOTTOM_OFFSET = FloatingTabBarFabOffset
-
-@Composable
-private fun AddSubscriptionFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = Accent,
-        tonalElevation = 0.dp,
-        shadowElevation = 8.dp,
-        modifier = modifier
-            .size(56.dp)
-            .clickable(onClick = onClick),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = Lucide.Plus,
-                contentDescription = "添加订阅",
-                tint = OnAccent,
-                modifier = Modifier.size(26.dp),
-            )
         }
     }
 }
