@@ -1,8 +1,10 @@
 package com.cycling.rssradar.ui.search
 
 import android.text.format.DateUtils
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,13 +26,20 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -39,6 +48,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.data.db.ArticleWithFeed
+import com.cycling.rssradar.ui.components.ArticleContextMenu
+import com.cycling.rssradar.ui.components.ArticleMenuActions
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
@@ -60,31 +71,57 @@ fun SearchScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val focusRequester = remember { FocusRequester() }
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    Column(modifier = Modifier.fillMaxSize().background(BgRoot)) {
-        SearchBar(
-            query = state.query,
-            onQueryChange = { viewModel.onIntent(SearchIntent.QueryChange(it)) },
-            onClear = { viewModel.onIntent(SearchIntent.QueryChange("")) },
-            onSubmit = { viewModel.onIntent(SearchIntent.Submit) },
-            modifier = Modifier
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .focusRequester(focusRequester),
-        )
-
-        if (state.query.isBlank()) {
-            RecentSearches(
-                history = state.history,
-                onPick = { viewModel.onIntent(SearchIntent.QueryChange(it)) },
-                onClear = { viewModel.onIntent(SearchIntent.ClearHistory) },
+    // 删除撤销（issue #46），与信息流一致
+    LaunchedEffect(state.pendingUndoDelete) {
+        state.pendingUndoDelete?.let { deleted ->
+            val result = snackbarHostState.showSnackbar(
+                message = "已删除「${deleted.title}」",
+                actionLabel = "撤销",
+                duration = SnackbarDuration.Short,
             )
-        } else {
-            SearchResults(
-                state = state,
-                onOpenArticle = onOpenArticle,
-            )
+            when (result) {
+                SnackbarResult.ActionPerformed -> viewModel.onIntent(SearchIntent.UndoDeleteArticle)
+                SnackbarResult.Dismissed -> viewModel.onIntent(SearchIntent.DiscardUndo)
+            }
         }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(BgRoot)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            SearchBar(
+                query = state.query,
+                onQueryChange = { viewModel.onIntent(SearchIntent.QueryChange(it)) },
+                onClear = { viewModel.onIntent(SearchIntent.QueryChange("")) },
+                onSubmit = { viewModel.onIntent(SearchIntent.Submit) },
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .focusRequester(focusRequester),
+            )
+
+            if (state.query.isBlank()) {
+                RecentSearches(
+                    history = state.history,
+                    onPick = { viewModel.onIntent(SearchIntent.QueryChange(it)) },
+                    onClear = { viewModel.onIntent(SearchIntent.ClearHistory) },
+                )
+            } else {
+                SearchResults(
+                    state = state,
+                    onOpenArticle = onOpenArticle,
+                    onToggleRead = { id, read -> viewModel.onIntent(SearchIntent.SetRead(id, read)) },
+                    onToggleStarred = { id -> viewModel.onIntent(SearchIntent.ToggleStarred(id)) },
+                    onToggleBookmarked = { id -> viewModel.onIntent(SearchIntent.ToggleBookmarked(id)) },
+                    onDelete = { id -> viewModel.onIntent(SearchIntent.DeleteArticle(id)) },
+                )
+            }
+        }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 
@@ -205,6 +242,10 @@ private fun HistoryChip(term: String, onClick: () -> Unit) {
 private fun SearchResults(
     state: SearchUiState,
     onOpenArticle: (ArticleWithFeed) -> Unit,
+    onToggleRead: (Long, Boolean) -> Unit,
+    onToggleStarred: (Long) -> Unit,
+    onToggleBookmarked: (Long) -> Unit,
+    onDelete: (Long) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -219,7 +260,15 @@ private fun SearchResults(
             )
         }
         items(state.results, key = { it.article.id }) { article ->
-            SearchResultRow(article = article, query = state.query, onClick = { onOpenArticle(article) })
+            SearchResultRow(
+                article = article,
+                query = state.query,
+                onClick = { onOpenArticle(article) },
+                onToggleRead = { onToggleRead(article.article.id, !article.article.isRead) },
+                onToggleStarred = { onToggleStarred(article.article.id) },
+                onToggleBookmarked = { onToggleBookmarked(article.article.id) },
+                onDelete = { onDelete(article.article.id) },
+            )
         }
         if (state.results.isEmpty()) {
             item {
@@ -236,19 +285,29 @@ private fun SearchResults(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SearchResultRow(
     article: ArticleWithFeed,
     query: String,
     onClick: () -> Unit,
+    onToggleRead: () -> Unit,
+    onToggleStarred: () -> Unit,
+    onToggleBookmarked: () -> Unit,
+    onDelete: () -> Unit,
 ) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = Surface1,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-    ) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    Box {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Surface1,
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { menuExpanded = true },
+                ),
+        ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
                 text = article.article.title.highlight(query),
@@ -289,6 +348,23 @@ private fun SearchResultRow(
                 )
             }
         }
+        }
+
+        // 长按上下文菜单（issue #46），与信息流一致
+        ArticleContextMenu(
+            expanded = menuExpanded,
+            actions = ArticleMenuActions(
+                isRead = article.article.isRead,
+                isStarred = article.article.isStarred,
+                isBookmarked = article.article.isBookmarked,
+                link = article.article.link,
+                onToggleRead = onToggleRead,
+                onToggleStarred = onToggleStarred,
+                onToggleBookmarked = onToggleBookmarked,
+                onDelete = onDelete,
+            ),
+            onDismiss = { menuExpanded = false },
+        )
     }
 }
 
