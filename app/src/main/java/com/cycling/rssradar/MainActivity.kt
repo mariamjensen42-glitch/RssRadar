@@ -43,6 +43,8 @@ import com.cycling.rssradar.ui.addsubscription.AddSubscriptionViewModel
 import com.cycling.rssradar.ui.article.ArticleDetailScreen
 import com.cycling.rssradar.ui.article.ArticleDetailViewModel
 import com.cycling.rssradar.ui.subscriptions.FeedActionScreen
+import com.cycling.rssradar.ui.feed.FeedArticlesScreen
+import com.cycling.rssradar.ui.feed.FeedArticlesViewModel
 import com.cycling.rssradar.ui.feed.FeedListScreen
 import com.cycling.rssradar.ui.feed.FeedListViewModel
 import com.cycling.rssradar.ui.me.RssHubSettingsScreen
@@ -53,6 +55,7 @@ import com.cycling.rssradar.ui.subscriptions.SubscriptionsScreen
 import com.cycling.rssradar.ui.subscriptions.SubscriptionsViewModel
 import com.cycling.rssradar.ui.components.FloatingBottomBar
 import com.cycling.rssradar.ui.navigation.ArticleDetailRoute
+import com.cycling.rssradar.ui.navigation.FeedArticlesRoute
 import com.cycling.rssradar.ui.navigation.FeedActionRoute
 import com.cycling.rssradar.ui.navigation.FeedRoute
 import com.cycling.rssradar.ui.navigation.MeRoute
@@ -154,6 +157,7 @@ private fun RssRadarAppContent() {
                     onAddSubscription = { showAddSheet = true },
                     onCreateGroup = { /* TODO */ },
                     onFeedAction = { navController.navigate(FeedActionRoute(it)) },
+                    onOpenFeed = { navController.navigate(FeedArticlesRoute(it)) },
                 )
             }
             composable<SearchRoute> {
@@ -186,6 +190,14 @@ private fun RssRadarAppContent() {
                     feedId = feedId,
                     viewModel = hiltViewModel<SubscriptionsViewModel>(),
                     onDismiss = { navController.popBackStack() },
+                )
+            }
+            // 订阅源文章列表（issue #51）：订阅源清单整行点击进入
+            composable<FeedArticlesRoute> { backStackEntry ->
+                FeedArticlesScreen(
+                    viewModel = hiltViewModel<FeedArticlesViewModel>(),
+                    onBack = { navController.popBackStack() },
+                    onOpenArticle = { navController.navigate(ArticleDetailRoute(it)) },
                 )
             }
         }

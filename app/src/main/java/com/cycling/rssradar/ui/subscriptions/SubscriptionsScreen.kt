@@ -77,6 +77,8 @@ fun SubscriptionsScreen(
     onAddSubscription: () -> Unit = {},
     onCreateGroup: () -> Unit = {},
     onFeedAction: (Long) -> Unit = {},
+    /** 点击订阅源 → 进「订阅源文章列表」（issue #51）。 */
+    onOpenFeed: (Long) -> Unit = {},
 ) {
     val groups by viewModel.groups.collectAsState()
     val expandedIds by viewModel.expandedGroupIds.collectAsState()
@@ -161,6 +163,7 @@ fun SubscriptionsScreen(
                             Box(Modifier.padding(start = 12.dp)) {
                                 FeedRow(
                                     item = feedItem,
+                                    onClick = { onOpenFeed(feedItem.feed.id) },
                                     onMore = { onFeedAction(feedItem.feed.id) },
                                 )
                             }
@@ -289,11 +292,14 @@ private fun GroupHeader(
 }
 
 @Composable
-private fun FeedRow(item: FeedWithUnread, onMore: () -> Unit) {
+private fun FeedRow(item: FeedWithUnread, onClick: () -> Unit, onMore: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = Surface1,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            // 整行点击进「订阅源文章列表」（issue #51）；管理入口仍是行尾"⋯"
+            .clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier

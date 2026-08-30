@@ -90,6 +90,10 @@ _Avoid_: 边缘返回、手势返回
 通过 URI（如 `rssradar://article/{id}`）直接导航到某目的地的机制。
 _Avoid_: 外部链接、web link
 
+**订阅源文章列表（Feed article list）**:
+单一订阅源的全部文章的浏览页：按时间新→旧排列、分页加载，从订阅源清单点击订阅源进入。不带信息流的过滤 tab 与分组筛选；订阅源的管理操作仍在清单行尾的入口。
+_Avoid_: 源详情、feed 详情页、源内页
+
 ## Dependency Injection
 
 **Hilt**:

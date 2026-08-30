@@ -219,6 +219,19 @@ interface ArticleDao {
     )
     suspend fun loadBookmarkedWithFeedPaged(limit: Int, offset: Int): List<ArticleWithFeed>
 
+    /** 订阅源文章列表（CONTEXT.md「Feed article list」）：单源全部文章，新→旧，分页。 */
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.feedId = :feedId
+        ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    suspend fun loadFeedWithFeedPaged(feedId: Long, limit: Int, offset: Int): List<ArticleWithFeed>
+
     @Query(
         """
         SELECT articles.*, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
