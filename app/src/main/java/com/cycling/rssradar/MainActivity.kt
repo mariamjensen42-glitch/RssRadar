@@ -35,6 +35,8 @@ import androidx.navigation.toRoute
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.cycling.rssradar.data.store.ListDisplayState
+import com.cycling.rssradar.data.store.ListDisplayStore
 import com.cycling.rssradar.data.store.ReadingStyleState
 import com.cycling.rssradar.data.store.ThemeMode
 import com.cycling.rssradar.di.AppEntryPoint
@@ -96,8 +98,10 @@ private fun RssRadarThemeHost(content: @Composable () -> Unit) {
     val entryPoint = remember { EntryPointAccessors.fromApplication(app, AppEntryPoint::class.java) }
     val themeStore = entryPoint.themeStore()
     val readingStyleStore = entryPoint.readingStyleStore()
+    val listDisplayStore = entryPoint.listDisplayStore()
     val themeMode by themeStore.mode.collectAsState()
     val readingStyle by readingStyleStore.state.collectAsState()
+    val listDisplay by listDisplayStore.state.collectAsState()
     val systemDark = isSystemInDarkTheme()
     val darkTheme = when (themeMode) {
         ThemeMode.SYSTEM -> systemDark
@@ -107,6 +111,7 @@ private fun RssRadarThemeHost(content: @Composable () -> Unit) {
     CompositionLocalProvider(
         LocalDarkTheme provides darkTheme,
         LocalReadingStyle provides readingStyle,
+        LocalListDisplay provides listDisplay,
     ) {
         RssRadarTheme(darkTheme = darkTheme) {
             content()
@@ -119,6 +124,9 @@ val LocalDarkTheme = staticCompositionLocalOf { true }
 
 /** 全局阅读排版状态（issue #42）：主题宿主注入，阅读页与其弹层共享同一数据源。 */
 val LocalReadingStyle = staticCompositionLocalOf { ReadingStyleState() }
+
+/** 信息流列表显示项（issue #56）：主题宿主注入，列表与设置页共享同一数据源。 */
+val LocalListDisplay = staticCompositionLocalOf { ListDisplayState() }
 
 @SuppressLint("RestrictedApi")
 @Composable

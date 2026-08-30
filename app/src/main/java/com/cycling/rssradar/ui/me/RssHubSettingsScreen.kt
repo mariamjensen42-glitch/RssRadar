@@ -23,6 +23,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,6 +39,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.store.AiStore
+import com.cycling.rssradar.data.store.ListDescMode
+import com.cycling.rssradar.data.store.ListDisplayState
+import com.cycling.rssradar.data.store.ListDisplayStore
 import com.cycling.rssradar.data.store.ThemeMode
 import com.cycling.rssradar.data.store.ThemeStore
 import com.cycling.rssradar.ui.components.tabBarBottomClearance
@@ -76,19 +81,23 @@ data class RssHubSettingsUiState(
     val aiKeyConfigured: Boolean = false,
     /** AI Key 保存的提示文案。 */
     val aiMessage: String? = null,
+    /** 信息流列表显示项（issue #56）。 */
+    val listDisplay: ListDisplayState = ListDisplayState(),
 )
 
 /**
- * 「我的」页：RSSHub 实例设置 + 主题设置 + AI 设置。
+ * 「我的」页：RSSHub 实例设置 + 主题设置 + AI 设置 + 列表显示设置。
  * 实例：查看当前实例、修改自定义实例、并发探测可达性（issue #14）。
  * 主题：浅色 / 深色 / 跟随系统（issue #9）。
  * AI：DeepSeek API Key 配置（issue #44，ADR-0005）。
+ * 列表显示：信息流卡片显示项逐项可配（issue #56）。
  */
 @HiltViewModel
 class RssHubSettingsViewModel @Inject constructor(
     private val store: RssHubInstanceStore,
     private val themeStore: ThemeStore,
     private val aiStore: AiStore,
+    private val listDisplayStore: ListDisplayStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -107,10 +116,21 @@ class RssHubSettingsViewModel @Inject constructor(
                 _state.value = _state.value.copy(themeMode = mode)
             }
         }
+        // 列表显示项跟随 ListDisplayStore 的 flow（issue #56）
+        viewModelScope.launch {
+            listDisplayStore.state.collect { display ->
+                _state.value = _state.value.copy(listDisplay = display)
+            }
+        }
     }
 
     fun setThemeMode(mode: ThemeMode) {
         themeStore.setMode(mode)
+    }
+
+    /** 列表显示项：转交 ListDisplayStore（持久化 + StateFlow 广播，列表即改即见）。 */
+    fun updateListDisplay(transform: (ListDisplayState) -> ListDisplayState) {
+        listDisplayStore.update(transform)
     }
 
     fun onCustomInputChange(value: String) {
@@ -174,6 +194,31 @@ class RssHubSettingsViewModel @Inject constructor(
         return runCatching {
             java.net.URL(withScheme).let { it.protocol + "://" + it.host + (it.port.takeIf { p -> p != -1 }?.let { p -> ":$p" } ?: "") }
         }.getOrNull()
+    }
+}
+
+@Composable
+private fun SettingSwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            color = TextPrimary,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = OnAccent,
+                checkedTrackColor = Accent,
+            ),
+        )
     }
 }
 
@@ -246,6 +291,87 @@ fun RssHubSettingsScreen(
                 }
             }
         }
+        Spacer(Modifier.height(16.dp))
+
+        // ---- 列表显示（issue #56）----
+        Text(
+            text = "列表显示",
+            color = TextSecondary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "信息流与订阅源文章列表卡片的显示项，全局生效，即改即见。",
+            color = TextTertiary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+        )
+        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                val display = state.listDisplay
+                SettingSwitchRow(
+                    label = "订阅源图标",
+                    checked = display.showFeedIcon,
+                    onChange = { v -> viewModel.updateListDisplay { it.copy(showFeedIcon = v) } },
+                )
+                SettingSwitchRow(
+                    label = "订阅源名称",
+                    checked = display.showFeedName,
+                    onChange = { v -> viewModel.updateListDisplay { it.copy(showFeedName = v) } },
+                )
+                SettingSwitchRow(
+                    label = "日期",
+                    checked = display.showDate,
+                    onChange = { v -> viewModel.updateListDisplay { it.copy(showDate = v) } },
+                )
+                SettingSwitchRow(
+                    label = "缩略图",
+                    checked = display.showThumbnail,
+                    onChange = { v -> viewModel.updateListDisplay { it.copy(showThumbnail = v) } },
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "描述",
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ListDescMode.entries.forEach { mode ->
+                            val selected = display.descMode == mode
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = if (selected) Accent else Surface2,
+                                modifier = Modifier.clickable {
+                                    viewModel.updateListDisplay { it.copy(descMode = mode) }
+                                },
+                            ) {
+                                Text(
+                                    text = mode.label,
+                                    color = if (selected) OnAccent else TextPrimary,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+                SettingSwitchRow(
+                    label = "粘性日期头",
+                    checked = display.stickyDateHeader,
+                    onChange = { v -> viewModel.updateListDisplay { it.copy(stickyDateHeader = v) } },
+                )
+                SettingSwitchRow(
+                    label = "已读弱化",
+                    checked = display.dimRead,
+                    onChange = { v -> viewModel.updateListDisplay { it.copy(dimRead = v) } },
+                )
+            }
+        }
+
         Spacer(Modifier.height(16.dp))
 
         Text(

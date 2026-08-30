@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -55,7 +56,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import java.time.Instant
+import java.time.ZoneId
 import com.cycling.rssradar.data.db.ArticleWithFeed
+import com.cycling.rssradar.data.store.ListDescMode
+import com.cycling.rssradar.data.store.ListDisplayState
+import com.cycling.rssradar.LocalListDisplay
 import com.cycling.rssradar.ui.components.ArticleContextMenu
 import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.ArticleMenuActions
@@ -393,6 +399,7 @@ private fun GroupOption(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ArticleCardList(
     articles: List<ArticleWithFeed>,
@@ -404,8 +411,13 @@ fun ArticleCardList(
     onScrolledToEnd: () -> Unit,
     // 底部让位：tab 屏传悬浮 TabBar 让位；无 TabBar 的页面传普通间距
     bottomPadding: Dp = tabBarBottomClearance(),
+    // 单源页强制隐藏订阅源名称（同源重复是噪音）；null = 跟随全局配置
+    showFeedName: Boolean? = null,
     modifier: Modifier = Modifier,
 ) {
+    val display = LocalListDisplay.current.let {
+        it.copy(showFeedName = showFeedName ?: it.showFeedName)
+    }
     val listState = rememberLazyListState()
     val shouldLoadMore = remember {
         derivedStateOf {
@@ -415,6 +427,13 @@ fun ArticleCardList(
     }
     LaunchedEffect(shouldLoadMore.value) {
         if (shouldLoadMore.value) onScrolledToEnd()
+    }
+    // 分组必须在 LazyColumn builder 外算：builder lambda 不是 composable 上下文，
+    // remember 放里面编不过。不开启粘性头时不算，零开销。
+    val dayGroups = if (display.stickyDateHeader) {
+        remember(articles) { dayGroups(articles) }
+    } else {
+        emptyList()
     }
     LazyColumn(
         state = listState,
@@ -428,15 +447,39 @@ fun ArticleCardList(
         ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(articles, key = { it.article.id }) { item ->
-            ArticleCard(
-                item = item,
-                onClick = { onArticleClick(item) },
-                onToggleRead = { onToggleRead(item.article.id, !item.article.isRead) },
-                onToggleStarred = { onToggleStarred(item.article.id) },
-                onToggleBookmarked = { onToggleBookmarked(item.article.id) },
-                onDelete = { onDelete(item.article.id) },
-            )
+        if (display.stickyDateHeader) {
+            // 粘性日期头（issue #56）：按自然日分组，吸附在顶部。
+            // 只做视觉分组，不改变排序与分页；列表本身已按 publishedAt DESC 排序。
+            dayGroups.forEach { group ->
+                group.label?.let { label ->
+                    stickyHeader(key = "date-${group.key}") {
+                        StickyDateHeader(label)
+                    }
+                }
+                items(group.items, key = { it.article.id }) { item ->
+                    ArticleCard(
+                        item = item,
+                        display = display,
+                        onClick = { onArticleClick(item) },
+                        onToggleRead = { onToggleRead(item.article.id, !item.article.isRead) },
+                        onToggleStarred = { onToggleStarred(item.article.id) },
+                        onToggleBookmarked = { onToggleBookmarked(item.article.id) },
+                        onDelete = { onDelete(item.article.id) },
+                    )
+                }
+            }
+        } else {
+            items(articles, key = { it.article.id }) { item ->
+                ArticleCard(
+                    item = item,
+                    display = display,
+                    onClick = { onArticleClick(item) },
+                    onToggleRead = { onToggleRead(item.article.id, !item.article.isRead) },
+                    onToggleStarred = { onToggleStarred(item.article.id) },
+                    onToggleBookmarked = { onToggleBookmarked(item.article.id) },
+                    onDelete = { onDelete(item.article.id) },
+                )
+            }
         }
     }
 }
@@ -444,10 +487,59 @@ fun ArticleCardList(
 /** 距列表尾部还剩这么多项时预加载下一页。 */
 private const val LOAD_MORE_THRESHOLD = 5
 
+private data class DayGroup(
+    /** 自然日的 epochDay，作 LazyColumn key；无日期组为负数哨兵。 */
+    val key: Long,
+    /** 粘性头文案；无发布日期的文章组不带日期头。 */
+    val label: String?,
+    val items: List<ArticleWithFeed>,
+)
+
+/** 按自然日分组（issue #56）。无发布日期的文章沉底为独立组，不参与日期头。 */
+private fun dayGroups(articles: List<ArticleWithFeed>): List<DayGroup> {
+    val dated = mutableListOf<Pair<Long, ArticleWithFeed>>()
+    val undated = mutableListOf<ArticleWithFeed>()
+    articles.forEach { a ->
+        val ts = a.article.publishedAt
+        if (ts == null) undated.add(a) else dated.add(ts to a)
+    }
+    // 输入已按时间倒序，groupBy 保持首次出现顺序，无需再排
+    val groups = dated
+        .groupBy { (ts, _) ->
+            Instant.ofEpochMilli(ts).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
+        }
+        .map { (day, list) ->
+            DayGroup(
+                key = day,
+                label = DateUtils.getRelativeTimeSpanString(list.first().first).toString(),
+                items = list.map { it.second },
+            )
+        }
+    return if (undated.isEmpty()) groups else groups + DayGroup(key = -1L, label = null, items = undated)
+}
+
+/** 粘性日期头：不透明底色（页面底色）保证滚动时干净压住下方卡片。 */
+@Composable
+private fun StickyDateHeader(label: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(BgRoot)
+            .padding(vertical = 4.dp),
+    ) {
+        Text(
+            text = label,
+            color = TextTertiary,
+            style = MaterialTheme.typography.labelMedium,
+        )
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ArticleCard(
     item: ArticleWithFeed,
+    display: ListDisplayState,
     onClick: () -> Unit,
     onToggleRead: () -> Unit,
     onToggleStarred: () -> Unit,
@@ -455,6 +547,10 @@ fun ArticleCard(
     onDelete: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    // 已读弱化（issue #56）：开关开启时已读卡片降弱色；未读卡片永不因此改变
+    val dimmed = display.dimRead && item.article.isRead
+    val titleColor = if (dimmed) TextTertiary else TextPrimary
+    val descColor = if (dimmed) TextTertiary else TextSecondary
     Box {
         Surface(
             shape = RoundedCornerShape(14.dp),
@@ -470,23 +566,30 @@ fun ArticleCard(
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 UnreadDot(visible = !item.article.isRead)
-                Spacer(Modifier.width(6.dp))
-                FeedIcon(title = item.feedTitle, iconUrl = item.feedIconUrl, size = 18.dp, cornerRadius = 5.dp)
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = item.feedTitle,
-                    color = TextPrimary,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                item.article.publishedAt?.let { ts ->
+                if (display.showFeedIcon) {
+                    Spacer(Modifier.width(6.dp))
+                    FeedIcon(title = item.feedTitle, iconUrl = item.feedIconUrl, size = 18.dp, cornerRadius = 5.dp)
+                }
+                if (display.showFeedName) {
+                    Spacer(Modifier.width(6.dp))
                     Text(
-                        text = DateUtils.getRelativeTimeSpanString(ts).toString(),
-                        color = TextTertiary,
-                        style = MaterialTheme.typography.labelSmall,
+                        text = item.feedTitle,
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                }
+                if (display.showDate) {
+                    if (!display.showFeedName) Spacer(Modifier.weight(1f))
+                    item.article.publishedAt?.let { ts ->
+                        Text(
+                            text = DateUtils.getRelativeTimeSpanString(ts).toString(),
+                            color = TextTertiary,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -494,25 +597,29 @@ fun ArticleCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.article.title,
-                        color = TextPrimary,
+                        color = titleColor,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    item.article.summary?.takeIf { it.isNotBlank() }?.let { summary ->
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = summary,
-                            color = TextSecondary,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                    if (display.descMode != ListDescMode.NONE) {
+                        item.article.summary?.takeIf { it.isNotBlank() }?.let { summary ->
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = summary,
+                                color = descColor,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = display.descMode.lines,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
-                Spacer(Modifier.width(10.dp))
-                CoverThumb(url = item.article.coverUrl?.takeIf { it.isNotBlank() })
+                if (display.showThumbnail) {
+                    Spacer(Modifier.width(10.dp))
+                    CoverThumb(url = item.article.coverUrl?.takeIf { it.isNotBlank() })
+                }
             }
         }
         }

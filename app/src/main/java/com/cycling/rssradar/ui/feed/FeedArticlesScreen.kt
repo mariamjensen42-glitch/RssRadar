@@ -120,6 +120,8 @@ fun FeedArticlesScreen(
                     viewModel.onIntent(FeedArticlesIntent.DeleteArticle(id))
                 },
                 onScrolledToEnd = { viewModel.onIntent(FeedArticlesIntent.LoadMore) },
+                // 单源页强制隐藏订阅源名称（issue #56）：同源卡片重复源名是纯噪音
+                showFeedName = false,
                 // 本页无悬浮 TabBar，普通间距即可
                 bottomPadding = 16.dp,
                 modifier = Modifier.padding(padding),

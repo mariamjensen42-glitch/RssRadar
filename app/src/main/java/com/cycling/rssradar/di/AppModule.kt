@@ -10,6 +10,7 @@ import com.cycling.rssradar.data.parser.ContentFetcher
 import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.store.AiStore
 import com.cycling.rssradar.data.store.GroupStore
+import com.cycling.rssradar.data.store.ListDisplayStore
 import com.cycling.rssradar.data.store.ReadingStyleStore
 import com.cycling.rssradar.data.db.MIGRATION_1_2
 import com.cycling.rssradar.data.db.MIGRATION_2_3
@@ -101,6 +102,11 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideListDisplayStore(@ApplicationContext context: Context): ListDisplayStore =
+        ListDisplayStore(context)
+
+    @Provides
+    @Singleton
     fun provideAiStore(app: Application): AiStore = AiStore(app)
 
     /** Key 经 provider 惰性读取，保证 AiStore 里改完 Key 后下一次调用即刻生效。 */
@@ -124,4 +130,5 @@ object AppModule {
 interface AppEntryPoint {
     fun themeStore(): ThemeStore
     fun readingStyleStore(): ReadingStyleStore
+    fun listDisplayStore(): ListDisplayStore
 }
