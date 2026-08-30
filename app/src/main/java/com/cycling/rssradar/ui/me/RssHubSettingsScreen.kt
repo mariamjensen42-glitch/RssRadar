@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
+import com.cycling.rssradar.data.store.AiStore
 import com.cycling.rssradar.data.store.ThemeMode
 import com.cycling.rssradar.data.store.ThemeStore
 import com.cycling.rssradar.ui.theme.Accent
@@ -68,20 +69,34 @@ data class RssHubSettingsUiState(
     val probeMessage: String? = null,
     /** 当前主题模式。 */
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    /** DeepSeek API Key 输入（issue #44）。 */
+    val aiKeyInput: String = "",
+    /** 是否已配置 Key（用于状态展示，不回显完整 Key）。 */
+    val aiKeyConfigured: Boolean = false,
+    /** AI Key 保存的提示文案。 */
+    val aiMessage: String? = null,
 )
 
 /**
- * 「我的」页：RSSHub 实例设置 + 主题设置。
+ * 「我的」页：RSSHub 实例设置 + 主题设置 + AI 设置。
  * 实例：查看当前实例、修改自定义实例、并发探测可达性（issue #14）。
  * 主题：浅色 / 深色 / 跟随系统（issue #9）。
+ * AI：DeepSeek API Key 配置（issue #44，ADR-0005）。
  */
 @HiltViewModel
 class RssHubSettingsViewModel @Inject constructor(
     private val store: RssHubInstanceStore,
     private val themeStore: ThemeStore,
+    private val aiStore: AiStore,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(RssHubSettingsUiState(activeHost = store.currentOrDefault()))
+    private val _state = MutableStateFlow(
+        RssHubSettingsUiState(
+            activeHost = store.currentOrDefault(),
+            aiKeyInput = aiStore.apiKey.orEmpty(),
+            aiKeyConfigured = aiStore.hasKey(),
+        ),
+    )
     val state: StateFlow<RssHubSettingsUiState> = _state.asStateFlow()
 
     init {
@@ -99,6 +114,21 @@ class RssHubSettingsViewModel @Inject constructor(
 
     fun onCustomInputChange(value: String) {
         _state.value = _state.value.copy(customInput = value)
+    }
+
+    /** DeepSeek API Key 输入（issue #44）。 */
+    fun onAiKeyChange(value: String) {
+        _state.value = _state.value.copy(aiKeyInput = value)
+    }
+
+    /** 保存 Key：留空保存 = 清除。 */
+    fun saveAiKey() {
+        val key = _state.value.aiKeyInput.trim()
+        aiStore.apiKey = key.ifEmpty { null }
+        _state.value = _state.value.copy(
+            aiKeyConfigured = aiStore.hasKey(),
+            aiMessage = if (key.isEmpty()) "已清除 API Key" else "API Key 已保存",
+        )
     }
 
     fun saveCustomHost() {
@@ -301,6 +331,66 @@ fun RssHubSettingsScreen(
         Spacer(Modifier.height(10.dp))
         TextButton(onClick = viewModel::saveCustomHost) {
             Text("保存", color = Accent, fontWeight = FontWeight.SemiBold)
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // ---- AI（DeepSeek）----
+        Text(
+            text = "AI（DeepSeek）",
+            color = TextSecondary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "详情页的 AI 摘要与翻译由 DeepSeek 提供，使用你自己的 API Key，费用与额度由你掌控。",
+            color = TextTertiary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+        )
+        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+            Column(Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "状态",
+                        color = TextTertiary,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = if (state.aiKeyConfigured) "已配置" else "未配置",
+                        color = if (state.aiKeyConfigured) Accent else TextTertiary,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = state.aiKeyInput,
+                    onValueChange = viewModel::onAiKeyChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("sk-…", color = TextTertiary, style = MaterialTheme.typography.bodyMedium) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Surface2,
+                        unfocusedContainerColor = Surface2,
+                        focusedBorderColor = Accent,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        cursorColor = Accent,
+                    ),
+                )
+                state.aiMessage?.let { message ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(text = message, color = TextTertiary, style = MaterialTheme.typography.bodySmall)
+                }
+                Spacer(Modifier.height(10.dp))
+                TextButton(onClick = viewModel::saveAiKey) {
+                    Text("保存 Key", color = Accent, fontWeight = FontWeight.SemiBold)
+                }
+            }
         }
 
         Spacer(Modifier.height(24.dp))

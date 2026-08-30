@@ -31,6 +31,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.cycling.rssradar.LocalReadingStyle
+import com.cycling.rssradar.data.ai.AiRepository
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.store.ReadingFontFamily
 import com.cycling.rssradar.data.store.ReadingStyleState
@@ -71,9 +74,11 @@ import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Bookmark
 import com.composables.icons.lucide.ExternalLink
+import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.Type
 import kotlin.math.roundToInt
@@ -88,15 +93,28 @@ fun ArticleDetailScreen(
 ) {
     val article by viewModel.article.collectAsState()
     val isFetchingContent by viewModel.isFetchingContent.collectAsState()
+    val aiSummaryState by viewModel.aiSummaryState.collectAsState()
+    val translationState by viewModel.translationState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
     var showStyleSheet by remember { mutableStateOf(false) }
     LaunchedEffect(articleId) { viewModel.load(articleId) }
+    // 翻译失败走 Snackbar（spec #44：正文保持原文，报错可重试）；按状态实例触发，不会重复弹
+    LaunchedEffect(translationState) {
+        if (translationState is TranslationState.Failed) {
+            snackbarHostState.showSnackbar((translationState as TranslationState.Failed).message)
+        }
+    }
 
     Scaffold(
         containerColor = BgRoot,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             ArticleDetailTopBar(
                 onBack = onBack,
                 onOpenStyle = { showStyleSheet = true },
+                onToggleTranslation = { viewModel.onIntent(ArticleDetailIntent.ToggleTranslation) },
+                isShowingTranslation = translationState is TranslationState.Shown,
+                isGeneratingTranslation = translationState is TranslationState.Generating,
             )
         },
         bottomBar = {
@@ -126,6 +144,11 @@ fun ArticleDetailScreen(
         ArticleDetailContent(
             article = current,
             isFetchingContent = isFetchingContent,
+            aiSummaryState = aiSummaryState,
+            translationState = translationState,
+            onGenerateSummary = { viewModel.onIntent(ArticleDetailIntent.GenerateSummary) },
+            onRetranslate = { viewModel.onIntent(ArticleDetailIntent.RetranslateArticle) },
+            onShowOriginal = { viewModel.onIntent(ArticleDetailIntent.ToggleTranslation) },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -144,7 +167,13 @@ fun ArticleDetailScreen(
 }
 
 @Composable
-private fun ArticleDetailTopBar(onBack: () -> Unit, onOpenStyle: () -> Unit) {
+private fun ArticleDetailTopBar(
+    onBack: () -> Unit,
+    onOpenStyle: () -> Unit,
+    onToggleTranslation: () -> Unit,
+    isShowingTranslation: Boolean,
+    isGeneratingTranslation: Boolean,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -156,7 +185,15 @@ private fun ArticleDetailTopBar(onBack: () -> Unit, onOpenStyle: () -> Unit) {
             Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = TextPrimary)
         }
         Spacer(Modifier.weight(1f))
-        // 原「更多」TODO 占位：收编为排版设置入口（issue #42）
+        // AI 翻译开关（issue #44）：未显示译文时发起翻译，显示中切回原文；生成中禁用
+        IconButton(onClick = onToggleTranslation, enabled = !isGeneratingTranslation) {
+            Icon(
+                Lucide.Languages,
+                contentDescription = if (isShowingTranslation) "切回原文" else "AI 翻译",
+                tint = if (isShowingTranslation || isGeneratingTranslation) Accent else TextPrimary,
+            )
+        }
+        // 排版设置入口（issue #42）
         IconButton(onClick = onOpenStyle) {
             Icon(Lucide.Type, contentDescription = "排版设置", tint = TextPrimary)
         }
@@ -167,6 +204,11 @@ private fun ArticleDetailTopBar(onBack: () -> Unit, onOpenStyle: () -> Unit) {
 private fun ArticleDetailContent(
     article: ArticleWithFeed,
     isFetchingContent: Boolean,
+    aiSummaryState: AiSummaryState,
+    translationState: TranslationState,
+    onGenerateSummary: () -> Unit,
+    onRetranslate: () -> Unit,
+    onShowOriginal: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // 水平边距不放在外层：正文 WebView 的边距由排版设置的 CSS padding 控制（issue #42），
@@ -221,7 +263,45 @@ private fun ArticleDetailContent(
         )
 
         Spacer(Modifier.height(12.dp))
+
+        // AI 摘要常驻卡片（issue #44，ADR-0005）：无摘要给按钮，生成中 loading，有摘要显示内容
+        AiSummaryCard(
+            summary = article.article.aiSummary,
+            state = aiSummaryState,
+            onGenerate = onGenerateSummary,
+        )
+        Spacer(Modifier.height(12.dp))
+
+        val shownTranslation = translationState as? TranslationState.Shown
+        if (shownTranslation != null) {
+            TranslationBanner(
+                onRetranslate = onRetranslate,
+                onShowOriginal = onShowOriginal,
+            )
+            Spacer(Modifier.height(4.dp))
+        }
+
         when {
+            // 正在翻译：占位 loading，正文区不动
+            translationState is TranslationState.Generating -> Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = Accent, strokeWidth = 2.dp)
+                    Spacer(Modifier.height(10.dp))
+                    Text("正在翻译…", color = TextTertiary, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+            // 替换式翻译：译文 HTML 走同一条 styled-HTML 渲染链路（ADR-0005）
+            shownTranslation != null -> ArticleWebView(
+                html = shownTranslation.html,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            )
             // feed 自带或已抓取的正文：WebView 渲染净化 HTML（内部滚动，水平边距走排版 CSS）
             article.article.content != null -> ArticleWebView(
                 html = article.article.content!!,
@@ -256,6 +336,99 @@ private fun ArticleDetailContent(
             }
         }
         Spacer(Modifier.height(12.dp)) // 避让底部操作栏
+    }
+}
+
+/**
+ * AI 摘要常驻卡片（issue #44）：空态给生成按钮不藏功能；生成中转圈；
+ * 有摘要显示内容；失败显示原因并可重试。空态/失败引导统一由 VM 给中文文案。
+ */
+@Composable
+private fun AiSummaryCard(
+    summary: String?,
+    state: AiSummaryState,
+    onGenerate: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = Surface1,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Lucide.Sparkles, contentDescription = null, tint = Accent, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "AI 摘要",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                if (state is AiSummaryState.Generating) {
+                    CircularProgressIndicator(color = Accent, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+                }
+            }
+            when {
+                state is AiSummaryState.Generating -> {
+                    Spacer(Modifier.height(8.dp))
+                    Text("正在生成摘要…", color = TextTertiary, style = MaterialTheme.typography.bodySmall)
+                }
+                state is AiSummaryState.Failed -> {
+                    Spacer(Modifier.height(8.dp))
+                    Text(state.message, color = TextTertiary, style = MaterialTheme.typography.bodySmall)
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(onClick = onGenerate) {
+                        Text(if (summary == null) "重试" else "重新生成", color = Accent, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                summary != null -> {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = summary,
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                else -> {
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = onGenerate) {
+                        Text("生成摘要", color = Accent, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 译文状态条（issue #44）：标明当前显示 AI 译文，提供重译与切回原文。 */
+@Composable
+private fun TranslationBanner(
+    onRetranslate: () -> Unit,
+    onShowOriginal: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Lucide.Languages, contentDescription = null, tint = Accent, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = "AI 译文（DeepSeek）",
+            color = TextTertiary,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onRetranslate) {
+            Text("重新翻译", color = Accent, style = MaterialTheme.typography.labelMedium)
+        }
+        TextButton(onClick = onShowOriginal) {
+            Text("切回原文", color = TextSecondary, style = MaterialTheme.typography.labelMedium)
+        }
     }
 }
 

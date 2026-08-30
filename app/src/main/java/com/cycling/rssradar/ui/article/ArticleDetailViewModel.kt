@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.data.db.ArticleEntity
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.data.ai.AiRepository
+import com.cycling.rssradar.data.store.AiStore
 import com.cycling.rssradar.data.store.ReadingStyleState
 import com.cycling.rssradar.data.store.ReadingStyleStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
@@ -21,6 +23,30 @@ import kotlinx.coroutines.launch
 sealed interface ArticleDetailIntent {
     data object ToggleStarred : ArticleDetailIntent
     data object ToggleBookmarked : ArticleDetailIntent
+    /** 生成/重新生成 AI 摘要（结果持久化在 articles.aiSummary）。 */
+    data object GenerateSummary : ArticleDetailIntent
+    /** 翻译开/关：未显示译文时发起翻译，显示中则切回原文。 */
+    data object ToggleTranslation : ArticleDetailIntent
+    /** 清缓存重译（issue #44：会话缓存 + 明确的重译按钮）。 */
+    data object RetranslateArticle : ArticleDetailIntent
+}
+
+/** AI 摘要生成状态。摘要本体在 article.aiSummary，这里只管过程。 */
+sealed interface AiSummaryState {
+    data object Idle : AiSummaryState
+    data object Generating : AiSummaryState
+    data class Failed(val message: String) : AiSummaryState
+}
+
+/**
+ * 替换式翻译状态（CONTEXT.md「AI 翻译」）。
+ * Shown 持有译文 HTML；切回原文（None）不清缓存，再次 Toggle 立即免费恢复。
+ */
+sealed interface TranslationState {
+    data object None : TranslationState
+    data object Generating : TranslationState
+    data class Shown(val html: String) : TranslationState
+    data class Failed(val message: String) : TranslationState
 }
 
 /** nav args 在 SavedStateHandle 里的键，与 ArticleDetailRoute 的参数名一致。 */
@@ -31,6 +57,8 @@ class ArticleDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: FeedRepository,
     private val readingStyleStore: ReadingStyleStore,
+    private val aiRepository: AiRepository,
+    private val aiStore: AiStore,
 ) : ViewModel(), MviViewModel<ArticleDetailIntent> {
 
     private val _article = MutableStateFlow<ArticleWithFeed?>(null)
@@ -39,6 +67,15 @@ class ArticleDetailViewModel @Inject constructor(
     /** 正在按需抓取原网页正文。失败是常态（反爬/JS 页），静默降级，UI 不弹错误。 */
     private val _isFetchingContent = MutableStateFlow(false)
     val isFetchingContent: StateFlow<Boolean> = _isFetchingContent.asStateFlow()
+
+    private val _aiSummaryState = MutableStateFlow<AiSummaryState>(AiSummaryState.Idle)
+    val aiSummaryState: StateFlow<AiSummaryState> = _aiSummaryState.asStateFlow()
+
+    private val _translationState = MutableStateFlow<TranslationState>(TranslationState.None)
+    val translationState: StateFlow<TranslationState> = _translationState.asStateFlow()
+
+    /** 当前文章 id，AI 操作的目标；load 时更新。 */
+    private var currentArticleId: Long = -1L
 
     /**
      * 阅读排版状态（issue #42）。偏好属 UI 环境而非业务事件，按 ADR-0003
@@ -62,6 +99,7 @@ class ArticleDetailViewModel @Inject constructor(
 
     /** 幂等：init 自加载后，screen 生命周期处重复调用只是重查 DB。 */
     fun load(articleId: Long) {
+        currentArticleId = articleId
         viewModelScope.launch {
             _article.value = repository.getArticle(articleId)
             if (_article.value?.article?.isRead == false) {
@@ -88,6 +126,72 @@ class ArticleDetailViewModel @Inject constructor(
         when (intent) {
             ArticleDetailIntent.ToggleStarred -> toggleStarred()
             ArticleDetailIntent.ToggleBookmarked -> toggleBookmarked()
+            ArticleDetailIntent.GenerateSummary -> generateSummary()
+            ArticleDetailIntent.ToggleTranslation -> toggleTranslation()
+            ArticleDetailIntent.RetranslateArticle -> retranslate()
+        }
+    }
+
+    /** 生成 AI 摘要。未配置 Key 直接失败并引导；结果入库后重查文章刷新卡片。 */
+    private fun generateSummary() {
+        if (_aiSummaryState.value is AiSummaryState.Generating) return
+        if (!aiStore.hasKey()) {
+            _aiSummaryState.value = AiSummaryState.Failed("未配置 API Key，请到「我的」页设置 DeepSeek Key")
+            return
+        }
+        viewModelScope.launch {
+            _aiSummaryState.value = AiSummaryState.Generating
+            when (val outcome = aiRepository.generateSummary(currentArticleId)) {
+                is AiRepository.SummaryOutcome.Success -> {
+                    _aiSummaryState.value = AiSummaryState.Idle
+                    _article.value = repository.getArticle(currentArticleId)
+                }
+                is AiRepository.SummaryOutcome.Failure ->
+                    _aiSummaryState.value = AiSummaryState.Failed(outcome.userMessage)
+            }
+        }
+    }
+
+    /** 翻译开/关：Shown → 切回原文（缓存保留）；None/Failed → 发起翻译。 */
+    private fun toggleTranslation() {
+        when (val state = _translationState.value) {
+            is TranslationState.Shown -> _translationState.value = TranslationState.None
+            is TranslationState.Generating -> return
+            is TranslationState.Failed, TranslationState.None -> {
+                // 失败后缓存里可能有旧译文（重译失败不清旧缓存），优先免费恢复
+                aiRepository.cachedTranslation(currentArticleId)?.let { cached ->
+                    if (state is TranslationState.None) {
+                        _translationState.value = TranslationState.Shown(cached)
+                        return
+                    }
+                }
+                startTranslation()
+            }
+        }
+    }
+
+    /** 清缓存重译（重译按钮）。 */
+    private fun retranslate() {
+        if (_translationState.value is TranslationState.Generating) return
+        aiRepository.clearTranslationCache(currentArticleId)
+        startTranslation()
+    }
+
+    private fun startTranslation() {
+        if (!aiStore.hasKey()) {
+            _translationState.value = TranslationState.Failed("未配置 API Key，请到「我的」页设置 DeepSeek Key")
+            return
+        }
+        viewModelScope.launch {
+            _translationState.value = TranslationState.Generating
+            when (val outcome = aiRepository.translate(currentArticleId)) {
+                is AiRepository.TranslationOutcome.Success ->
+                    _translationState.value = TranslationState.Shown(outcome.html)
+                is AiRepository.TranslationOutcome.AlreadyChinese ->
+                    _translationState.value = TranslationState.Failed("原文已是中文，无需翻译")
+                is AiRepository.TranslationOutcome.Failure ->
+                    _translationState.value = TranslationState.Failed(outcome.userMessage)
+            }
         }
     }
 
