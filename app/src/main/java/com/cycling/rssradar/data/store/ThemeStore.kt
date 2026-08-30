@@ -14,7 +14,7 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
  * 用 StateFlow 让设置页与主题宿主共享同一份状态：
  * 设置页改 mode → flow 更新 → 宿主重组换主题。
  */
-class ThemeStore(prefs: SharedPreferences) {
+class ThemeStore(private val prefs: SharedPreferences) {
 
     private val _mode = MutableStateFlow(readPersisted())
     val mode: StateFlow<ThemeMode> = _mode.asStateFlow()

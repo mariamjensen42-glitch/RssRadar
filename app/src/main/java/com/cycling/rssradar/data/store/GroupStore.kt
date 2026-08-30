@@ -15,7 +15,7 @@ import com.cycling.rssradar.data.db.GROUP_DESIGN
  * - 创建 = 注册表加名字；删除 = 注册表删名字 + 该组 feed 移回默认组
  * - 重命名 = 注册表改名 + feeds.groupName 批量更新
  */
-class GroupStore(prefs: SharedPreferences) {
+class GroupStore(private val prefs: SharedPreferences) {
 
     init {
         // 首次运行：写入默认分组，保证注册表非空、UI 总有分组可显示

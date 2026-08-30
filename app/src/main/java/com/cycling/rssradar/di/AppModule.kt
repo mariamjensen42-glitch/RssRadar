@@ -3,6 +3,7 @@ package com.cycling.rssradar.di
 import android.app.Application
 import android.content.Context
 import androidx.room.Room
+import androidx.room.withTransaction
 import com.cycling.rssradar.data.ai.AiRepository
 import com.cycling.rssradar.data.ai.DeepSeekClient
 import com.cycling.rssradar.data.db.AppDatabase
@@ -203,5 +204,5 @@ interface AppEntryPoint {
 /** 生产事务 adapter：委托 Room 的 withTransaction。 */
 private class RoomTransactionRunner(private val db: AppDatabase) : TransactionRunner {
     override suspend fun <T> inTransaction(block: suspend () -> T): T =
-        androidx.room.withTransaction(db) { block() }
+        db.withTransaction { block() }
 }

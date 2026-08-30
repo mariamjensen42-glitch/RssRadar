@@ -43,7 +43,7 @@ data class SyncState(
  * 自动同步偏好持久化 + 运行态共享（ArchiveStore 同款模式，issue #58）。
  * 设置页改间隔/约束 → SyncScheduler.reschedule 重建周期任务。
  */
-class SyncStore(prefs: SharedPreferences) {
+class SyncStore(private val prefs: SharedPreferences) {
 
     private val _state = MutableStateFlow(readPersisted())
     val state: StateFlow<SyncState> = _state.asStateFlow()

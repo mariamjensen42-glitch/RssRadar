@@ -131,7 +131,7 @@ class FeedListViewModel @Inject constructor(
         val current = starredOf(articleId)
         viewModelScope.launch {
             repository.setStarred(articleId, !current)
-            update { it.copy(articles = PagedSnapshot.mutate(it.articles, ::idOf, articleId) { a -> a.copy(isStarred = !current) }) }
+            update { it.copy(articles = PagedSnapshot.mutate(it.articles, ::idOf, articleId) { a -> a.copy(article = a.article.copy(isStarred = !current)) }) }
         }
     }
 
@@ -142,7 +142,7 @@ class FeedListViewModel @Inject constructor(
     private fun markRead(articleId: Long) {
         viewModelScope.launch {
             repository.markRead(articleId)
-            update { it.copy(articles = PagedSnapshot.mutate(it.articles, ::idOf, articleId) { a -> a.copy(isRead = true) }) }
+            update { it.copy(articles = PagedSnapshot.mutate(it.articles, ::idOf, articleId) { a -> a.copy(article = a.article.copy(isRead = true)) }) }
         }
     }
 
@@ -150,7 +150,7 @@ class FeedListViewModel @Inject constructor(
     private fun setRead(articleId: Long, read: Boolean) {
         viewModelScope.launch {
             repository.setRead(articleId, read)
-            update { it.copy(articles = PagedSnapshot.mutate(it.articles, ::idOf, articleId) { a -> a.copy(isRead = read) }) }
+            update { it.copy(articles = PagedSnapshot.mutate(it.articles, ::idOf, articleId) { a -> a.copy(article = a.article.copy(isRead = read)) }) }
         }
     }
 
@@ -159,7 +159,7 @@ class FeedListViewModel @Inject constructor(
         val current = stateOf(articleId)?.article?.isBookmarked ?: false
         viewModelScope.launch {
             repository.setBookmarked(articleId, !current)
-            update { it.copy(articles = PagedSnapshot.mutate(it.articles, ::idOf, articleId) { a -> a.copy(isBookmarked = !current) }) }
+            update { it.copy(articles = PagedSnapshot.mutate(it.articles, ::idOf, articleId) { a -> a.copy(article = a.article.copy(isBookmarked = !current)) }) }
         }
     }
 
@@ -202,11 +202,12 @@ class FeedListViewModel @Inject constructor(
             update { it.copy(isRefreshing = true) }
             val successCount = repository.refreshAllFeeds()
             loadFirstPage()
+            val hasFeeds = repository.hasFeeds()
             update {
                 it.copy(
                     isRefreshing = false,
                     uiMessage = when {
-                        repository.hasFeeds() && successCount == 0 -> "刷新失败，展示的是上次内容"
+                        hasFeeds && successCount == 0 -> "刷新失败，展示的是上次内容"
                         successCount > 0 -> "已更新 $successCount 个订阅源"
                         else -> it.uiMessage
                     },

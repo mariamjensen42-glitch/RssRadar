@@ -39,7 +39,7 @@ enum class KeepArchived(val days: Long, val label: String) {
  * 归档策略持久化 + 运行态共享（ListDisplayStore 同款模式，issue #57）。
  * 默认 ALWAYS：存量数据大，升级即删不可接受——清理必须 opt-in。
  */
-class ArchiveStore(prefs: SharedPreferences) {
+class ArchiveStore(private val prefs: SharedPreferences) {
 
     private val _state = MutableStateFlow(readPersisted())
     val state: StateFlow<KeepArchived> = _state.asStateFlow()

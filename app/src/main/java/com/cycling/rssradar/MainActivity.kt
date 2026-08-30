@@ -52,6 +52,7 @@ import com.cycling.rssradar.ui.navigation.SearchRoute
 import com.cycling.rssradar.ui.navigation.SubscriptionsRoute
 import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.CompositionLocalRoot
+import dagger.hilt.android.AndroidEntryPoint
 
 /**
  * 纯壳 Activity：edge-to-edge + 组合根。启动副作用在 [RssRadarApp]，

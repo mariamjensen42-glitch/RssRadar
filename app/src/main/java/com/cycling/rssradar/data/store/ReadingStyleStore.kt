@@ -50,7 +50,7 @@ fun coercePadding(value: Int): Int =
  * 阅读排版偏好持久化 + 运行态共享（ThemeStore 同款模式）。
  * 设置弹层改参数 → StateFlow 更新 → 主题宿主注入的 CompositionLocal 跟着重组，即改即见。
  */
-class ReadingStyleStore(prefs: SharedPreferences) {
+class ReadingStyleStore(private val prefs: SharedPreferences) {
 
     private val _state = MutableStateFlow(readPersisted())
     val state: StateFlow<ReadingStyleState> = _state.asStateFlow()

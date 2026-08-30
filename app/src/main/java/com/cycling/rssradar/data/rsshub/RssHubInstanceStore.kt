@@ -17,7 +17,7 @@ import java.net.URL
  * （GitHub/常规源正常）——实例写死等于首次使用即坏，见 issue #14。
  * 策略：内置镜像列表 + 并发探测选首个可达 + 用户自定义实例优先。
  */
-class RssHubInstanceStore(prefs: SharedPreferences, private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
+class RssHubInstanceStore(private val prefs: SharedPreferences, private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
 
     /** 用户手动设置的实例。空表示未设置（用探测或默认）。 */
     var customHost: String?
