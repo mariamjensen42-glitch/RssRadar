@@ -2,6 +2,12 @@ package com.cycling.rssradar.data.ai
 
 import com.cycling.rssradar.data.db.ArticleDao
 
+/** 译文缓存上限（篇）。 */
+private const val TRANSLATION_CACHE_MAX = 20
+
+/** AI 摘要入库长度上限（字符）。列表流会带 aiSummary，防异常输出撑爆 CursorWindow 单行。 */
+private const val AI_SUMMARY_MAX_LENGTH = 2_000
+
 /**
  * AI 能力的领域门面（issue #44，ADR-0005）：
  * - AI 摘要：基于正文生成，持久化（articles.aiSummary），刷新永不覆盖；
@@ -13,8 +19,15 @@ class AiRepository(
     private val client: DeepSeekClient,
 ) {
 
-    /** 译文会话级缓存：key = articleId，进程内有效，不落盘（ADR-0005）。 */
-    private val translationCache = mutableMapOf<Long, String>()
+    /**
+     * 译文会话级缓存：key = articleId，进程内有效，不落盘（ADR-0005）。
+     * LRU 上限 20 篇（OOM 防线）：每条译文是整篇正文 HTML，无上限的 Map 会
+     * 随翻译篇数线性吃堆。按访问序淘汰最旧的。
+     */
+    private val translationCache = object : LinkedHashMap<Long, String>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, String>): Boolean =
+            size > TRANSLATION_CACHE_MAX
+    }
 
     fun cachedTranslation(articleId: Long): String? = translationCache[articleId]
 
@@ -46,8 +59,10 @@ class AiRepository(
             val (input, truncated) = AiText.truncateForPrompt(source)
             val text = client.chat(SUMMARY_SYSTEM, input)
             val summary = if (truncated) text + AiText.truncationNote(input.length) else text
-            articleDao.updateAiSummary(articleId, summary)
-            SummaryOutcome.Success(summary)
+            // 入库前截断（CursorWindow 防线）：列表流会连 aiSummary 一起查出，
+            // 异常长的模型输出会把单行撑爆 2MB 窗口（数万行查询里一粒老鼠屎坏一锅粥）
+            articleDao.updateAiSummary(articleId, summary.take(AI_SUMMARY_MAX_LENGTH))
+            SummaryOutcome.Success(summary.take(AI_SUMMARY_MAX_LENGTH))
         } catch (e: AiException) {
             SummaryOutcome.Failure(e.userMessage)
         } catch (e: Exception) {

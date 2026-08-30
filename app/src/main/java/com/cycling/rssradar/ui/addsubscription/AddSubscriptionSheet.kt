@@ -40,6 +40,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -84,9 +85,9 @@ private val RssHubOrange = Color(0xFFFF6B00)
  *
  * 依据：日常动作是读信息流，「加源」是低频动作，不该占掉主屏。
  * 抽屉内部两阶段：Catalog（搜索 / 分类 / 路由列表）→ Params（填参数 → 预览 → 订阅）。
- * 两阶段由嵌套 nav graph 表达为两个目的地（issue #33）——
- * [AddSubscriptionCatalogScreen] 与 [AddSubscriptionParamsScreen]，ViewModel 为 navGraph
- * 作用域共享（MainActivity 装配处 hiltViewModel(parentEntry)）。
+ * 两阶段共用**同一个** ModalBottomSheet（[AddSheetShell] 只创建一次），步骤切换由
+ * ViewModel 状态驱动：selectedRoute == null 显示目录，非空显示填参页。
+ * 不再拆成两个 nav 目的地——那样两层 sheet 一关一开、中间闪过全屏背景，跳转极其割裂。
  * 手填普通 RSS 链接在 Catalog 顶部，与路由构建共用同一条校验 / 订阅链路。
  */
 
@@ -131,43 +132,32 @@ private fun AddSheetShell(
     }
 }
 
-/** 第一步：路由目录（搜索 / 分类 / 路由列表 + 手填链接）。选路由后跳转 Params 目的地。 */
+/** 加订阅抽屉：一个 ModalBottomSheet 承载两步内容，步骤切换由 VM 状态驱动。 */
 @Composable
-fun AddSubscriptionCatalogScreen(
+fun AddSubscriptionSheet(
     viewModel: AddSubscriptionViewModel,
     onDismiss: () -> Unit,
-    onOpenParams: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
-    AddSheetShell(viewModel = viewModel, onDismiss = onDismiss) {
-        SheetHeader(
-            title = "添加订阅",
-            subtitle = "粘贴链接，或从 RSSHub 路由构建",
-            onClose = onDismiss,
-        )
-        CatalogContent(
-            state = state,
-            viewModel = viewModel,
-            onOpenParams = onOpenParams,
-        )
-    }
-}
 
-/** 第二步：填参数 → 预览 → 订阅。返回目录由导航（popBackStack）承担。 */
-@Composable
-fun AddSubscriptionParamsScreen(
-    viewModel: AddSubscriptionViewModel,
-    onDismiss: () -> Unit,
-    onBack: () -> Unit,
-) {
-    val state by viewModel.state.collectAsState()
+    // 填参步骤按系统返回键 = 返回目录，而不是直接关掉抽屉（与原导航 popBackStack 行为一致）
+    BackHandler(enabled = state.selectedRoute != null) {
+        viewModel.onIntent(AddSubscriptionIntent.BackToCatalog)
+    }
+
     AddSheetShell(viewModel = viewModel, onDismiss = onDismiss) {
         val route = state.selectedRoute
         if (route == null) {
-            // 理论上不可达：进入本目的地前必先 RouteSelected；防御性回退
-            SheetHeader(title = "添加订阅", subtitle = null, onClose = onDismiss)
+            SheetHeader(
+                title = "添加订阅",
+                subtitle = "粘贴链接，或从 RSSHub 路由构建",
+                onClose = onDismiss,
+            )
+            CatalogContent(state = state, viewModel = viewModel)
         } else {
-            ParamsHeader(route = route, onBack = onBack)
+            ParamsHeader(route = route, onBack = {
+                viewModel.onIntent(AddSubscriptionIntent.BackToCatalog)
+            })
             ParamsContent(
                 state = state,
                 route = route,
@@ -262,7 +252,6 @@ private fun ParamsHeader(route: RssHubRoute, onBack: () -> Unit) {
 private fun ColumnScope.CatalogContent(
     state: AddSubscriptionUiState,
     viewModel: AddSubscriptionViewModel,
-    onOpenParams: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -336,10 +325,7 @@ private fun ColumnScope.CatalogContent(
         items(state.visibleRoutes, key = { it.id }) { route ->
             RouteRow(
                 route = route,
-                onClick = {
-                    viewModel.onIntent(AddSubscriptionIntent.RouteSelected(route))
-                    onOpenParams()
-                },
+                onClick = { viewModel.onIntent(AddSubscriptionIntent.RouteSelected(route)) },
             )
         }
 

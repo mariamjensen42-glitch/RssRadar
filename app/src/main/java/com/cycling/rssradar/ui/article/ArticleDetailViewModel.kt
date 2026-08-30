@@ -13,6 +13,7 @@ import com.cycling.rssradar.data.store.ReadingStyleStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +31,9 @@ sealed interface ArticleDetailIntent {
     /** 清缓存重译（issue #44：会话缓存 + 明确的重译按钮）。 */
     data object RetranslateArticle : ArticleDetailIntent
 }
+
+/** 同源相邻文章 id（底栏上一篇/下一篇）。prev = 更早一篇，next = 更新一篇；列表尽头为 null。 */
+data class ArticleNeighbors(val prevId: Long?, val nextId: Long?)
 
 /** AI 摘要生成状态。摘要本体在 article.aiSummary，这里只管过程。 */
 sealed interface AiSummaryState {
@@ -74,8 +78,15 @@ class ArticleDetailViewModel @Inject constructor(
     private val _translationState = MutableStateFlow<TranslationState>(TranslationState.None)
     val translationState: StateFlow<TranslationState> = _translationState.asStateFlow()
 
+    /** 同源上一篇/下一篇（底栏切换用），load 时随文章一起刷新。 */
+    private val _neighbors = MutableStateFlow(ArticleNeighbors(prevId = null, nextId = null))
+    val neighbors: StateFlow<ArticleNeighbors> = _neighbors.asStateFlow()
+
     /** 当前文章 id，AI 操作的目标；load 时更新。 */
     private var currentArticleId: Long = -1L
+
+    /** 连点上/下一篇时取消前一次未完成的加载，避免旧文章晚到覆盖新文章。 */
+    private var loadJob: Job? = null
 
     /**
      * 阅读排版状态（issue #42）。偏好属 UI 环境而非业务事件，按 ADR-0003
@@ -97,16 +108,36 @@ class ArticleDetailViewModel @Inject constructor(
         if (articleId != null) load(articleId)
     }
 
-    /** 幂等：init 自加载后，screen 生命周期处重复调用只是重查 DB。 */
+    /** 幂等：init 自加载后，screen 生命周期处重复调用只是重查 DB。切换文章时重置 AI 过程状态。 */
     fun load(articleId: Long) {
+        val isNewArticle = articleId != currentArticleId
         currentArticleId = articleId
-        viewModelScope.launch {
+        if (isNewArticle) {
+            // 译文/摘要缓存都按文章 id 键控，换文章必须清过程状态，否则旧译文会顶在新文章上
+            _translationState.value = TranslationState.None
+            _aiSummaryState.value = AiSummaryState.Idle
+        }
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _article.value = repository.getArticle(articleId)
+            _neighbors.value = loadNeighbors(articleId)
             if (_article.value?.article?.isRead == false) {
                 repository.markRead(articleId)
             }
             fetchFullContentIfNeeded(articleId)
         }
+    }
+
+    /** 同源相邻文章：按信息流列表序（新→旧）取当前文章前后各一篇。 */
+    private suspend fun loadNeighbors(articleId: Long): ArticleNeighbors {
+        val current = _article.value ?: return ArticleNeighbors(null, null)
+        val ids = repository.getFeedArticleIds(current.article.feedId)
+        val index = ids.indexOf(articleId)
+        if (index == -1) return ArticleNeighbors(null, null)
+        return ArticleNeighbors(
+            prevId = ids.getOrNull(index + 1), // 列表序更靠后 = 发布更早
+            nextId = ids.getOrNull(index - 1), // 列表序更靠前 = 发布更新
+        )
     }
 
     /**

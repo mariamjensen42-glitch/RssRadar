@@ -39,6 +39,7 @@ import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.store.AiStore
 import com.cycling.rssradar.data.store.ThemeMode
 import com.cycling.rssradar.data.store.ThemeStore
+import com.cycling.rssradar.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.OnAccent
@@ -188,7 +189,12 @@ fun RssHubSettingsScreen(
             .fillMaxSize()
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
+            .padding(
+                start = 20.dp,
+                end = 20.dp,
+                // 底部让位悬浮 TabBar（含导航栏 inset），页尾设置项能完整滚出胶囊
+                bottom = tabBarBottomClearance(),
+            ),
     ) {
         Text(
             text = "我的",

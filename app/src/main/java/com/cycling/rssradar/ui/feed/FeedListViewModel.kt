@@ -61,18 +61,14 @@ class FeedListViewModel @Inject constructor(
     private val _selectedGroup = MutableStateFlow<String?>(null)
     val selectedGroup: StateFlow<String?> = _selectedGroup.asStateFlow()
 
-    /** All tab 用分页累积列表（量大，只取已加载部分）；其余 tab 用实时 Flow。 */
-    private val _allArticles = MutableStateFlow<List<ArticleWithFeed>>(emptyList())
-    val allArticles: StateFlow<List<ArticleWithFeed>> = _allArticles.asStateFlow()
-
-    val unreadArticles: StateFlow<List<ArticleWithFeed>> = repository.observeUnreadArticles()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    val starredArticles: StateFlow<List<ArticleWithFeed>> = repository.observeStarredArticles()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    val bookmarkedArticles: StateFlow<List<ArticleWithFeed>> = repository.observeBookmarkedArticles()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /**
+     * 当前 tab 的分页快照列表（规模现实：源 1000+、文章数万条）。
+     * 四个 tab 统一 LIMIT/OFFSET 分页累积；tab 切换 / 下拉刷新 / 撤销删除时重载首页。
+     * 快照语义：列表内的卡片状态（已读/收藏等）由 [mutateLocal] 原地更新，
+     * 不靠 DB 失效重查——那正是数万行重查询 OOM 的根源。
+     */
+    private val _pagedArticles = MutableStateFlow<List<ArticleWithFeed>>(emptyList())
+    val pagedArticles: StateFlow<List<ArticleWithFeed>> = _pagedArticles.asStateFlow()
 
     val unreadCount: StateFlow<Int> = repository.observeUnreadCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
@@ -80,7 +76,7 @@ class FeedListViewModel @Inject constructor(
     /** 分组清单（注册表），供筛选栏使用。 */
     val groupOptions: StateFlow<List<String>> = MutableStateFlow(groupStore.getGroups())
 
-    /** 是否还有下一页（仅 All tab 分页生效）。 */
+    /** 是否还有下一页（四个 tab 均分页）。 */
     var hasMore by mutableStateOf(false)
         private set
 
@@ -129,7 +125,9 @@ class FeedListViewModel @Inject constructor(
     }
 
     private fun selectTab(tab: FeedTab) {
+        if (_selectedTab.value == tab) return
         _selectedTab.value = tab
+        viewModelScope.launch { loadFirstPage() }
     }
 
     private fun selectGroup(group: String?) {
@@ -144,27 +142,45 @@ class FeedListViewModel @Inject constructor(
 
     private fun toggleStarred(articleId: Long) {
         val current = starredOf(articleId)
-        viewModelScope.launch { repository.setStarred(articleId, !current) }
+        viewModelScope.launch {
+            repository.setStarred(articleId, !current)
+            mutateLocal(articleId) { it.copy(isStarred = !current) }
+        }
     }
 
     /** 从自身缓存列表读当前收藏态再翻转（MVI：状态由 VM 持有，不靠 UI 回传 current）。 */
     private fun starredOf(articleId: Long): Boolean =
-        (_allArticles.value + unreadArticles.value + starredArticles.value + bookmarkedArticles.value)
-            .firstOrNull { it.article.id == articleId }?.article?.isStarred ?: false
+        _pagedArticles.value.firstOrNull { it.article.id == articleId }?.article?.isStarred ?: false
 
     private fun markRead(articleId: Long) {
-        viewModelScope.launch { repository.markRead(articleId) }
+        viewModelScope.launch {
+            repository.markRead(articleId)
+            mutateLocal(articleId) { it.copy(isRead = true) }
+        }
     }
 
     /** 已读/未读互切：从自身缓存读当前态再翻转。 */
     private fun setRead(articleId: Long, read: Boolean) {
-        viewModelScope.launch { repository.setRead(articleId, read) }
+        viewModelScope.launch {
+            repository.setRead(articleId, read)
+            mutateLocal(articleId) { it.copy(isRead = read) }
+        }
     }
 
     /** 稍后读切换（issue #46）。 */
     private fun toggleBookmarked(articleId: Long) {
         val current = stateOf(articleId)?.article?.isBookmarked ?: false
-        viewModelScope.launch { repository.setBookmarked(articleId, !current) }
+        viewModelScope.launch {
+            repository.setBookmarked(articleId, !current)
+            mutateLocal(articleId) { it.copy(isBookmarked = !current) }
+        }
+    }
+
+    /** 分页快照原地更新单篇卡片状态，免去整表重查。 */
+    private fun mutateLocal(articleId: Long, transform: (ArticleEntity) -> ArticleEntity) {
+        _pagedArticles.value = _pagedArticles.value.map {
+            if (it.article.id == articleId) it.copy(article = transform(it.article)) else it
+        }
     }
 
     /**
@@ -176,6 +192,8 @@ class FeedListViewModel @Inject constructor(
             val deleted = repository.deleteArticle(articleId) ?: return@launch
             aiRepository.clearTranslationCache(articleId)
             pendingUndoDelete = deleted
+            // 分页快照同步移除，卡片立刻消失
+            _pagedArticles.value = _pagedArticles.value.filterNot { it.article.id == articleId }
         }
     }
 
@@ -191,8 +209,7 @@ class FeedListViewModel @Inject constructor(
 
     /** 从自身缓存列表读指定文章的当前态（MVI：状态由 VM 持有）。 */
     private fun stateOf(articleId: Long): ArticleWithFeed? =
-        (_allArticles.value + unreadArticles.value + starredArticles.value + bookmarkedArticles.value)
-            .firstOrNull { it.article.id == articleId }
+        _pagedArticles.value.firstOrNull { it.article.id == articleId }
 
     /** 下拉刷新：全源抓取 + 重载第一页。失败保留现有数据并提示。 */
     private fun refresh() {
@@ -211,23 +228,31 @@ class FeedListViewModel @Inject constructor(
         }
     }
 
-    /** 滚动到列表尾部时调用：拉下一页追加。 */
+    /** 滚动到列表尾部时调用：按当前 tab 拉下一页追加。 */
     private fun loadMore() {
         if (isLoadingMore || !hasMore) return
         if (loadMoreJob?.isActive == true) return
         loadMoreJob = viewModelScope.launch {
             isLoadingMore = true
-            val current = _allArticles.value
-            val page = repository.loadArticlesPage(PAGE_SIZE, current.size)
-            _allArticles.value = current + page
+            val current = _pagedArticles.value
+            val page = loadTabPage(PAGE_SIZE, current.size)
+            _pagedArticles.value = current + page
             hasMore = page.size == PAGE_SIZE
             isLoadingMore = false
         }
     }
 
+    /** 按当前 tab 取一页。 */
+    private suspend fun loadTabPage(limit: Int, offset: Int): List<ArticleWithFeed> = when (_selectedTab.value) {
+        FeedTab.All -> repository.loadArticlesPage(limit, offset)
+        FeedTab.Unread -> repository.loadUnreadPage(limit, offset)
+        FeedTab.Starred -> repository.loadStarredPage(limit, offset)
+        FeedTab.Bookmarked -> repository.loadBookmarkedPage(limit, offset)
+    }
+
     private suspend fun loadFirstPage() {
-        val page = repository.loadArticlesPage(PAGE_SIZE, 0)
-        _allArticles.value = page
+        val page = loadTabPage(PAGE_SIZE, 0)
+        _pagedArticles.value = page
         hasMore = page.size == PAGE_SIZE
     }
 

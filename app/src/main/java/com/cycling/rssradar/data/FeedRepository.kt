@@ -14,7 +14,6 @@ import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
-
 import androidx.room.withTransaction
 import com.cycling.rssradar.data.db.AppDatabase
 import com.cycling.rssradar.data.db.ArticleEntity
@@ -61,20 +60,32 @@ class FeedRepository(
     companion object {
         /** 刷新的有界并发度（#48）：8 路并行，几百个源不再串行排队几十分钟。 */
         private const val REFRESH_CONCURRENCY = 8
+        private const val CONNECT_TIMEOUT_MS = 10_000
+        private const val READ_TIMEOUT_MS = 15_000
+        private const val USER_AGENT = "Mozilla/5.0 (Android) RssRadar/1.0"
     }
 
     private val refreshSemaphore = Semaphore(REFRESH_CONCURRENCY)
 
-    fun observeArticles(): Flow<List<ArticleWithFeed>> = articleDao.observeAllWithFeed()
-    fun observeAllArticles(): Flow<List<ArticleWithFeed>> = articleDao.observeAllWithFeed()
-    fun observeUnreadArticles(): Flow<List<ArticleWithFeed>> = articleDao.observeUnreadWithFeed()
-    fun observeStarredArticles(): Flow<List<ArticleWithFeed>> = articleDao.observeStarredWithFeed()
-    fun observeBookmarkedArticles(): Flow<List<ArticleWithFeed>> = articleDao.observeBookmarkedWithFeed()
     fun search(query: String): Flow<List<ArticleWithFeed>> = articleDao.search("%$query%")
 
-    /** 信息流分页：一次取一页，All tab 用。 */
+    // —— 信息流四个 tab 统一分页（规模：源 1000+、文章数万条，全量 observe 不可行） ——
+
+    /** All tab：一次取一页。 */
     suspend fun loadArticlesPage(limit: Int, offset: Int): List<ArticleWithFeed> =
         articleDao.loadAllWithFeedPaged(limit, offset)
+
+    /** 未读 tab：一次取一页。 */
+    suspend fun loadUnreadPage(limit: Int, offset: Int): List<ArticleWithFeed> =
+        articleDao.loadUnreadWithFeedPaged(limit, offset)
+
+    /** 收藏 tab：一次取一页。 */
+    suspend fun loadStarredPage(limit: Int, offset: Int): List<ArticleWithFeed> =
+        articleDao.loadStarredWithFeedPaged(limit, offset)
+
+    /** 稍后读 tab：一次取一页。 */
+    suspend fun loadBookmarkedPage(limit: Int, offset: Int): List<ArticleWithFeed> =
+        articleDao.loadBookmarkedWithFeedPaged(limit, offset)
 
     /**
      * 刷新全部订阅源，返回成功刷新的源数。失败源静默跳过（保留已有数据），
@@ -155,6 +166,9 @@ class FeedRepository(
     }
 
     suspend fun getArticle(id: Long): ArticleWithFeed? = articleDao.getWithFeed(id)
+
+    /** 同源文章 id（列表序：新→旧），详情页上一篇/下一篇导航用。 */
+    suspend fun getFeedArticleIds(feedId: Long): List<Long> = articleDao.getFeedArticleIds(feedId)
 
     /**
      * 按需抓取原网页正文（ADR-0001）：文章没有 feed 自带正文时调用。
@@ -369,11 +383,5 @@ class FeedRepository(
             throw IOException("HTTP ${connection.responseCode}")
         }
         return connection.inputStream
-    }
-
-    private companion object {
-        const val CONNECT_TIMEOUT_MS = 10_000
-        const val READ_TIMEOUT_MS = 15_000
-        const val USER_AGENT = "Mozilla/5.0 (Android) RssRadar/1.0"
     }
 }

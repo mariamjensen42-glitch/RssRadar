@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -45,6 +46,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.ui.components.FeedIcon
+import com.cycling.rssradar.ui.components.FloatingTabBarFabOffset
+import com.cycling.rssradar.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.Link
@@ -121,6 +124,8 @@ fun SubscriptionsScreen(
                 icon = { Icon(Lucide.Plus, contentDescription = null) },
                 text = { Text("添加") },
                 shape = RoundedCornerShape(20.dp),
+                // 抬升让开底部悬浮 TabBar（与 FeedListScreen 的 FAB 同一规则）
+                modifier = Modifier.padding(bottom = FloatingTabBarFabOffset),
             )
         },
     ) { padding ->
@@ -128,7 +133,13 @@ fun SubscriptionsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            // 底部让位悬浮 TabBar（含导航栏 inset）
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = 8.dp,
+                bottom = tabBarBottomClearance(),
+            ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // 分组列表拍平（#48）：分组头与 FeedRow 都是 LazyColumn 的 item，
@@ -231,7 +242,6 @@ private fun SubscriptionsTopBar(onImport: () -> Unit, onSort: () -> Unit, onAdd:
     }
 }
 
-@Composable
 @Composable
 private fun GroupHeader(
     title: String,

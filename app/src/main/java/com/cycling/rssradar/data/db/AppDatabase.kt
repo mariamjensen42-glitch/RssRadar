@@ -102,6 +102,19 @@ data class ArticleWithFeed(
     val feedIconUrl: String?,
 )
 
+/**
+ * 列表流专用列清单：剔除 content / contentText 两列全文（每篇可达几十上百 KB）。
+ * 列表卡片只用到 title/summary/coverUrl 等轻字段，全量物化几百篇会把 Java 堆吃满
+ * （OOM 诊断：observeUnreadWithFeed 的 CursorWindow.nativeGetString 分配失败）。
+ * 缺失的两列由 ArticleEntity 的 Kotlin 默认值 null 兜底（Room 2.8 支持缺列映射）。
+ * 详情页仍走 getWithFeed 的 SELECT *，正文完整。
+ */
+private const val ARTICLE_LIST_COLUMNS =
+    "articles.id, articles.feedId, articles.link, articles.title, articles.summary, " +
+        "articles.publishedAt, articles.fetchedAt, articles.author, articles.contentSource, " +
+        "articles.isRead, articles.isStarred, articles.isBookmarked, articles.readingMinutes, " +
+        "articles.coverUrl, articles.aiSummary"
+
 /** 文章 id 与 link 的轻量对，供刷新时一次建 link→id 映射（#48 批量 upsert）。 */
 data class ArticleIdLink(
     val id: Long,
@@ -155,48 +168,56 @@ interface ArticleDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(articles: List<ArticleEntity>)
 
-    @Query(
-        """
-        SELECT articles.*, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
-        FROM articles
-        JOIN feeds ON articles.feedId = feeds.id
-        ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
-        """,
-    )
-    fun observeAllWithFeed(): Flow<List<ArticleWithFeed>>
+    // —— 信息流列表：轻量投影 + LIMIT/OFFSET 分页，四个 tab 统一 ——
+    // 规模现实：订阅源 1000+、文章数万条。任何"全表 observe 全量物化"的列表流
+    // 都会在每次 DB 写失效时重查数万行，内存与主线程都扛不住（OOM 诊断结论）。
 
     @Query(
         """
-        SELECT articles.*, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    suspend fun loadAllWithFeedPaged(limit: Int, offset: Int): List<ArticleWithFeed>
+
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
         WHERE articles.isRead = 0
         ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit OFFSET :offset
         """,
     )
-    fun observeUnreadWithFeed(): Flow<List<ArticleWithFeed>>
+    suspend fun loadUnreadWithFeedPaged(limit: Int, offset: Int): List<ArticleWithFeed>
 
     @Query(
         """
-        SELECT articles.*, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
         WHERE articles.isStarred = 1
         ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit OFFSET :offset
         """,
     )
-    fun observeStarredWithFeed(): Flow<List<ArticleWithFeed>>
+    suspend fun loadStarredWithFeedPaged(limit: Int, offset: Int): List<ArticleWithFeed>
 
     @Query(
         """
-        SELECT articles.*, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
         WHERE articles.isBookmarked = 1
         ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit OFFSET :offset
         """,
     )
-    fun observeBookmarkedWithFeed(): Flow<List<ArticleWithFeed>>
+    suspend fun loadBookmarkedWithFeedPaged(limit: Int, offset: Int): List<ArticleWithFeed>
 
     @Query(
         """
@@ -211,7 +232,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT articles.*, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
         WHERE (articles.title LIKE :query OR articles.summary LIKE :query
@@ -244,20 +265,14 @@ interface ArticleDao {
     @Query("SELECT id, link FROM articles WHERE feedId = :feedId")
     suspend fun getIdLinkPairsByFeed(feedId: Long): List<ArticleIdLink>
 
-    /**
-     * 分页加载全部文章（信息流 All tab）。OFFSET 分页在个人订阅量级足够，
-     * 若未来文章量大再换 keyset（按 publishedAt 游标）。
-     */
+    /** 同源文章 id（列表序：新→旧），详情页上一篇/下一篇导航用。 */
     @Query(
         """
-        SELECT articles.*, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
-        FROM articles
-        JOIN feeds ON articles.feedId = feeds.id
-        ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
-        LIMIT :limit OFFSET :offset
+        SELECT id FROM articles WHERE feedId = :feedId
+        ORDER BY publishedAt IS NULL, publishedAt DESC, fetchedAt DESC
         """,
     )
-    suspend fun loadAllWithFeedPaged(limit: Int, offset: Int): List<ArticleWithFeed>
+    suspend fun getFeedArticleIds(feedId: Long): List<Long>
 
     /**
      * 增量刷新：只更新内容状态（标题/时间/摘要/正文），绝不触碰用户状态
