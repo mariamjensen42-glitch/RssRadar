@@ -1,6 +1,6 @@
 package com.cycling.rssradar.data.store
 
-import android.content.Context
+import android.content.SharedPreferences
 import com.cycling.rssradar.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.data.db.GROUP_TECH
 import com.cycling.rssradar.data.db.GROUP_DEV
@@ -15,9 +15,7 @@ import com.cycling.rssradar.data.db.GROUP_DESIGN
  * - 创建 = 注册表加名字；删除 = 注册表删名字 + 该组 feed 移回默认组
  * - 重命名 = 注册表改名 + feeds.groupName 批量更新
  */
-class GroupStore(context: Context) {
-
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+class GroupStore(prefs: SharedPreferences) {
 
     init {
         // 首次运行：写入默认分组，保证注册表非空、UI 总有分组可显示
@@ -53,7 +51,6 @@ class GroupStore(context: Context) {
     }
 
     companion object {
-        private const val PREFS_NAME = "rssradar_settings"
         private const val KEY_GROUPS = "feed_groups"
         private const val GROUP_SEPARATOR = "\u001F"
     }

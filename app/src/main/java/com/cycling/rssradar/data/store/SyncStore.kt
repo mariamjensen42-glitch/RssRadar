@@ -1,6 +1,6 @@
 package com.cycling.rssradar.data.store
 
-import android.content.Context
+import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,9 +43,7 @@ data class SyncState(
  * 自动同步偏好持久化 + 运行态共享（ArchiveStore 同款模式，issue #58）。
  * 设置页改间隔/约束 → SyncScheduler.reschedule 重建周期任务。
  */
-class SyncStore(context: Context) {
-
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+class SyncStore(prefs: SharedPreferences) {
 
     private val _state = MutableStateFlow(readPersisted())
     val state: StateFlow<SyncState> = _state.asStateFlow()
@@ -72,7 +70,6 @@ class SyncStore(context: Context) {
     )
 
     companion object {
-        private const val PREFS_NAME = "rssradar_settings"
         private const val KEY_INTERVAL = "sync_interval"
         private const val KEY_ONLY_WIFI = "sync_only_wifi"
         private const val KEY_ONLY_CHARGING = "sync_only_charging"

@@ -1,6 +1,6 @@
 package com.cycling.rssradar.data.store
 
-import android.content.Context
+import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,9 +33,7 @@ data class ListDisplayState(
  * 列表显示项偏好持久化 + 运行态共享（ReadingStyleStore 同款模式）。
  * 设置页改开关 → StateFlow 更新 → 主题宿主注入的 CompositionLocal 跟着重组，即改即见。
  */
-class ListDisplayStore(context: Context) {
-
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+class ListDisplayStore(prefs: SharedPreferences) {
 
     private val _state = MutableStateFlow(readPersisted())
     val state: StateFlow<ListDisplayState> = _state.asStateFlow()
@@ -67,7 +65,6 @@ class ListDisplayStore(context: Context) {
     )
 
     companion object {
-        private const val PREFS_NAME = "rssradar_settings"
         private const val KEY_FEED_ICON = "list_show_feed_icon"
         private const val KEY_FEED_NAME = "list_show_feed_name"
         private const val KEY_DATE = "list_show_date"

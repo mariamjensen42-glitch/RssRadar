@@ -1,6 +1,6 @@
 package com.cycling.rssradar.data.store
 
-import android.content.Context
+import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,9 +50,7 @@ fun coercePadding(value: Int): Int =
  * 阅读排版偏好持久化 + 运行态共享（ThemeStore 同款模式）。
  * 设置弹层改参数 → StateFlow 更新 → 主题宿主注入的 CompositionLocal 跟着重组，即改即见。
  */
-class ReadingStyleStore(context: Context) {
-
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+class ReadingStyleStore(prefs: SharedPreferences) {
 
     private val _state = MutableStateFlow(readPersisted())
     val state: StateFlow<ReadingStyleState> = _state.asStateFlow()
@@ -85,7 +83,6 @@ class ReadingStyleStore(context: Context) {
     )
 
     companion object {
-        private const val PREFS_NAME = "rssradar_settings"
         private const val KEY_FONT_SIZE = "reading_font_size"
         private const val KEY_LINE_HEIGHT = "reading_line_height"
         private const val KEY_PADDING = "reading_horizontal_padding"

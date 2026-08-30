@@ -13,6 +13,7 @@ import com.cycling.rssradar.data.store.ArchiveStore
 import com.cycling.rssradar.data.store.GroupStore
 import com.cycling.rssradar.data.store.ListDisplayStore
 import com.cycling.rssradar.data.store.ReadingStyleStore
+import com.cycling.rssradar.data.store.SettingsPrefs
 import com.cycling.rssradar.data.store.SyncStore
 import com.cycling.rssradar.data.db.MIGRATION_1_2
 import com.cycling.rssradar.data.db.MIGRATION_2_3
@@ -23,6 +24,7 @@ import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.parser.RssParser
 import com.cycling.rssradar.data.rss.BestIconFinder
 import com.cycling.rssradar.data.store.ThemeStore
+import com.cycling.rssradar.sync.AutoSync
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.EntryPoint
@@ -86,41 +88,46 @@ object AppModule {
         externalScope = externalScope,
     )
 
+    /** 各 Store 构造只吃 SharedPreferences：Hilt 在此取一次，测试塞内存实例即可。 */
     @Provides
     @Singleton
-    fun provideGroupStore(@ApplicationContext context: Context): GroupStore = GroupStore(context)
+    fun provideGroupStore(@ApplicationContext context: Context): GroupStore =
+        GroupStore(SettingsPrefs.of(context))
 
     @Provides
     @Singleton
-    fun provideRssHubInstanceStore(app: Application): RssHubInstanceStore = RssHubInstanceStore(app)
+    fun provideRssHubInstanceStore(@ApplicationContext context: Context): RssHubInstanceStore =
+        RssHubInstanceStore(SettingsPrefs.of(context))
 
     @Provides
     @Singleton
-    fun provideThemeStore(app: Application): ThemeStore = ThemeStore(app)
+    fun provideThemeStore(@ApplicationContext context: Context): ThemeStore =
+        ThemeStore(SettingsPrefs.of(context))
 
     @Provides
     @Singleton
     fun provideReadingStyleStore(@ApplicationContext context: Context): ReadingStyleStore =
-        ReadingStyleStore(context)
+        ReadingStyleStore(SettingsPrefs.of(context))
 
     @Provides
     @Singleton
     fun provideListDisplayStore(@ApplicationContext context: Context): ListDisplayStore =
-        ListDisplayStore(context)
+        ListDisplayStore(SettingsPrefs.of(context))
 
     @Provides
     @Singleton
     fun provideArchiveStore(@ApplicationContext context: Context): ArchiveStore =
-        ArchiveStore(context)
+        ArchiveStore(SettingsPrefs.of(context))
 
     @Provides
     @Singleton
     fun provideSyncStore(@ApplicationContext context: Context): SyncStore =
-        SyncStore(context)
+        SyncStore(SettingsPrefs.of(context))
 
     @Provides
     @Singleton
-    fun provideAiStore(app: Application): AiStore = AiStore(app)
+    fun provideAiStore(@ApplicationContext context: Context): AiStore =
+        AiStore(SettingsPrefs.of(context))
 
     /** Key 经 provider 惰性读取，保证 AiStore 里改完 Key 后下一次调用即刻生效。 */
     @Provides
@@ -132,6 +139,14 @@ object AppModule {
     @Singleton
     fun provideAiRepository(db: AppDatabase, client: DeepSeekClient): AiRepository =
         AiRepository(db.articleDao(), client)
+
+    @Provides
+    @Singleton
+    fun provideAutoSync(
+        syncStore: SyncStore,
+        archiveStore: ArchiveStore,
+        feedRepository: FeedRepository,
+    ): AutoSync = AutoSync(syncStore, archiveStore, feedRepository)
 }
 
 /**
@@ -147,5 +162,6 @@ interface AppEntryPoint {
     fun archiveStore(): ArchiveStore
     fun syncStore(): SyncStore
     fun feedRepository(): FeedRepository
+    fun autoSync(): AutoSync
     fun applicationScope(): CoroutineScope
 }

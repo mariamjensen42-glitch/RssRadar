@@ -52,10 +52,8 @@ object SyncScheduler {
 
     /**
      * 应用启动入口：先按最新偏好重建周期任务（覆盖系统重启/任务被清的场景），
-     * 再在**单个协程内顺序执行**：应跑启动同步则「刷新 → 清理」（与周期任务同链路），
-     * 否则只做归档清理。fire-and-forget，不阻塞启动。
-     * 禁止把刷新和清理拆成并发协程——刷新会把 feed 里的旧文章重新 upsert 回来，
-     * 与清理竞态就是「删了又同步回来」（issue #57 修订实测）。
+     * 再 fire-and-forget 执行自动同步用例：应跑启动同步走完整链路，否则只做归档清理。
+     * 顺序规则由 [AutoSync] 承载，此处不再复述。
      */
     fun onAppStart(context: Context, externalScope: CoroutineScope) {
         reschedule(context)
@@ -63,16 +61,11 @@ object SyncScheduler {
             val entryPoint = EntryPointAccessors
                 .fromApplication(context.applicationContext, AppEntryPoint::class.java)
             val state = entryPoint.syncStore().state.value
-            val now = System.currentTimeMillis()
             val shouldSync = state.syncOnStart &&
-                now - state.lastAutoSyncAt >= SyncStore.START_SYNC_DEBOUNCE_MS
-            if (shouldSync) {
-                runCatching { SyncRunner.runAutoSync(context) }
-            } else {
-                runCatching {
-                    entryPoint.feedRepository()
-                        .archiveExpired(entryPoint.archiveStore().state.value)
-                }
+                System.currentTimeMillis() - state.lastAutoSyncAt >= SyncStore.START_SYNC_DEBOUNCE_MS
+            runCatching {
+                if (shouldSync) entryPoint.autoSync().run()
+                else entryPoint.autoSync().archiveOnly()
             }
         }
     }

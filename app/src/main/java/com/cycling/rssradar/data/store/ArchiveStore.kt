@@ -1,6 +1,6 @@
 package com.cycling.rssradar.data.store
 
-import android.content.Context
+import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,9 +39,7 @@ enum class KeepArchived(val days: Long, val label: String) {
  * 归档策略持久化 + 运行态共享（ListDisplayStore 同款模式，issue #57）。
  * 默认 ALWAYS：存量数据大，升级即删不可接受——清理必须 opt-in。
  */
-class ArchiveStore(context: Context) {
-
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+class ArchiveStore(prefs: SharedPreferences) {
 
     private val _state = MutableStateFlow(readPersisted())
     val state: StateFlow<KeepArchived> = _state.asStateFlow()
@@ -55,7 +53,6 @@ class ArchiveStore(context: Context) {
         KeepArchived.fromNameOrNull(prefs.getString(KEY_KEEP_ARCHIVED, null)) ?: KeepArchived.ALWAYS
 
     companion object {
-        private const val PREFS_NAME = "rssradar_settings"
         private const val KEY_KEEP_ARCHIVED = "archive_keep_archived"
     }
 }

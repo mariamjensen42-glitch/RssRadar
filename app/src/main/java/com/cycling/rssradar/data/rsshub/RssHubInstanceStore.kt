@@ -1,6 +1,6 @@
 package com.cycling.rssradar.data.rsshub
 
-import android.content.Context
+import android.content.SharedPreferences
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -17,9 +17,7 @@ import java.net.URL
  * （GitHub/常规源正常）——实例写死等于首次使用即坏，见 issue #14。
  * 策略：内置镜像列表 + 并发探测选首个可达 + 用户自定义实例优先。
  */
-class RssHubInstanceStore(context: Context, private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
-
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+class RssHubInstanceStore(prefs: SharedPreferences, private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
 
     /** 用户手动设置的实例。空表示未设置（用探测或默认）。 */
     var customHost: String?
@@ -67,7 +65,6 @@ class RssHubInstanceStore(context: Context, private val ioDispatcher: CoroutineD
     }
 
     companion object {
-        private const val PREFS_NAME = "rssradar_settings"
         private const val KEY_CUSTOM_HOST = "rsshub_custom_host"
         private const val KEY_LAST_AVAILABLE = "rsshub_last_available_host"
         private const val PROBE_TIMEOUT_MS = 5_000
