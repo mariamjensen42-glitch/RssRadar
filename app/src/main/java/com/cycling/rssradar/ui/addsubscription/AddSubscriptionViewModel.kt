@@ -12,7 +12,12 @@ import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.db.GROUP_DESIGN
 import com.cycling.rssradar.data.db.GROUP_DEV
 import com.cycling.rssradar.data.db.GROUP_TECH
+import com.cycling.rssradar.data.rsshub.CatalogSource
+import com.cycling.rssradar.data.rsshub.RouteCatalogQuery
+import com.cycling.rssradar.data.rsshub.RouteCatalogStore
 import com.cycling.rssradar.data.rsshub.RouteCategory
+import com.cycling.rssradar.data.rsshub.RouteExample
+import com.cycling.rssradar.data.rsshub.RoutePath
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.rsshub.RssHubRoute
 import com.cycling.rssradar.data.rsshub.RssHubRoutes
@@ -40,7 +45,7 @@ sealed interface ValidationInfo {
 /**
  * 加订阅两步流的两阶段。
  * Catalog = 路由目录（搜索 + 分类 + 列表）；Params = 选中路由后填参数。
- * 注意：步骤切换由 VM 状态承担——selectedRouteId 非空即 Params 阶段，
+ * 步骤切换由 VM 状态承担——selectedRoute 非空即 Params 阶段，
  * 置空即回 Catalog（BackToCatalog）；本 state 同时承载两步共享的数据。
  */
 data class AddSubscriptionUiState(
@@ -52,16 +57,24 @@ data class AddSubscriptionUiState(
     val isAdding: Boolean = false,
     val query: String = "",
     val category: String = RouteCategory.ALL,
-    val selectedRouteId: String? = null,
+    /** 选中的路由。直接持有对象：目录是动态数据，没有可反查的静态表。 */
+    val selectedRoute: RssHubRoute? = null,
     val paramValues: Map<String, String> = emptyMap(),
     val host: String = RssHubRoutes.DEFAULT_HOST,
+    /** 目录正在首次装载（读内置快照或缓存）。 */
+    val isCatalogLoading: Boolean = false,
+    /** 目录更新中。 */
+    val isCatalogRefreshing: Boolean = false,
+    val catalogRouteCount: Int = 0,
+    /** 目录数据的生成时刻；null 表示还没装载。 */
+    val catalogGeneratedAt: Long? = null,
+    val catalogSource: CatalogSource = CatalogSource.BUILTIN,
+    /** 当前检索结果。单独存而不用派生属性：3800 条打分不该在每次 state 拷贝时重算。 */
+    val visibleRoutes: List<RssHubRoute> = emptyList(),
 ) {
-    val selectedRoute: RssHubRoute? get() = selectedRouteId?.let { RssHubRoutes.byId(it) }
-    val visibleRoutes: List<RssHubRoute> get() = RssHubRoutes.search(query, category)
-    /** 当前参数拼出来的完整地址；没选路由时为 null。 */
+    /** 当前参数拼出来的完整地址；必填参数没填时为 null。 */
     val builtUrl: String? get() = selectedRoute?.let { RssHubRoutes.buildUrl(it, paramValues, host) }
-    /** 内置路由表里没有「必填且没兜底值」的参数，所以选了路由就能预览。 */
-    val canPreview: Boolean get() = selectedRoute != null
+    val canPreview: Boolean get() = selectedRoute?.let { RssHubRoutes.canBuild(it, paramValues) } == true
     val isUrlFromRoute: Boolean get() = selectedRoute != null && url.isNotBlank()
     val canSubmit: Boolean get() = url.isNotBlank() && validation is ValidationInfo.Valid && !isAdding
 }
@@ -76,7 +89,11 @@ sealed interface AddSubscriptionIntent {
     /** 从填参步返回路由目录：清空所选路由，目录的搜索/分类等状态原样保留。 */
     data object BackToCatalog : AddSubscriptionIntent
     data class ParamChange(val key: String, val value: String) : AddSubscriptionIntent
+    /** 选中一条官方示例：反填参数并直接预览。 */
+    data class ExampleSelected(val example: RouteExample) : AddSubscriptionIntent
     data object PreviewRoute : AddSubscriptionIntent
+    /** 联网更新路由目录（ADR-0010）。 */
+    data object RefreshCatalog : AddSubscriptionIntent
     data object Submit : AddSubscriptionIntent
     data object ConsumeMessage : AddSubscriptionIntent
 }
@@ -85,6 +102,7 @@ sealed interface AddSubscriptionIntent {
 class AddSubscriptionViewModel @Inject constructor(
     private val repository: FeedRepository,
     private val instanceStore: RssHubInstanceStore,
+    private val catalogStore: RouteCatalogStore,
 ) : ViewModel(), MviViewModel<AddSubscriptionIntent> {
 
     private val _state = MutableStateFlow(AddSubscriptionUiState(host = instanceStore.currentOrDefault()))
@@ -98,6 +116,13 @@ class AddSubscriptionViewModel @Inject constructor(
 
     private var validationJob: Job? = null
 
+    /** 全量路由常驻内存：检索是纯内存打分，不必每次回 Store。 */
+    private var allRoutes: List<RssHubRoute> = emptyList()
+
+    init {
+        loadCatalog()
+    }
+
     override fun onIntent(intent: AddSubscriptionIntent) {
         when (intent) {
             is AddSubscriptionIntent.UrlChange -> urlChange(intent.raw)
@@ -107,11 +132,139 @@ class AddSubscriptionViewModel @Inject constructor(
             is AddSubscriptionIntent.RouteSelected -> routeSelected(intent.route)
             AddSubscriptionIntent.BackToCatalog -> backToCatalog()
             is AddSubscriptionIntent.ParamChange -> paramChange(intent.key, intent.value)
+            is AddSubscriptionIntent.ExampleSelected -> exampleSelected(intent.example)
             AddSubscriptionIntent.PreviewRoute -> previewRoute()
+            AddSubscriptionIntent.RefreshCatalog -> refreshCatalog()
             AddSubscriptionIntent.Submit -> submit()
             AddSubscriptionIntent.ConsumeMessage -> uiMessage = null
         }
     }
+
+    /* ------------------------------ 路由目录 ------------------------------ */
+
+    private fun loadCatalog() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isCatalogLoading = true)
+            val catalog = catalogStore.load()
+            allRoutes = catalog.routes
+            _state.value = _state.value.copy(
+                isCatalogLoading = false,
+                catalogRouteCount = catalog.routes.size,
+                catalogGeneratedAt = catalog.generatedAtMillis,
+                catalogSource = catalog.source,
+                visibleRoutes = search(),
+            )
+        }
+    }
+
+    /** 联网更新目录；失败只提示，不影响已装载的目录继续用。 */
+    private fun refreshCatalog() {
+        if (_state.value.isCatalogRefreshing) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isCatalogRefreshing = true)
+            catalogStore.refresh()
+                .onSuccess { count ->
+                    allRoutes = catalogStore.catalog.value?.routes.orEmpty()
+                    _state.value = _state.value.copy(
+                        isCatalogRefreshing = false,
+                        catalogRouteCount = count,
+                        catalogGeneratedAt = System.currentTimeMillis(),
+                        catalogSource = CatalogSource.UPDATED,
+                        visibleRoutes = search(),
+                    )
+                    uiMessage = "路由目录已更新，共 $count 条"
+                }
+                .onFailure { error ->
+                    _state.value = _state.value.copy(isCatalogRefreshing = false)
+                    uiMessage = "路由目录更新失败：${error.message ?: "网络错误"}"
+                }
+        }
+    }
+
+    private fun search(
+        query: String = _state.value.query,
+        category: String = _state.value.category,
+    ): List<RssHubRoute> = RouteCatalogQuery.search(allRoutes, query, category)
+
+    private fun queryChange(query: String) {
+        _state.value = _state.value.copy(query = query, visibleRoutes = search(query = query))
+    }
+
+    private fun categoryChange(category: String) {
+        _state.value = _state.value.copy(category = category, visibleRoutes = search(category = category))
+    }
+
+    /* ------------------------------- 填参数 ------------------------------- */
+
+    /**
+     * 选中路由 → 记录所选路由并清空手填痕迹；UI 依 selectedRoute 切到填参步。
+     * 参数预填元数据给的默认值（可选值与 default），用户改或点示例都行。
+     */
+    private fun routeSelected(route: RssHubRoute) {
+        val defaults = route.params.mapNotNull { param -> param.fallback?.let { param.key to it } }.toMap()
+        _state.value = _state.value.copy(
+            selectedRoute = route,
+            paramValues = defaults,
+            url = "",
+            validation = ValidationInfo.Idle,
+            selectedGroup = route.suggestedGroup,
+        )
+        validationJob?.cancel()
+    }
+
+    /** 返回路由目录：只清所选路由，搜索词 / 分类 / 已填参数保留，方便换个路由或改主意。 */
+    private fun backToCatalog() {
+        validationJob?.cancel()
+        _state.value = _state.value.copy(
+            selectedRoute = null,
+            paramValues = emptyMap(),
+            url = "",
+            validation = ValidationInfo.Idle,
+        )
+    }
+
+    private fun paramChange(key: String, value: String) {
+        // 参数一改，之前那次预览/校验就作废了
+        validationJob?.cancel()
+        _state.value = _state.value.copy(
+            paramValues = _state.value.paramValues.toMutableMap().apply { put(key, value) },
+            url = "",
+            validation = ValidationInfo.Idle,
+        )
+    }
+
+    /**
+     * 选官方示例：按模板反解出参数值，填满表单并直接发起预览——
+     * 示例是 RSSHub 文档里跑通过的真实值，比让用户猜 uid 可靠得多。
+     */
+    private fun exampleSelected(example: RouteExample) {
+        val route = _state.value.selectedRoute ?: return
+        val values = RoutePath.match(route.path, example.path)
+        if (values == null) {
+            uiMessage = "这条示例与路由模板对不上，请手动填写参数"
+            return
+        }
+        validationJob?.cancel()
+        _state.value = _state.value.copy(
+            paramValues = values,
+            url = "",
+            validation = ValidationInfo.Idle,
+        )
+        previewRoute()
+    }
+
+    /** 把拼好的地址塞进统一的 url 通道，走与手填完全相同的校验。 */
+    private fun previewRoute() {
+        val state = _state.value
+        val built = state.builtUrl
+        if (built == null) {
+            uiMessage = "请先填写必填参数"
+            return
+        }
+        urlChange(built)
+    }
+
+    /* ------------------------------ 手填链接 ------------------------------ */
 
     private fun urlChange(raw: String) {
         _state.value = _state.value.copy(url = raw, validation = ValidationInfo.Idle)
@@ -137,58 +290,18 @@ class AddSubscriptionViewModel @Inject constructor(
         _state.value = _state.value.copy(selectedGroup = group)
     }
 
-    private fun queryChange(query: String) {
-        _state.value = _state.value.copy(query = query)
-    }
-
-    private fun categoryChange(category: String) {
-        _state.value = _state.value.copy(category = category)
-    }
-
-    /** 选中路由 → 记录所选路由并清空手填痕迹；UI 依 selectedRoute 切到填参步。参数留空，由 placeholder 兜底出示例值。 */
-    private fun routeSelected(route: RssHubRoute) {
-        _state.value = _state.value.copy(
-            selectedRouteId = route.id,
-            paramValues = emptyMap(),
-            url = "",
-            validation = ValidationInfo.Idle,
-            selectedGroup = route.suggestedGroup,
-        )
-        validationJob?.cancel()
-    }
-
-    /** 返回路由目录：只清所选路由，搜索词 / 分类 / 已填参数保留，方便换个路由或改主意。 */
-    private fun backToCatalog() {
-        validationJob?.cancel()
-        _state.value = _state.value.copy(
-            selectedRouteId = null,
-            paramValues = emptyMap(),
-            url = "",
-            validation = ValidationInfo.Idle,
-        )
-    }
-
-    private fun paramChange(key: String, value: String) {
-        val next = _state.value.paramValues.toMutableMap().apply { put(key, value) }
-        // 参数一改，之前那次预览/校验就作废了
-        validationJob?.cancel()
-        _state.value = _state.value.copy(
-            paramValues = next,
-            url = "",
-            validation = ValidationInfo.Idle,
-        )
-    }
-
-    /** 把拼好的地址塞进统一的 url 通道，走与手填完全相同的校验。 */
-    private fun previewRoute() {
-        val built = _state.value.builtUrl ?: return
-        urlChange(built)
-    }
-
     /** 订阅成功后清空状态；抽屉关闭时由调用方走 [onDismissed]，下次打开从目录步开始。 */
     private fun reset() {
         validationJob?.cancel()
-        _state.value = AddSubscriptionUiState()
+        // 实例与目录信息不属于「一次添加流程」，重置时保留
+        val current = _state.value
+        _state.value = AddSubscriptionUiState(
+            host = current.host,
+            catalogRouteCount = current.catalogRouteCount,
+            catalogGeneratedAt = current.catalogGeneratedAt,
+            catalogSource = current.catalogSource,
+            visibleRoutes = RouteCatalogQuery.search(allRoutes, "", RouteCategory.ALL),
+        )
         uiMessage = null
     }
 

@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BottomSheetDefaults
@@ -51,9 +52,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.cycling.rssradar.data.rsshub.CatalogSource
+import com.cycling.rssradar.data.rsshub.RouteCategory
+import com.cycling.rssradar.data.rsshub.RouteExample
 import com.cycling.rssradar.data.rsshub.RouteParam
 import com.cycling.rssradar.data.rsshub.RssHubRoute
-import com.cycling.rssradar.data.rsshub.RssHubRoutes
 import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.theme.Accent
@@ -72,6 +75,7 @@ import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.CircleCheckBig
 import com.composables.icons.lucide.Link2
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.RefreshCw
 import com.composables.icons.lucide.Rss
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.X
@@ -224,7 +228,7 @@ private fun ParamsHeader(route: RssHubRoute, onBack: () -> Unit) {
         IconButton(onClick = onBack) {
             Icon(Lucide.ArrowLeft, contentDescription = "返回目录", tint = TextPrimary)
         }
-        FeedIcon(title = route.name, size = 32.dp, cornerRadius = 9.dp)
+        FeedIcon(title = route.sourceName, size = 32.dp, cornerRadius = 9.dp)
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -236,7 +240,7 @@ private fun ParamsHeader(route: RssHubRoute, onBack: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = route.pathTemplate,
+                text = route.sourceName,
                 color = TextTertiary,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
@@ -315,21 +319,44 @@ private fun ColumnScope.CatalogContent(
         }
 
         item {
-                    CategoryChips(
-                        categories = RssHubRoutes.categories,
+            CategoryChips(
+                categories = RouteCategory.ORDER,
                 selected = state.category,
                 onSelect = { viewModel.onIntent(AddSubscriptionIntent.CategoryChange(it)) },
             )
         }
 
-        items(state.visibleRoutes, key = { it.id }) { route ->
-            RouteRow(
-                route = route,
-                onClick = { viewModel.onIntent(AddSubscriptionIntent.RouteSelected(route)) },
+        item {
+            CatalogStatusBar(
+                routeCount = state.catalogRouteCount,
+                generatedAtMillis = state.catalogGeneratedAt,
+                source = state.catalogSource,
+                refreshing = state.isCatalogRefreshing,
+                onRefresh = { viewModel.onIntent(AddSubscriptionIntent.RefreshCatalog) },
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 8.dp),
             )
         }
 
-        if (state.visibleRoutes.isEmpty()) {
+        if (state.isCatalogLoading) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(color = Accent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "正在装载路由目录…",
+                            color = TextTertiary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        } else if (state.visibleRoutes.isEmpty()) {
             item {
                 Box(
                     modifier = Modifier
@@ -344,10 +371,81 @@ private fun ColumnScope.CatalogContent(
                     )
                 }
             }
+        } else {
+            items(state.visibleRoutes, key = { it.id }) { route ->
+                RouteRow(
+                    route = route,
+                    onClick = { viewModel.onIntent(AddSubscriptionIntent.RouteSelected(route)) },
+                )
+            }
         }
 
         item { Spacer(Modifier.height(24.dp)) }
     }
+}
+
+/** 目录状态：条数 + 数据时间 + 更新入口。让用户知道目录是活的可更新，而不是死的 14 条。 */
+@Composable
+private fun CatalogStatusBar(
+    routeCount: Int,
+    generatedAtMillis: Long?,
+    source: CatalogSource,
+    refreshing: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = catalogStatusText(routeCount, generatedAtMillis, source),
+            color = TextTertiary,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.weight(1f),
+        )
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = Surface2,
+            modifier = Modifier.clickable(enabled = !refreshing, onClick = onRefresh),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (refreshing) {
+                    CircularProgressIndicator(color = Accent, strokeWidth = 2.dp, modifier = Modifier.size(12.dp))
+                } else {
+                    Icon(
+                        imageVector = Lucide.RefreshCw,
+                        contentDescription = "更新路由目录",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(12.dp),
+                    )
+                }
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    text = if (refreshing) "更新中" else "更新目录",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+        }
+    }
+}
+
+private fun catalogStatusText(routeCount: Int, generatedAtMillis: Long?, source: CatalogSource): String {
+    if (routeCount == 0) return ""
+    val count = "$routeCount 条路由"
+    val origin = if (source == CatalogSource.UPDATED) "已更新" else "内置"
+    val date = generatedAtMillis?.let { formatCatalogDate(it) }
+    return listOfNotNull(count, origin, date).joinToString(" · ")
+}
+
+/** 目录时间只到日期：路由表不需要精确到时分，短一点更省地方。 */
+private fun formatCatalogDate(millis: Long): String {
+    val formatter = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+    return formatter.format(java.util.Date(millis))
 }
 
 @Composable
@@ -359,7 +457,7 @@ private fun RouteRow(route: RssHubRoute, onClick: () -> Unit) {
             .padding(horizontal = 20.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FeedIcon(title = route.name, size = 34.dp, cornerRadius = 9.dp)
+        FeedIcon(title = route.sourceName, size = 34.dp, cornerRadius = 9.dp)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -372,13 +470,13 @@ private fun RouteRow(route: RssHubRoute, onClick: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (route.featured) {
+                if (route.heat >= RssHubRoute.FEATURED_HEAT) {
                     Spacer(Modifier.width(6.dp))
                     HotTag()
                 }
             }
             Text(
-                text = route.pathTemplate,
+                text = route.subtitle,
                 color = TextTertiary,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
@@ -417,17 +515,17 @@ private fun CategoryChips(
     selected: String,
     onSelect: (String) -> Unit,
 ) {
-    Row(
+    LazyRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        categories.forEach { name ->
+        items(categories, key = { it }) { key ->
             FilterChipLight(
-                label = name,
-                selected = name == selected,
-                onClick = { onSelect(name) },
+                label = RouteCategory.label(key),
+                selected = key == selected,
+                onClick = { onSelect(key) },
             )
         }
     }
@@ -450,7 +548,17 @@ private fun ColumnScope.ParamsContent(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            CodeBlock(text = route.pathTemplate)
+            Column {
+                CodeBlock(text = route.path)
+                if (route.description.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = route.description,
+                        color = TextTertiary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
         }
 
         if (route.params.isEmpty()) {
@@ -467,6 +575,15 @@ private fun ColumnScope.ParamsContent(
                     param = param,
                     value = state.paramValues[param.key].orEmpty(),
                     onChange = { viewModel.onIntent(AddSubscriptionIntent.ParamChange(param.key, it)) },
+                )
+            }
+        }
+
+        if (route.examples.isNotEmpty()) {
+            item {
+                ExamplePicker(
+                    examples = route.examples,
+                    onSelect = { viewModel.onIntent(AddSubscriptionIntent.ExampleSelected(it)) },
                 )
             }
         }
@@ -543,6 +660,57 @@ private fun ColumnScope.ParamsContent(
     }
 }
 
+/**
+ * 示例选择。
+ *
+ * 多数路由的参数（uid / 板块 id / 分类码）用户根本背不下来，而 RSSHub 元数据里
+ * 每条路由都带了跑通过的示例——点一下比手填靠谱得多。
+ */
+@Composable
+private fun ExamplePicker(
+    examples: List<RouteExample>,
+    onSelect: (RouteExample) -> Unit,
+) {
+    Column {
+        Text(
+            text = "示例",
+            color = TextSecondary,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(8.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(examples.size, key = { examples[it].path }) { index ->
+                val example = examples[index]
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Surface2,
+                    modifier = Modifier.clickable { onSelect(example) },
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Text(
+                            text = example.title.ifBlank { example.path.substringAfterLast('/') },
+                            color = TextPrimary,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (example.title.isNotBlank()) {
+                            Text(
+                                text = example.path,
+                                color = TextTertiary,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun ParamField(
     param: RouteParam,
@@ -550,19 +718,45 @@ private fun ParamField(
     onChange: (String) -> Unit,
 ) {
     Column {
-        Text(
-            text = "${param.label} · :${param.key}",
-            color = TextSecondary,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "${param.label} · :${param.key}",
+                color = TextSecondary,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            if (param.optional) {
+                Spacer(Modifier.width(6.dp))
+                OptionalTag()
+            }
+        }
+
+        // 有枚举值就用 chips 选：比让用户照着说明手打可靠
+        if (param.options.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(param.options, key = { it.value }) { option ->
+                    FilterChipLight(
+                        label = option.label,
+                        selected = value == option.value,
+                        onClick = { onChange(option.value) },
+                    )
+                }
+            }
+        }
+
         Spacer(Modifier.height(6.dp))
         OutlinedTextField(
             value = value,
             onValueChange = onChange,
             modifier = Modifier.fillMaxWidth(),
             placeholder = {
-                Text(param.placeholder, color = TextTertiary, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = param.fallback ?: "必填",
+                    color = TextTertiary,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
@@ -575,6 +769,32 @@ private fun ParamField(
                 unfocusedTextColor = TextPrimary,
                 cursorColor = Accent,
             ),
+        )
+        // 说明与标签重复时不再啰嗦一遍
+        if (param.description.isNotBlank() && param.description != param.label) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = param.description,
+                color = TextTertiary,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun OptionalTag() {
+    Box(
+        modifier = Modifier
+            .background(Surface3, RoundedCornerShape(4.dp))
+            .padding(horizontal = 5.dp, vertical = 2.dp),
+    ) {
+        Text(
+            text = "可选",
+            color = TextTertiary,
+            style = MaterialTheme.typography.labelSmall,
         )
     }
 }
@@ -661,7 +881,7 @@ private fun SearchField(
         onValueChange = onChange,
         modifier = modifier.fillMaxWidth(),
         placeholder = {
-            Text("搜索路由，如 b站 / github / 日报", color = TextTertiary, style = MaterialTheme.typography.bodyMedium)
+            Text("搜索 3800 条路由，如 b站 / github / 日报", color = TextTertiary, style = MaterialTheme.typography.bodyMedium)
         },
         singleLine = true,
         leadingIcon = {

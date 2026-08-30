@@ -45,6 +45,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cycling.rssradar.data.rsshub.CatalogSource
+import com.cycling.rssradar.data.rsshub.RouteCatalogStore
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.store.AiStore
 import com.cycling.rssradar.data.store.ArchiveStore
@@ -103,6 +105,13 @@ data class RssHubSettingsUiState(
     val keepArchived: KeepArchived = KeepArchived.ALWAYS,
     /** 自动同步状态（issue #58）。 */
     val sync: SyncState = SyncState(),
+    /** 路由目录（issue #59）：条数 / 数据时间 / 来源。 */
+    val catalogRouteCount: Int = 0,
+    val catalogGeneratedAt: Long? = null,
+    val catalogSource: CatalogSource = CatalogSource.BUILTIN,
+    val catalogRefreshing: Boolean = false,
+    /** 目录更新结果的提示文案。 */
+    val catalogMessage: String? = null,
 )
 
 /**
@@ -120,6 +129,7 @@ class RssHubSettingsViewModel @Inject constructor(
     private val listDisplayStore: ListDisplayStore,
     private val archiveStore: ArchiveStore,
     private val syncStore: SyncStore,
+    private val catalogStore: RouteCatalogStore,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -156,6 +166,39 @@ class RssHubSettingsViewModel @Inject constructor(
             syncStore.state.collect { sync ->
                 _state.value = _state.value.copy(sync = sync)
             }
+        }
+        // 路由目录（issue #59）：装载一次，之后跟随 Store 的更新广播
+        viewModelScope.launch {
+            catalogStore.catalog.collect { catalog ->
+                if (catalog == null) return@collect
+                _state.value = _state.value.copy(
+                    catalogRouteCount = catalog.routes.size,
+                    catalogGeneratedAt = catalog.generatedAtMillis,
+                    catalogSource = catalog.source,
+                )
+            }
+        }
+        viewModelScope.launch { catalogStore.load() }
+    }
+
+    /** 联网更新路由目录（issue #59）。 */
+    fun refreshCatalog() {
+        if (_state.value.catalogRefreshing) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(catalogRefreshing = true, catalogMessage = null)
+            catalogStore.refresh()
+                .onSuccess { count ->
+                    _state.value = _state.value.copy(
+                        catalogRefreshing = false,
+                        catalogMessage = "已更新，共 $count 条路由",
+                    )
+                }
+                .onFailure { error ->
+                    _state.value = _state.value.copy(
+                        catalogRefreshing = false,
+                        catalogMessage = "更新失败：${error.message ?: "网络错误"}",
+                    )
+                }
         }
     }
 
@@ -266,6 +309,13 @@ private fun SettingSwitchRow(label: String, checked: Boolean, onChange: (Boolean
             ),
         )
     }
+}
+
+/** 目录数据时间精确到分钟：更新完能一眼看出「确实换了」。 */
+private fun formatCatalogTimestamp(millis: Long?): String {
+    if (millis == null) return "—"
+    return java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+        .format(java.util.Date(millis))
 }
 
 @Composable
@@ -510,6 +560,79 @@ fun RssHubSettingsScreen(
                     checked = state.sync.syncOnStart,
                     onChange = { v -> viewModel.updateSync { it.copy(syncOnStart = v) } },
                 )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ---- 路由目录（issue #59）----
+        Text(
+            text = "路由目录",
+            color = TextSecondary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "内置 RSSHub 全量路由，加订阅时可搜索与分类筛选。官方新增路由后联网更新目录即可同步。",
+            color = TextTertiary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+        )
+        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+            Column(Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "收录路由",
+                        color = TextTertiary,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = if (state.catalogRouteCount > 0) "${state.catalogRouteCount} 条" else "装载中…",
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "数据时间",
+                        color = TextTertiary,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = formatCatalogTimestamp(state.catalogGeneratedAt) +
+                            if (state.catalogSource == CatalogSource.UPDATED) "（已更新）" else "（内置）",
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = viewModel::refreshCatalog,
+                    enabled = !state.catalogRefreshing,
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Accent,
+                        contentColor = OnAccent,
+                    ),
+                ) {
+                    if (state.catalogRefreshing) {
+                        CircularProgressIndicator(color = OnAccent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("更新中…", style = MaterialTheme.typography.labelLarge)
+                    } else {
+                        Text("更新路由目录", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+                state.catalogMessage?.let { message ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(text = message, color = TextTertiary, style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
 
