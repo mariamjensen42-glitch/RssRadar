@@ -24,10 +24,25 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // CI 签名（Release workflow）：密钥经 GitHub Secrets 以环境变量注入。
+    // 本地没有这些环境变量时自动缺省，日常构建不受影响。
+    signingConfigs {
+        create("release") {
+            val ksPath = System.getenv("RSSRADAR_KEYSTORE_PATH") ?: return@create
+            storeFile = file(ksPath)
+            storePassword = System.getenv("RSSRADAR_STORE_PASSWORD")
+            keyAlias = System.getenv("RSSRADAR_KEY_ALIAS")
+            keyPassword = System.getenv("RSSRADAR_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
             optimization {
                 enable = false
+            }
+            if (System.getenv("RSSRADAR_KEYSTORE_PATH") != null) {
+                signingConfig = signingConfigs.getByName("release")
             }
         }
     }
