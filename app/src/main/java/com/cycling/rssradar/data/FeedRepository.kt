@@ -87,6 +87,16 @@ class FeedRepository(
     suspend fun loadBookmarkedPage(limit: Int, offset: Int): List<ArticleWithFeed> =
         articleDao.loadBookmarkedWithFeedPaged(limit, offset)
 
+    /** 订阅源文章列表（issue #51）：单源全部文章，一次取一页。 */
+    suspend fun loadFeedPage(feedId: Long, limit: Int, offset: Int): List<ArticleWithFeed> =
+        articleDao.loadFeedWithFeedPaged(feedId, limit, offset)
+
+    /** 单个订阅源实体（订阅源文章列表的顶栏标题用）。 */
+    suspend fun getFeed(feedId: Long): FeedEntity? = feedDao.getById(feedId)
+
+    /** 单源刷新（订阅源文章列表顶栏动作用），返回是否成功。 */
+    suspend fun refreshSingleFeed(feedId: Long): Boolean = refreshFeed(feedId)
+
     /**
      * 刷新全部订阅源，返回成功刷新的源数。失败源静默跳过（保留已有数据），
      * 供下拉刷新调用。

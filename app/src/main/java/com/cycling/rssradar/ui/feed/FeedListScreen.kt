@@ -53,6 +53,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.cycling.rssradar.data.db.ArticleWithFeed
@@ -393,7 +394,7 @@ private fun GroupOption(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ArticleCardList(
+fun ArticleCardList(
     articles: List<ArticleWithFeed>,
     onArticleClick: (ArticleWithFeed) -> Unit,
     onToggleRead: (Long, Boolean) -> Unit,
@@ -401,6 +402,9 @@ private fun ArticleCardList(
     onToggleBookmarked: (Long) -> Unit,
     onDelete: (Long) -> Unit,
     onScrolledToEnd: () -> Unit,
+    // 底部让位：tab 屏传悬浮 TabBar 让位；无 TabBar 的页面传普通间距
+    bottomPadding: Dp = tabBarBottomClearance(),
+    modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
     val shouldLoadMore = remember {
@@ -414,13 +418,13 @@ private fun ArticleCardList(
     }
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize(),
-        // 底部让位悬浮 TabBar（含导航栏 inset），最后一条文章能完整滚出胶囊
+        modifier = modifier.fillMaxSize(),
+        // 底部让位：tab 屏让开悬浮 TabBar，最后一条文章能完整滚出胶囊
         contentPadding = PaddingValues(
             start = 16.dp,
             end = 16.dp,
             top = 4.dp,
-            bottom = tabBarBottomClearance(),
+            bottom = bottomPadding,
         ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
