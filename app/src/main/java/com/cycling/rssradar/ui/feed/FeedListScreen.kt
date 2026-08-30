@@ -59,6 +59,8 @@ import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.ui.components.ArticleContextMenu
 import com.cycling.rssradar.ui.components.ArticleMenuActions
 import com.cycling.rssradar.ui.components.FeedIcon
+import com.cycling.rssradar.ui.components.FloatingTabBarFabOffset
+import com.cycling.rssradar.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.OnAccent
@@ -84,10 +86,7 @@ fun FeedListScreen(
     onAddSubscription: () -> Unit = {},
 ) {
     val selectedTab by viewModel.selectedTab.collectAsState()
-    val allArticles by viewModel.allArticles.collectAsState()
-    val unreadArticles by viewModel.unreadArticles.collectAsState()
-    val starredArticles by viewModel.starredArticles.collectAsState()
-    val bookmarkedArticles by viewModel.bookmarkedArticles.collectAsState()
+    val pagedArticles by viewModel.pagedArticles.collectAsState()
     val selectedGroup by viewModel.selectedGroup.collectAsState()
     val groupOptions by viewModel.groupOptions.collectAsState()
     val unreadCount by viewModel.unreadCount.collectAsState()
@@ -121,14 +120,8 @@ fun FeedListScreen(
         }
     }
 
-    val currentList = viewModel.filterByGroup(
-        when (selectedTab) {
-            FeedTab.All -> allArticles
-            FeedTab.Unread -> unreadArticles
-            FeedTab.Starred -> starredArticles
-            FeedTab.Bookmarked -> bookmarkedArticles
-        },
-    )
+    // 四个 tab 统一分页快照，分组筛选仍是对已加载页的内存过滤
+    val currentList = viewModel.filterByGroup(pagedArticles)
 
     Scaffold(
         containerColor = BgRoot,
@@ -185,10 +178,8 @@ fun FeedListScreen(
                         onDelete = { id ->
                             viewModel.onIntent(FeedListIntent.DeleteArticle(id))
                         },
-                        // 只有 All tab 分页；滚动到底自动加载下一页
-                        onScrolledToEnd = {
-                            if (selectedTab == FeedTab.All) viewModel.onIntent(FeedListIntent.LoadMore)
-                        },
+                        // 四个 tab 均分页；滚动到底自动加载下一页
+                        onScrolledToEnd = { viewModel.onIntent(FeedListIntent.LoadMore) },
                     )
                     Box(
                         modifier = Modifier
@@ -264,8 +255,8 @@ private fun FeedListTopBar(
     }
 }
 
-/** 让开底部胶囊 TabBar 的抬升量：TabBar 高约 56 + 外边距 12 + 间距 20。 */
-private val FAB_BOTTOM_OFFSET = 88.dp
+/** 让开底部胶囊 TabBar 的抬升量，与 FloatingBottomBar 实际占位联动（BottomTabBar.kt）。 */
+private val FAB_BOTTOM_OFFSET = FloatingTabBarFabOffset
 
 @Composable
 private fun AddSubscriptionFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -424,7 +415,13 @@ private fun ArticleCardList(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+        // 底部让位悬浮 TabBar（含导航栏 inset），最后一条文章能完整滚出胶囊
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = 4.dp,
+            bottom = tabBarBottomClearance(),
+        ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(articles, key = { it.article.id }) { item ->
@@ -612,7 +609,13 @@ private fun EmptyState(selectedTab: FeedTab, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(32.dp),
+            .padding(
+                start = 32.dp,
+                end = 32.dp,
+                top = 32.dp,
+                // 底部让位 TabBar，空态提示文字不被胶囊压住
+                bottom = 32.dp + tabBarBottomClearance(),
+            ),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

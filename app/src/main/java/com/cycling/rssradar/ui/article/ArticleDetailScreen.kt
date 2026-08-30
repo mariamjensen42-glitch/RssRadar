@@ -1,11 +1,14 @@
 package com.cycling.rssradar.ui.article
 
 import android.text.format.DateUtils
+import android.view.MotionEvent
 import android.webkit.WebView
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -47,6 +50,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -74,6 +79,8 @@ import com.cycling.rssradar.ui.theme.TextSecondary
 import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Bookmark
+import com.composables.icons.lucide.ChevronLeft
+import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Lucide
@@ -96,9 +103,19 @@ fun ArticleDetailScreen(
     val isFetchingContent by viewModel.isFetchingContent.collectAsState()
     val aiSummaryState by viewModel.aiSummaryState.collectAsState()
     val translationState by viewModel.translationState.collectAsState()
+    val neighbors by viewModel.neighbors.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showStyleSheet by remember { mutableStateOf(false) }
-    LaunchedEffect(articleId) { viewModel.load(articleId) }
+    // 整页滚动状态提升到 Screen：顶栏标题「滚出视口才出现」需要读滚动量
+    val scrollState = rememberScrollState()
+    // 标题完全滚出视口所需的滚动量（标题 top + 高度，onGloballyPositioned 量出）。
+    // 初值 Int.MAX_VALUE = 未量出前顶栏不显标题。
+    var titleHideOffset by remember { mutableStateOf(Int.MAX_VALUE) }
+    LaunchedEffect(articleId) {
+        viewModel.load(articleId)
+        scrollState.scrollTo(0)
+        titleHideOffset = Int.MAX_VALUE
+    }
     // 翻译失败走 Snackbar（spec #44：正文保持原文，报错可重试）；按状态实例触发，不会重复弹
     LaunchedEffect(translationState) {
         if (translationState is TranslationState.Failed) {
@@ -111,6 +128,8 @@ fun ArticleDetailScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             ArticleDetailTopBar(
+                title = article?.article?.title,
+                showTitle = scrollState.value >= titleHideOffset,
                 onBack = onBack,
                 onOpenStyle = { showStyleSheet = true },
                 onToggleTranslation = { viewModel.onIntent(ArticleDetailIntent.ToggleTranslation) },
@@ -123,6 +142,10 @@ fun ArticleDetailScreen(
                 ArticleActionsBar(
                     isStarred = item.article.isStarred,
                     isBookmarked = item.article.isBookmarked,
+                    hasPrev = neighbors.prevId != null,
+                    hasNext = neighbors.nextId != null,
+                    onPrev = { neighbors.prevId?.let(viewModel::load) },
+                    onNext = { neighbors.nextId?.let(viewModel::load) },
                     onStar = { viewModel.onIntent(ArticleDetailIntent.ToggleStarred) },
                     onBookmark = { viewModel.onIntent(ArticleDetailIntent.ToggleBookmarked) },
                     onOpenOriginal = { onOpenOriginal(item.article.link) },
@@ -147,6 +170,8 @@ fun ArticleDetailScreen(
             isFetchingContent = isFetchingContent,
             aiSummaryState = aiSummaryState,
             translationState = translationState,
+            scrollState = scrollState,
+            onTitleMeasured = { titleHideOffset = it },
             onGenerateSummary = { viewModel.onIntent(ArticleDetailIntent.GenerateSummary) },
             onRetranslate = { viewModel.onIntent(ArticleDetailIntent.RetranslateArticle) },
             onShowOriginal = { viewModel.onIntent(ArticleDetailIntent.ToggleTranslation) },
@@ -169,6 +194,8 @@ fun ArticleDetailScreen(
 
 @Composable
 private fun ArticleDetailTopBar(
+    title: String?,
+    showTitle: Boolean,
     onBack: () -> Unit,
     onOpenStyle: () -> Unit,
     onToggleTranslation: () -> Unit,
@@ -185,7 +212,20 @@ private fun ArticleDetailTopBar(
         IconButton(onClick = onBack) {
             Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = TextPrimary)
         }
-        Spacer(Modifier.weight(1f))
+        // 标题滚出视口后顶栏补位显示（用户反馈）；阅读中隐藏，不占阅读注意力
+        Box(modifier = Modifier.weight(1f)) {
+            if (showTitle && title != null) {
+                Text(
+                    text = title,
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.align(Alignment.CenterStart),
+                )
+            }
+        }
         // AI 翻译开关（issue #44）：未显示译文时发起翻译，显示中切回原文；生成中禁用
         IconButton(onClick = onToggleTranslation, enabled = !isGeneratingTranslation) {
             Icon(
@@ -207,136 +247,223 @@ private fun ArticleDetailContent(
     isFetchingContent: Boolean,
     aiSummaryState: AiSummaryState,
     translationState: TranslationState,
+    scrollState: ScrollState,
+    onTitleMeasured: (Int) -> Unit,
     onGenerateSummary: () -> Unit,
     onRetranslate: () -> Unit,
     onShowOriginal: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // 水平边距不放在外层：正文 WebView 的边距由排版设置的 CSS padding 控制（issue #42），
-    // 头部（源名/标题）保持固定 20dp 不随排版项变化
-    Column(
-        modifier = modifier.padding(vertical = 8.dp),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 20.dp),
-        ) {
-            FeedIcon(title = article.feedTitle, size = 22.dp, cornerRadius = 6.dp)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = article.feedTitle,
-                color = TextPrimary,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
+    // 头部（源名/标题）保持固定 20dp 不随排版项变化。
+    val shownTranslation = translationState as? TranslationState.Shown
+    val bodyHtml: String? = when {
+        shownTranslation != null -> shownTranslation.html
+        article.article.content != null -> article.article.content
+        else -> null
+    }
+    // OOM 防线（闪退诊断）：整页包高的 WebView 会被 Chromium 视为全部内容可见，
+    // 有图文章的所有图片同时解码进 Java 堆，图多必 OOM（256MB 堆几十秒吃满）。
+    // 混合模式：有图 → 视口渲染（头部固定、WebView 内部滚动、触摸正常）；
+    // 纯文字 → 整页渲染（头部随正文滚出的体验保留），文字栅格内存可控。
+    val hasImages = bodyHtml?.contains("<img", ignoreCase = true) == true
+
+    if (hasImages) {
+        Column(modifier = modifier.padding(vertical = 8.dp)) {
+            ArticleHeader(
+                article = article,
+                aiSummaryState = aiSummaryState,
+                onGenerateSummary = onGenerateSummary,
+                shownTranslation = shownTranslation,
+                onRetranslate = onRetranslate,
+                onShowOriginal = onShowOriginal,
+                onTitleMeasured = onTitleMeasured,
             )
+            when {
+                translationState is TranslationState.Generating ->
+                    TranslatingPlaceholder(Modifier.fillMaxWidth().weight(1f))
+                shownTranslation != null -> ArticleWebView(
+                    html = shownTranslation.html,
+                    passThroughTouch = false,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                )
+                article.article.content != null -> ArticleWebView(
+                    html = article.article.content!!,
+                    passThroughTouch = false,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                )
+                else -> NoContentBody(
+                    summary = article.article.summary,
+                    isFetchingContent = isFetchingContent,
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                )
+            }
+            Spacer(Modifier.height(12.dp)) // 避让底部操作栏
+        }
+    } else {
+        // 整页单滚动容器（用户反馈）：标题 / AI 摘要卡片随正文一起滚出，WebView 包内容高度
+        Column(
+            modifier = modifier
+                .padding(vertical = 8.dp)
+                .verticalScroll(scrollState),
+        ) {
+            ArticleHeader(
+                article = article,
+                aiSummaryState = aiSummaryState,
+                onGenerateSummary = onGenerateSummary,
+                shownTranslation = shownTranslation,
+                onRetranslate = onRetranslate,
+                onShowOriginal = onShowOriginal,
+                onTitleMeasured = onTitleMeasured,
+            )
+            when {
+                translationState is TranslationState.Generating ->
+                    TranslatingPlaceholder(Modifier.fillMaxWidth().height(180.dp))
+                shownTranslation != null -> ArticleWebView(
+                    html = shownTranslation.html,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                article.article.content != null -> ArticleWebView(
+                    html = article.article.content!!,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                else -> NoContentBody(
+                    summary = article.article.summary,
+                    isFetchingContent = isFetchingContent,
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                )
+            }
+            Spacer(Modifier.height(12.dp)) // 避让底部操作栏
+        }
+    }
+}
+
+/** 详情页头部：源名行 + 标题 + AI 摘要卡 + 译文横幅。两种正文渲染模式共用。 */
+@Composable
+private fun ArticleHeader(
+    article: ArticleWithFeed,
+    aiSummaryState: AiSummaryState,
+    onGenerateSummary: () -> Unit,
+    shownTranslation: TranslationState.Shown?,
+    onRetranslate: () -> Unit,
+    onShowOriginal: () -> Unit,
+    onTitleMeasured: (Int) -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(horizontal = 20.dp),
+    ) {
+        FeedIcon(title = article.feedTitle, size = 22.dp, cornerRadius = 6.dp)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = article.feedTitle,
+            color = TextPrimary,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text("·", color = TextTertiary)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = formatDate(article.article.publishedAt),
+            color = TextTertiary,
+            style = MaterialTheme.typography.labelMedium,
+        )
+        // 阅读时长：只有真实正文字数算出来的才显示。取不到就不显示，不虚构。
+        article.article.readingMinutes?.let { minutes ->
             Spacer(Modifier.width(8.dp))
             Text("·", color = TextTertiary)
             Spacer(Modifier.width(8.dp))
             Text(
-                text = formatDate(article.article.publishedAt),
+                text = "阅读约 $minutes 分钟",
                 color = TextTertiary,
                 style = MaterialTheme.typography.labelMedium,
             )
-            // 阅读时长：只有真实正文字数算出来的才显示。取不到就不显示，不虚构。
-            article.article.readingMinutes?.let { minutes ->
-                Spacer(Modifier.width(8.dp))
-                Text("·", color = TextTertiary)
+        }
+    }
+
+    // 压薄头部：标题用 titleLarge（比 headlineSmall 矮一档），间距收紧，减少固定占用
+    Spacer(Modifier.height(10.dp))
+    Text(
+        text = article.article.title,
+        color = TextPrimary,
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .padding(horizontal = 20.dp)
+            // 量出「标题完全滚出视口」的滚动量（标题 top + 高度，相对滚动内容顶部）；
+            // 视口模式下页面不滚，此值不会被触发，无害
+            .onGloballyPositioned { coords ->
+                onTitleMeasured(coords.positionInParent().y.roundToInt() + coords.size.height)
+            },
+    )
+
+    Spacer(Modifier.height(12.dp))
+
+    // AI 摘要常驻卡片（issue #44，ADR-0005）：无摘要给按钮，生成中 loading，有摘要显示内容
+    AiSummaryCard(
+        summary = article.article.aiSummary,
+        state = aiSummaryState,
+        onGenerate = onGenerateSummary,
+    )
+    Spacer(Modifier.height(12.dp))
+
+    if (shownTranslation != null) {
+        TranslationBanner(
+            onRetranslate = onRetranslate,
+            onShowOriginal = onShowOriginal,
+        )
+        Spacer(Modifier.height(4.dp))
+    }
+}
+
+/** 翻译生成中的占位。视口模式撑满剩余空间，整页模式固定高度居中。 */
+@Composable
+private fun TranslatingPlaceholder(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(180.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator(color = Accent, strokeWidth = 2.dp)
+            Spacer(Modifier.height(10.dp))
+            Text("正在翻译…", color = TextTertiary, style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+/** 无正文分支：显示摘要；按需抓取中给出轻提示，失败静默（"查看原文"兜底）。 */
+@Composable
+private fun NoContentBody(
+    summary: String?,
+    isFetchingContent: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.padding(horizontal = 20.dp)) {
+        BodyParagraph(text = summary ?: "本文没有可显示的正文，可查看原文。")
+        if (isFetchingContent) {
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(
+                    color = Accent,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(14.dp),
+                )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "阅读约 $minutes 分钟",
+                    text = "正在获取全文…",
                     color = TextTertiary,
                     style = MaterialTheme.typography.labelMedium,
                 )
             }
         }
-
-        // 压薄头部：标题用 titleLarge（比 headlineSmall 矮一档），间距收紧，减少固定占用
-        Spacer(Modifier.height(10.dp))
-        Text(
-            text = article.article.title,
-            color = TextPrimary,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 20.dp),
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        // AI 摘要常驻卡片（issue #44，ADR-0005）：无摘要给按钮，生成中 loading，有摘要显示内容
-        AiSummaryCard(
-            summary = article.article.aiSummary,
-            state = aiSummaryState,
-            onGenerate = onGenerateSummary,
-        )
-        Spacer(Modifier.height(12.dp))
-
-        val shownTranslation = translationState as? TranslationState.Shown
-        if (shownTranslation != null) {
-            TranslationBanner(
-                onRetranslate = onRetranslate,
-                onShowOriginal = onShowOriginal,
-            )
-            Spacer(Modifier.height(4.dp))
-        }
-
-        when {
-            // 正在翻译：占位 loading，正文区不动
-            translationState is TranslationState.Generating -> Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = Accent, strokeWidth = 2.dp)
-                    Spacer(Modifier.height(10.dp))
-                    Text("正在翻译…", color = TextTertiary, style = MaterialTheme.typography.labelMedium)
-                }
-            }
-            // 替换式翻译：译文 HTML 走同一条 styled-HTML 渲染链路（ADR-0005）
-            shownTranslation != null -> ArticleWebView(
-                html = shownTranslation.html,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-            )
-            // feed 自带或已抓取的正文：WebView 渲染净化 HTML（内部滚动，水平边距走排版 CSS）
-            article.article.content != null -> ArticleWebView(
-                html = article.article.content!!,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-            )
-            // 无正文：显示摘要；按需抓取中给出轻提示，失败静默（"查看原文"兜底）
-            else -> Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp),
-            ) {
-                BodyParagraph(text = article.article.summary ?: "本文没有可显示的正文，可查看原文。")
-                if (isFetchingContent) {
-                    Spacer(Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(
-                            color = Accent,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = "正在获取全文…",
-                            color = TextTertiary,
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(12.dp)) // 避让底部操作栏
     }
 }
 
@@ -437,9 +564,17 @@ private fun TranslationBanner(
  * 净化后的正文 HTML 用 WebView 渲染：排版参数与主题色注入 CSS（issue #42）。
  * 模板构建在 [ReadingContentHtml]（纯函数，JVM 单测覆盖）；本组合函数只负责
  * 从 RssRadarPalette / LocalReadingStyle 读实时值。
+ *
+ * [passThroughTouch]：整页模式（高度包内容）为 true——触摸穿透给外层 Compose 滚动，
+ * 否则 WebView 会吞掉滑动手势；视口模式（有图文章，内部滚动）为 false——
+ * WebView 必须自己消费触摸才能滚动。
  */
 @Composable
-private fun ArticleWebView(html: String, modifier: Modifier = Modifier) {
+private fun ArticleWebView(
+    html: String,
+    modifier: Modifier = Modifier,
+    passThroughTouch: Boolean = true,
+) {
     // 颜色读自 RssRadarPalette（getter 代理 mutableStateOf），主题切换自动重组
     val bg = toCssColor(BgRoot)
     val fg = toCssColor(TextPrimary)
@@ -453,7 +588,10 @@ private fun ArticleWebView(html: String, modifier: Modifier = Modifier) {
     }
     AndroidView(
         factory = { context ->
-            WebView(context).apply {
+            object : WebView(context) {
+                override fun onTouchEvent(event: MotionEvent): Boolean =
+                    if (passThroughTouch) false else super.onTouchEvent(event)
+            }.apply {
                 settings.javaScriptEnabled = false
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
             }
@@ -618,6 +756,10 @@ private fun ReadingStyleSheet(
 private fun ArticleActionsBar(
     isStarred: Boolean,
     isBookmarked: Boolean,
+    hasPrev: Boolean,
+    hasNext: Boolean,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
     onStar: () -> Unit,
     onBookmark: () -> Unit,
     onOpenOriginal: () -> Unit,
@@ -630,16 +772,36 @@ private fun ArticleActionsBar(
                 .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp + insets.calculateBottomPadding()),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ActionIcon(icon = Lucide.Star, checked = isStarred, contentDescription = "收藏", onClick = onStar)
-            Spacer(Modifier.width(8.dp))
-            ActionIcon(icon = Lucide.Bookmark, checked = isBookmarked, contentDescription = "稍后读", onClick = onBookmark)
-            Spacer(Modifier.width(8.dp))
+            // 上一篇 = 发布更早（列表序更靠后），下一篇 = 更新一篇
+            ActionIcon(
+                icon = Lucide.ChevronLeft,
+                checked = false,
+                contentDescription = "上一篇",
+                enabled = hasPrev,
+                size = 40.dp,
+                onClick = onPrev,
+            )
+            Spacer(Modifier.width(6.dp))
+            ActionIcon(
+                icon = Lucide.ChevronRight,
+                checked = false,
+                contentDescription = "下一篇",
+                enabled = hasNext,
+                size = 40.dp,
+                onClick = onNext,
+            )
+            Spacer(Modifier.width(10.dp))
+            ActionIcon(icon = Lucide.Star, checked = isStarred, contentDescription = "收藏", size = 40.dp, onClick = onStar)
+            Spacer(Modifier.width(6.dp))
+            ActionIcon(icon = Lucide.Bookmark, checked = isBookmarked, contentDescription = "稍后读", size = 40.dp, onClick = onBookmark)
+            Spacer(Modifier.width(10.dp))
             Button(
                 onClick = onOpenOriginal,
                 modifier = Modifier
                     .weight(1f)
                     .height(48.dp),
                 shape = RoundedCornerShape(14.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Accent,
                     contentColor = OnAccent,
@@ -653,8 +815,9 @@ private fun ArticleActionsBar(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = "查看原文",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
                 )
             }
         }
@@ -667,16 +830,22 @@ private fun ActionIcon(
     checked: Boolean,
     contentDescription: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
+    size: androidx.compose.ui.unit.Dp = 48.dp,
 ) {
     val bg = if (checked) Accent else Surface2
-    val fg = if (checked) OnAccent else TextPrimary
+    val fg = when {
+        checked -> OnAccent
+        !enabled -> TextTertiary
+        else -> TextPrimary
+    }
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = bg,
+        color = bg.copy(alpha = if (enabled || checked) 1f else 0.5f),
         modifier = Modifier
-            .size(48.dp)
+            .size(size)
             .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick, enabled = enabled),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(

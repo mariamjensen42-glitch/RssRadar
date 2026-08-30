@@ -40,8 +40,8 @@ sealed interface ValidationInfo {
 /**
  * 加订阅两步流的两阶段。
  * Catalog = 路由目录（搜索 + 分类 + 列表）；Params = 选中路由后填参数。
- * 注意：步骤切换由导航承担（嵌套 nav graph，issue #33）——Catalog→Params 是
- * 目的地跳转（popBackStack 返回），不再走 VM 状态；本 state 只承载两步共享的数据。
+ * 注意：步骤切换由 VM 状态承担——selectedRouteId 非空即 Params 阶段，
+ * 置空即回 Catalog（BackToCatalog）；本 state 同时承载两步共享的数据。
  */
 data class AddSubscriptionUiState(
     /** 最终要订阅的地址：可能来自手填，也可能由 RSSHub 路由拼出。 */
@@ -73,6 +73,8 @@ sealed interface AddSubscriptionIntent {
     data class QueryChange(val query: String) : AddSubscriptionIntent
     data class CategoryChange(val category: String) : AddSubscriptionIntent
     data class RouteSelected(val route: RssHubRoute) : AddSubscriptionIntent
+    /** 从填参步返回路由目录：清空所选路由，目录的搜索/分类等状态原样保留。 */
+    data object BackToCatalog : AddSubscriptionIntent
     data class ParamChange(val key: String, val value: String) : AddSubscriptionIntent
     data object PreviewRoute : AddSubscriptionIntent
     data object Submit : AddSubscriptionIntent
@@ -103,6 +105,7 @@ class AddSubscriptionViewModel @Inject constructor(
             is AddSubscriptionIntent.QueryChange -> queryChange(intent.query)
             is AddSubscriptionIntent.CategoryChange -> categoryChange(intent.category)
             is AddSubscriptionIntent.RouteSelected -> routeSelected(intent.route)
+            AddSubscriptionIntent.BackToCatalog -> backToCatalog()
             is AddSubscriptionIntent.ParamChange -> paramChange(intent.key, intent.value)
             AddSubscriptionIntent.PreviewRoute -> previewRoute()
             AddSubscriptionIntent.Submit -> submit()
@@ -142,7 +145,7 @@ class AddSubscriptionViewModel @Inject constructor(
         _state.value = _state.value.copy(category = category)
     }
 
-    /** 选中路由 → 记录所选路由并清空手填痕迹；进入 Params 阶段由导航（目的地跳转）承担。参数留空，由 placeholder 兜底出示例值。 */
+    /** 选中路由 → 记录所选路由并清空手填痕迹；UI 依 selectedRoute 切到填参步。参数留空，由 placeholder 兜底出示例值。 */
     private fun routeSelected(route: RssHubRoute) {
         _state.value = _state.value.copy(
             selectedRouteId = route.id,
@@ -152,6 +155,17 @@ class AddSubscriptionViewModel @Inject constructor(
             selectedGroup = route.suggestedGroup,
         )
         validationJob?.cancel()
+    }
+
+    /** 返回路由目录：只清所选路由，搜索词 / 分类 / 已填参数保留，方便换个路由或改主意。 */
+    private fun backToCatalog() {
+        validationJob?.cancel()
+        _state.value = _state.value.copy(
+            selectedRouteId = null,
+            paramValues = emptyMap(),
+            url = "",
+            validation = ValidationInfo.Idle,
+        )
     }
 
     private fun paramChange(key: String, value: String) {
@@ -171,10 +185,16 @@ class AddSubscriptionViewModel @Inject constructor(
         urlChange(built)
     }
 
-    /** 订阅成功后清空状态；抽屉关闭（graph 出栈）时整个 VM 销毁，状态天然重置。 */
+    /** 订阅成功后清空状态；抽屉关闭时由调用方走 [onDismissed]，下次打开从目录步开始。 */
     private fun reset() {
         validationJob?.cancel()
         _state.value = AddSubscriptionUiState()
+        uiMessage = null
+    }
+
+    /** 抽屉整体关闭（非流程内返回目录）：VM 是 Activity 作用域、不随弹层销毁，需手动重置。 */
+    fun onDismissed() {
+        reset()
     }
 
     private fun submit() {

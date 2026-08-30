@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.OnAccent
@@ -48,6 +50,27 @@ private val TOP_LEVEL_TABS = listOf(
     TabDef("search", "搜索", Lucide.Search),
     TabDef("me", "我的", Lucide.User),
 )
+
+/**
+ * 悬浮 TabBar 的底部让位（不含导航栏 inset）：胶囊高约 52dp + 底边距 12dp。
+ * 与 [FloatingBottomBar] 的实际占位联动——改胶囊内边距/外边距时必须同步这里，
+ * 否则 tab 屏最后一条内容又会被遮住。
+ */
+val FloatingTabBarClearance = 64.dp
+
+/** FAB 等悬浮件完整让开 TabBar 的底部抬升：让位高 + 呼吸空间。 */
+val FloatingTabBarFabOffset = 88.dp
+
+/**
+ * 滚动内容底部应预留的让位（TabBar 总占位 + 导航栏 inset）。
+ * TabBar 是 overlay 不占布局，各 tab 屏的 LazyColumn / 滚动 Column
+ * 必须把它加进 contentPadding / padding，最后一条内容才能完整滚出胶囊。
+ */
+@Composable
+fun tabBarBottomClearance(): Dp {
+    val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    return FloatingTabBarClearance + navInset
+}
 
 /**
  * 悬浮胶囊底部 TabBar：选中 tab 是紫色填充胶囊；未选中是透明 + 灰字。

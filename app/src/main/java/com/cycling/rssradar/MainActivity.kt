@@ -19,7 +19,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -29,7 +31,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.navDeepLink
-import androidx.navigation.navigation
 import androidx.navigation.toRoute
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -37,8 +38,7 @@ import androidx.navigation.compose.rememberNavController
 import com.cycling.rssradar.data.store.ReadingStyleState
 import com.cycling.rssradar.data.store.ThemeMode
 import com.cycling.rssradar.di.AppEntryPoint
-import com.cycling.rssradar.ui.addsubscription.AddSubscriptionCatalogScreen
-import com.cycling.rssradar.ui.addsubscription.AddSubscriptionParamsScreen
+import com.cycling.rssradar.ui.addsubscription.AddSubscriptionSheet
 import com.cycling.rssradar.ui.addsubscription.AddSubscriptionViewModel
 import com.cycling.rssradar.ui.article.ArticleDetailScreen
 import com.cycling.rssradar.ui.article.ArticleDetailViewModel
@@ -52,9 +52,6 @@ import com.cycling.rssradar.ui.search.SearchViewModel
 import com.cycling.rssradar.ui.subscriptions.SubscriptionsScreen
 import com.cycling.rssradar.ui.subscriptions.SubscriptionsViewModel
 import com.cycling.rssradar.ui.components.FloatingBottomBar
-import com.cycling.rssradar.ui.navigation.AddSubscriptionCatalogRoute
-import com.cycling.rssradar.ui.navigation.AddSubscriptionParamsRoute
-import com.cycling.rssradar.ui.navigation.AddSubscriptionRoute
 import com.cycling.rssradar.ui.navigation.ArticleDetailRoute
 import com.cycling.rssradar.ui.navigation.FeedActionRoute
 import com.cycling.rssradar.ui.navigation.FeedRoute
@@ -126,6 +123,9 @@ private fun RssRadarAppContent() {
     val navController = rememberNavController()
     val context = LocalContext.current
 
+    // 加订阅抽屉显隐：纯弹层，不入导航栈（无路由语义、不参与返回栈）。
+    var showAddSheet by remember { mutableStateOf(false) }
+
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val selectedTab: String? = when {
@@ -144,14 +144,14 @@ private fun RssRadarAppContent() {
                     viewModel = vm,
                     onOpenSearch = { navController.navigate(SearchRoute) },
                     onOpenArticle = { navController.navigate(ArticleDetailRoute(it.article.id)) },
-                    onAddSubscription = { navController.navigate(AddSubscriptionRoute) },
+                    onAddSubscription = { showAddSheet = true },
                 )
             }
             composable<SubscriptionsRoute> {
                 val vm = hiltViewModel<SubscriptionsViewModel>()
                 SubscriptionsScreen(
                     viewModel = vm,
-                    onAddSubscription = { navController.navigate(AddSubscriptionRoute) },
+                    onAddSubscription = { showAddSheet = true },
                     onCreateGroup = { /* TODO */ },
                     onFeedAction = { navController.navigate(FeedActionRoute(it)) },
                 )
@@ -180,29 +180,6 @@ private fun RssRadarAppContent() {
                     onOpenOriginal = { url -> context.openUrl(url) },
                 )
             }
-            // 加订阅两步流：嵌套 nav graph（issue #33）。graph route 即 AddSubscriptionRoute，
-            // AddSubscriptionViewModel 作用域在 graph 上，两步共享、graph 出栈销毁。
-            navigation<AddSubscriptionRoute>(startDestination = AddSubscriptionCatalogRoute) {
-                composable<AddSubscriptionCatalogRoute> {
-                    // navGraph 作用域共享：跨目的地取同一 VM 实例
-                    val parentEntry = remember { navController.getBackStackEntry<AddSubscriptionRoute>() }
-                    val vm = hiltViewModel<AddSubscriptionViewModel>(parentEntry)
-                    AddSubscriptionCatalogScreen(
-                        viewModel = vm,
-                        onDismiss = { navController.popBackStack() },
-                        onOpenParams = { navController.navigate(AddSubscriptionParamsRoute) },
-                    )
-                }
-                composable<AddSubscriptionParamsRoute> {
-                    val parentEntry = remember { navController.getBackStackEntry<AddSubscriptionRoute>() }
-                    val vm = hiltViewModel<AddSubscriptionViewModel>(parentEntry)
-                    AddSubscriptionParamsScreen(
-                        viewModel = vm,
-                        onDismiss = { navController.popBackStack() },
-                        onBack = { navController.popBackStack() },
-                    )
-                }
-            }
             composable<FeedActionRoute> { backStackEntry ->
                 val feedId = backStackEntry.toRoute<FeedActionRoute>().feedId
                 FeedActionScreen(
@@ -211,6 +188,19 @@ private fun RssRadarAppContent() {
                     onDismiss = { navController.popBackStack() },
                 )
             }
+        }
+
+        // 加订阅抽屉：ModalBottomSheet 自带窗口级弹层与返回拦截（BackHandler），
+        // 不需要 NavHost 承载。VM 挂在 Activity 作用域，关闭时手动重置流程状态。
+        if (showAddSheet) {
+            val addVm: AddSubscriptionViewModel = hiltViewModel()
+            AddSubscriptionSheet(
+                viewModel = addVm,
+                onDismiss = {
+                    addVm.onDismissed()
+                    showAddSheet = false
+                },
+            )
         }
 
         if (selectedTab != null) {
