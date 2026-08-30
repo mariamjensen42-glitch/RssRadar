@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -452,6 +451,8 @@ fun ArticleCardList(
             // 只做视觉分组，不改变排序与分页；列表本身已按 publishedAt DESC 排序。
             dayGroups.forEach { group ->
                 group.label?.let { label ->
+                    // stickyHeader 是 LazyListScope 接口成员（foundation 1.10+，真值表已核），
+                    // DSL 内直接调用，不可 import
                     stickyHeader(key = "date-${group.key}") {
                         StickyDateHeader(label)
                     }
