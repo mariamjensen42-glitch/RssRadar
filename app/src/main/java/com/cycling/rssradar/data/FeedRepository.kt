@@ -2,14 +2,20 @@ package com.cycling.rssradar.data
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
+import androidx.room.withTransaction
 import com.cycling.rssradar.data.db.AppDatabase
 import com.cycling.rssradar.data.db.ArticleEntity
 import com.cycling.rssradar.data.db.ArticleWithFeed
@@ -52,6 +58,13 @@ class FeedRepository(
     private val feedDao = database.feedDao()
     private val articleDao = database.articleDao()
 
+    companion object {
+        /** 刷新的有界并发度（#48）：8 路并行，几百个源不再串行排队几十分钟。 */
+        private const val REFRESH_CONCURRENCY = 8
+    }
+
+    private val refreshSemaphore = Semaphore(REFRESH_CONCURRENCY)
+
     fun observeArticles(): Flow<List<ArticleWithFeed>> = articleDao.observeAllWithFeed()
     fun observeAllArticles(): Flow<List<ArticleWithFeed>> = articleDao.observeAllWithFeed()
     fun observeUnreadArticles(): Flow<List<ArticleWithFeed>> = articleDao.observeUnreadWithFeed()
@@ -67,8 +80,9 @@ class FeedRepository(
      * 刷新全部订阅源，返回成功刷新的源数。失败源静默跳过（保留已有数据），
      * 供下拉刷新调用。
      */
-    suspend fun refreshAllFeeds(): Int = withContext(ioDispatcher) {
-        feedDao.getAll().count { refreshFeed(it.id) }
+    suspend fun refreshAllFeeds(): Int {
+        val feeds = feedDao.getAll()
+        return refreshInParallel(feeds.map { it.id })
     }
 
     /** 是否已有订阅源。供 UI 区分「没有源」和「刷新失败」。 */
@@ -223,8 +237,22 @@ class FeedRepository(
      * 定向刷新一批订阅源（盲导后补文章用），返回成功的源数。
      * 失败静默跳过，语义同 [refreshAllFeeds]。
      */
-    suspend fun refreshFeeds(feedIds: List<Long>): Int = withContext(ioDispatcher) {
-        feedIds.count { refreshFeed(it) }
+    suspend fun refreshFeeds(feedIds: List<Long>): Int = refreshInParallel(feedIds)
+
+    /**
+     * 有界并发刷新（#48）：Semaphore(8) 同时处理 8 个源。
+     * HttpURLConnection 无状态、Room 写入天然串行，并发安全；
+     * 几百个源的总耗时从「串行累加」降为约 1/8。
+     * 整体跑在 ioDispatcher 上，不让并发骨架占用调用方（Main）线程。
+     */
+    private suspend fun refreshInParallel(feedIds: List<Long>): Int = withContext(ioDispatcher) {
+        coroutineScope {
+            feedIds.map { feedId ->
+                async {
+                    refreshSemaphore.withPermit { refreshFeed(feedId) }
+                }
+            }.awaitAll().count { it }
+        }
     }
 
     /**
@@ -245,46 +273,49 @@ class FeedRepository(
         true
     }
 
-    /** 同一 link：只更新内容状态字段，用户状态原样保留。 */
+    /** 同一 link：只更新内容状态字段，用户状态原样保留。整源一次事务（#48）。 */
     private suspend fun upsertArticles(feedId: Long, articles: List<RssParser.ParsedArticle>, now: Long) {
-        articles.forEach { article ->
-            val existingId = articleDao.findIdByLink(feedId, article.link)
-            val readingMinutes = article.contentText?.let { estimateReadingMinutes(it) }
-            val contentSource = if (article.contentHtml != null) ArticleEntity.CONTENT_SOURCE_FEED else ArticleEntity.CONTENT_SOURCE_NONE
-            if (existingId != null) {
-                articleDao.updateContentState(
-                    id = existingId,
-                    title = article.title,
-                    summary = article.summary,
-                    content = article.contentHtml,
-                    contentText = article.contentText,
-                    author = article.author,
-                    publishedAt = article.publishedAt,
-                    coverUrl = article.coverUrl,
-                    readingMinutes = readingMinutes,
-                    contentSource = contentSource,
-                    fetchedAt = now,
-                )
-            } else {
-                articleDao.insertAll(
-                    listOf(
-                        ArticleEntity(
-                            feedId = feedId,
-                            link = article.link,
-                            title = article.title,
-                            summary = article.summary,
-                            content = article.contentHtml,
-                            contentText = article.contentText,
-                            author = article.author,
-                            publishedAt = article.publishedAt,
-                            fetchedAt = now,
-                            coverUrl = article.coverUrl,
-                            readingMinutes = readingMinutes,
-                            contentSource = contentSource,
-                        ),
-                    ),
-                )
+        if (articles.isEmpty()) return
+        database.withTransaction {
+            // 一次查询建 link→id 映射，替代逐篇 findIdByLink（#48：消除 N+1 写放大）
+            val existing = articleDao.getIdLinkPairsByFeed(feedId).associate { it.link to it.id }
+            val newArticles = mutableListOf<ArticleEntity>()
+            articles.forEach { article ->
+                val readingMinutes = article.contentText?.let { estimateReadingMinutes(it) }
+                val contentSource = if (article.contentHtml != null) ArticleEntity.CONTENT_SOURCE_FEED else ArticleEntity.CONTENT_SOURCE_NONE
+                val existingId = existing[article.link]
+                if (existingId == null) {
+                    newArticles += ArticleEntity(
+                        feedId = feedId,
+                        link = article.link,
+                        title = article.title,
+                        summary = article.summary,
+                        content = article.contentHtml,
+                        contentText = article.contentText,
+                        author = article.author,
+                        publishedAt = article.publishedAt,
+                        fetchedAt = now,
+                        coverUrl = article.coverUrl,
+                        readingMinutes = readingMinutes,
+                        contentSource = contentSource,
+                    )
+                } else {
+                    articleDao.updateContentState(
+                        id = existingId,
+                        title = article.title,
+                        summary = article.summary,
+                        content = article.contentHtml,
+                        contentText = article.contentText,
+                        author = article.author,
+                        publishedAt = article.publishedAt,
+                        coverUrl = article.coverUrl,
+                        readingMinutes = readingMinutes,
+                        contentSource = contentSource,
+                        fetchedAt = now,
+                    )
+                }
             }
+            if (newArticles.isNotEmpty()) articleDao.insertAll(newArticles)
         }
     }
 
