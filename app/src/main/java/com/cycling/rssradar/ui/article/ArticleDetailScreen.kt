@@ -2,7 +2,6 @@ package com.cycling.rssradar.ui.article
 
 import android.text.format.DateUtils
 import android.webkit.WebView
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,31 +24,44 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import coil3.compose.SubcomposeAsyncImage
-import com.cycling.rssradar.LocalDarkTheme
+import com.cycling.rssradar.LocalReadingStyle
 import com.cycling.rssradar.data.db.ArticleWithFeed
+import com.cycling.rssradar.data.store.ReadingFontFamily
+import com.cycling.rssradar.data.store.ReadingStyleState
+import com.cycling.rssradar.data.store.coerceFontSize
+import com.cycling.rssradar.data.store.coerceLineHeight
+import com.cycling.rssradar.data.store.coercePadding
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
+import com.cycling.rssradar.ui.theme.Link
 import com.cycling.rssradar.ui.theme.OnAccent
 import com.cycling.rssradar.ui.theme.Surface1
 import com.cycling.rssradar.ui.theme.Surface2
@@ -58,10 +70,13 @@ import com.cycling.rssradar.ui.theme.TextSecondary
 import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Bookmark
-import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Minus
+import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Star
+import com.composables.icons.lucide.Type
+import kotlin.math.roundToInt
 
 
 @Composable
@@ -73,11 +88,17 @@ fun ArticleDetailScreen(
 ) {
     val article by viewModel.article.collectAsState()
     val isFetchingContent by viewModel.isFetchingContent.collectAsState()
+    var showStyleSheet by remember { mutableStateOf(false) }
     LaunchedEffect(articleId) { viewModel.load(articleId) }
 
     Scaffold(
         containerColor = BgRoot,
-        topBar = { ArticleDetailTopBar(onBack = onBack) },
+        topBar = {
+            ArticleDetailTopBar(
+                onBack = onBack,
+                onOpenStyle = { showStyleSheet = true },
+            )
+        },
         bottomBar = {
             article?.let { item ->
                 ArticleActionsBar(
@@ -110,10 +131,20 @@ fun ArticleDetailScreen(
                 .padding(padding),
         )
     }
+
+    if (showStyleSheet) {
+        ReadingStyleSheet(
+            onFontSize = { v -> viewModel.updateReadingStyle { it.copy(fontSize = v) } },
+            onLineHeight = { v -> viewModel.updateReadingStyle { it.copy(lineHeight = v) } },
+            onPadding = { v -> viewModel.updateReadingStyle { it.copy(horizontalPadding = v) } },
+            onFontFamily = { v -> viewModel.updateReadingStyle { it.copy(fontFamily = v) } },
+            onDismiss = { showStyleSheet = false },
+        )
+    }
 }
 
 @Composable
-private fun ArticleDetailTopBar(onBack: () -> Unit) {
+private fun ArticleDetailTopBar(onBack: () -> Unit, onOpenStyle: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -125,8 +156,9 @@ private fun ArticleDetailTopBar(onBack: () -> Unit) {
             Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = TextPrimary)
         }
         Spacer(Modifier.weight(1f))
-        IconButton(onClick = { /* TODO: 更多菜单 */ }) {
-            Icon(Lucide.EllipsisVertical, contentDescription = "更多", tint = TextPrimary)
+        // 原「更多」TODO 占位：收编为排版设置入口（issue #42）
+        IconButton(onClick = onOpenStyle) {
+            Icon(Lucide.Type, contentDescription = "排版设置", tint = TextPrimary)
         }
     }
 }
@@ -137,10 +169,15 @@ private fun ArticleDetailContent(
     isFetchingContent: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    // 水平边距不放在外层：正文 WebView 的边距由排版设置的 CSS padding 控制（issue #42），
+    // 头部（源名/标题）保持固定 20dp 不随排版项变化
     Column(
-        modifier = modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+        modifier = modifier.padding(vertical = 8.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 20.dp),
+        ) {
             FeedIcon(title = article.feedTitle, size = 22.dp, cornerRadius = 6.dp)
             Spacer(Modifier.width(8.dp))
             Text(
@@ -180,17 +217,12 @@ private fun ArticleDetailContent(
             color = TextPrimary,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 20.dp),
         )
-
-        // 封面：取到了且为有效地址才显示真图；否则整块不渲染（不留空白占位）
-        article.article.coverUrl?.takeIf { it.isNotBlank() }?.let { url ->
-            Spacer(Modifier.height(12.dp))
-            ArticleCoverImage(url = url)
-        }
 
         Spacer(Modifier.height(12.dp))
         when {
-            // feed 自带或已抓取的正文：WebView 渲染净化 HTML（内部滚动，模板注入深色主题）
+            // feed 自带或已抓取的正文：WebView 渲染净化 HTML（内部滚动，水平边距走排版 CSS）
             article.article.content != null -> ArticleWebView(
                 html = article.article.content!!,
                 modifier = Modifier
@@ -201,7 +233,8 @@ private fun ArticleDetailContent(
             else -> Column(
                 modifier = Modifier
                     .weight(1f)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp),
             ) {
                 BodyParagraph(text = article.article.summary ?: "本文没有可显示的正文，可查看原文。")
                 if (isFetchingContent) {
@@ -226,12 +259,24 @@ private fun ArticleDetailContent(
     }
 }
 
-/** 净化后的正文 HTML 用 WebView 渲染：模板注入主题样式，与全局一致。 */
+/**
+ * 净化后的正文 HTML 用 WebView 渲染：排版参数与主题色注入 CSS（issue #42）。
+ * 模板构建在 [ReadingContentHtml]（纯函数，JVM 单测覆盖）；本组合函数只负责
+ * 从 RssRadarPalette / LocalReadingStyle 读实时值。
+ */
 @Composable
 private fun ArticleWebView(html: String, modifier: Modifier = Modifier) {
-    // 用主题宿主注入的实际深色状态（跟随系统或用户强制），不是系统值
-    val darkTheme = LocalDarkTheme.current
-    val styledHtml = remember(html, darkTheme) { buildStyledContentHtml(html, darkTheme) }
+    // 颜色读自 RssRadarPalette（getter 代理 mutableStateOf），主题切换自动重组
+    val bg = toCssColor(BgRoot)
+    val fg = toCssColor(TextPrimary)
+    val muted = toCssColor(TextSecondary)
+    val codeBg = toCssColor(Surface2)
+    val border = toCssColor(Surface1)
+    val link = toCssColor(Link)
+    val style = LocalReadingStyle.current
+    val styledHtml = remember(html, style, bg, fg, muted, codeBg, border, link) {
+        ReadingContentHtml.build(html, style, bg, fg, muted, codeBg, border, link)
+    }
     AndroidView(
         factory = { context ->
             WebView(context).apply {
@@ -246,66 +291,153 @@ private fun ArticleWebView(html: String, modifier: Modifier = Modifier) {
     )
 }
 
-/**
- * 渲染模板。正文 HTML 在解析层已经净化（去 script/style/iframe/事件属性，见 RssParser），
- * 这里再包一层静态 CSS：深色黑底白字 / 浅色白底黑字，图片限宽，链接用主题紫。
- */
-private fun buildStyledContentHtml(contentHtml: String, darkTheme: Boolean): String {
-    val bg: String
-    val fg: String
-    val muted: String
-    val codeBg: String
-    val border: String
-    val link: String
-    if (darkTheme) {
-        bg = "#000000"; fg = "#FFFFFF"; muted = "#B0B0B6"; codeBg = "#1C1C1E"; border = "#3A3A3C"; link = "#9B9CFF"
-    } else {
-        bg = "#FFFFFF"; fg = "#1A1A1E"; muted = "#55555C"; codeBg = "#F0F0F4"; border = "#D9D9E0"; link = "#5B5BD6"
-    }
-    return """
-    <!DOCTYPE html>
-    <html><head><meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { background:$bg; color:$fg; font-size:16px; line-height:1.7;
-               font-family:-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
-               margin:0; padding:0; word-break:break-word; }
-        img { max-width:100%; height:auto; border-radius:8px; }
-        a { color:$link; text-decoration:none; }
-        p { margin:0 0 1em 0; }
-        blockquote { margin:0 0 1em 0; padding:4px 12px; border-left:3px solid $border; color:$muted; }
-        pre { background:$codeBg; padding:10px; border-radius:8px; overflow-x:auto; }
-        code { font-family:Menlo,Consolas,monospace; font-size:13px; }
-        h1,h2,h3 { line-height:1.4; }
-        figure { margin:0 0 1em 0; }
-    </style></head>
-    <body>$contentHtml</body></html>
-""".trimIndent()
-}
+/** Compose Color → CSS #RRGGBB。 */
+private fun toCssColor(color: androidx.compose.ui.graphics.Color): String =
+    "#%06X".format(color.toArgb() and 0xFFFFFF)
 
-@Composable
-private fun ArticleCoverImage(url: String) {
-    SubcomposeAsyncImage(
-        model = url,
-        contentDescription = "文章封面",
-        contentScale = ContentScale.Crop,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(160.dp)
-            .clip(RoundedCornerShape(12.dp)),
-        // 加载中 / 失败：画可见的 Surface2 占位，避免透明空洞（Coil 3 默认加载态不绘制）
-        loading = { Box(Modifier.fillMaxSize().background(Surface2)) },
-        error = { Box(Modifier.fillMaxSize().background(Surface2)) },
-    )
+/** Store 层的纯 JVM 字体族枚举 → Compose FontFamily（摘要分支用）。 */
+private fun ReadingFontFamily.toComposeFontFamily(): FontFamily = when (this) {
+    ReadingFontFamily.SYSTEM -> FontFamily.Default
+    ReadingFontFamily.SERIF -> FontFamily.Serif
+    ReadingFontFamily.MONOSPACE -> FontFamily.Monospace
 }
 
 @Composable
 private fun BodyParagraph(text: String) {
+    val style = LocalReadingStyle.current
     Text(
         text = text,
         color = TextPrimary,
-        style = MaterialTheme.typography.bodyLarge,
+        style = MaterialTheme.typography.bodyLarge.copy(
+            fontSize = style.fontSize.sp,
+            lineHeight = (style.fontSize * style.lineHeight).sp,
+            fontFamily = style.fontFamily.toComposeFontFamily(),
+        ),
     )
+}
+
+/**
+ * 排版设置弹层（issue #42）：字号步进、行距/边距滑杆、字体族三选一。
+ * 显示值读 LocalReadingStyle，写入经 VM 直达 ReadingStyleStore，无确认按钮即改即见。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReadingStyleSheet(
+    onFontSize: (Int) -> Unit,
+    onLineHeight: (Float) -> Unit,
+    onPadding: (Int) -> Unit,
+    onFontFamily: (ReadingFontFamily) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val style = LocalReadingStyle.current
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Surface1) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
+        ) {
+            Text(
+                text = "排版设置",
+                color = TextPrimary,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(8.dp))
+
+            // 字号：步进
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "字号",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = { onFontSize(coerceFontSize(style.fontSize - 1)) }) {
+                    Icon(Lucide.Minus, contentDescription = "减小字号", tint = TextPrimary, modifier = Modifier.size(18.dp))
+                }
+                Text(
+                    text = "${style.fontSize}",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.width(40.dp),
+                )
+                IconButton(onClick = { onFontSize(coerceFontSize(style.fontSize + 1)) }) {
+                    Icon(Lucide.Plus, contentDescription = "增大字号", tint = TextPrimary, modifier = Modifier.size(18.dp))
+                }
+            }
+
+            // 行距：滑杆（0.8–2.5）
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "行距",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.width(72.dp),
+                )
+                Slider(
+                    value = style.lineHeight,
+                    onValueChange = { onLineHeight(coerceLineHeight(it)) },
+                    valueRange = ReadingStyleState.LINE_HEIGHT_MIN..ReadingStyleState.LINE_HEIGHT_MAX,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "%.1f".format(style.lineHeight),
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(40.dp),
+                )
+            }
+
+            // 边距：滑杆（0–48dp）
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "边距",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.width(72.dp),
+                )
+                Slider(
+                    value = style.horizontalPadding.toFloat(),
+                    onValueChange = { onPadding(coercePadding(it.roundToInt())) },
+                    valueRange = ReadingStyleState.PADDING_MIN.toFloat()..ReadingStyleState.PADDING_MAX.toFloat(),
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "${style.horizontalPadding}dp",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(40.dp),
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+            // 字体族：三选一
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ReadingFontFamily.entries.forEach { family ->
+                    val selected = family == style.fontFamily
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (selected) Accent else Surface2,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(50))
+                            .clickable(onClick = { onFontFamily(family) }),
+                    ) {
+                        Text(
+                            text = family.label,
+                            color = if (selected) OnAccent else TextPrimary,
+                            style = MaterialTheme.typography.labelLarge,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

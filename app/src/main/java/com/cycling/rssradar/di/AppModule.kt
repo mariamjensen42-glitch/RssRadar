@@ -7,6 +7,7 @@ import com.cycling.rssradar.data.db.AppDatabase
 import com.cycling.rssradar.data.parser.ContentFetcher
 import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.store.GroupStore
+import com.cycling.rssradar.data.store.ReadingStyleStore
 import com.cycling.rssradar.data.db.MIGRATION_1_2
 import com.cycling.rssradar.data.db.MIGRATION_2_3
 import com.cycling.rssradar.data.db.MIGRATION_3_4
@@ -66,6 +67,11 @@ object AppModule {
     @Provides
     @Singleton
     fun provideThemeStore(app: Application): ThemeStore = ThemeStore(app)
+
+    @Provides
+    @Singleton
+    fun provideReadingStyleStore(@ApplicationContext context: Context): ReadingStyleStore =
+        ReadingStyleStore(context)
 }
 
 /**
@@ -76,4 +82,5 @@ object AppModule {
 @InstallIn(SingletonComponent::class)
 interface AppEntryPoint {
     fun themeStore(): ThemeStore
+    fun readingStyleStore(): ReadingStyleStore
 }

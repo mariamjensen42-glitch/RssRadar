@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.data.db.ArticleEntity
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.data.store.ReadingStyleState
+import com.cycling.rssradar.data.store.ReadingStyleStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -28,6 +30,7 @@ private const val KEY_ARTICLE_ID = "articleId"
 class ArticleDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: FeedRepository,
+    private val readingStyleStore: ReadingStyleStore,
 ) : ViewModel(), MviViewModel<ArticleDetailIntent> {
 
     private val _article = MutableStateFlow<ArticleWithFeed?>(null)
@@ -36,6 +39,17 @@ class ArticleDetailViewModel @Inject constructor(
     /** 正在按需抓取原网页正文。失败是常态（反爬/JS 页），静默降级，UI 不弹错误。 */
     private val _isFetchingContent = MutableStateFlow(false)
     val isFetchingContent: StateFlow<Boolean> = _isFetchingContent.asStateFlow()
+
+    /**
+     * 阅读排版状态（issue #42）。偏好属 UI 环境而非业务事件，按 ADR-0003
+     * 「纯函数与状态 producer 保持 fun」的先例走普通方法，不进 Intent 面；
+     * 数据源与主题宿主注入的 LocalReadingStyle 是同一份 Store。
+     */
+    val readingStyle: StateFlow<ReadingStyleState> = readingStyleStore.state
+
+    fun updateReadingStyle(transform: (ReadingStyleState) -> ReadingStyleState) {
+        readingStyleStore.update(transform)
+    }
 
     init {
         // articleId 来自 nav args（类型安全路由写入 SavedStateHandle，issue #32）。
