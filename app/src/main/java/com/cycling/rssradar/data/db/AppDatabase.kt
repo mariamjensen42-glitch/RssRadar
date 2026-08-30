@@ -102,6 +102,12 @@ data class ArticleWithFeed(
     val feedIconUrl: String?,
 )
 
+/** 文章 id 与 link 的轻量对，供刷新时一次建 link→id 映射（#48 批量 upsert）。 */
+data class ArticleIdLink(
+    val id: Long,
+    val link: String,
+)
+
 /** 订阅 + 未读数（每条结果用 Flow 汇总）。 */
 data class FeedUnreadCount(
     val feedId: Long,
@@ -233,6 +239,10 @@ interface ArticleDao {
 
     @Query("SELECT id FROM articles WHERE feedId = :feedId AND link = :link LIMIT 1")
     suspend fun findIdByLink(feedId: Long, link: String): Long?
+
+    /** 该源全部已有文章的 id/link 对，一次查询建映射（#48 批量 upsert）。 */
+    @Query("SELECT id, link FROM articles WHERE feedId = :feedId")
+    suspend fun getIdLinkPairsByFeed(feedId: Long): List<ArticleIdLink>
 
     /**
      * 分页加载全部文章（信息流 All tab）。OFFSET 分页在个人订阅量级足够，

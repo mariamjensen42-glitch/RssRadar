@@ -2,7 +2,6 @@ package com.cycling.rssradar.ui.subscriptions
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -133,16 +131,31 @@ fun SubscriptionsScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(groups, key = { it.group }) { group ->
-                GroupSection(
-                    title = group.group,
-                    feedCount = group.feeds.size,
-                    feeds = group.feeds,
-                    expanded = group.group in expandedIds,
-                    onToggle = { viewModel.onIntent(SubscriptionsIntent.ToggleGroup(group.group)) },
-                    onEdit = { renameGroupTarget = group.group },
-                    onFeedMore = { onFeedAction(it.id) },
-                )
+            // 分组列表拍平（#48）：分组头与 FeedRow 都是 LazyColumn 的 item，
+            // 展开大分组只组合可见行——原 AnimatedVisibility { forEach } 会把
+            // 几百行一次性同步组合在主线程上，点击分组卡顿的根因。
+            groups.forEach { group ->
+                item(key = "header-${group.group}", contentType = "header") {
+                    GroupHeader(
+                        title = group.group,
+                        feedCount = group.feeds.size,
+                        expanded = group.group in expandedIds,
+                        onToggle = { viewModel.onIntent(SubscriptionsIntent.ToggleGroup(group.group)) },
+                        onEdit = { renameGroupTarget = group.group },
+                    )
+                }
+                if (group.group in expandedIds) {
+                    group.feeds.forEach { feedItem ->
+                        item(key = "feed-${feedItem.feed.id}", contentType = "feed") {
+                            Box(Modifier.padding(start = 12.dp)) {
+                                FeedRow(
+                                    item = feedItem,
+                                    onMore = { onFeedAction(feedItem.feed.id) },
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             item {
@@ -219,36 +232,6 @@ private fun SubscriptionsTopBar(onImport: () -> Unit, onSort: () -> Unit, onAdd:
 }
 
 @Composable
-private fun GroupSection(
-    title: String,
-    feedCount: Int,
-    feeds: List<FeedWithUnread>,
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    onEdit: () -> Unit,
-    onFeedMore: (FeedEntity) -> Unit,
-) {
-    Column {
-        GroupHeader(
-            title = title,
-            feedCount = feedCount,
-            expanded = expanded,
-            onToggle = onToggle,
-            onEdit = onEdit,
-        )
-        AnimatedVisibility(visible = expanded) {
-            Column(
-                modifier = Modifier.padding(top = 6.dp, start = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                feeds.forEach { item ->
-                    FeedRow(item = item, onMore = { onFeedMore(item.feed) })
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun GroupHeader(
     title: String,
