@@ -1,0 +1,79 @@
+package com.cycling.rssradar.ui.article
+
+import com.cycling.rssradar.data.store.ReadingFontFamily
+import com.cycling.rssradar.data.store.ReadingStyleState
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ReadingContentHtmlTest {
+
+    private val colors = linkedMapOf(
+        "bg" to "#0E0F13",
+        "fg" to "#E8E8EC",
+        "muted" to "#9A9AA6",
+        "codeBg" to "#1C1C22",
+        "border" to "#26262E",
+        "link" to "#9B9CFF",
+    )
+
+    private fun build(content: String, style: ReadingStyleState = ReadingStyleState()) =
+        ReadingContentHtml.build(
+            contentHtml = content,
+            style = style,
+            bg = colors["bg"]!!,
+            fg = colors["fg"]!!,
+            muted = colors["muted"]!!,
+            codeBg = colors["codeBg"]!!,
+            border = colors["border"]!!,
+            link = colors["link"]!!,
+        )
+
+    @Test
+    fun `default style produces expected css values`() {
+        val html = build("<p>hi</p>")
+
+        assertTrue(html.contains("font-size:17px"))
+        assertTrue(html.contains("line-height:1.0"))
+        assertTrue(html.contains("padding:0 24px"))
+        assertTrue(html.contains("background:#0E0F13"))
+        assertTrue(html.contains("color:#E8E8EC"))
+        assertTrue(html.contains("color:#9B9CFF"))
+    }
+
+    @Test
+    fun `style params are reflected in css`() {
+        val html = build(
+            "<p>hi</p>",
+            ReadingStyleState(fontSize = 22, lineHeight = 1.6f, horizontalPadding = 8),
+        )
+
+        assertTrue(html.contains("font-size:22px"))
+        assertTrue(html.contains("line-height:1.6"))
+        assertTrue(html.contains("padding:0 8px"))
+    }
+
+    @Test
+    fun `font family maps to its css stack`() {
+        assertTrue(build("<p>a</p>", ReadingStyleState(fontFamily = ReadingFontFamily.SYSTEM)).contains(ReadingFontFamily.SYSTEM.cssStack))
+        assertTrue(build("<p>a</p>", ReadingStyleState(fontFamily = ReadingFontFamily.SERIF)).contains("Georgia"))
+        assertTrue(build("<p>a</p>", ReadingStyleState(fontFamily = ReadingFontFamily.MONOSPACE)).contains("Menlo"))
+    }
+
+    @Test
+    fun `content html is preserved verbatim`() {
+        val content = """<p>Hi &amp; bye</p><img src="https://example.com/a.png" alt="">"""
+        val html = build(content)
+
+        assertTrue(html.contains("<body>$content</body>"))
+    }
+
+    @Test
+    fun `document shell is a complete html document`() {
+        val html = build("<p>x</p>")
+
+        assertTrue(html.startsWith("<!DOCTYPE html>"))
+        assertTrue(html.contains("<meta name=\"viewport\""))
+        assertTrue(html.trim().endsWith("</html>"))
+    }
+}
