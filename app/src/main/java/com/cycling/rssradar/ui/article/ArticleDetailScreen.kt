@@ -36,7 +36,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -63,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.cycling.rssradar.LocalReadingStyle
 import com.cycling.rssradar.openUrl
+import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.data.ai.AiRepository
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.store.ReadingFontFamily
@@ -128,7 +128,7 @@ fun ArticleDetailScreen(
 
     Scaffold(
         containerColor = BgRoot,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
             ArticleDetailTopBar(
                 title = article?.article?.title,

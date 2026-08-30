@@ -26,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.data.db.DEFAULT_GROUP
+import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.components.FloatingTabBarFabOffset
 import com.cycling.rssradar.ui.components.tabBarBottomClearance
@@ -106,7 +106,7 @@ fun SubscriptionsScreen(
 
     Scaffold(
         containerColor = BgRoot,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
             SubscriptionsTopBar(
                 onImport = {

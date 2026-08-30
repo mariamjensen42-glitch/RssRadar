@@ -35,7 +35,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -55,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.data.rsshub.RouteParam
 import com.cycling.rssradar.data.rsshub.RssHubRoute
 import com.cycling.rssradar.data.rsshub.RssHubRoutes
+import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.Divider
@@ -121,7 +121,7 @@ private fun AddSheetShell(
             Column(modifier = Modifier.fillMaxSize()) {
                 content()
             }
-            SnackbarHost(
+            AppSnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
