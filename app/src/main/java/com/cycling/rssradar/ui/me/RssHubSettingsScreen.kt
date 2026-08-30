@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -421,15 +422,15 @@ fun RssHubSettingsScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ---- 文章保留（issue #57）----
+        // ---- 文章清理（issue #57）----
         Text(
-            text = "文章保留",
+            text = "文章清理",
             color = TextSecondary,
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            text = "超过保留期的文章在自动同步后被清理；收藏与稍后读的文章永不清理。",
+            text = "发布时间超过所选期限的文章会被清理（打开应用时和自动同步完成后执行）；收藏与稍后读永不清理。",
             color = TextTertiary,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
@@ -443,7 +444,7 @@ fun RssHubSettingsScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "保留天数",
+                    text = "发布超过",
                     color = TextPrimary,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f),
@@ -699,7 +700,7 @@ fun RssHubSettingsScreen(
 
     if (showKeepSheet) {
         OptionPickerSheet(
-            title = "保留天数",
+            title = "发布超过",
             options = KeepArchived.entries.toList(),
             selected = state.keepArchived,
             label = { it.label },

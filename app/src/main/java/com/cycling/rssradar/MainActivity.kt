@@ -68,6 +68,7 @@ import com.cycling.rssradar.ui.theme.RssRadarTheme
 import com.cycling.rssradar.sync.SyncScheduler
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -79,6 +80,13 @@ class MainActivity : ComponentActivity() {
         // 并按开关 + 30 分钟去抖决定是否立即同步一轮（fire-and-forget 不阻塞启动）。
         val entryPoint = EntryPointAccessors.fromApplication(applicationContext, AppEntryPoint::class.java)
         SyncScheduler.onAppStart(this, entryPoint.applicationScope())
+        // 归档清理（issue #57 修订）：打开应用即按保留天数清理一次，不依赖自动同步
+        // 开关；ALWAYS 档是 no-op。fire-and-forget，清多少算多少。
+        entryPoint.applicationScope().launch {
+            runCatching {
+                entryPoint.feedRepository().archiveExpired(entryPoint.archiveStore().state.value)
+            }
+        }
         setContent {
             RssRadarThemeHost {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
