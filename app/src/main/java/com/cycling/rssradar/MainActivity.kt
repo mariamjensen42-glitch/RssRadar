@@ -68,7 +68,6 @@ import com.cycling.rssradar.ui.theme.RssRadarTheme
 import com.cycling.rssradar.sync.SyncScheduler
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.EntryPointAccessors
-import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -76,17 +75,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // 自动同步（issue #58）：启动即重建周期任务（系统重启/任务被清兜底），
-        // 并按开关 + 30 分钟去抖决定是否立即同步一轮（fire-and-forget 不阻塞启动）。
+        // 自动同步 + 归档清理（issue #57/#58）：启动即重建周期任务，随后在
+        // SyncScheduler 内单个协程顺序执行「启动同步 → 清理」或仅清理。
+        // 清理禁止与刷新并发——刷新会把旧文章重新插入，竞态即「删了又同步回来」。
         val entryPoint = EntryPointAccessors.fromApplication(applicationContext, AppEntryPoint::class.java)
         SyncScheduler.onAppStart(this, entryPoint.applicationScope())
-        // 归档清理（issue #57 修订）：打开应用即按保留天数清理一次，不依赖自动同步
-        // 开关；ALWAYS 档是 no-op。fire-and-forget，清多少算多少。
-        entryPoint.applicationScope().launch {
-            runCatching {
-                entryPoint.feedRepository().archiveExpired(entryPoint.archiveStore().state.value)
-            }
-        }
         setContent {
             RssRadarThemeHost {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
