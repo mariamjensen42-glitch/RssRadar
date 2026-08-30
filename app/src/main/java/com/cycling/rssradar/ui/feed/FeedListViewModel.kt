@@ -236,7 +236,13 @@ class FeedListViewModel @Inject constructor(
             isLoadingMore = true
             val current = _pagedArticles.value
             val page = loadTabPage(PAGE_SIZE, current.size)
-            _pagedArticles.value = current + page
+            // 去重保护：任何 DB 删除（归档清理/单篇删除的本地移除）都会让 OFFSET
+            // 位移，下一页可能与快照尾部重叠；重复 id 会让 LazyColumn 的 key
+            // 冲突直接崩溃（实测 "Key 50442 was already used"）。ADR-0006 的
+            // OFFSET 快照模型缺口，根治方向是 keyset 分页，先在追加边界兜住。
+            val loadedIds = current.mapTo(HashSet()) { it.article.id }
+            val fresh = page.filterNot { it.article.id in loadedIds }
+            _pagedArticles.value = current + fresh
             hasMore = page.size == PAGE_SIZE
             isLoadingMore = false
         }
