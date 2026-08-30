@@ -298,6 +298,18 @@ interface ArticleDao {
     @Query("UPDATE articles SET isRead = 1 WHERE id = :id")
     suspend fun markRead(id: Long)
 
+    /** 已读/未读互切（长按菜单，issue #46）。 */
+    @Query("UPDATE articles SET isRead = :read WHERE id = :id")
+    suspend fun setRead(id: Long, read: Boolean)
+
+    /** 删除单篇文章（撤销由 restore 带原 id 插回）。 */
+    @Query("DELETE FROM articles WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    /** 撤销删除：原样插回（REPLACE 保 id 不变；订阅源未动，外键不悬空）。 */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun restore(article: ArticleEntity)
+
     @Query("UPDATE articles SET isStarred = :starred WHERE id = :id")
     suspend fun setStarred(id: Long, starred: Boolean)
 

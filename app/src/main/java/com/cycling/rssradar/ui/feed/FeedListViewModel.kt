@@ -6,8 +6,10 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.data.AddFeedResult
+import com.cycling.rssradar.data.db.ArticleEntity
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.data.ai.AiRepository
 import com.cycling.rssradar.data.store.GroupStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,7 +33,15 @@ sealed interface FeedListIntent {
     data class SelectTab(val tab: FeedTab) : FeedListIntent
     data class SelectGroup(val group: String?) : FeedListIntent
     data class ToggleStarred(val articleId: Long) : FeedListIntent
+    data class ToggleBookmarked(val articleId: Long) : FeedListIntent
+    /** 已读/未读互切（长按菜单，issue #46）。 */
+    data class SetRead(val articleId: Long, val read: Boolean) : FeedListIntent
     data class MarkRead(val articleId: Long) : FeedListIntent
+    data class DeleteArticle(val articleId: Long) : FeedListIntent
+    /** 撤销最近一次删除（Snackbar 动作）。 */
+    data object UndoDeleteArticle : FeedListIntent
+    /** 放弃撤销机会（Snackbar 自动消失）。 */
+    data object DiscardUndo : FeedListIntent
     data object Refresh : FeedListIntent
     data object LoadMore : FeedListIntent
     data class AddFeed(val rawUrl: String, val groupName: String) : FeedListIntent
@@ -41,6 +51,7 @@ sealed interface FeedListIntent {
 class FeedListViewModel @Inject constructor(
     private val repository: FeedRepository,
     groupStore: GroupStore,
+    private val aiRepository: AiRepository,
 ) : ViewModel(), MviViewModel<FeedListIntent> {
 
     private val _selectedTab = MutableStateFlow(FeedTab.All)
@@ -88,6 +99,10 @@ class FeedListViewModel @Inject constructor(
     var uiMessage by mutableStateOf<String?>(null)
         private set
 
+    /** 最近删除的文章（issue #46 撤销删除）：Snackbar 撤销期内暂存，带原 id 可完整插回。 */
+    var pendingUndoDelete by mutableStateOf<ArticleEntity?>(null)
+        private set
+
     private var loadMoreJob: Job? = null
 
     init {
@@ -101,7 +116,12 @@ class FeedListViewModel @Inject constructor(
             is FeedListIntent.SelectTab -> selectTab(intent.tab)
             is FeedListIntent.SelectGroup -> selectGroup(intent.group)
             is FeedListIntent.ToggleStarred -> toggleStarred(intent.articleId)
+            is FeedListIntent.ToggleBookmarked -> toggleBookmarked(intent.articleId)
+            is FeedListIntent.SetRead -> setRead(intent.articleId, intent.read)
             is FeedListIntent.MarkRead -> markRead(intent.articleId)
+            is FeedListIntent.DeleteArticle -> deleteArticle(intent.articleId)
+            FeedListIntent.UndoDeleteArticle -> undoDelete()
+            FeedListIntent.DiscardUndo -> pendingUndoDelete = null
             FeedListIntent.Refresh -> refresh()
             FeedListIntent.LoadMore -> loadMore()
             is FeedListIntent.AddFeed -> addFeed(intent.rawUrl, intent.groupName)
@@ -135,6 +155,44 @@ class FeedListViewModel @Inject constructor(
     private fun markRead(articleId: Long) {
         viewModelScope.launch { repository.markRead(articleId) }
     }
+
+    /** 已读/未读互切：从自身缓存读当前态再翻转。 */
+    private fun setRead(articleId: Long, read: Boolean) {
+        viewModelScope.launch { repository.setRead(articleId, read) }
+    }
+
+    /** 稍后读切换（issue #46）。 */
+    private fun toggleBookmarked(articleId: Long) {
+        val current = stateOf(articleId)?.article?.isBookmarked ?: false
+        viewModelScope.launch { repository.setBookmarked(articleId, !current) }
+    }
+
+    /**
+     * 删除单篇文章：暂存实体供撤销，并清译文缓存（翻译不落盘，删文即孤儿）。
+     * 撤销窗口由 Snackbar 的生命周期决定，超时丢弃。
+     */
+    private fun deleteArticle(articleId: Long) {
+        viewModelScope.launch {
+            val deleted = repository.deleteArticle(articleId) ?: return@launch
+            aiRepository.clearTranslationCache(articleId)
+            pendingUndoDelete = deleted
+        }
+    }
+
+    private fun undoDelete() {
+        val entity = pendingUndoDelete ?: return
+        pendingUndoDelete = null
+        viewModelScope.launch {
+            repository.restoreArticle(entity)
+            // All tab 是分页快照，恢复后重载第一页让文章立即可见
+            loadFirstPage()
+        }
+    }
+
+    /** 从自身缓存列表读指定文章的当前态（MVI：状态由 VM 持有）。 */
+    private fun stateOf(articleId: Long): ArticleWithFeed? =
+        (_allArticles.value + unreadArticles.value + starredArticles.value + bookmarkedArticles.value)
+            .firstOrNull { it.article.id == articleId }
 
     /** 下拉刷新：全源抓取 + 重载第一页。失败保留现有数据并提示。 */
     private fun refresh() {

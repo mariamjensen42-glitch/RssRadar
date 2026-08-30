@@ -103,6 +103,22 @@ class FeedRepository(
     suspend fun setBookmarked(id: Long, bookmarked: Boolean) = articleDao.setBookmarked(id, bookmarked)
     suspend fun markAllRead() = articleDao.markAllRead()
 
+    /** 已读/未读互切（长按菜单，issue #46）。 */
+    suspend fun setRead(id: Long, read: Boolean) = articleDao.setRead(id, read)
+
+    /**
+     * 删除单篇文章，返回被删实体供撤销；文章不存在返回 null。
+     * 只删文章本身，不碰订阅源（区别于 deleteFeed 的级联删除）。
+     */
+    suspend fun deleteArticle(id: Long): ArticleEntity? {
+        val entity = articleDao.getWithFeed(id)?.article ?: return null
+        articleDao.deleteById(id)
+        return entity
+    }
+
+    /** 撤销删除：带原 id 原样插回。 */
+    suspend fun restoreArticle(entity: ArticleEntity) = articleDao.restore(entity)
+
     // —— 订阅源 / 分组管理（issue #6） ——
 
     /** 移动订阅源到其他分组。 */

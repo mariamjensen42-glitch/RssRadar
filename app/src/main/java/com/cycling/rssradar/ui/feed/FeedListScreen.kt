@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,8 +32,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -52,6 +56,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.cycling.rssradar.data.db.ArticleWithFeed
+import com.cycling.rssradar.ui.components.ArticleContextMenu
+import com.cycling.rssradar.ui.components.ArticleMenuActions
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
@@ -96,6 +102,22 @@ fun FeedListScreen(
         message?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.onIntent(FeedListIntent.ConsumeMessage)
+        }
+    }
+
+    // 删除撤销（issue #46）：Snackbar 期内可撤销，超时自动丢弃
+    val pendingUndo = viewModel.pendingUndoDelete
+    LaunchedEffect(pendingUndo) {
+        pendingUndo?.let { deleted ->
+            val result = snackbarHostState.showSnackbar(
+                message = "已删除「${deleted.title}」",
+                actionLabel = "撤销",
+                duration = SnackbarDuration.Short,
+            )
+            when (result) {
+                SnackbarResult.ActionPerformed -> viewModel.onIntent(FeedListIntent.UndoDeleteArticle)
+                SnackbarResult.Dismissed -> viewModel.onIntent(FeedListIntent.DiscardUndo)
+            }
         }
     }
 
@@ -150,6 +172,18 @@ fun FeedListScreen(
                         onArticleClick = { item ->
                             viewModel.onIntent(FeedListIntent.MarkRead(item.article.id))
                             onOpenArticle(item)
+                        },
+                        onToggleRead = { id, read ->
+                            viewModel.onIntent(FeedListIntent.SetRead(id, read))
+                        },
+                        onToggleStarred = { id ->
+                            viewModel.onIntent(FeedListIntent.ToggleStarred(id))
+                        },
+                        onToggleBookmarked = { id ->
+                            viewModel.onIntent(FeedListIntent.ToggleBookmarked(id))
+                        },
+                        onDelete = { id ->
+                            viewModel.onIntent(FeedListIntent.DeleteArticle(id))
                         },
                         // 只有 All tab 分页；滚动到底自动加载下一页
                         onScrolledToEnd = {
@@ -371,6 +405,10 @@ private fun GroupOption(label: String, selected: Boolean, onClick: () -> Unit) {
 private fun ArticleCardList(
     articles: List<ArticleWithFeed>,
     onArticleClick: (ArticleWithFeed) -> Unit,
+    onToggleRead: (Long, Boolean) -> Unit,
+    onToggleStarred: (Long) -> Unit,
+    onToggleBookmarked: (Long) -> Unit,
+    onDelete: (Long) -> Unit,
     onScrolledToEnd: () -> Unit,
 ) {
     val listState = rememberLazyListState()
@@ -390,7 +428,14 @@ private fun ArticleCardList(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(articles, key = { it.article.id }) { item ->
-            ArticleCard(item, onClick = { onArticleClick(item) })
+            ArticleCard(
+                item = item,
+                onClick = { onArticleClick(item) },
+                onToggleRead = { onToggleRead(item.article.id, !item.article.isRead) },
+                onToggleStarred = { onToggleStarred(item.article.id) },
+                onToggleBookmarked = { onToggleBookmarked(item.article.id) },
+                onDelete = { onDelete(item.article.id) },
+            )
         }
     }
 }
@@ -398,16 +443,29 @@ private fun ArticleCardList(
 /** 距列表尾部还剩这么多项时预加载下一页。 */
 private const val LOAD_MORE_THRESHOLD = 5
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ArticleCard(item: ArticleWithFeed, onClick: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = Surface1,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick),
-    ) {
+fun ArticleCard(
+    item: ArticleWithFeed,
+    onClick: () -> Unit,
+    onToggleRead: () -> Unit,
+    onToggleStarred: () -> Unit,
+    onToggleBookmarked: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    Box {
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = Surface1,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { menuExpanded = true },
+                ),
+        ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 UnreadDot(visible = !item.article.isRead)
@@ -456,6 +514,23 @@ fun ArticleCard(item: ArticleWithFeed, onClick: () -> Unit) {
                 CoverThumb(url = item.article.coverUrl?.takeIf { it.isNotBlank() })
             }
         }
+        }
+
+        // 长按上下文菜单（issue #46），锚定卡片
+        ArticleContextMenu(
+            expanded = menuExpanded,
+            actions = ArticleMenuActions(
+                isRead = item.article.isRead,
+                isStarred = item.article.isStarred,
+                isBookmarked = item.article.isBookmarked,
+                link = item.article.link,
+                onToggleRead = onToggleRead,
+                onToggleStarred = onToggleStarred,
+                onToggleBookmarked = onToggleBookmarked,
+                onDelete = onDelete,
+            ),
+            onDismiss = { menuExpanded = false },
+        )
     }
 }
 
