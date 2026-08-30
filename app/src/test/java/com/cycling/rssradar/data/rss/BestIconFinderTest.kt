@@ -49,8 +49,9 @@ class BestIconFinderTest {
         assertEquals("https://site.example/blog/assets/icon.svg", result)
     }
 
+    // 反引号函数名原样成为 JVM 方法名，冒号是非法字符（Kotlin/JVM 直接编译报错）
     @Test
-    fun `ignores og:image entirely`() {
+    fun `ignores og-image entirely`() {
         val html = """<html><head>
             <meta property="og:image" content="https://cdn.example.com/big.jpg"/>
         </head></html>"""
