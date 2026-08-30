@@ -2,7 +2,6 @@ package com.cycling.rssradar.ui.article
 
 import android.text.format.DateUtils
 import android.webkit.WebView
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,17 +38,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import coil3.compose.SubcomposeAsyncImage
-import com.cycling.rssradar.LocalDarkTheme
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
+import com.cycling.rssradar.ui.theme.Link
 import com.cycling.rssradar.ui.theme.OnAccent
 import com.cycling.rssradar.ui.theme.Surface1
 import com.cycling.rssradar.ui.theme.Surface2
@@ -182,15 +180,9 @@ private fun ArticleDetailContent(
             fontWeight = FontWeight.Bold,
         )
 
-        // 封面：取到了且为有效地址才显示真图；否则整块不渲染（不留空白占位）
-        article.article.coverUrl?.takeIf { it.isNotBlank() }?.let { url ->
-            Spacer(Modifier.height(12.dp))
-            ArticleCoverImage(url = url)
-        }
-
         Spacer(Modifier.height(12.dp))
         when {
-            // feed 自带或已抓取的正文：WebView 渲染净化 HTML（内部滚动，模板注入深色主题）
+            // feed 自带或已抓取的正文：WebView 渲染净化 HTML（内部滚动，封面只在列表展示，不进正文）
             article.article.content != null -> ArticleWebView(
                 html = article.article.content!!,
                 modifier = Modifier
@@ -226,12 +218,22 @@ private fun ArticleDetailContent(
     }
 }
 
-/** 净化后的正文 HTML 用 WebView 渲染：模板注入主题样式，与全局一致。 */
+/**
+ * 净化后的正文 HTML 用 WebView 渲染：封面注入模板首屏、CSS 全部取实时主题色，
+ * 与页面背景严格一致（不再用硬编码黑白，避免深色主题下色块割裂）。
+ */
 @Composable
 private fun ArticleWebView(html: String, modifier: Modifier = Modifier) {
-    // 用主题宿主注入的实际深色状态（跟随系统或用户强制），不是系统值
-    val darkTheme = LocalDarkTheme.current
-    val styledHtml = remember(html, darkTheme) { buildStyledContentHtml(html, darkTheme) }
+    // 颜色读自 RssRadarPalette（getter 代理 mutableStateOf），主题切换自动重组
+    val bg = toCssColor(BgRoot)
+    val fg = toCssColor(TextPrimary)
+    val muted = toCssColor(TextSecondary)
+    val codeBg = toCssColor(Surface2)
+    val border = toCssColor(Surface1)
+    val link = toCssColor(Link)
+    val styledHtml = remember(html, bg, fg, muted, codeBg, border, link) {
+        buildStyledContentHtml(html, bg, fg, muted, codeBg, border, link)
+    }
     AndroidView(
         factory = { context ->
             WebView(context).apply {
@@ -246,22 +248,23 @@ private fun ArticleWebView(html: String, modifier: Modifier = Modifier) {
     )
 }
 
+/** Compose Color → CSS #RRGGBB。 */
+private fun toCssColor(color: androidx.compose.ui.graphics.Color): String =
+    "#%06X".format(color.toArgb() and 0xFFFFFF)
+
 /**
  * 渲染模板。正文 HTML 在解析层已经净化（去 script/style/iframe/事件属性，见 RssParser），
- * 这里再包一层静态 CSS：深色黑底白字 / 浅色白底黑字，图片限宽，链接用主题紫。
+ * 这里再包一层静态 CSS：颜色全部来自实时主题；封面不在详情页渲染（归列表缩略图）。
  */
-private fun buildStyledContentHtml(contentHtml: String, darkTheme: Boolean): String {
-    val bg: String
-    val fg: String
-    val muted: String
-    val codeBg: String
-    val border: String
-    val link: String
-    if (darkTheme) {
-        bg = "#000000"; fg = "#FFFFFF"; muted = "#B0B0B6"; codeBg = "#1C1C1E"; border = "#3A3A3C"; link = "#9B9CFF"
-    } else {
-        bg = "#FFFFFF"; fg = "#1A1A1E"; muted = "#55555C"; codeBg = "#F0F0F4"; border = "#D9D9E0"; link = "#5B5BD6"
-    }
+private fun buildStyledContentHtml(
+    contentHtml: String,
+    bg: String,
+    fg: String,
+    muted: String,
+    codeBg: String,
+    border: String,
+    link: String,
+): String {
     return """
     <!DOCTYPE html>
     <html><head><meta charset="utf-8">
@@ -281,22 +284,6 @@ private fun buildStyledContentHtml(contentHtml: String, darkTheme: Boolean): Str
     </style></head>
     <body>$contentHtml</body></html>
 """.trimIndent()
-}
-
-@Composable
-private fun ArticleCoverImage(url: String) {
-    SubcomposeAsyncImage(
-        model = url,
-        contentDescription = "文章封面",
-        contentScale = ContentScale.Crop,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(160.dp)
-            .clip(RoundedCornerShape(12.dp)),
-        // 加载中 / 失败：画可见的 Surface2 占位，避免透明空洞（Coil 3 默认加载态不绘制）
-        loading = { Box(Modifier.fillMaxSize().background(Surface2)) },
-        error = { Box(Modifier.fillMaxSize().background(Surface2)) },
-    )
 }
 
 @Composable

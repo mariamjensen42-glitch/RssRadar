@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -23,9 +24,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -37,13 +40,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.theme.Accent
@@ -54,10 +61,13 @@ import com.cycling.rssradar.ui.theme.TextPrimary
 import com.cycling.rssradar.ui.theme.TextSecondary
 import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.ArrowUp
+import com.composables.icons.lucide.Check
+import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.SlidersHorizontal
+import com.cycling.rssradar.ui.theme.Surface2
 
 
 @Composable
@@ -76,6 +86,7 @@ fun FeedListScreen(
     val groupOptions by viewModel.groupOptions.collectAsState()
     val unreadCount by viewModel.unreadCount.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showGroupSheet by remember { mutableStateOf(false) }
     val message = viewModel.uiMessage
     val isRefreshing = viewModel.isRefreshing
     val isLoadingMore = viewModel.isLoadingMore
@@ -101,7 +112,11 @@ fun FeedListScreen(
         containerColor = BgRoot,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            FeedListTopBar(onOpenSearch = onOpenSearch)
+            FeedListTopBar(
+                onOpenSearch = onOpenSearch,
+                onOpenFilter = { showGroupSheet = true },
+                filterActive = selectedGroup != null,
+            )
         },
         // 加源是低频动作，收进 FAB，不占主屏。抬高是为了让开底部胶囊 TabBar。
         floatingActionButton = {
@@ -121,15 +136,6 @@ fun FeedListScreen(
                 unreadCount = unreadCount,
                 onSelect = { viewModel.onIntent(FeedListIntent.SelectTab(it)) },
             )
-            // 分组筛选：仅 All tab 显示，其余 tab 是全量视图
-            if (selectedTab == FeedTab.All && groupOptions.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                GroupFilterRow(
-                    groups = groupOptions,
-                    selected = selectedGroup,
-                    onSelect = { viewModel.onIntent(FeedListIntent.SelectGroup(it)) },
-                )
-            }
             Spacer(Modifier.height(8.dp))
             PullToRefreshBox(
                 isRefreshing = isRefreshing,
@@ -170,10 +176,26 @@ fun FeedListScreen(
             }
         }
     }
+
+    if (showGroupSheet) {
+        GroupFilterSheet(
+            groups = groupOptions,
+            selected = selectedGroup,
+            onSelect = { group ->
+                viewModel.onIntent(FeedListIntent.SelectGroup(group))
+                showGroupSheet = false
+            },
+            onDismiss = { showGroupSheet = false },
+        )
+    }
 }
 
 @Composable
-private fun FeedListTopBar(onOpenSearch: () -> Unit) {
+private fun FeedListTopBar(
+    onOpenSearch: () -> Unit,
+    onOpenFilter: () -> Unit,
+    filterActive: Boolean,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -191,8 +213,19 @@ private fun FeedListTopBar(onOpenSearch: () -> Unit) {
         IconButton(onClick = onOpenSearch) {
             Icon(Lucide.Search, contentDescription = "搜索", tint = TextPrimary)
         }
-        IconButton(onClick = { /* TODO: 打开筛选/排序 */ }) {
-            Icon(Lucide.SlidersHorizontal, contentDescription = "排序", tint = TextPrimary)
+        IconButton(onClick = onOpenFilter) {
+            Box {
+                Icon(Lucide.SlidersHorizontal, contentDescription = "分组筛选", tint = TextPrimary)
+                if (filterActive) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(7.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Accent),
+                    )
+                }
+            }
         }
     }
 }
@@ -268,22 +301,68 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** 分组筛选栏：「全部」+ 各分组。 */
+/** 分组筛选底部弹层：「全部」+ 各分组。 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun GroupFilterRow(
+private fun GroupFilterSheet(
     groups: List<String>,
     selected: String?,
     onSelect: (String?) -> Unit,
+    onDismiss: () -> Unit,
 ) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Surface1) {
+        Column(modifier = Modifier.padding(bottom = 24.dp)) {
+            Text(
+                text = "分组筛选",
+                color = TextPrimary,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
+            LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                item {
+                    GroupOption(
+                        label = "全部",
+                        selected = selected == null,
+                        onClick = { onSelect(null) },
+                    )
+                }
+                items(groups) { group ->
+                    GroupOption(
+                        label = group,
+                        selected = selected == group,
+                        onClick = { onSelect(group) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GroupOption(label: String, selected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        FilterChip(label = "全部", selected = selected == null, onClick = { onSelect(null) })
-        groups.take(4).forEach { group ->
-            FilterChip(label = group, selected = selected == group, onClick = { onSelect(group) })
+        Text(
+            text = label,
+            color = if (selected) Accent else TextPrimary,
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (selected) {
+            Icon(
+                imageVector = Lucide.Check,
+                contentDescription = "已选",
+                tint = Accent,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }
@@ -352,24 +431,63 @@ fun ArticleCard(item: ArticleWithFeed, onClick: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Text(
-                text = item.article.title,
-                color = TextPrimary,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            item.article.summary?.takeIf { it.isNotBlank() }?.let { summary ->
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = summary,
-                    color = TextSecondary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            Row(verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.article.title,
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    item.article.summary?.takeIf { it.isNotBlank() }?.let { summary ->
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = summary,
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+                CoverThumb(url = item.article.coverUrl?.takeIf { it.isNotBlank() })
             }
+        }
+    }
+}
+
+/**
+ * 列表封面缩略图：统一 96×72（4:3），ContentScale.Crop 居中裁剪不拉伸；
+ * 无封面画 Surface2 + Image 图标占位。固定尺寸让 Coil 免读原图尺寸、按目标大小解码，
+ * LazyColumn 滚动开销最小；AsyncImage 无子组合，比 SubcomposeAsyncImage 更轻。
+ */
+@Composable
+private fun CoverThumb(url: String?) {
+    Box(
+        modifier = Modifier
+            .size(width = 96.dp, height = 72.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Surface2),
+    ) {
+        if (url != null) {
+            AsyncImage(
+                model = url,
+                contentDescription = "封面缩略图",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Icon(
+                imageVector = Lucide.Image,
+                contentDescription = null,
+                tint = TextTertiary,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(20.dp),
+            )
         }
     }
 }
