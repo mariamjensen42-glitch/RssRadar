@@ -189,8 +189,10 @@ class RefreshEngine(
 /**
  * 事务缝：Room 的 withTransaction 需要真库实例，包成可注入接口后，
  * JVM 测试用 [DirectTransactionRunner] 直跑，生产装配真事务。
+ * 注意：普通 interface 而非 fun interface——Kotlin 的 fun interface
+ * 不允许带类型参数的抽象方法。
  */
-fun interface TransactionRunner {
+interface TransactionRunner {
     suspend fun <T> inTransaction(block: suspend () -> T): T
 }
 
