@@ -13,10 +13,12 @@ import com.cycling.rssradar.data.store.ArchiveStore
 import com.cycling.rssradar.data.store.GroupStore
 import com.cycling.rssradar.data.store.ListDisplayStore
 import com.cycling.rssradar.data.store.ReadingStyleStore
+import com.cycling.rssradar.data.store.SyncStore
 import com.cycling.rssradar.data.db.MIGRATION_1_2
 import com.cycling.rssradar.data.db.MIGRATION_2_3
 import com.cycling.rssradar.data.db.MIGRATION_3_4
 import com.cycling.rssradar.data.db.MIGRATION_4_5
+import com.cycling.rssradar.data.db.MIGRATION_5_6
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.parser.RssParser
 import com.cycling.rssradar.data.rss.BestIconFinder
@@ -46,7 +48,7 @@ object AppModule {
     @Singleton
     fun provideAppDatabase(app: Application): AppDatabase =
         Room.databaseBuilder(app, AppDatabase::class.java, "rssradar.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .build()
 
     @Provides
@@ -113,6 +115,11 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideSyncStore(@ApplicationContext context: Context): SyncStore =
+        SyncStore(context)
+
+    @Provides
+    @Singleton
     fun provideAiStore(app: Application): AiStore = AiStore(app)
 
     /** Key 经 provider 惰性读取，保证 AiStore 里改完 Key 后下一次调用即刻生效。 */
@@ -138,4 +145,7 @@ interface AppEntryPoint {
     fun readingStyleStore(): ReadingStyleStore
     fun listDisplayStore(): ListDisplayStore
     fun archiveStore(): ArchiveStore
+    fun syncStore(): SyncStore
+    fun feedRepository(): FeedRepository
+    fun applicationScope(): CoroutineScope
 }

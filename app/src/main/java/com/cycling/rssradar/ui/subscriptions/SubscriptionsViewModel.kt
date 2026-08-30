@@ -47,6 +47,8 @@ sealed interface SubscriptionsIntent {
     data class RenameFeed(val feedId: Long, val title: String) : SubscriptionsIntent
     data class DeleteFeed(val feedId: Long, val feedTitle: String) : SubscriptionsIntent
     data class ImportOpml(val uri: Uri) : SubscriptionsIntent
+    /** 自动同步开关（issue #58）：屏蔽后不参与自动同步，手动刷新照常。 */
+    data class SetSyncEnabled(val feedId: Long, val enabled: Boolean) : SubscriptionsIntent
 }
 
 @HiltViewModel
@@ -96,6 +98,7 @@ class SubscriptionsViewModel @Inject constructor(
             is SubscriptionsIntent.RenameFeed -> renameFeed(intent.feedId, intent.title)
             is SubscriptionsIntent.DeleteFeed -> deleteFeed(intent.feedId, intent.feedTitle)
             is SubscriptionsIntent.ImportOpml -> importOpml(intent.uri)
+            is SubscriptionsIntent.SetSyncEnabled -> setSyncEnabled(intent.feedId, intent.enabled)
         }
     }
 
@@ -178,6 +181,14 @@ class SubscriptionsViewModel @Inject constructor(
         viewModelScope.launch {
             repository.deleteFeed(feedId)
             uiMessage = "已删除「$feedTitle」"
+        }
+    }
+
+    /** 自动同步开关（issue #58）。 */
+    private fun setSyncEnabled(feedId: Long, enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setSyncEnabled(feedId, enabled)
+            uiMessage = if (enabled) "已参与自动同步" else "已屏蔽自动同步（手动刷新不受影响）"
         }
     }
 

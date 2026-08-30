@@ -1,5 +1,6 @@
 package com.cycling.rssradar.ui.me
 
+import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,8 +51,12 @@ import com.cycling.rssradar.data.store.KeepArchived
 import com.cycling.rssradar.data.store.ListDescMode
 import com.cycling.rssradar.data.store.ListDisplayState
 import com.cycling.rssradar.data.store.ListDisplayStore
+import com.cycling.rssradar.data.store.SyncInterval
+import com.cycling.rssradar.data.store.SyncState
+import com.cycling.rssradar.data.store.SyncStore
 import com.cycling.rssradar.data.store.ThemeMode
 import com.cycling.rssradar.data.store.ThemeStore
+import com.cycling.rssradar.sync.SyncScheduler
 import com.cycling.rssradar.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
@@ -67,6 +72,7 @@ import com.composables.icons.lucide.CircleAlert
 import com.composables.icons.lucide.CircleCheckBig
 import com.composables.icons.lucide.Lucide
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -94,6 +100,8 @@ data class RssHubSettingsUiState(
     val listDisplay: ListDisplayState = ListDisplayState(),
     /** 归档保留档位（issue #57）。 */
     val keepArchived: KeepArchived = KeepArchived.ALWAYS,
+    /** 自动同步状态（issue #58）。 */
+    val sync: SyncState = SyncState(),
 )
 
 /**
@@ -110,6 +118,8 @@ class RssHubSettingsViewModel @Inject constructor(
     private val aiStore: AiStore,
     private val listDisplayStore: ListDisplayStore,
     private val archiveStore: ArchiveStore,
+    private val syncStore: SyncStore,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -140,6 +150,12 @@ class RssHubSettingsViewModel @Inject constructor(
                 _state.value = _state.value.copy(keepArchived = keep)
             }
         }
+        // 自动同步状态跟随 SyncStore 的 flow（issue #58）
+        viewModelScope.launch {
+            syncStore.state.collect { sync ->
+                _state.value = _state.value.copy(sync = sync)
+            }
+        }
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -149,6 +165,12 @@ class RssHubSettingsViewModel @Inject constructor(
     /** 归档保留档位（issue #57）。 */
     fun setKeepArchived(keep: KeepArchived) {
         archiveStore.set(keep)
+    }
+
+    /** 自动同步偏好（issue #58）：持久化 + 重建 WorkManager 周期任务。 */
+    fun updateSync(transform: (SyncState) -> SyncState) {
+        syncStore.update(transform)
+        SyncScheduler.reschedule(appContext)
     }
 
     /** 列表显示项：转交 ListDisplayStore（持久化 + StateFlow 广播，列表即改即见）。 */
@@ -252,6 +274,7 @@ fun RssHubSettingsScreen(
 ) {
     val state by viewModel.state.collectAsState()
     var showKeepSheet by remember { mutableStateOf(false) }
+    var showIntervalSheet by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -430,6 +453,61 @@ fun RssHubSettingsScreen(
                     color = Accent,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ---- 自动同步（issue #58）----
+        Text(
+            text = "自动同步",
+            color = TextSecondary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "后台周期刷新订阅源，同步完成后按保留天数清理归档。手动刷新不受这些限制。",
+            color = TextTertiary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+        )
+        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showIntervalSheet = true }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "同步间隔",
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = state.sync.interval.label,
+                        color = Accent,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                SettingSwitchRow(
+                    label = "仅 WiFi",
+                    checked = state.sync.onlyOnWifi,
+                    onChange = { v -> viewModel.updateSync { it.copy(onlyOnWifi = v) } },
+                )
+                SettingSwitchRow(
+                    label = "仅充电",
+                    checked = state.sync.onlyWhenCharging,
+                    onChange = { v -> viewModel.updateSync { it.copy(onlyWhenCharging = v) } },
+                )
+                SettingSwitchRow(
+                    label = "启动时同步",
+                    checked = state.sync.syncOnStart,
+                    onChange = { v -> viewModel.updateSync { it.copy(syncOnStart = v) } },
                 )
             }
         }
@@ -627,6 +705,17 @@ fun RssHubSettingsScreen(
             label = { it.label },
             onSelect = viewModel::setKeepArchived,
             onDismiss = { showKeepSheet = false },
+        )
+    }
+
+    if (showIntervalSheet) {
+        OptionPickerSheet(
+            title = "同步间隔",
+            options = SyncInterval.entries.toList(),
+            selected = state.sync.interval,
+            label = { it.label },
+            onSelect = { interval -> viewModel.updateSync { it.copy(interval = interval) } },
+            onDismiss = { showIntervalSheet = false },
         )
     }
 }

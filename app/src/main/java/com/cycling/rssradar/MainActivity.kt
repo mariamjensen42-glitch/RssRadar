@@ -65,6 +65,7 @@ import com.cycling.rssradar.ui.navigation.SearchRoute
 import com.cycling.rssradar.ui.navigation.SubscriptionsRoute
 import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.RssRadarTheme
+import com.cycling.rssradar.sync.SyncScheduler
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 
@@ -74,6 +75,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // 自动同步（issue #58）：启动即重建周期任务（系统重启/任务被清兜底），
+        // 并按开关 + 30 分钟去抖决定是否立即同步一轮（fire-and-forget 不阻塞启动）。
+        val entryPoint = EntryPointAccessors.fromApplication(applicationContext, AppEntryPoint::class.java)
+        SyncScheduler.onAppStart(this, entryPoint.applicationScope())
         setContent {
             RssRadarThemeHost {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {

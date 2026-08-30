@@ -114,6 +114,17 @@ class FeedRepository(
         return refreshInParallel(feeds.map { it.id })
     }
 
+    /**
+     * 自动同步路径（issue #58）：只刷新参与自动同步的源（syncEnabled = 1）。
+     * 与手动路径 refreshAllFeeds 的唯一差别是屏蔽源过滤；失败源静默跳过。
+     */
+    suspend fun refreshAutoSyncFeeds(): Int =
+        refreshInParallel(feedDao.getSyncEnabledFeedIds())
+
+    /** 更新单源的自动同步开关（issue #58）。 */
+    suspend fun setSyncEnabled(feedId: Long, enabled: Boolean) =
+        feedDao.updateSyncEnabled(feedId, enabled)
+
     /** 是否已有订阅源。供 UI 区分「没有源」和「刷新失败」。 */
     suspend fun hasFeeds(): Boolean = feedDao.getAll().isNotEmpty()
 

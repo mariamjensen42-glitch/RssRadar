@@ -19,6 +19,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -112,6 +114,35 @@ fun FeedActionScreen(
                             }
                         }
                     }
+                }
+                Spacer(Modifier.height(16.dp))
+                // 自动同步开关（issue #58）：屏蔽后不参与后台自动同步，手动刷新照常
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = "参与自动同步",
+                            color = TextPrimary,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = "关闭后此订阅源不再后台自动刷新",
+                            color = TextTertiary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Switch(
+                        checked = f.syncEnabled,
+                        onCheckedChange = { v ->
+                            viewModel.onIntent(SubscriptionsIntent.SetSyncEnabled(f.id, v))
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = OnAccent,
+                            checkedTrackColor = Accent,
+                        ),
+                    )
                 }
                 Spacer(Modifier.height(16.dp))
                 Surface(

@@ -38,6 +38,8 @@ data class FeedEntity(
     val iconUrl: String? = null,
     /** 订阅源类型：0=常规 RSS/Atom，1=RSSHub 路由。 */
     @ColumnInfo(defaultValue = "0") val sourceType: Int = SOURCE_TYPE_RSS,
+    /** 是否参与自动同步（issue #58）。屏蔽后不参与自动同步，手动刷新照常。 */
+    @ColumnInfo(defaultValue = "1") val syncEnabled: Boolean = true,
 ) {
     companion object {
         const val SOURCE_TYPE_RSS = 0
@@ -165,6 +167,14 @@ interface FeedDao {
     /** 删除订阅源：articles 经外键 CASCADE 级联删除。 */
     @Query("DELETE FROM feeds WHERE id = :feedId")
     suspend fun deleteFeed(feedId: Long)
+
+    /** 自动同步开关（issue #58）：屏蔽后不参与自动同步，手动刷新照常。 */
+    @Query("UPDATE feeds SET syncEnabled = :enabled WHERE id = :feedId")
+    suspend fun updateSyncEnabled(feedId: Long, enabled: Boolean)
+
+    /** 参与自动同步的源 id 清单（issue #58）。 */
+    @Query("SELECT id FROM feeds WHERE syncEnabled = 1")
+    suspend fun getSyncEnabledFeedIds(): List<Long>
 }
 
 @Dao
@@ -424,9 +434,18 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+/**
+ * v5 → v6：feeds 增加自动同步开关（syncEnabled，issue #58）。
+ */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE feeds ADD COLUMN syncEnabled INTEGER NOT NULL DEFAULT 1")
+    }
+}
+
 @Database(
     entities = [FeedEntity::class, ArticleEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
