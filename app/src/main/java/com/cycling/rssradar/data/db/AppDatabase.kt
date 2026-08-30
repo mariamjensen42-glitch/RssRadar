@@ -158,6 +158,10 @@ interface FeedDao {
     @Query("UPDATE feeds SET title = :title WHERE id = :feedId")
     suspend fun updateTitle(feedId: Long, title: String)
 
+    /** 站点图标回填（只在为 null 时抓，写入后不再覆盖，见 CONTEXT.md「站点图标」）。 */
+    @Query("UPDATE feeds SET iconUrl = :iconUrl WHERE id = :feedId")
+    suspend fun updateIconUrl(feedId: Long, iconUrl: String)
+
     /** 删除订阅源：articles 经外键 CASCADE 级联删除。 */
     @Query("DELETE FROM feeds WHERE id = :feedId")
     suspend fun deleteFeed(feedId: Long)

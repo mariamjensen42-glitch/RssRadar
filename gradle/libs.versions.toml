@@ -13,6 +13,7 @@ room = "2.8.4"
 rome = "2.1.0"
 jsoup = "1.18.3"
 readability4j = "1.0.8"
+okhttp = "4.12.0"
 coil = "3.3.0"
 composablesIcons = "2.2.1"
 navigation = "2.10.0"
@@ -48,6 +49,7 @@ jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 readability4j = { group = "net.dankito.readability4j", name = "readability4j", version.ref = "readability4j" }
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 compose-icons-lucide = { group = "com.composables", name = "icons-lucide-cmp", version.ref = "composablesIcons" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }

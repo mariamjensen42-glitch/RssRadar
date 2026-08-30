@@ -40,6 +40,12 @@ class RssParser {
     data class ParsedFeed(
         val title: String,
         val articles: List<ParsedArticle>,
+        /**
+         * 站点链接（feed XML 的 channel/根 link，指向源站点首页，见 CONTEXT.md「站点链接」）。
+         * 与订阅源地址不同：RSSHub 路由的 feed URL 是 RSSHub 实例地址，
+         * 而 siteUrl 才是站点图标的抓取目标。容忍缺失（空串）。
+         */
+        val siteUrl: String = "",
     )
 
     /** 解析失败（非法 XML / 非 RSS·Atom 内容）时抛 [IllegalArgumentException]。 */
@@ -53,6 +59,7 @@ class RssParser {
         return ParsedFeed(
             title = feed.title?.trim().orEmpty().ifEmpty { "Untitled feed" },
             articles = articles,
+            siteUrl = feed.link?.trim().orEmpty(),
         )
     }
 

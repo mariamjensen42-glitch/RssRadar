@@ -17,6 +17,7 @@ import com.cycling.rssradar.data.db.MIGRATION_3_4
 import com.cycling.rssradar.data.db.MIGRATION_4_5
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.parser.RssParser
+import com.cycling.rssradar.data.rss.BestIconFinder
 import com.cycling.rssradar.data.store.ThemeStore
 import dagger.Module
 import dagger.Provides
@@ -24,6 +25,9 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import javax.inject.Singleton
 
 
@@ -52,13 +56,31 @@ object AppModule {
     @Singleton
     fun provideRssParser(): RssParser = RssParser()
 
+    /** 应用级外部作用域：fire-and-forget 任务（站点图标抓取等）不随任何 ViewModel/刷新协程死亡。 */
+    @Provides
+    @Singleton
+    fun provideApplicationScope(): CoroutineScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    @Provides
+    @Singleton
+    fun provideBestIconFinder(): BestIconFinder = BestIconFinder()
+
     @Provides
     @Singleton
     fun provideFeedRepository(
         db: AppDatabase,
         parser: RssParser,
         contentFetcher: ContentFetcher,
-    ): FeedRepository = FeedRepository(db, parser, contentFetcher = contentFetcher)
+        iconFinder: BestIconFinder,
+        externalScope: CoroutineScope,
+    ): FeedRepository = FeedRepository(
+        db,
+        parser,
+        contentFetcher = contentFetcher,
+        iconFinder = iconFinder,
+        externalScope = externalScope,
+    )
 
     @Provides
     @Singleton

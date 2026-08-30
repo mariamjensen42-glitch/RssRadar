@@ -307,7 +307,7 @@ private fun FeedRow(item: FeedWithUnread, onClick: () -> Unit, onMore: () -> Uni
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            FeedIcon(title = item.feed.title, size = 32.dp, cornerRadius = 8.dp)
+            FeedIcon(title = item.feed.title, iconUrl = item.feed.iconUrl, size = 32.dp, cornerRadius = 8.dp)
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(

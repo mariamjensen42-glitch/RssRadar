@@ -1,12 +1,14 @@
 package com.cycling.rssradar.data
 
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -24,6 +26,7 @@ import com.cycling.rssradar.data.opml.OpmlParser
 import com.cycling.rssradar.data.parser.ContentFetcher
 import com.cycling.rssradar.data.parser.FeedProbeResult
 import com.cycling.rssradar.data.parser.RssParser
+import com.cycling.rssradar.data.rss.BestIconFinder
 import com.cycling.rssradar.ui.theme.Success
 /** 订阅结果，供 UI 层区分提示文案。 */
 sealed interface AddFeedResult {
@@ -53,6 +56,10 @@ class FeedRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     /** 为 null 时按需抓取不可用（见 [fetchFullContent]）。 */
     private val contentFetcher: ContentFetcher? = null,
+    /** 为 null 时站点图标抓取不可用（见 [fetchIconInBackground]）。 */
+    private val iconFinder: BestIconFinder? = null,
+    /** fire-and-forget 图标抓取的外部作用域，为 null 时同样不抓。 */
+    private val externalScope: CoroutineScope? = null,
 ) {
     private val feedDao = database.feedDao()
     private val articleDao = database.articleDao()
@@ -234,6 +241,7 @@ class FeedRepository(
         val resolvedFeedId = feedId.takeIf { it != -1L } ?: feedDao.findIdByUrl(url) ?: return@withContext AddFeedResult.Duplicate
 
         upsertArticles(resolvedFeedId, parsed.articles, now)
+        fetchIconInBackground(resolvedFeedId, parsed.siteUrl)
         AddFeedResult.Success
     }
 
@@ -310,7 +318,27 @@ class FeedRepository(
             return@withContext false
         }
         upsertArticles(feedId, parsed.articles, System.currentTimeMillis())
+        // 图标 backfill：老源 / 盲导源 / 早期订阅的源补齐（仅 null 时抓，见 CONTEXT.md「站点图标」）
+        if (feed.iconUrl == null) fetchIconInBackground(feedId, parsed.siteUrl)
         true
+    }
+
+    /**
+     * 站点图标后台回填：fire-and-forget，不阻塞订阅 / 刷新返回（也不占用刷新 Semaphore 名额），
+     * 抓到即写库，UI 由 Room Flow 自动刷新。仅 [CONTEXT.md]「站点图标」语义：null 才抓，永不覆盖。
+     * 任何失败静默放弃——图标是装饰性资产。
+     */
+    private fun fetchIconInBackground(feedId: Long, siteUrl: String) {
+        val finder = iconFinder ?: return
+        val scope = externalScope ?: return
+        if (siteUrl.isBlank()) return
+        scope.launch {
+            try {
+                finder.findIcon(siteUrl)?.let { feedDao.updateIconUrl(feedId, it) }
+            } catch (_: Exception) {
+                // 静默放弃
+            }
+        }
     }
 
     /** 同一 link：只更新内容状态字段，用户状态原样保留。整源一次事务（#48）。 */

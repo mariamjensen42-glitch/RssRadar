@@ -336,7 +336,7 @@ private fun SearchResultRow(
             }
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                FeedIcon(title = article.feedTitle, size = 14.dp, cornerRadius = 4.dp)
+                FeedIcon(title = article.feedTitle, iconUrl = article.feedIconUrl, size = 14.dp, cornerRadius = 4.dp)
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = article.feedTitle,

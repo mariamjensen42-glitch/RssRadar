@@ -471,7 +471,7 @@ fun ArticleCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 UnreadDot(visible = !item.article.isRead)
                 Spacer(Modifier.width(6.dp))
-                FeedIcon(title = item.feedTitle, size = 18.dp, cornerRadius = 5.dp)
+                FeedIcon(title = item.feedTitle, iconUrl = item.feedIconUrl, size = 18.dp, cornerRadius = 5.dp)
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = item.feedTitle,

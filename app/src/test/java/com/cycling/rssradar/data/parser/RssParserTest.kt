@@ -322,4 +322,50 @@ class RssParserTest {
         assertEquals(1, feed.articles.size)
         assertEquals("Real", feed.articles[0].title)
     }
+
+    @Test
+    fun `extracts site url from RSS channel link`() {
+        val xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0"><channel>
+                <title>Sample</title>
+                <link>https://example.com/</link>
+                <item><title>One</title><link>https://example.com/1</link></item>
+            </channel></rss>
+        """.trimIndent()
+
+        val feed = parser.parse(ByteArrayInputStream(xml.toByteArray()))
+
+        assertEquals("https://example.com/", feed.siteUrl)
+    }
+
+    @Test
+    fun `extracts site url from Atom feed alternate link`() {
+        val xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <feed xmlns="http://www.w3.org/2005/Atom">
+                <title>Atom Example</title>
+                <link href="https://example.org/atom.xml" rel="self" type="application/atom+xml"/>
+                <link href="https://example.org/" rel="alternate" type="text/html"/>
+                <entry><title>E</title><link href="https://example.org/a"/></entry>
+            </feed>
+        """.trimIndent()
+
+        val feed = parser.parse(ByteArrayInputStream(xml.toByteArray()))
+
+        assertEquals("https://example.org/", feed.siteUrl)
+    }
+
+    @Test
+    fun `tolerates missing site url`() {
+        val xml = """
+            <rss version="2.0"><channel><title>No Link</title>
+                <item><title>One</title><link>https://example.com/1</link></item>
+            </channel></rss>
+        """.trimIndent()
+
+        val feed = parser.parse(ByteArrayInputStream(xml.toByteArray()))
+
+        assertEquals("", feed.siteUrl)
+    }
 }

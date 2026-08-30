@@ -355,7 +355,7 @@ private fun ArticleHeader(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(horizontal = 20.dp),
     ) {
-        FeedIcon(title = article.feedTitle, size = 22.dp, cornerRadius = 6.dp)
+        FeedIcon(title = article.feedTitle, iconUrl = article.feedIconUrl, size = 22.dp, cornerRadius = 6.dp)
         Spacer(Modifier.width(8.dp))
         Text(
             text = article.feedTitle,

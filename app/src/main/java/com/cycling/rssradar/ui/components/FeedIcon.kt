@@ -16,18 +16,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import com.cycling.rssradar.ui.theme.Surface3
 import com.cycling.rssradar.ui.theme.TextTertiary
 
 
 /**
- * 订阅源 / 站点的彩色占位图标：用 title 的稳定 hash 在 12 色调色板中取色，
- * 居中显示首个字符。
+ * 订阅源 / 站点图标：有 [iconUrl] 时用 Coil 加载真图（底下字母块常驻打底，
+ * 加载中 / 失败自然露出字母块，无需额外状态）；无图时用 title 的稳定 hash
+ * 在 12 色调色板中取色，居中显示首个字符。
  */
 @Composable
 fun FeedIcon(
     title: String,
     modifier: Modifier = Modifier,
+    iconUrl: String? = null,
     size: Dp = 28.dp,
     cornerRadius: Dp = 7.dp,
 ) {
@@ -47,6 +51,14 @@ fun FeedIcon(
             fontSize = (size.value * 0.45f).sp,
             style = MaterialTheme.typography.labelLarge,
         )
+        if (iconUrl != null) {
+            AsyncImage(
+                model = iconUrl,
+                contentDescription = null,
+                modifier = Modifier.matchParentSize(),
+                contentScale = ContentScale.Crop,
+            )
+        }
     }
 }
 
