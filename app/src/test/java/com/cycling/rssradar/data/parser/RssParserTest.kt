@@ -368,4 +368,66 @@ class RssParserTest {
 
         assertEquals("", feed.siteUrl)
     }
+
+    @Test
+    fun `sanitize replaces iframe with media card`() {
+        val html = """<p>前文</p><iframe src="https://www.youtube.com/embed/abc123"></iframe><p>后文</p>"""
+
+        val out = RssParser.sanitizeHtml(html)
+
+        assertTrue(out.contains("media-card"))
+        assertTrue(out.contains("href=\"https://www.youtube.com/embed/abc123\""))
+        assertTrue(out.contains("嵌入内容 · www.youtube.com"))
+        assertFalse(out.contains("<iframe"))
+    }
+
+    @Test
+    fun `sanitize replaces video with src with media card`() {
+        val html = """<video src="https://cdn.example.com/clip.mp4"></video>"""
+
+        val out = RssParser.sanitizeHtml(html)
+
+        assertTrue(out.contains("media-card"))
+        assertTrue(out.contains("视频 · cdn.example.com"))
+        assertFalse(out.contains("<video"))
+    }
+
+    @Test
+    fun `sanitize uses nested source element of video`() {
+        val html = """<video><source src="https://cdn.example.com/clip.mp4" type="video/mp4"></video>"""
+
+        val out = RssParser.sanitizeHtml(html)
+
+        assertTrue(out.contains("media-card"))
+        assertFalse(out.contains("<video"))
+    }
+
+    @Test
+    fun `sanitize drops iframe without http src entirely`() {
+        val html = """<iframe src="/local/embed"></iframe><p>ok</p>"""
+
+        val out = RssParser.sanitizeHtml(html)
+
+        assertFalse(out.contains("<iframe"))
+        assertFalse(out.contains("media-card"))
+        assertTrue(out.contains("<p>ok</p>"))
+    }
+
+    @Test
+    fun `sanitize normalizes protocol relative iframe src`() {
+        val html = """<iframe src="//player.bilibili.com/player.html?bvid=BV1"></iframe>"""
+
+        val out = RssParser.sanitizeHtml(html)
+
+        assertTrue(out.contains("href=\"https://player.bilibili.com/player.html?bvid=BV1\""))
+    }
+
+    @Test
+    fun `sanitize strips foreign class but keeps media card class`() {
+        val html = """<a class="evil" href="https://example.com">x</a>"""
+
+        val out = RssParser.sanitizeHtml(html)
+
+        assertFalse(out.contains("evil"))
+    }
 }

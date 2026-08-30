@@ -3,6 +3,8 @@ package com.cycling.rssradar.ui.article
 import android.text.format.DateUtils
 import android.view.MotionEvent
 import android.webkit.WebView
+import android.webkit.WebResourceRequest
+import android.webkit.WebViewClient
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.cycling.rssradar.LocalReadingStyle
+import com.cycling.rssradar.openUrl
 import com.cycling.rssradar.data.ai.AiRepository
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.store.ReadingFontFamily
@@ -594,6 +597,20 @@ private fun ArticleWebView(
             }.apply {
                 settings.javaScriptEnabled = false
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                // 链接接管（视口模式生效；整页模式触摸穿透点不到，见 ADR-0007）：
+                // 一律不进 WebView 导航，http(s) 外链交系统浏览器（与"查看原文"一致），
+                // 其余 scheme 静默丢弃——顺带消灭"原地导航把正文顶掉"的默认行为。
+                webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(
+                        view: WebView,
+                        request: WebResourceRequest,
+                    ): Boolean {
+                        if (request.url.scheme == "http" || request.url.scheme == "https") {
+                            context.openUrl(request.url.toString())
+                        }
+                        return true
+                    }
+                }
             }
         },
         update = { webView ->

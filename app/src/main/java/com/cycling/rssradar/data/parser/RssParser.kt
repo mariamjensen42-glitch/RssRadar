@@ -149,13 +149,48 @@ class RssParser {
         internal fun textLength(html: String?): Int =
             html?.takeIf { it.isNotBlank() }?.let { Jsoup.parse(it).text().length } ?: 0
 
-        /** 净化 HTML：去 script/style/iframe 等危险元素与事件属性，保留结构与白名单属性。 */
+        /**
+         * 净化 HTML：去 script/style 等危险元素与事件属性，保留结构与白名单属性。
+         * 嵌入媒体（iframe/object/embed/video）不静默删除，替换为媒体占位卡
+         * （CONTEXT.md「媒体占位卡」）：不开 JS、不动 ADR-0007，视频类源至少可见可跳。
+         */
         internal fun sanitizeHtml(html: String): String {
             val doc = Jsoup.parseBodyFragment(html)
-            doc.select("script, style, iframe, object, embed, form, noscript, svg, link, meta").remove()
+            doc.select("script, style, object, embed, form, noscript, svg, link, meta").remove()
+            // 占位卡替换必须在属性净化之前：cleanAttributes 会剥掉非白名单属性，src 就没了
+            doc.select("iframe").forEach { el ->
+                absoluteMediaSrc(el.attr("src"))
+                    ?.let { el.replaceWith(mediaCard(doc, it, "嵌入内容")) }
+                    ?: el.remove()
+            }
+            doc.select("video").forEach { el ->
+                val src = absoluteMediaSrc(el.attr("src"))
+                    ?: absoluteMediaSrc(el.selectFirst("source[src]")?.attr("src"))
+                if (src != null) el.replaceWith(mediaCard(doc, src, "视频")) else el.remove()
+            }
             val body = doc.body()
             body.select("*").forEach { el -> cleanAttributes(el) }
             return body.html()
+        }
+
+        /** 媒体地址归一化：只认 http(s) 与协议相对（//host/...），相对路径一律丢弃。 */
+        private fun absoluteMediaSrc(raw: String?): String? = when {
+            raw == null -> null
+            raw.startsWith("http") -> raw
+            raw.startsWith("//") -> "https:$raw"
+            else -> null
+        }
+
+        /** 构建占位卡：<a class="media-card"><span>▶</span>标签 · 域名</a>。 */
+        private fun mediaCard(doc: org.jsoup.nodes.Document, src: String, label: String): Element {
+            val host = runCatching { java.net.URI(src).host }
+                .getOrNull().orEmpty().ifEmpty { "外部内容" }
+            val card = doc.createElement("a")
+                .attr("class", "media-card")
+                .attr("href", src)
+            card.appendElement("span").text("▶")
+            card.appendText("$label · $host")
+            return card
         }
 
         /** 纯文本副本：块级元素转分段空白，压缩连续空白。 */
@@ -168,7 +203,11 @@ class RssParser {
         private fun cleanAttributes(el: Element) {
             val keep = mutableMapOf<String, String>()
             when (el.tagName()) {
-                "a" -> el.attr("href")?.takeIf { it.startsWith("http") }?.let { keep["href"] = it }
+                // class 仅媒体占位卡在用（外来自带的 class 无害：样式只匹配 .media-card/.play）
+                "a" -> {
+                    el.attr("href")?.takeIf { it.startsWith("http") }?.let { keep["href"] = it }
+                    el.attr("class")?.takeIf { it == "media-card" }?.let { keep["class"] = it }
+                }
                 "img" -> {
                     el.attr("src")?.takeIf { it.startsWith("http") }?.let { keep["src"] = it }
                     el.attr("alt")?.let { keep["alt"] = it }

@@ -76,4 +76,27 @@ class ReadingContentHtmlTest {
         assertTrue(html.contains("<meta name=\"viewport\""))
         assertTrue(html.trim().endsWith("</html>"))
     }
+
+    @Test
+    fun `typography css covers tables headings lists and code`() {
+        val html = build("<p>x</p>")
+
+        assertTrue(html.contains("table { display:block"))
+        assertTrue(html.contains("th,td { border:1px solid"))
+        assertTrue(html.contains("h1 { font-size:1.45em"))
+        assertTrue(html.contains("ul,ol { margin:0 0 1em 0"))
+        assertTrue(html.contains("hr { border:none"))
+        assertTrue(html.contains("figcaption { text-align:center"))
+        assertTrue(html.contains(":not(pre) > code"))
+        assertTrue(html.contains("pre code { background:none"))
+    }
+
+    @Test
+    fun `media card and underline styles present`() {
+        val html = build("<p>x</p>")
+
+        assertTrue(html.contains(".media-card { display:flex"))
+        assertTrue(html.contains(".media-card span { color:#9B9CFF"))
+        assertTrue(html.contains("text-decoration:underline"))
+    }
 }
