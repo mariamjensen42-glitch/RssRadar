@@ -55,13 +55,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import java.time.Instant
-import java.time.ZoneId
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.store.ListDescMode
 import com.cycling.rssradar.data.store.ListDisplayState
-import com.cycling.rssradar.ui.theme.LocalListDisplay
-import com.cycling.rssradar.ui.components.ArticleContextMenu
+import com.cycling.rssradar.ui.theme.LocalListDisplayimport com.cycling.rssradar.ui.components.ArticleContextMenu
 import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.ArticleMenuActions
 import com.cycling.rssradar.ui.components.FeedIcon
@@ -87,17 +84,13 @@ fun FeedListScreen(
     onOpenSearch: () -> Unit = {},
     onOpenArticle: (ArticleWithFeed) -> Unit = {},
 ) {
-    val selectedTab by viewModel.selectedTab.collectAsState()
-    val pagedArticles by viewModel.pagedArticles.collectAsState()
-    val selectedGroup by viewModel.selectedGroup.collectAsState()
+    // MVI 候选 C（ADR-0003）：单一 UiState 快照驱动渲染
+    val uiState by viewModel.uiState.collectAsState()
     val groupOptions by viewModel.groupOptions.collectAsState()
     val unreadCount by viewModel.unreadCount.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showGroupSheet by remember { mutableStateOf(false) }
-    val message = viewModel.uiMessage
-    val isRefreshing = viewModel.isRefreshing
-    val isLoadingMore = viewModel.isLoadingMore
-    val hasMore = viewModel.hasMore
+    val message = uiState.uiMessage
 
     LaunchedEffect(message) {
         message?.let {
@@ -107,7 +100,7 @@ fun FeedListScreen(
     }
 
     // 删除撤销（issue #46）：Snackbar 期内可撤销，超时自动丢弃
-    val pendingUndo = viewModel.pendingUndoDelete
+    val pendingUndo = uiState.pendingUndoDelete
     LaunchedEffect(pendingUndo) {
         pendingUndo?.let { deleted ->
             val result = snackbarHostState.showSnackbar(
@@ -123,7 +116,7 @@ fun FeedListScreen(
     }
 
     // 四个 tab 统一分页快照，分组筛选仍是对已加载页的内存过滤
-    val currentList = viewModel.filterByGroup(pagedArticles)
+    val currentList = viewModel.filterByGroup(uiState.articles)
 
     Scaffold(
         containerColor = BgRoot,
@@ -132,7 +125,7 @@ fun FeedListScreen(
             FeedListTopBar(
                 onOpenSearch = onOpenSearch,
                 onOpenFilter = { showGroupSheet = true },
-                filterActive = selectedGroup != null,
+                filterActive = uiState.selectedGroup != null,
             )
         },
     ) { padding ->
@@ -142,18 +135,18 @@ fun FeedListScreen(
                 .padding(padding),
         ) {
             FeedListTabRow(
-                selected = selectedTab,
+                selected = uiState.selectedTab,
                 unreadCount = unreadCount,
                 onSelect = { viewModel.onIntent(FeedListIntent.SelectTab(it)) },
             )
             Spacer(Modifier.height(8.dp))
             PullToRefreshBox(
-                isRefreshing = isRefreshing,
+                isRefreshing = uiState.isRefreshing,
                 onRefresh = { viewModel.onIntent(FeedListIntent.Refresh) },
                 modifier = Modifier.fillMaxSize(),
             ) {
                 if (currentList.isEmpty()) {
-                    EmptyState(selectedTab = selectedTab, modifier = Modifier.fillMaxSize())
+                    EmptyState(selectedTab = uiState.selectedTab, modifier = Modifier.fillMaxSize())
                 } else {
                     ArticleCardList(
                         articles = currentList,
@@ -182,13 +175,13 @@ fun FeedListScreen(
                             .padding(vertical = 16.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (isLoadingMore) {
+                        if (uiState.isLoadingMore) {
                             CircularProgressIndicator(
                                 color = Accent,
                                 strokeWidth = 2.dp,
                                 modifier = Modifier.size(18.dp),
                             )
-                        } else if (hasMore) {
+                        } else if (uiState.hasMore) {
                             LoadMoreHint()
                         }
                     }
@@ -200,7 +193,7 @@ fun FeedListScreen(
     if (showGroupSheet) {
         GroupFilterSheet(
             groups = groupOptions,
-            selected = selectedGroup,
+            selected = uiState.selectedGroup,
             onSelect = { group ->
                 viewModel.onIntent(FeedListIntent.SelectGroup(group))
                 showGroupSheet = false
@@ -451,37 +444,6 @@ fun ArticleCardList(
 
 /** 距列表尾部还剩这么多项时预加载下一页。 */
 private const val LOAD_MORE_THRESHOLD = 5
-
-private data class DayGroup(
-    /** 自然日的 epochDay，作 LazyColumn key；无日期组为负数哨兵。 */
-    val key: Long,
-    /** 粘性头文案；无发布日期的文章组不带日期头。 */
-    val label: String?,
-    val items: List<ArticleWithFeed>,
-)
-
-/** 按自然日分组（issue #56）。无发布日期的文章沉底为独立组，不参与日期头。 */
-private fun dayGroups(articles: List<ArticleWithFeed>): List<DayGroup> {
-    val dated = mutableListOf<Pair<Long, ArticleWithFeed>>()
-    val undated = mutableListOf<ArticleWithFeed>()
-    articles.forEach { a ->
-        val ts = a.article.publishedAt
-        if (ts == null) undated.add(a) else dated.add(ts to a)
-    }
-    // 输入已按时间倒序，groupBy 保持首次出现顺序，无需再排
-    val groups = dated
-        .groupBy { (ts, _) ->
-            Instant.ofEpochMilli(ts).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
-        }
-        .map { (day, list) ->
-            DayGroup(
-                key = day,
-                label = DateUtils.getRelativeTimeSpanString(list.first().first).toString(),
-                items = list.map { it.second },
-            )
-        }
-    return if (undated.isEmpty()) groups else groups + DayGroup(key = -1L, label = null, items = undated)
-}
 
 /** 粘性日期头：不透明底色（页面底色）保证滚动时干净压住下方卡片。 */
 @Composable
