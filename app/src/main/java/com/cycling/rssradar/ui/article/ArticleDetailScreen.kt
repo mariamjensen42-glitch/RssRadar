@@ -46,12 +46,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -111,12 +114,15 @@ fun ArticleDetailScreen(
     var showStyleSheet by remember { mutableStateOf(false) }
     // 整页滚动状态提升到 Screen：顶栏标题「滚出视口才出现」需要读滚动量
     val scrollState = rememberScrollState()
+    // 视口模式（有图文章）的头部折叠量 = WebView 内部滚动量，同样驱动顶栏补位标题
+    var headerScrollY by remember { mutableStateOf(0) }
     // 标题完全滚出视口所需的滚动量（标题 top + 高度，onGloballyPositioned 量出）。
     // 初值 Int.MAX_VALUE = 未量出前顶栏不显标题。
     var titleHideOffset by remember { mutableStateOf(Int.MAX_VALUE) }
     LaunchedEffect(articleId) {
         viewModel.load(articleId)
         scrollState.scrollTo(0)
+        headerScrollY = 0
         titleHideOffset = Int.MAX_VALUE
     }
     // 翻译失败走 Snackbar（spec #44：正文保持原文，报错可重试）；按状态实例触发，不会重复弹
@@ -132,7 +138,9 @@ fun ArticleDetailScreen(
         topBar = {
             ArticleDetailTopBar(
                 title = article?.article?.title,
-                showTitle = scrollState.value >= titleHideOffset,
+                // 两种模式任一把标题滚出视口都补位显示
+                showTitle = scrollState.value >= titleHideOffset ||
+                    headerScrollY >= titleHideOffset,
                 onBack = onBack,
                 onOpenStyle = { showStyleSheet = true },
                 onToggleTranslation = { viewModel.onIntent(ArticleDetailIntent.ToggleTranslation) },
@@ -174,6 +182,8 @@ fun ArticleDetailScreen(
             aiSummaryState = aiSummaryState,
             translationState = translationState,
             scrollState = scrollState,
+            headerScrollY = headerScrollY,
+            onHeaderScroll = { headerScrollY = it },
             onTitleMeasured = { titleHideOffset = it },
             onGenerateSummary = { viewModel.onIntent(ArticleDetailIntent.GenerateSummary) },
             onRetranslate = { viewModel.onIntent(ArticleDetailIntent.RetranslateArticle) },
@@ -251,6 +261,9 @@ private fun ArticleDetailContent(
     aiSummaryState: AiSummaryState,
     translationState: TranslationState,
     scrollState: ScrollState,
+    /** 视口模式的头部折叠量（= WebView 内部滚动量），随滚驱动。 */
+    headerScrollY: Int,
+    onHeaderScroll: (Int) -> Unit,
     onTitleMeasured: (Int) -> Unit,
     onGenerateSummary: () -> Unit,
     onRetranslate: () -> Unit,
@@ -267,32 +280,49 @@ private fun ArticleDetailContent(
     }
     // OOM 防线（闪退诊断）：整页包高的 WebView 会被 Chromium 视为全部内容可见，
     // 有图文章的所有图片同时解码进 Java 堆，图多必 OOM（256MB 堆几十秒吃满）。
-    // 混合模式：有图 → 视口渲染（头部固定、WebView 内部滚动、触摸正常）；
+    // 混合模式：有图 → 视口渲染（WebView 内部滚动驱动头部折叠，触摸正常）；
     // 纯文字 → 整页渲染（头部随正文滚出的体验保留），文字栅格内存可控。
     val hasImages = bodyHtml?.contains("<img", ignoreCase = true) == true
 
     if (hasImages) {
         Column(modifier = modifier.padding(vertical = 8.dp)) {
-            ArticleHeader(
-                article = article,
-                aiSummaryState = aiSummaryState,
-                onGenerateSummary = onGenerateSummary,
-                shownTranslation = shownTranslation,
-                onRetranslate = onRetranslate,
-                onShowOriginal = onShowOriginal,
-                onTitleMeasured = onTitleMeasured,
-            )
+            // 视口模式的"随滚"体验（与整页模式对齐）：WebView 内部滚动量驱动头部向上折叠。
+            // 只动布局高度不改渲染模式——不触碰 ADR-0007 的视口渲染与内存约束。
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clipToBounds()
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        val visible = (placeable.height - headerScrollY).coerceAtLeast(0)
+                        layout(placeable.width, visible) {
+                            placeable.placeRelative(0, -headerScrollY)
+                        }
+                    },
+            ) {
+                ArticleHeader(
+                    article = article,
+                    aiSummaryState = aiSummaryState,
+                    onGenerateSummary = onGenerateSummary,
+                    shownTranslation = shownTranslation,
+                    onRetranslate = onRetranslate,
+                    onShowOriginal = onShowOriginal,
+                    onTitleMeasured = onTitleMeasured,
+                )
+            }
             when {
                 translationState is TranslationState.Generating ->
                     TranslatingPlaceholder(Modifier.fillMaxWidth().weight(1f))
                 shownTranslation != null -> ArticleWebView(
                     html = shownTranslation.html,
                     passThroughTouch = false,
+                    onScroll = onHeaderScroll,
                     modifier = Modifier.fillMaxWidth().weight(1f),
                 )
                 article.article.content != null -> ArticleWebView(
                     html = article.article.content!!,
                     passThroughTouch = false,
+                    onScroll = onHeaderScroll,
                     modifier = Modifier.fillMaxWidth().weight(1f),
                 )
                 else -> NoContentBody(
@@ -399,8 +429,8 @@ private fun ArticleHeader(
         fontWeight = FontWeight.Bold,
         modifier = Modifier
             .padding(horizontal = 20.dp)
-            // 量出「标题完全滚出视口」的滚动量（标题 top + 高度，相对滚动内容顶部）；
-            // 视口模式下页面不滚，此值不会被触发，无害
+            // 量出「标题完全滚出视口」的滚动量（标题 top + 高度，相对所在容器顶部）；
+            // 整页模式 = 相对滚动内容，视口模式 = 相对折叠容器。滚动量达到该值顶栏补位标题。
             .onGloballyPositioned { coords ->
                 onTitleMeasured(coords.positionInParent().y.roundToInt() + coords.size.height)
             },
@@ -571,12 +601,15 @@ private fun TranslationBanner(
  * [passThroughTouch]：整页模式（高度包内容）为 true——触摸穿透给外层 Compose 滚动，
  * 否则 WebView 会吞掉滑动手势；视口模式（有图文章，内部滚动）为 false——
  * WebView 必须自己消费触摸才能滚动。
+ *
+ * [onScroll]：视口模式头部折叠用，回调 WebView 内部滚动量（px）。
  */
 @Composable
 private fun ArticleWebView(
     html: String,
     modifier: Modifier = Modifier,
     passThroughTouch: Boolean = true,
+    onScroll: ((Int) -> Unit)? = null,
 ) {
     // 颜色读自 RssRadarPalette（getter 代理 mutableStateOf），主题切换自动重组
     val bg = toCssColor(BgRoot)
@@ -589,11 +622,18 @@ private fun ArticleWebView(
     val styledHtml = remember(html, style, bg, fg, muted, codeBg, border, link) {
         ReadingContentHtml.build(html, style, bg, fg, muted, codeBg, border, link)
     }
+    // factory 只跑一次，回调经 updated 引用保持最新
+    val currentOnScroll by rememberUpdatedState(onScroll)
     AndroidView(
         factory = { context ->
             object : WebView(context) {
                 override fun onTouchEvent(event: MotionEvent): Boolean =
                     if (passThroughTouch) false else super.onTouchEvent(event)
+
+                override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
+                    super.onScrollChanged(l, t, oldl, oldt)
+                    currentOnScroll?.invoke(t)
+                }
             }.apply {
                 settings.javaScriptEnabled = false
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
