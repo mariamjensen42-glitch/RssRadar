@@ -84,6 +84,8 @@ data class ArticleEntity(
     val readingMinutes: Int? = null,
     /** 封面图 URL。 */
     val coverUrl: String? = null,
+    /** AI 摘要：LLM 基于正文生成的内容概括。生成物语义同用户状态——刷新永不覆盖。见 ADR-0005。 */
+    val aiSummary: String? = null,
 ) {
     companion object {
         const val CONTENT_SOURCE_NONE = 0
@@ -304,6 +306,10 @@ interface ArticleDao {
 
     @Query("UPDATE articles SET isRead = 1")
     suspend fun markAllRead()
+
+    /** 写入 AI 摘要。生成物不参与内容状态刷新，只由 AI 功能写入/清空。 */
+    @Query("UPDATE articles SET aiSummary = :aiSummary WHERE id = :id")
+    suspend fun updateAiSummary(id: Long, aiSummary: String?)
 }
 
 /**
@@ -344,9 +350,18 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+/**
+ * v4 → v5：articles 增加 AI 摘要列（aiSummary）。见 ADR-0005。
+ */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE articles ADD COLUMN aiSummary TEXT")
+    }
+}
+
 @Database(
     entities = [FeedEntity::class, ArticleEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

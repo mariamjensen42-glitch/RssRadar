@@ -3,14 +3,18 @@ package com.cycling.rssradar.di
 import android.app.Application
 import android.content.Context
 import androidx.room.Room
+import com.cycling.rssradar.data.ai.AiRepository
+import com.cycling.rssradar.data.ai.DeepSeekClient
 import com.cycling.rssradar.data.db.AppDatabase
 import com.cycling.rssradar.data.parser.ContentFetcher
 import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.data.store.AiStore
 import com.cycling.rssradar.data.store.GroupStore
 import com.cycling.rssradar.data.store.ReadingStyleStore
 import com.cycling.rssradar.data.db.MIGRATION_1_2
 import com.cycling.rssradar.data.db.MIGRATION_2_3
 import com.cycling.rssradar.data.db.MIGRATION_3_4
+import com.cycling.rssradar.data.db.MIGRATION_4_5
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.parser.RssParser
 import com.cycling.rssradar.data.store.ThemeStore
@@ -36,7 +40,7 @@ object AppModule {
     @Singleton
     fun provideAppDatabase(app: Application): AppDatabase =
         Room.databaseBuilder(app, AppDatabase::class.java, "rssradar.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
 
     @Provides
@@ -72,6 +76,21 @@ object AppModule {
     @Singleton
     fun provideReadingStyleStore(@ApplicationContext context: Context): ReadingStyleStore =
         ReadingStyleStore(context)
+
+    @Provides
+    @Singleton
+    fun provideAiStore(app: Application): AiStore = AiStore(app)
+
+    /** Key 经 provider 惰性读取，保证 AiStore 里改完 Key 后下一次调用即刻生效。 */
+    @Provides
+    @Singleton
+    fun provideDeepSeekClient(aiStore: AiStore): DeepSeekClient =
+        DeepSeekClient(apiKeyProvider = { aiStore.apiKey })
+
+    @Provides
+    @Singleton
+    fun provideAiRepository(db: AppDatabase, client: DeepSeekClient): AiRepository =
+        AiRepository(db.articleDao(), client)
 }
 
 /**
