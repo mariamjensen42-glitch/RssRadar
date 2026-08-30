@@ -1,5 +1,7 @@
 package com.cycling.rssradar.ui.subscriptions
 
+import android.content.Context
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -14,6 +16,7 @@ import com.cycling.rssradar.data.db.GROUP_TECH
 import com.cycling.rssradar.data.store.GroupStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -43,12 +46,14 @@ sealed interface SubscriptionsIntent {
     data class MoveFeed(val feedId: Long, val targetGroup: String) : SubscriptionsIntent
     data class RenameFeed(val feedId: Long, val title: String) : SubscriptionsIntent
     data class DeleteFeed(val feedId: Long, val feedTitle: String) : SubscriptionsIntent
+    data class ImportOpml(val uri: Uri) : SubscriptionsIntent
 }
 
 @HiltViewModel
 class SubscriptionsViewModel @Inject constructor(
     private val repository: FeedRepository,
     private val groupStore: GroupStore,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel(), MviViewModel<SubscriptionsIntent> {
 
     private val _expandedIds = MutableStateFlow(setOf(GROUP_TECH, GROUP_DEV, GROUP_DESIGN))
@@ -90,6 +95,7 @@ class SubscriptionsViewModel @Inject constructor(
             is SubscriptionsIntent.MoveFeed -> moveFeed(intent.feedId, intent.targetGroup)
             is SubscriptionsIntent.RenameFeed -> renameFeed(intent.feedId, intent.title)
             is SubscriptionsIntent.DeleteFeed -> deleteFeed(intent.feedId, intent.feedTitle)
+            is SubscriptionsIntent.ImportOpml -> importOpml(intent.uri)
         }
     }
 
@@ -172,6 +178,40 @@ class SubscriptionsViewModel @Inject constructor(
         viewModelScope.launch {
             repository.deleteFeed(feedId)
             uiMessage = "已删除「$feedTitle」"
+        }
+    }
+
+    /**
+     * OPML 盲导（ADR-0004）：解析入库 → 注册新分组 → 立即报结果 →
+     * 后台对新导入的源定向刷新补文章（静默失败，语义同全量刷新）。
+     */
+    private fun importOpml(uri: Uri) {
+        viewModelScope.launch {
+            val result = try {
+                val stream = appContext.contentResolver.openInputStream(uri)
+                    ?: run {
+                        uiMessage = "无法读取所选文件"
+                        return@launch
+                    }
+                stream.use { repository.importOpml(it) }
+            } catch (_: IllegalArgumentException) {
+                uiMessage = "不是有效的 OPML 文件"
+                return@launch
+            } catch (_: Exception) {
+                uiMessage = "导入失败，请重试"
+                return@launch
+            }
+            result.groups.forEach { groupStore.addGroup(it) }
+            refreshGroups()
+            uiMessage = if (result.skipped > 0) {
+                "已导入 ${result.imported} 个订阅源，跳过 ${result.skipped} 个重复"
+            } else {
+                "已导入 ${result.imported} 个订阅源"
+            }
+            // 后台补文章：只刷新新导入的源，不阻塞导入结果提示
+            viewModelScope.launch {
+                repository.refreshFeeds(result.newFeedIds)
+            }
         }
     }
 

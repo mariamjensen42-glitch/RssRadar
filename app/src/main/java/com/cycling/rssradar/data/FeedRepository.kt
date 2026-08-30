@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -14,6 +15,7 @@ import com.cycling.rssradar.data.db.ArticleEntity
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.data.db.FeedEntity
+import com.cycling.rssradar.data.opml.OpmlParser
 import com.cycling.rssradar.data.parser.ContentFetcher
 import com.cycling.rssradar.data.parser.FeedProbeResult
 import com.cycling.rssradar.data.parser.RssParser
@@ -25,6 +27,16 @@ sealed interface AddFeedResult {
     data object InvalidFeed : AddFeedResult
     data object NetworkError : AddFeedResult
 }
+
+/** OPML 盲导结果（ADR-0004）。 */
+data class OpmlImportResult(
+    val imported: Int,
+    val skipped: Int,
+    /** 新入库订阅源的 id，供定向刷新补文章。 */
+    val newFeedIds: List<Long>,
+    /** OPML 中出现的所有非空分组名，供调用方注册进分组注册表。 */
+    val groups: Set<String>,
+)
 
 /**
  * 订阅链路仓库：抓取 → 解析 → 持久化 → 观察文章流。
@@ -169,6 +181,50 @@ class FeedRepository(
 
         upsertArticles(resolvedFeedId, parsed.articles, now)
         AddFeedResult.Success
+    }
+
+    /**
+     * OPML 盲导（ADR-0004）：解析 [stream] 后直接入库，不联网校验。
+     * 标题取 OPML text/title，分组取 outline 嵌套路径；重复（规范化 URL 精确匹配）跳过计数。
+     * 根元素非 OPML 时抛 [IllegalArgumentException]，由调用方转为提示。
+     */
+    suspend fun importOpml(stream: InputStream): OpmlImportResult = withContext(ioDispatcher) {
+        val entries = OpmlParser.parse(stream)
+        var imported = 0
+        var skipped = 0
+        val newIds = mutableListOf<Long>()
+        val now = System.currentTimeMillis()
+        entries.forEach { entry ->
+            val url = normalizeUrl(entry.xmlUrl) ?: run { skipped++; return@forEach }
+            if (feedDao.findIdByUrl(url) != null) { skipped++; return@forEach }
+            val feedId = feedDao.insert(
+                FeedEntity(
+                    url = url,
+                    title = entry.title,
+                    createdAt = now,
+                    groupName = entry.group.ifBlank { DEFAULT_GROUP },
+                    sourceType = FeedEntity.SOURCE_TYPE_RSS,
+                ),
+            )
+            val resolved = feedId.takeIf { it != -1L } ?: feedDao.findIdByUrl(url)
+            if (resolved == null) { skipped++; return@forEach }
+            imported++
+            newIds += resolved
+        }
+        OpmlImportResult(
+            imported = imported,
+            skipped = skipped,
+            newFeedIds = newIds,
+            groups = entries.map { it.group }.filter { it.isNotBlank() }.toSet(),
+        )
+    }
+
+    /**
+     * 定向刷新一批订阅源（盲导后补文章用），返回成功的源数。
+     * 失败静默跳过，语义同 [refreshAllFeeds]。
+     */
+    suspend fun refreshFeeds(feedIds: List<Long>): Int = withContext(ioDispatcher) {
+        feedIds.count { refreshFeed(it) }
     }
 
     /**

@@ -1,5 +1,7 @@
 package com.cycling.rssradar.ui.subscriptions
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +62,7 @@ import com.composables.icons.lucide.CheckCheck
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Ellipsis
+import com.composables.icons.lucide.FileUp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.CornerUpRight
 import com.composables.icons.lucide.Pencil
@@ -84,6 +87,13 @@ fun SubscriptionsScreen(
     var createGroupDialog by remember { mutableStateOf(false) }
     var renameGroupTarget by remember { mutableStateOf<String?>(null) }
 
+    // OPML 导入：SAF 文件选择器（mime 放宽，规避文件管理器标注不一致，见 ADR-0004）
+    val opmlLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri?.let { viewModel.onIntent(SubscriptionsIntent.ImportOpml(it)) }
+    }
+
     LaunchedEffect(message) {
         message?.let {
             snackbarHostState.showSnackbar(it)
@@ -96,6 +106,11 @@ fun SubscriptionsScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             SubscriptionsTopBar(
+                onImport = {
+                    opmlLauncher.launch(
+                        arrayOf("text/*", "application/xml", "application/octet-stream"),
+                    )
+                },
                 onSort = { viewModel.onIntent(SubscriptionsIntent.ToggleSort) },
                 onAdd = onAddSubscription,
             )
@@ -176,7 +191,7 @@ fun SubscriptionsScreen(
 }
 
 @Composable
-private fun SubscriptionsTopBar(onSort: () -> Unit, onAdd: () -> Unit) {
+private fun SubscriptionsTopBar(onImport: () -> Unit, onSort: () -> Unit, onAdd: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -191,6 +206,9 @@ private fun SubscriptionsTopBar(onSort: () -> Unit, onAdd: () -> Unit) {
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f),
         )
+        IconButton(onClick = onImport) {
+            Icon(Lucide.FileUp, contentDescription = "导入 OPML", tint = TextPrimary)
+        }
         IconButton(onClick = onSort) {
             Icon(Lucide.ArrowDownUp, contentDescription = "排序", tint = TextPrimary)
         }
