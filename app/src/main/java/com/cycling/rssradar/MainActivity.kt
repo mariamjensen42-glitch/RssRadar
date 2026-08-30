@@ -1,29 +1,20 @@
 package com.cycling.rssradar
 
 import android.annotation.SuppressLint
-import android.app.Application
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,11 +26,6 @@ import androidx.navigation.toRoute
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.cycling.rssradar.data.store.ListDisplayState
-import com.cycling.rssradar.data.store.ListDisplayStore
-import com.cycling.rssradar.data.store.ReadingStyleState
-import com.cycling.rssradar.data.store.ThemeMode
-import com.cycling.rssradar.di.AppEntryPoint
 import com.cycling.rssradar.ui.addsubscription.AddSubscriptionSheet
 import com.cycling.rssradar.ui.addsubscription.AddSubscriptionViewModel
 import com.cycling.rssradar.ui.article.ArticleDetailScreen
@@ -56,6 +42,7 @@ import com.cycling.rssradar.ui.search.SearchViewModel
 import com.cycling.rssradar.ui.subscriptions.SubscriptionsScreen
 import com.cycling.rssradar.ui.subscriptions.SubscriptionsViewModel
 import com.cycling.rssradar.ui.components.FloatingBottomBar
+import com.cycling.rssradar.ui.components.openUrl
 import com.cycling.rssradar.ui.navigation.ArticleDetailRoute
 import com.cycling.rssradar.ui.navigation.FeedArticlesRoute
 import com.cycling.rssradar.ui.navigation.FeedActionRoute
@@ -64,24 +51,20 @@ import com.cycling.rssradar.ui.navigation.MeRoute
 import com.cycling.rssradar.ui.navigation.SearchRoute
 import com.cycling.rssradar.ui.navigation.SubscriptionsRoute
 import com.cycling.rssradar.ui.theme.BgRoot
-import com.cycling.rssradar.ui.theme.RssRadarTheme
-import com.cycling.rssradar.sync.SyncScheduler
-import dagger.hilt.android.AndroidEntryPoint
-import dagger.hilt.android.EntryPointAccessors
+import com.cycling.rssradar.ui.theme.CompositionLocalRoot
 
+/**
+ * 纯壳 Activity：edge-to-edge + 组合根。启动副作用在 [RssRadarApp]，
+ * 全局 CompositionLocal 注入在 ui.theme.CompositionLocalRoot，导航图在此。
+ */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // 自动同步 + 归档清理（issue #57/#58）：启动即重建周期任务，随后在
-        // SyncScheduler 内单个协程顺序执行「启动同步 → 清理」或仅清理。
-        // 清理禁止与刷新并发——刷新会把旧文章重新插入，竞态即「删了又同步回来」。
-        val entryPoint = EntryPointAccessors.fromApplication(applicationContext, AppEntryPoint::class.java)
-        SyncScheduler.onAppStart(this, entryPoint.applicationScope())
         setContent {
-            RssRadarThemeHost {
+            CompositionLocalRoot {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     RssRadarAppContent()
                 }
@@ -89,50 +72,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
-/**
- * 主题宿主：读持久化的主题偏好（ThemeStore flow），跟随系统时用
- * isSystemInDarkTheme 实时感知，把 darkTheme 交给 RssRadarTheme。
- * 设置页通过同一个 store 改模式，flow 更新后这里自动重组。
- * 同时把当前 darkTheme 注入 CompositionLocal，供 WebView 正文模板等
- * 需要感知主题的非 Material 组件使用。
- */
-@Composable
-private fun RssRadarThemeHost(content: @Composable () -> Unit) {
-    val context = LocalContext.current
-    val app = context.applicationContext as Application
-    val entryPoint = remember { EntryPointAccessors.fromApplication(app, AppEntryPoint::class.java) }
-    val themeStore = entryPoint.themeStore()
-    val readingStyleStore = entryPoint.readingStyleStore()
-    val listDisplayStore = entryPoint.listDisplayStore()
-    val themeMode by themeStore.mode.collectAsState()
-    val readingStyle by readingStyleStore.state.collectAsState()
-    val listDisplay by listDisplayStore.state.collectAsState()
-    val systemDark = isSystemInDarkTheme()
-    val darkTheme = when (themeMode) {
-        ThemeMode.SYSTEM -> systemDark
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-    }
-    CompositionLocalProvider(
-        LocalDarkTheme provides darkTheme,
-        LocalReadingStyle provides readingStyle,
-        LocalListDisplay provides listDisplay,
-    ) {
-        RssRadarTheme(darkTheme = darkTheme) {
-            content()
-        }
-    }
-}
-
-/** 当前应用的实际深色状态（跟随系统或用户强制）。 */
-val LocalDarkTheme = staticCompositionLocalOf { true }
-
-/** 全局阅读排版状态（issue #42）：主题宿主注入，阅读页与其弹层共享同一数据源。 */
-val LocalReadingStyle = staticCompositionLocalOf { ReadingStyleState() }
-
-/** 信息流列表显示项（issue #56）：主题宿主注入，列表与设置页共享同一数据源。 */
-val LocalListDisplay = staticCompositionLocalOf { ListDisplayState() }
 
 @SuppressLint("RestrictedApi")
 @Composable
@@ -249,16 +188,4 @@ private fun RssRadarAppContent() {
             )
         }
     }
-}
-
-/** 用系统浏览器打开外链。失败要让用户看见，不能静默吞掉。阅读页 WebView 链接接管也复用。 */
-internal fun Context.openUrl(url: String) {
-    if (url.isBlank()) {
-        Toast.makeText(this, "该文章没有可用链接", Toast.LENGTH_SHORT).show()
-        return
-    }
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    runCatching { startActivity(intent) }
-        .onFailure { Toast.makeText(this, "无法打开链接", Toast.LENGTH_SHORT).show() }
 }

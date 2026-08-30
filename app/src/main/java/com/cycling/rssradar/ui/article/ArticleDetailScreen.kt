@@ -63,8 +63,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.cycling.rssradar.LocalReadingStyle
-import com.cycling.rssradar.openUrl
+import com.cycling.rssradar.ui.theme.LocalReadingStyle
+import com.cycling.rssradar.ui.components.openUrl
 import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.data.ai.AiRepository
 import com.cycling.rssradar.data.db.ArticleWithFeed
