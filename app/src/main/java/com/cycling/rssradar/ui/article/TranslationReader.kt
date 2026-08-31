@@ -41,6 +41,9 @@ import com.cycling.rssradar.ui.theme.LocalTranslationDisplay
  * - 纯译文：有译文显示译文，未翻出的块显示原文淡显（翻到哪亮到哪）。
  * - 双语·上下：原文块（淡显）在上、其译文块紧贴在下，成对向下推进。
  * - 双语·左右：同一对的原文/译文各占半宽，中间细分隔线；逐对纵向堆叠。
+ * - 双语模式的原文列经 [ReadingNodes.stripVisualDuplicates] 剥掉图片与代码块：
+ *   这类块翻不翻都一样，双语下并排渲染成两份纯属噪音（用户反馈"图重复了"）；
+ *   剥完为空（整块只有图/代码）就退化成只显示一份。
  *
  * 空块（解析一无所获）跳过——调用方（ReadingBody）已保证至少一块可渲染，
  * 否则整篇回退 WebView 路径。
@@ -78,7 +81,13 @@ internal fun TranslationReader(
             val units = remember(pair.originalHtml, pair.translatedHtml) {
                 buildRenderUnits(originalNodes, translatedNodes)
             }
-            units.forEachIndexed { unitIndex, (sourceNodes, targetNodes) ->
+            units.forEachIndexed { unitIndex, unit ->
+                val sourceNodes = unit.source
+                val targetNodes = unit.target
+                // 双语模式的原文列剥掉图片/代码块（译文里原样出现，不该渲染第二份）；
+                // 剥完为空 = 该块只有图片/代码 → 退化成只显示一份
+                val bilingualSource = if (targetNodes != null) unit.dedupedSource else sourceNodes
+                val imageOnlyBlock = targetNodes != null && bilingualSource.isEmpty()
                 when (display.viewMode) {
                     TranslationViewMode.TRANSLATION_ONLY -> {
                         // 未翻出的块：原文淡显占位，翻完即被译文替换
@@ -89,10 +98,16 @@ internal fun TranslationReader(
                             dimmed = targetNodes == null,
                         )
                     }
-                    TranslationViewMode.BILINGUAL -> when (display.bilingualLayout) {
-                        BilingualLayout.STACKED -> {
+                    TranslationViewMode.BILINGUAL -> when {
+                        // 纯图片/代码块：整块只渲染一次，不做无意义的"对照"
+                        imageOnlyBlock -> NativeNodesColumn(
+                            nodes = targetNodes!!,
+                            onLinkClick = onLinkClick,
+                            onImageClick = onImageClick,
+                        )
+                        display.bilingualLayout == BilingualLayout.STACKED -> {
                             NativeNodesColumn(
-                                nodes = sourceNodes,
+                                nodes = bilingualSource,
                                 onLinkClick = onLinkClick,
                                 onImageClick = onImageClick,
                                 dimmed = true,
@@ -106,11 +121,11 @@ internal fun TranslationReader(
                                 )
                             }
                         }
-                        BilingualLayout.SIDE_BY_SIDE -> {
+                        else -> {
                             Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                                 Box(modifier = Modifier.weight(1f)) {
                                     NativeNodesColumn(
-                                        nodes = sourceNodes,
+                                        nodes = bilingualSource,
                                         onLinkClick = onLinkClick,
                                         onImageClick = onImageClick,
                                         dimmed = true,
@@ -157,6 +172,14 @@ internal fun TranslationReader(
     }
 }
 
+/** 一个双语渲染单元：原文侧节点、译文侧节点、以及原文侧去重后的节点。 */
+private data class RenderUnit(
+    val source: List<ReadingNode>,
+    val target: List<ReadingNode>?,
+    /** 双语模式的原文列：剥掉图片/代码块后的版本（[ReadingNodes.stripVisualDuplicates]）。 */
+    val dedupedSource: List<ReadingNode>,
+)
+
 /**
  * 渲染单元：默认整块一个单元；列表块且原文/译文条目数一致时拆到条目级，
  * 让"项一原文→项一译文→项二原文→项二译文"严格交替。
@@ -165,7 +188,7 @@ internal fun TranslationReader(
 private fun buildRenderUnits(
     original: List<ReadingNode>,
     translated: List<ReadingNode>?,
-): List<Pair<List<ReadingNode>, List<ReadingNode>?>> {
+): List<RenderUnit> {
     val sourceList = original.singleOrNull() as? NodeList
     val targetList = translated?.singleOrNull() as? NodeList
     if (sourceList != null && targetList != null &&
@@ -176,10 +199,10 @@ private fun buildRenderUnits(
             val target = listOf<ReadingNode>(
                 NodeList(targetList.ordered, listOf(targetList.items[index])),
             )
-            source to target
+            RenderUnit(source, target, ReadingNodes.stripVisualDuplicates(source))
         }
     }
-    return listOf(original to translated)
+    return listOf(RenderUnit(original, translated, ReadingNodes.stripVisualDuplicates(original)))
 }
 
 /** 一对内原文与译文的间距。 */

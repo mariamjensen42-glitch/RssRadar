@@ -465,6 +465,46 @@ class ReadingNodesTest {
     }
 
     // ———————————————————————————————————————————————
+    // stripVisualDuplicates：双语对照原文列去重（图片/代码/分隔线不重复渲染）
+    // ———————————————————————————————————————————————
+
+    @Test
+    fun `stripVisualDuplicates - image only block becomes empty`() {
+        val nodes = ReadingNodes.parse("""<p><img src="https://a/b.png" alt="图"></p>""")
+        assertTrue(nodes.any { it is NodeImage })
+        assertTrue("纯图片块剥完应为空（退化为只显示一份）", ReadingNodes.stripVisualDuplicates(nodes).isEmpty())
+    }
+
+    @Test
+    fun `stripVisualDuplicates - keeps text blocks`() {
+        val nodes = ReadingNodes.parse("""<p>正文一段</p><pre>code()</pre><p>正文二段</p>""")
+        val stripped = ReadingNodes.stripVisualDuplicates(nodes)
+        // 代码块也被剥掉（译文里一模一样），只剩两段正文
+        assertEquals(2, stripped.size)
+        assertTrue(stripped.all { it is NodeParagraph })
+    }
+
+    @Test
+    fun `stripVisualDuplicates - drops emptied containers but keeps mixed ones`() {
+        val nodes = ReadingNodes.parse("""<blockquote><img src="https://a/b.png" alt="x"></blockquote>""")
+        // 引用里只剩图 → 整块丢掉
+        assertTrue(ReadingNodes.stripVisualDuplicates(nodes).isEmpty())
+
+        val mixed = ReadingNodes.parse(
+            """<div><p>带文字</p><img src="https://a/b.png" alt="x"></div>""",
+        )
+        val kept = ReadingNodes.stripVisualDuplicates(mixed)
+        assertEquals(1, kept.size)
+        assertTrue("混合容器应保留文字部分", kept.single().plainText().contains("带文字"))
+    }
+
+    @Test
+    fun `stripVisualDuplicates - leaves other blocks untouched`() {
+        val nodes = ReadingNodes.parse("""<h2>标题</h2><p>段落</p><ul><li>项</li></ul>""")
+        assertEquals(nodes, ReadingNodes.stripVisualDuplicates(nodes))
+    }
+
+    // ———————————————————————————————————————————————
     // 辅助
     // ———————————————————————————————————————————————
 

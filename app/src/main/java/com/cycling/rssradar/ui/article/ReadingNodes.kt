@@ -55,6 +55,29 @@ internal object ReadingNodes {
         }.getOrDefault(emptyList())
     }
 
+    /**
+     * 双语对照用：从原文侧剥掉"译文里一模一样"的块——图片（含公式图）、代码块、分隔线。
+     * 双语模式原文列与译文列并排，这类块翻不翻都一样，重复渲染两份纯属噪音
+     * （用户反馈：同一张图出现两次）。剥空了的容器（只剩图的 group/引用）一并丢掉，
+     * 调用方据此把该块退化为"只显示一份"。纯函数，JVM 可测。
+     */
+    fun stripVisualDuplicates(nodes: List<ReadingNode>): List<ReadingNode> {
+        val out = ArrayList<ReadingNode>(nodes.size)
+        for (node in nodes) {
+            when (node) {
+                is NodeImage, is NodeCode, is NodeRule -> Unit // 译文侧照原样出现，不再重复
+                is NodeGroup -> stripVisualDuplicates(node.nodes)
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { out.add(NodeGroup(it)) }
+                is NodeQuote -> stripVisualDuplicates(node.blocks)
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { out.add(NodeQuote(it)) }
+                else -> out.add(node)
+            }
+        }
+        return out
+    }
+
     // ———————————————————————————————————————————————
     // 块级
     // ———————————————————————————————————————————————
