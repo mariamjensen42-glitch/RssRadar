@@ -30,7 +30,11 @@ import sys
 import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-CACHE = pathlib.Path(r"E:\AndroidDev\Gradle\caches\modules-2\files-2.1")
+# 真实 GRADLE_USER_HOME：gradle.properties / 环境变量指向 E:\SoftWare\GradleCache，
+# 不是默认的 ~/.gradle，也不是别的盘上留下的旧副本（写错路径 = 依赖全丢，
+# 报出上百条 unresolved reference 的假错误）。注意 files-2.1 下的 group 目录名
+# 保留点号（io.coil-kt.coil3），不转成斜杠。
+CACHE = pathlib.Path(r"E:\SoftWare\GradleCache\caches\modules-2\files-2.1")
 SDK = pathlib.Path(r"E:\SoftWare\SDK")
 WORK = ROOT / "build/kotlinc"
 
@@ -43,25 +47,25 @@ DEPS = [
     ("org.jetbrains.kotlinx", "kotlinx-coroutines-core-jvm", ""),
     ("org.jetbrains.kotlinx", "kotlinx-coroutines-android", ""),
     ("org.jetbrains.kotlinx", "kotlinx-serialization-json-jvm", "1.7"),
+    ("org.jdom", "jdom2", ""),  # rome 的传递依赖，运行时也要，否则 SyndFeedInput 直接 NoClassDefFoundError
     ("org.jetbrains.kotlinx", "kotlinx-serialization-core-jvm", "1.7"),
-    ("org.jetbrains.kotlinx", "kotlinx-collections-immutable-jvm", ""),
     ("androidx.annotation", "annotation-jvm", ""),
     ("androidx.annotation", "annotation-experimental", ""),
     ("androidx.core", "core-ktx", ""),
-    ("androidx.core", "core-android", ""),
+    ("androidx.core", "core", ""),
     ("androidx.collection", "collection-jvm", ""),
     ("androidx.collection", "collection-ktx", ""),
     ("androidx.lifecycle", "lifecycle-runtime-ktx-android", ""),
     ("androidx.lifecycle", "lifecycle-runtime-android", ""),
-    ("androidx.lifecycle", "lifecycle-viewmodel-ktx-android", ""),
     ("androidx.lifecycle", "lifecycle-viewmodel-android", ""),
     ("androidx.lifecycle", "lifecycle-viewmodel-compose-android", ""),
     ("androidx.lifecycle", "lifecycle-viewmodel-savedstate-android", ""),
     ("androidx.lifecycle", "lifecycle-common", ""),
+    ("androidx.lifecycle", "lifecycle-common-jvm", ""),
     ("androidx.savedstate", "savedstate-ktx", ""),
     ("androidx.savedstate", "savedstate-android", ""),
-    ("androidx.activity", "activity-compose-android", ""),
-    ("androidx.activity", "activity-android", ""),
+    ("androidx.activity", "activity-compose", ""),
+    ("androidx.activity", "activity", ""),
     ("androidx.compose.runtime", "runtime-android", ""),
     ("androidx.compose.runtime", "runtime-saveable-android", ""),
     ("androidx.compose.ui", "ui-android", ""),
@@ -76,31 +80,40 @@ DEPS = [
     ("androidx.compose.material", "material-icons-core-android", ""),
     ("androidx.compose.animation", "animation-android", ""),
     ("androidx.navigation", "navigation-compose-android", ""),
-    ("androidx.navigation", "navigation-runtime-ktx-android", ""),
+    ("androidx.navigation", "navigation-runtime-android", ""),
+    ("androidx.navigation", "navigation-runtime-ktx", ""),
     ("androidx.navigation", "navigation-common-android", ""),
+    ("androidx.navigationevent", "navigationevent-android", ""),
     ("androidx.room", "room-runtime-android", "2.7"),
     ("androidx.room", "room-common-jvm", "2.7"),
     ("androidx.room", "room-ktx", "2.7"),
-    ("androidx.room", "room-ktx-android", ""),
+    ("androidx.room", "room-ktx", ""),
     ("androidx.sqlite", "sqlite-android", ""),
     ("androidx.sqlite", "sqlite-framework-android", ""),
-    ("androidx.work", "work-runtime-ktx-android", ""),
-    ("androidx.work", "work-runtime-android", ""),
+    ("androidx.work", "work-runtime-ktx", ""),
+    ("androidx.work", "work-runtime", ""),
     ("androidx.hilt", "hilt-navigation-compose", ""),
+    ("com.google.dagger", "dagger", "2.60"),
     ("com.google.dagger", "hilt-android", ""),
     ("com.google.dagger", "hilt-core", ""),
     ("javax.inject", "javax.inject", ""),
     ("jakarta.inject", "jakarta.inject-api", ""),
-    ("com.composables", "icons-lucide-android", ""),
+    # 只有 -android-debug 的 aar 里才带 Kotlin 类（Lucide object）；icons-lucide-android 那个 aar 纯资源。
+    ("com.composables", "icons-lucide-cmp-android-debug", ""),
     ("com.rometools", "rome", ""),
     ("com.rometools", "rome-modules", ""),
     ("com.rometools", "rome-utils", ""),
     ("org.jsoup", "jsoup", ""),
+    # rome 运行时要 slf4j：LoggerFactory 出现在 RSS092Parser 的静态初始化里。
+    # 少了它，RssParserTest 会报 NoClassDefFoundError: org/slf4j/LoggerFactory——
+    # 看起来像解析代码坏了，其实只是运行时 classpath 缺一个 jar（gradle 打包会自动带上）。
+    ("org.slf4j", "slf4j-api", ""),
     ("com.squareup.okhttp3", "okhttp", ""),
     ("com.squareup.okio", "okio-jvm", ""),
-    ("io.coil-kt", "coil-compose-android", ""),
-    ("io.coil-kt", "coil-core-android", ""),
-    ("io.coil-kt", "coil-network-okhttp-android", ""),
+    ("io.coil-kt.coil3", "coil-compose-android", "3.3"),
+    ("io.coil-kt.coil3", "coil-compose-core-android", "3.3"),
+    ("io.coil-kt.coil3", "coil-core-android", "3.3"),
+    ("io.coil-kt.coil3", "coil-network-okhttp", "3.3"),
     ("net.dankito.readability4j", "readability4j", ""),
     ("org.jetbrains", "annotations", ""),
     ("junit", "junit", "4"),

@@ -72,6 +72,7 @@ import com.cycling.rssradar.ui.theme.TextSecondary
 import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.CircleAlert
+import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.CircleCheckBig
 import com.composables.icons.lucide.Lucide
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -322,6 +323,8 @@ private fun formatCatalogTimestamp(millis: Long?): String {
 fun RssHubSettingsScreen(
     viewModel: RssHubSettingsViewModel,
     modifier: Modifier = Modifier,
+    /** 打开全文抓取诊断页（ADR-0012）。 */
+    onOpenFetchDiagnostics: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     var showKeepSheet by remember { mutableStateOf(false) }
@@ -786,6 +789,46 @@ fun RssHubSettingsScreen(
                 TextButton(onClick = viewModel::saveAiKey) {
                     Text("保存 Key", color = Accent, fontWeight = FontWeight.SemiBold)
                 }
+            }
+        }
+
+        // ---- 正文抓取（ADR-0012）----
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = "正文抓取",
+            color = TextSecondary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "按需抓原文失败或抓不全时，这里能看到站点、状态码与原因。",
+            color = TextTertiary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+        )
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = Surface1,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onOpenFetchDiagnostics),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "全文抓取诊断",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    imageVector = Lucide.ChevronRight,
+                    contentDescription = "进入",
+                    tint = TextTertiary,
+                    modifier = Modifier.size(18.dp),
+                )
             }
         }
 

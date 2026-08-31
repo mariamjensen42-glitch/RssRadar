@@ -1,0 +1,169 @@
+<rss version="2.0">
+  <channel>
+    <title>InfoQ - 促进软件开发领域知识与创新的传播</title>
+    <link>https://www.infoq.cn</link>
+    <description>InfoQ 是一个实践驱动的社区资讯站点，致力于促进软件开发领域知识与创新的传播。</description>
+    <pubDate>Sat, 29 Aug 2026 16:33:53 GMT</pubDate>
+    <copyright>Copyright © 2019, Geekbang Technology Ltd. All rights reserved. 极客邦控股（北京）有限公司</copyright>
+    <item>
+      <title>一句话找图，低清图再增强：HarmonyOS7 视觉 AI 如何走进真实应用</title>
+      <link>https://www.infoq.cn/article/3R8f57Bow3B4kEBkPv5J?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/article/3R8f57Bow3B4kEBkPv5J?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>王玮</author>
+      <guid>https://www.infoq.cn/article/3R8f57Bow3B4kEBkPv5J?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Sat, 29 Aug 2026 13:19:17 GMT</pubDate>
+    </item>
+    <item>
+      <title>Agent 时代，为什么有人开始重新造 Google？</title>
+      <link>https://www.infoq.cn/article/KbbHdAQFxQM7AJIYMLqR?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/article/KbbHdAQFxQM7AJIYMLqR?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>蔡芳芳</author>
+      <guid>https://www.infoq.cn/article/KbbHdAQFxQM7AJIYMLqR?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Sat, 29 Aug 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>下一层抽象：从UX角度思考Agentic OS的样貌</title>
+      <link>https://www.infoq.cn/article/c4zPz7WHXryL5Erw7xop?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/article/c4zPz7WHXryL5Erw7xop?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>灯火明</author>
+      <guid>https://www.infoq.cn/article/c4zPz7WHXryL5Erw7xop?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 18:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>DuckDB v2.0 重磅预览：从嵌入式数据库迈向分布式架构</title>
+      <link>https://www.infoq.cn/article/9YLW3ZxLvrqxOVzSh9Y1?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/article/9YLW3ZxLvrqxOVzSh9Y1?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>作者：Olimpiu Pop</author>
+      <guid>https://www.infoq.cn/article/9YLW3ZxLvrqxOVzSh9Y1?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 17:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>圆桌讨论：研究型人才培养与数据库未来发展方向</title>
+      <link>https://www.infoq.cn/video/kJ0ARKZePg80FpGY1J3Y?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/video/kJ0ARKZePg80FpGY1J3Y?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>凌敏</author>
+      <guid>https://www.infoq.cn/video/kJ0ARKZePg80FpGY1J3Y?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 16:55:25 GMT</pubDate>
+    </item>
+    <item>
+      <title>Token消耗减少75%，千问办公创造了新的“省钱模式”</title>
+      <link>https://www.infoq.cn/article/70zHFKxwRRGIjBO8EUtC?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/article/70zHFKxwRRGIjBO8EUtC?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>凌敏</author>
+      <guid>https://www.infoq.cn/article/70zHFKxwRRGIjBO8EUtC?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 16:54:48 GMT</pubDate>
+    </item>
+    <item>
+      <title>数据库测试、测评：进展与展望 | 腾讯云数据库 DBTalk</title>
+      <link>https://www.infoq.cn/video/SD7eGfAXrr5K0spls5LO?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/video/SD7eGfAXrr5K0spls5LO?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>凌敏</author>
+      <guid>https://www.infoq.cn/video/SD7eGfAXrr5K0spls5LO?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 16:35:03 GMT</pubDate>
+    </item>
+    <item>
+      <title>腾讯混元 Hy4 preview 开源，参与“训练自己”！WorkBuddy实测：有了小型团队交付实力，但还得有人盯</title>
+      <link>https://www.infoq.cn/article/SxrNXURUimQf4hL83ybj?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/article/SxrNXURUimQf4hL83ybj?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>褚杏娟</author>
+      <guid>https://www.infoq.cn/article/SxrNXURUimQf4hL83ybj?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 16:09:08 GMT</pubDate>
+    </item>
+    <item>
+      <title>大模型和硬件之间，长出了一层新生意</title>
+      <link>https://www.infoq.cn/article/IROW9KWVs4zSCByU8wQE?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/article/IROW9KWVs4zSCByU8wQE?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>陈姚戈</author>
+      <guid>https://www.infoq.cn/article/IROW9KWVs4zSCByU8wQE?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 15:57:35 GMT</pubDate>
+    </item>
+    <item>
+      <title>2026年中国企业AI转型洞察报告</title>
+      <link>https://www.infoq.cn/minibook/oYXpDApcpvvgHIOzIOXp?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/minibook/oYXpDApcpvvgHIOzIOXp?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>极客时间企业版</author>
+      <guid>https://www.infoq.cn/minibook/oYXpDApcpvvgHIOzIOXp?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 15:53:42 GMT</pubDate>
+    </item>
+    <item>
+      <title>规模化 AI 代码审查：LinkedIn 的多智能体方案</title>
+      <link>https://www.infoq.cn/article/A0CMcU7UVsMQreKPcKOw?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/article/A0CMcU7UVsMQreKPcKOw?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>作者：Sergio De Simone</author>
+      <guid>https://www.infoq.cn/article/A0CMcU7UVsMQreKPcKOw?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 15:36:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>从方案走向运行｜世界人工智能开源大赛（GOAI）复赛作品提交正式开启</title>
+      <link>https://www.infoq.cn/article/REPGvBlF661I4hRmvV8J?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/article/REPGvBlF661I4hRmvV8J?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>世界人工智能开源大赛</author>
+      <guid>https://www.infoq.cn/article/REPGvBlF661I4hRmvV8J?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 14:20:17 GMT</pubDate>
+    </item>
+    <item>
+      <title>Cloudflare 发布 Kitesurf，一款面向 AI 智能智能体的浏览器引擎</title>
+      <link>https://www.infoq.cn/article/JDYKJmiY9vTRSw47t15a?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/article/JDYKJmiY9vTRSw47t15a?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>作者：Renato Losio</author>
+      <guid>https://www.infoq.cn/article/JDYKJmiY9vTRSw47t15a?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 14:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>从云原生数据库到数据基础设施：架构、弹性与智能化演进 | 腾讯云数据库 DBTalk</title>
+      <link>https://www.infoq.cn/video/gaAV7GRNCXWITqLRGu0H?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/video/gaAV7GRNCXWITqLRGu0H?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>凌敏</author>
+      <guid>https://www.infoq.cn/video/gaAV7GRNCXWITqLRGu0H?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 12:31:09 GMT</pubDate>
+    </item>
+    <item>
+      <title>S3 兼容不代表具备 S3 级别的安全性</title>
+      <link>https://www.infoq.cn/article/xr3L0bkiFZGzYmtZwscB?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/article/xr3L0bkiFZGzYmtZwscB?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>作者： Renato Losio</author>
+      <guid>https://www.infoq.cn/article/xr3L0bkiFZGzYmtZwscB?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 12:30:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>从数据格式到完整引擎：2026 数据库系统演进趋势与 TDSQL 实践 | 腾讯云数据库 DBTalk</title>
+      <link>https://www.infoq.cn/video/7Idl1NaRyb6MPku1W1Vv?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/video/7Idl1NaRyb6MPku1W1Vv?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>凌敏</author>
+      <guid>https://www.infoq.cn/video/7Idl1NaRyb6MPku1W1Vv?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 12:07:33 GMT</pubDate>
+    </item>
+    <item>
+      <title>你的 Agent 已经上线生产环境，下一步怎么办？ | 技术实践</title>
+      <link>https://www.infoq.cn/article/mKFB15kPm6Uw8fNG4Y7e?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/article/mKFB15kPm6Uw8fNG4Y7e?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>Arun Agarwal</author>
+      <guid>https://www.infoq.cn/article/mKFB15kPm6Uw8fNG4Y7e?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 11:53:03 GMT</pubDate>
+    </item>
+    <item>
+      <title>1周半写64个PR、完成30%项目重构：一家成熟SaaS公司把Agent塞进研发全流程后</title>
+      <link>https://www.infoq.cn/article/0yv69MyNwHiwY3IZXPQt?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/article/0yv69MyNwHiwY3IZXPQt?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>Jackie Calapristi</author>
+      <guid>https://www.infoq.cn/article/0yv69MyNwHiwY3IZXPQt?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 11:43:17 GMT</pubDate>
+    </item>
+    <item>
+      <title>智谱认领“牛来”模型，实测：“牛马”友好</title>
+      <link>https://www.infoq.cn/article/sTYSudHtvkbNJvuSbp31?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/article/sTYSudHtvkbNJvuSbp31?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>李冬梅</author>
+      <guid>https://www.infoq.cn/article/sTYSudHtvkbNJvuSbp31?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 11:32:33 GMT</pubDate>
+    </item>
+    <item>
+      <title>谷歌落后一个时代？CEO 亲自官宣“语音转文字”模型，网友：你们看不清形势啊</title>
+      <link>https://www.infoq.cn/article/MCTm2NvWob0ZHulXe0AQ?utm_source=rss&amp;utm_medium=article</link>
+      <description>&lt;div align=&#39;right&#39;&gt;&lt;a href=&#39;https://www.infoq.cn/article/MCTm2NvWob0ZHulXe0AQ?utm_source=rss&amp;utm_medium=article&#39;&gt;点击查看原文&gt;&lt;/a&gt;&lt;/div&gt;</description>
+      <author>李冬梅</author>
+      <guid>https://www.infoq.cn/article/MCTm2NvWob0ZHulXe0AQ?utm_source=rss&amp;utm_medium=article</guid>
+      <pubDate>Fri, 28 Aug 2026 10:58:42 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

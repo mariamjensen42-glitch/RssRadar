@@ -14,9 +14,9 @@ class ReadingTimeTest {
 
     @Test
     fun `英文按 200 词每分钟（6 字符约 1 词）`() {
-        // 200 × 4 字符 = 800 非空白字符 → 800/6 = 133 分钟 → 134
+        // 800 非空白字符 / 6 ≈ 133 词；133 词 @ 200 词/分 = 0 分 → 兜底 +1 = 1
         val text = "word".repeat(200)
-        assertEquals(134, estimateReadingMinutes(text))
+        assertEquals(1, estimateReadingMinutes(text))
     }
 
     @Test

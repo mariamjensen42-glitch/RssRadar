@@ -35,6 +35,8 @@ import com.cycling.rssradar.ui.feed.FeedArticlesScreen
 import com.cycling.rssradar.ui.feed.FeedArticlesViewModel
 import com.cycling.rssradar.ui.feed.FeedListScreen
 import com.cycling.rssradar.ui.feed.FeedListViewModel
+import com.cycling.rssradar.ui.me.FetchDiagnosticsScreen
+import com.cycling.rssradar.ui.me.FetchDiagnosticsViewModel
 import com.cycling.rssradar.ui.me.RssHubSettingsScreen
 import com.cycling.rssradar.ui.me.RssHubSettingsViewModel
 import com.cycling.rssradar.ui.search.SearchScreen
@@ -47,6 +49,7 @@ import com.cycling.rssradar.ui.navigation.ArticleDetailRoute
 import com.cycling.rssradar.ui.navigation.FeedArticlesRoute
 import com.cycling.rssradar.ui.navigation.FeedActionRoute
 import com.cycling.rssradar.ui.navigation.FeedRoute
+import com.cycling.rssradar.ui.navigation.FetchDiagnosticsRoute
 import com.cycling.rssradar.ui.navigation.MeRoute
 import com.cycling.rssradar.ui.navigation.SearchRoute
 import com.cycling.rssradar.ui.navigation.SubscriptionsRoute
@@ -122,7 +125,16 @@ private fun RssRadarAppContent() {
             }
             composable<MeRoute> {
                 val vm = hiltViewModel<RssHubSettingsViewModel>()
-                RssHubSettingsScreen(viewModel = vm)
+                RssHubSettingsScreen(
+                    viewModel = vm,
+                    onOpenFetchDiagnostics = { navController.navigate(FetchDiagnosticsRoute) },
+                )
+            }
+            composable<FetchDiagnosticsRoute> {
+                FetchDiagnosticsScreen(
+                    viewModel = hiltViewModel<FetchDiagnosticsViewModel>(),
+                    onBack = { navController.popBackStack() },
+                )
             }
             // deepLink rssradar://article/{id}（issue #32）：manifest intent-filter 把
             // 外部 intent 送进本 Activity，NavHost 自动解析 initial intent 落到此目的地。

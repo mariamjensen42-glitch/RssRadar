@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,6 +32,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,9 +50,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.store.ReadingFontFamily
+import com.cycling.rssradar.data.store.ReadingImageState
+import com.cycling.rssradar.data.store.ReadingRenderer
 import com.cycling.rssradar.data.store.ReadingStyleState
 import com.cycling.rssradar.data.store.coerceFontSize
+import com.cycling.rssradar.data.store.coerceImageCornerRadius
 import com.cycling.rssradar.data.store.coerceLineHeight
 import com.cycling.rssradar.data.store.coercePadding
 import com.cycling.rssradar.ui.components.AppSnackbarHost
@@ -71,10 +78,17 @@ import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.Type
 import kotlin.math.roundToInt
 
+
+/**
+ * 全屏查看页的入参（issue #60）：本文图片列表 + 起始下标。
+ * 刷新列表在读屏时惰性算一次，只在用户真点图时才付 jsoup 解析的代价。
+ */
+private data class ImageViewer(val images: List<String>, val index: Int)
 
 @Composable
 fun ArticleDetailScreen(
@@ -88,8 +102,12 @@ fun ArticleDetailScreen(
     val aiSummaryState by viewModel.aiSummaryState.collectAsState()
     val translationState by viewModel.translationState.collectAsState()
     val neighbors by viewModel.neighbors.collectAsState()
+    val renderer by viewModel.readingRenderer.collectAsState()
+    val imagePrefs by viewModel.readingImage.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showStyleSheet by remember { mutableStateOf(false) }
+    // 全屏图片查看（issue #60）：瞬时 UI，不入路由、不占 back 栈
+    var imageViewer by remember { mutableStateOf<ImageViewer?>(null) }
     // 整页滚动状态提升到 Screen：顶栏标题「滚出视口才出现」需要读滚动量
     val scrollState = rememberScrollState()
     // 视口模式（有图文章）的头部折叠量 = WebView 内部滚动量，同样驱动顶栏补位标题
@@ -102,6 +120,7 @@ fun ArticleDetailScreen(
         scrollState.scrollTo(0)
         headerScrollY = 0
         titleHideOffset = Int.MAX_VALUE
+        imageViewer = null
     }
     // 翻译失败走 Snackbar（spec #44：正文保持原文，报错可重试）；按状态实例触发，不会重复弹
     LaunchedEffect(translationState) {
@@ -122,8 +141,12 @@ fun ArticleDetailScreen(
                 onBack = onBack,
                 onOpenStyle = { showStyleSheet = true },
                 onToggleTranslation = { viewModel.onIntent(ArticleDetailIntent.ToggleTranslation) },
-                isShowingTranslation = translationState is TranslationState.Shown,
-                isGeneratingTranslation = translationState is TranslationState.Generating,
+                isShowingTranslation = translationState is TranslationState.Shown ||
+                    translationState is TranslationState.Progressing,
+                isGeneratingTranslation = translationState is TranslationState.Progressing,
+                aiSummary = article?.article?.aiSummary,
+                aiSummaryState = aiSummaryState,
+                onGenerateSummary = { viewModel.onIntent(ArticleDetailIntent.GenerateSummary) },
             )
         },
         bottomBar = {
@@ -166,20 +189,48 @@ fun ArticleDetailScreen(
             onGenerateSummary = { viewModel.onIntent(ArticleDetailIntent.GenerateSummary) },
             onRetranslate = { viewModel.onIntent(ArticleDetailIntent.RetranslateArticle) },
             onShowOriginal = { viewModel.onIntent(ArticleDetailIntent.ToggleTranslation) },
+            onTranslationDisplayChange = viewModel::updateTranslationDisplay,
+            onImageClick = { url -> imageViewer = openImageViewer(current, url) },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
         )
     }
 
+    imageViewer?.let { viewer ->
+        ReaderImagePage(
+            images = viewer.images,
+            initialIndex = viewer.index,
+            onDismiss = { imageViewer = null },
+        )
+    }
+
     if (showStyleSheet) {
         ReadingStyleSheet(
+            renderer = renderer.renderer,
+            image = imagePrefs,
+            onRenderer = { viewModel.setRenderer(it) },
             onFontSize = { v -> viewModel.updateReadingStyle { it.copy(fontSize = v) } },
             onLineHeight = { v -> viewModel.updateReadingStyle { it.copy(lineHeight = v) } },
             onPadding = { v -> viewModel.updateReadingStyle { it.copy(horizontalPadding = v) } },
             onFontFamily = { v -> viewModel.updateReadingStyle { it.copy(fontFamily = v) } },
+            onImageCornerRadius = { v -> viewModel.updateReadingImage { it.copy(cornerRadius = v) } },
+            onImageMaximize = { v -> viewModel.updateReadingImage { it.copy(maximizeOnTap = v) } },
             onDismiss = { showStyleSheet = false },
         )
+    }
+}
+
+/**
+ * 点图 → 全屏查看：现提取本文图片列表（jsoup 解析，只在点击时付代价）并定位下标。
+ * 提取不到（例如地址来自 srcset、被 sanitize 改过）时退化成"只看这一张"。
+ */
+private fun openImageViewer(article: ArticleWithFeed, url: String): ImageViewer {
+    val images = ReadingImages.extract(article.article.content.orEmpty())
+    return if (url in images) {
+        ImageViewer(images, images.indexOf(url))
+    } else {
+        ImageViewer(listOf(url), 0)
     }
 }
 
@@ -192,6 +243,9 @@ private fun ArticleDetailTopBar(
     onToggleTranslation: () -> Unit,
     isShowingTranslation: Boolean,
     isGeneratingTranslation: Boolean,
+    aiSummary: String?,
+    aiSummaryState: AiSummaryState,
+    onGenerateSummary: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -217,6 +271,24 @@ private fun ArticleDetailTopBar(
                 )
             }
         }
+        // AI 摘要生成入口（用户反馈）：未生成/生成中在顶栏给 Sparkles 或转圈，不在正文占位卡片；
+        // 有摘要且空闲时隐藏（卡片里已显示内容）。生成中转圈禁用，失败态保持可点重生成。
+        if (aiSummaryState is AiSummaryState.Generating ||
+            aiSummaryState is AiSummaryState.Failed ||
+            aiSummary == null
+        ) {
+            if (aiSummaryState is AiSummaryState.Generating) {
+                CircularProgressIndicator(color = Accent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+            } else {
+                IconButton(onClick = onGenerateSummary) {
+                    Icon(
+                        Lucide.Sparkles,
+                        contentDescription = "生成 AI 摘要",
+                        tint = if (aiSummaryState is AiSummaryState.Failed) Accent else TextPrimary,
+                    )
+                }
+            }
+        }
         // AI 翻译开关（issue #44）：未显示译文时发起翻译，显示中切回原文；生成中禁用
         IconButton(onClick = onToggleTranslation, enabled = !isGeneratingTranslation) {
             Icon(
@@ -239,10 +311,15 @@ private fun ArticleDetailTopBar(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReadingStyleSheet(
+    renderer: ReadingRenderer,
+    image: ReadingImageState,
+    onRenderer: (ReadingRenderer) -> Unit,
     onFontSize: (Int) -> Unit,
     onLineHeight: (Float) -> Unit,
     onPadding: (Int) -> Unit,
     onFontFamily: (ReadingFontFamily) -> Unit,
+    onImageCornerRadius: (Int) -> Unit,
+    onImageMaximize: (Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val style = LocalReadingStyle.current
@@ -259,6 +336,36 @@ private fun ReadingStyleSheet(
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(8.dp))
+
+            // 正文渲染器：WebView / 原生 Compose 二选一（ADR-0009）。
+            // 原生路对表格/视频/内联样式退化，仅建议被 WebView 滚动闪烁困扰时启用。
+            Text(
+                text = "正文渲染器",
+                color = TextPrimary,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ReadingRenderer.entries.forEach { r ->
+                    val selected = r == renderer
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (selected) Accent else Surface2,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onRenderer(r) },
+                    ) {
+                        Text(
+                            text = r.label,
+                            color = if (selected) OnAccent else TextSecondary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
 
             // 字号：步进
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -351,6 +458,57 @@ private fun ReadingStyleSheet(
                         )
                     }
                 }
+            }
+            Spacer(Modifier.height(12.dp))
+
+            // 图片（issue #60）：圆角直接改 CSS/Compose 形状；点击放大关掉后，
+            // 正文不再把 <img> 包成链接，点图在 WebView 里自然无反应。
+            Text(
+                text = "图片",
+                color = TextPrimary,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "圆角",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.width(72.dp),
+                )
+                Slider(
+                    value = image.cornerRadius.toFloat(),
+                    onValueChange = { onImageCornerRadius(coerceImageCornerRadius(it.roundToInt())) },
+                    valueRange = ReadingImageState.CORNER_RADIUS_MIN.toFloat()..
+                        ReadingImageState.CORNER_RADIUS_MAX.toFloat(),
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "${image.cornerRadius}dp",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(40.dp),
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "点击放大",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = image.maximizeOnTap,
+                    onCheckedChange = onImageMaximize,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = OnAccent,
+                        checkedTrackColor = Accent,
+                    ),
+                )
             }
         }
     }

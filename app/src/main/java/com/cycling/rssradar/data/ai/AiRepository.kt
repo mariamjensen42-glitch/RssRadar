@@ -8,10 +8,30 @@ private const val TRANSLATION_CACHE_MAX = 20
 /** AI 摘要入库长度上限（字符）。列表流会带 aiSummary，防异常输出撑爆 CursorWindow 单行。 */
 private const val AI_SUMMARY_MAX_LENGTH = 2_000
 
+/** 译文会话缓存条目：整篇的分段译文，与分段切分结果按序对齐。 */
+private data class TranslationCacheEntry(
+    val originalsHash: Int,
+    val translated: List<String>,
+)
+
+/**
+ * 渐进式翻译的进度快照（翻译功能 v2）：
+ * [originals] 恒定（分段切分一次成型）；[translated] 与之按序对齐，
+ * 元素为 null 表示该段尚未翻完。完成段数 = translated.count { it != null }。
+ */
+data class TranslationProgress(
+    val originals: List<String>,
+    val translated: List<String?>,
+) {
+    val doneCount: Int get() = translated.count { it != null }
+    val total: Int get() = originals.size
+}
+
 /**
  * AI 能力的领域门面（issue #44，ADR-0005）：
  * - AI 摘要：基于正文生成，持久化（articles.aiSummary），刷新永不覆盖；
- * - AI 翻译：替换式翻译为简体中文，不落盘，仅会话内内存缓存。
+ * - AI 翻译：按 [TranslationSegments] 分段逐段译为简体中文，不落盘，
+ *   会话内整篇缓存；经 [onProgress] 回调实现渐进显示（翻译功能 v2）。
  * 语言预检 / 截断 / 响应解析都在 [AiText] 纯函数层。
  */
 class AiRepository(
@@ -21,15 +41,13 @@ class AiRepository(
 
     /**
      * 译文会话级缓存：key = articleId，进程内有效，不落盘（ADR-0005）。
-     * LRU 上限 20 篇（OOM 防线）：每条译文是整篇正文 HTML，无上限的 Map 会
-     * 随翻译篇数线性吃堆。按访问序淘汰最旧的。
+     * LRU 上限 20 篇（OOM 防线）：每条译文是整篇正文的分段集合，无上限的 Map 会
+     * 随翻译篇数线性吃堆。按访问序淘汰最旧的。originalsHash 防正文变化后错位恢复。
      */
-    private val translationCache = object : LinkedHashMap<Long, String>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, String>): Boolean =
+    private val translationCache = object : LinkedHashMap<Long, TranslationCacheEntry>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, TranslationCacheEntry>): Boolean =
             size > TRANSLATION_CACHE_MAX
     }
-
-    fun cachedTranslation(articleId: Long): String? = translationCache[articleId]
 
     fun clearTranslationCache(articleId: Long) {
         translationCache.remove(articleId)
@@ -41,7 +59,8 @@ class AiRepository(
     }
 
     sealed interface TranslationOutcome {
-        data class Success(val html: String) : TranslationOutcome
+        /** 全部分段完成（含缓存秒出）。分段内容经 onProgress 交付，这里只报状态。 */
+        data object Success : TranslationOutcome
         data object AlreadyChinese : TranslationOutcome
         data class Failure(val userMessage: String) : TranslationOutcome
     }
@@ -72,11 +91,17 @@ class AiRepository(
     }
 
     /**
-     * 替换式翻译：正文 HTML 整体译为简体中文（保留标签结构），会话内缓存。
-     * 中文文章预检直接拦截，不调 API。
+     * 渐进式翻译：正文按 [TranslationSegments] 分段，逐段调 API 译为简体中文，
+     * 每完成一段经 [onProgress] 上抛最新快照（缓存命中时首次回调即全量，秒出）。
+     *
+     * 失败策略：单段输出为空 → 该段回退显示原文，不中断整篇；
+     * 网络/Key 等异常 → 中断并返回 Failure（已完成段经 onProgress 已可见，但不入缓存）。
+     * 协程取消会自然中断，无副作用。
      */
-    suspend fun translate(articleId: Long): TranslationOutcome {
-        translationCache[articleId]?.let { return TranslationOutcome.Success(it) }
+    suspend fun translate(
+        articleId: Long,
+        onProgress: (TranslationProgress) -> Unit,
+    ): TranslationOutcome {
         val article = articleDao.getWithFeed(articleId)?.article
             ?: return TranslationOutcome.Failure("文章不存在")
         val html = article.content?.takeIf { it.isNotBlank() }
@@ -85,11 +110,34 @@ class AiRepository(
         if (AiText.isMostlyChinese(article.contentText ?: html)) {
             return TranslationOutcome.AlreadyChinese
         }
+        val originals = TranslationSegments.split(html)
+        if (originals.isEmpty()) return TranslationOutcome.Failure("本文没有可翻译的内容")
+
+        // 缓存秒出：同一段序的整篇译文直接回调全量进度
+        translationCache[articleId]?.let { entry ->
+            if (entry.originalsHash == originals.hashCode() && entry.translated.size == originals.size) {
+                onProgress(TranslationProgress(originals, entry.translated))
+                return TranslationOutcome.Success
+            }
+            translationCache.remove(articleId) // 正文变了，旧缓存作废
+        }
+
+        val translated = arrayOfNulls<String>(originals.size)
+        onProgress(TranslationProgress(originals, translated.toList()))
         return try {
-            val (input, _) = AiText.truncateForPrompt(html)
-            val translated = client.chat(TRANSLATE_SYSTEM, input)
-            translationCache[articleId] = translated
-            TranslationOutcome.Success(translated)
+            for (i in originals.indices) {
+                val (input, _) = AiText.truncateForPrompt(originals[i])
+                val out = client.chat(TRANSLATE_SYSTEM, input, temperature = 0.3)
+                    .takeIf { it.isNotBlank() }
+                    ?: originals[i] // 单段失败回退原文，不中断整篇
+                translated[i] = out
+                onProgress(TranslationProgress(originals, translated.toList()))
+            }
+            translationCache[articleId] = TranslationCacheEntry(
+                originalsHash = originals.hashCode(),
+                translated = translated.map { it.orEmpty() },
+            )
+            TranslationOutcome.Success
         } catch (e: AiException) {
             TranslationOutcome.Failure(e.userMessage)
         } catch (e: Exception) {

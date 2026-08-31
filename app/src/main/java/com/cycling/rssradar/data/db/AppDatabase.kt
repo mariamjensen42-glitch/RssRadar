@@ -40,6 +40,11 @@ data class FeedEntity(
     @ColumnInfo(defaultValue = "0") val sourceType: Int = SOURCE_TYPE_RSS,
     /** 是否参与自动同步（issue #58）。屏蔽后不参与自动同步，手动刷新照常。 */
     @ColumnInfo(defaultValue = "1") val syncEnabled: Boolean = true,
+    /**
+     * Feed 级预设（issue #9）：详情页是否自动抓取该源的原网页正文（ADR-0001 按需抓取）。
+     * 关闭后详情页只显示 feed 自带内容，不再联网抓全文。
+     */
+    @ColumnInfo(defaultValue = "1") val fullContentEnabled: Boolean = true,
 ) {
     companion object {
         const val SOURCE_TYPE_RSS = 0
@@ -86,6 +91,11 @@ data class ArticleEntity(
     val readingMinutes: Int? = null,
     /** 封面图 URL。 */
     val coverUrl: String? = null,
+    /**
+     * 正文被判定为「不完整」的标记（ADR-0012）：抓取成功但正文过短 / 无段落 /
+     * 疑似 JS 渲染 / 疑似付费墙时置 1。数据仍然写入（比空白页好），但 UI 必须如实告知用户。
+     */
+    @ColumnInfo(defaultValue = "0") val contentIncomplete: Boolean = false,
     /** AI 摘要：LLM 基于正文生成的内容概括。生成物语义同用户状态——刷新永不覆盖。见 ADR-0005。 */
     val aiSummary: String? = null,
 ) {
@@ -108,19 +118,46 @@ data class ArticleWithFeed(
  * 列表流专用列清单：剔除 content / contentText 两列全文（每篇可达几十上百 KB）。
  * 列表卡片只用到 title/summary/coverUrl 等轻字段，全量物化几百篇会把 Java 堆吃满
  * （OOM 诊断：observeUnreadWithFeed 的 CursorWindow.nativeGetString 分配失败）。
- * 缺失的两列由 ArticleEntity 的 Kotlin 默认值 null 兜底（Room 2.8 支持缺列映射）。
  * 详情页仍走 getWithFeed 的 SELECT *，正文完整。
+ *
+ * 缺了 content/contentText 会让 Room 报 QUERY_MISMATCH（缺列），这是**有意为之**：
+ * 列表查询统一带 `@Suppress("QUERY_MISMATCH")` 声明，
+ * 两列由 ArticleEntity 的 Kotlin 默认值 null 兜底。
+ * 反过来——新增列必须同步加进这里，否则列表页拿到的永远是默认值（静默出错）。
  */
 private const val ARTICLE_LIST_COLUMNS =
     "articles.id, articles.feedId, articles.link, articles.title, articles.summary, " +
         "articles.publishedAt, articles.fetchedAt, articles.author, articles.contentSource, " +
         "articles.isRead, articles.isStarred, articles.isBookmarked, articles.readingMinutes, " +
-        "articles.coverUrl, articles.aiSummary"
+        "articles.coverUrl, articles.aiSummary, articles.contentIncomplete"
 
 /** 文章 id 与 link 的轻量对，供刷新时一次建 link→id 映射（#48 批量 upsert）。 */
 data class ArticleIdLink(
     val id: Long,
     val link: String,
+)
+
+/** 文章 feedId 与 link 的轻量对，供删除前抓「将删文章」的名单写墓碑。 */
+data class ArticleFeedLink(
+    val feedId: Long,
+    val link: String,
+)
+
+/**
+ * 归档/清空墓碑（issue「归档后刷新文章复活」）：真删的文章在这里留一笔 (feedId, link)，
+ * 刷新 upsert 见到墓碑就跳过——否则 feed XML 里还挂着的旧条目会被当成新文章插回来，
+ * 用户看到「删了又回来」。单篇删除走撤销机制（restore），不在此列。
+ *
+ * 墓碑按 archivedAt 滚动清理（90 天）：feed 一般只挂最近几十条，更早的 link 不会再被重发。
+ */
+@Entity(
+    tableName = "archived_article_tombstones",
+    primaryKeys = ["feedId", "link"],
+)
+data class ArchivedArticleTombstoneEntity(
+    val feedId: Long,
+    val link: String,
+    val archivedAt: Long,
 )
 
 /** 订阅 + 未读数（每条结果用 Flow 汇总）。 */
@@ -149,6 +186,10 @@ interface FeedDao {
     @Query("UPDATE feeds SET groupName = :groupName WHERE id = :feedId")
     suspend fun updateGroup(feedId: Long, groupName: String)
 
+    /** 批量移动订阅源到分组（issue #7）。 */
+    @Query("UPDATE feeds SET groupName = :groupName WHERE id IN (:feedIds)")
+    suspend fun updateGroupForFeeds(feedIds: List<Long>, groupName: String)
+
     /** 重命名分组：该组所有 feed 的 groupName 批量改。 */
     @Query("UPDATE feeds SET groupName = :newName WHERE groupName = :oldName")
     suspend fun renameGroup(oldName: String, newName: String)
@@ -171,6 +212,10 @@ interface FeedDao {
     /** 自动同步开关（issue #58）：屏蔽后不参与自动同步，手动刷新照常。 */
     @Query("UPDATE feeds SET syncEnabled = :enabled WHERE id = :feedId")
     suspend fun updateSyncEnabled(feedId: Long, enabled: Boolean)
+
+    /** Feed 级预设：全文抓取开关（issue #9）。 */
+    @Query("UPDATE feeds SET fullContentEnabled = :enabled WHERE id = :feedId")
+    suspend fun updateFullContentEnabled(feedId: Long, enabled: Boolean)
 
     /** 参与自动同步的源 id 清单（issue #58）。 */
     @Query("SELECT id FROM feeds WHERE syncEnabled = 1")
@@ -195,6 +240,7 @@ interface ArticleDao {
         LIMIT :limit OFFSET :offset
         """,
     )
+    @Suppress("QUERY_MISMATCH")
     suspend fun loadAllWithFeedPaged(limit: Int, offset: Int): List<ArticleWithFeed>
 
     @Query(
@@ -207,6 +253,7 @@ interface ArticleDao {
         LIMIT :limit OFFSET :offset
         """,
     )
+    @Suppress("QUERY_MISMATCH")
     suspend fun loadUnreadWithFeedPaged(limit: Int, offset: Int): List<ArticleWithFeed>
 
     @Query(
@@ -219,6 +266,7 @@ interface ArticleDao {
         LIMIT :limit OFFSET :offset
         """,
     )
+    @Suppress("QUERY_MISMATCH")
     suspend fun loadStarredWithFeedPaged(limit: Int, offset: Int): List<ArticleWithFeed>
 
     @Query(
@@ -231,6 +279,7 @@ interface ArticleDao {
         LIMIT :limit OFFSET :offset
         """,
     )
+    @Suppress("QUERY_MISMATCH")
     suspend fun loadBookmarkedWithFeedPaged(limit: Int, offset: Int): List<ArticleWithFeed>
 
     /** 订阅源文章列表（CONTEXT.md「Feed article list」）：单源全部文章，新→旧，分页。 */
@@ -244,6 +293,7 @@ interface ArticleDao {
         LIMIT :limit OFFSET :offset
         """,
     )
+    @Suppress("QUERY_MISMATCH")
     suspend fun loadFeedWithFeedPaged(feedId: Long, limit: Int, offset: Int): List<ArticleWithFeed>
 
     @Query(
@@ -267,6 +317,7 @@ interface ArticleDao {
         ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
         """,
     )
+    @Suppress("QUERY_MISMATCH")
     fun search(query: String): Flow<List<ArticleWithFeed>>
 
     @Query("SELECT COUNT(*) FROM articles")
@@ -328,12 +379,16 @@ interface ArticleDao {
         fetchedAt: Long,
     )
 
-    /** 抓取原网页正文后回填。同样不触碰用户状态；封面只在原本没有时才补 og:image。 */
+    /**
+     * 抓取原网页正文后回填。同样不触碰用户状态；封面只在原本没有时才补 og:image。
+     * [contentIncomplete] 由抓取端判定（ADR-0012）：正文过短/无段落/JS 空壳/付费墙时置 1，
+     * 内容照写，但 UI 必须如实提示"不完整"。
+     */
     @Query(
         """
         UPDATE articles SET
             content = :content, contentText = :contentText, contentSource = :contentSource,
-            readingMinutes = :readingMinutes,
+            readingMinutes = :readingMinutes, contentIncomplete = :contentIncomplete,
             coverUrl = COALESCE(coverUrl, :coverUrl)
         WHERE id = :id
         """,
@@ -345,6 +400,7 @@ interface ArticleDao {
         contentSource: Int,
         readingMinutes: Int?,
         coverUrl: String?,
+        contentIncomplete: Boolean,
     )
 
     @Query("UPDATE articles SET isRead = 1 WHERE id = :id")
@@ -385,6 +441,72 @@ interface ArticleDao {
             "AND COALESCE(publishedAt, fetchedAt) < :cutoff",
     )
     suspend fun deleteExpiredArticles(cutoff: Long): Int
+
+    // —— 墓碑（issue「归档后刷新文章复活」）：删除前抓名单，删除后刷新不再复活 ——
+
+    /** 归档即将删除的文章名单（豁免规则与 deleteExpiredArticles 完全一致）。 */
+    @Query(
+        "SELECT feedId, link FROM articles WHERE isStarred = 0 AND isBookmarked = 0 " +
+            "AND COALESCE(publishedAt, fetchedAt) < :cutoff",
+    )
+    suspend fun getExpiredArticleLinks(cutoff: Long): List<ArticleFeedLink>
+
+    /** 清空单源前抓名单（豁免规则与 deleteByFeed 一致）。 */
+    @Query(
+        "SELECT feedId, link FROM articles WHERE feedId = :feedId " +
+            "AND isStarred = 0 AND isBookmarked = 0",
+    )
+    suspend fun getArticleLinksByFeed(feedId: Long): List<ArticleFeedLink>
+
+    /** 清空分组前抓名单（豁免规则与 deleteByGroup 一致）。 */
+    @Query(
+        "SELECT feedId, link FROM articles WHERE isStarred = 0 AND isBookmarked = 0 " +
+            "AND feedId IN (SELECT id FROM feeds WHERE groupName = :groupName)",
+    )
+    suspend fun getArticleLinksByGroup(groupName: String): List<ArticleFeedLink>
+
+    /** 写墓碑；同一篇重复删除时 IGNORE（保留首次时间，滚动清理按最早一笔算）。 */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertTombstones(items: List<ArchivedArticleTombstoneEntity>)
+
+    /** 某 feed 下的墓碑 link 集合，刷新 upsert 用它过滤「删了又回来」。 */
+    @Query("SELECT link FROM archived_article_tombstones WHERE feedId = :feedId")
+    suspend fun getTombstonedLinks(feedId: Long): List<String>
+
+    /** 墓碑滚动清理：早于 cutoff 的墓碑删除，防止表无限增长。 */
+    @Query("DELETE FROM archived_article_tombstones WHERE archivedAt < :cutoff")
+    suspend fun deleteTombstonesOlderThan(cutoff: Long): Int
+
+    // —— 清空（issue #8）：只删文章不删源，豁免规则同归档清理 ——
+    // 用户主动标记的（收藏/稍后读）不因批量清空丢失，这是「清空」与「删除订阅」的差别：
+    // 后者走外键 CASCADE，一律真删。
+
+    /** 清空单个订阅源的文章，返回删除条数。 */
+    @Query("DELETE FROM articles WHERE feedId = :feedId AND isStarred = 0 AND isBookmarked = 0")
+    suspend fun deleteByFeed(feedId: Long): Int
+
+    /** 清空一个分组下所有订阅源的文章，返回删除条数。 */
+    @Query(
+        """
+        DELETE FROM articles
+        WHERE isStarred = 0 AND isBookmarked = 0
+            AND feedId IN (SELECT id FROM feeds WHERE groupName = :groupName)
+        """,
+    )
+    suspend fun deleteByGroup(groupName: String): Int
+
+    /** 清空时被豁免保留的条数，供 UI 如实汇报（数字必须真实）。 */
+    @Query("SELECT COUNT(*) FROM articles WHERE feedId = :feedId AND (isStarred = 1 OR isBookmarked = 1)")
+    suspend fun countProtectedByFeed(feedId: Long): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        WHERE (isStarred = 1 OR isBookmarked = 1)
+            AND feedId IN (SELECT id FROM feeds WHERE groupName = :groupName)
+        """,
+    )
+    suspend fun countProtectedByGroup(groupName: String): Int
 }
 
 /**
@@ -443,12 +565,147 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
+/**
+ * v6 → v7：feeds 增加 Feed 级预设——全文抓取开关（fullContentEnabled，issue #9）。
+ */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE feeds ADD COLUMN fullContentEnabled INTEGER NOT NULL DEFAULT 1")
+    }
+}
+
+/**
+ * v7 → v8：正文抓取可观测性。
+ * - articles.contentIncomplete：正文被判定为「不完整」的标记（ADR-0012）。
+ * - content_fetch_log：每次按需抓取留一条记录（链接/站点/状态码/重试次数/页数/原因），
+ *   诊断页与"哪些站点抓不到正文"的归因都依赖它。
+ */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE articles ADD COLUMN contentIncomplete INTEGER NOT NULL DEFAULT 0")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS content_fetch_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                link TEXT NOT NULL,
+                host TEXT NOT NULL,
+                statusCode INTEGER,
+                attempts INTEGER NOT NULL,
+                pages INTEGER NOT NULL,
+                ok INTEGER NOT NULL,
+                failure TEXT,
+                issue TEXT,
+                contentChars INTEGER NOT NULL,
+                durationMs INTEGER NOT NULL,
+                createdAt INTEGER NOT NULL
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_content_fetch_log_host ON content_fetch_log (host)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_content_fetch_log_createdAt ON content_fetch_log (createdAt)")
+    }
+}
+
+/**
+ * v8 → v9：归档/清空墓碑表（issue「归档后刷新文章复活」）。
+ * 真删的文章留一笔 (feedId, link)，刷新 upsert 跳过墓碑，杜绝「删了又同步回来」。
+ */
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS archived_article_tombstones (
+                feedId INTEGER NOT NULL,
+                link TEXT NOT NULL,
+                archivedAt INTEGER NOT NULL,
+                PRIMARY KEY(feedId, link)
+            )
+            """.trimIndent(),
+        )
+    }
+}
+
 @Database(
-    entities = [FeedEntity::class, ArticleEntity::class],
-    version = 6,
+    entities = [FeedEntity::class, ArticleEntity::class, ContentFetchLogEntity::class, ArchivedArticleTombstoneEntity::class],
+    version = 9,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun feedDao(): FeedDao
     abstract fun articleDao(): ArticleDao
+    abstract fun contentFetchLogDao(): ContentFetchLogDao
+}
+
+/**
+ * 一次「按需抓原文」的留痕（ADR-0012 可观测性）。
+ *
+ * 抓不到正文时旧实现只有一个静默的 null，既不知道是站点反爬、限流还是提取器没认出容器——
+ * 有了这张表才能回答「哪些站点抓不到、为什么、重试了几次」。
+ */
+@Entity(
+    tableName = "content_fetch_log",
+    indices = [Index("host"), Index("createdAt")],
+)
+data class ContentFetchLogEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val link: String,
+    val host: String,
+    val statusCode: Int?,
+    val attempts: Int,
+    val pages: Int,
+    /** 是否拿到了可写入的正文（false = 抓取/提取失败）。 */
+    val ok: Boolean,
+    /** [com.cycling.rssradar.data.parser.FetchFailure] 的 name，成功时 null。 */
+    val failure: String?,
+    /** [com.cycling.rssradar.data.parser.ExtractionIssue] 的 name，成功时非空。 */
+    val issue: String?,
+    val contentChars: Int,
+    val durationMs: Long,
+    val createdAt: Long,
+)
+
+/** 按站点聚合：总数 / 失败数 / 不完整数。诊断页的分组统计直接吃这个。 */
+data class FetchHostStat(
+    val host: String,
+    val total: Int,
+    val failures: Int,
+    val incomplete: Int,
+)
+
+@Dao
+interface ContentFetchLogDao {
+    @Insert
+    suspend fun insert(log: ContentFetchLogEntity)
+
+    @Query("SELECT * FROM content_fetch_log ORDER BY createdAt DESC LIMIT :limit")
+    fun observeRecent(limit: Int): kotlinx.coroutines.flow.Flow<List<ContentFetchLogEntity>>
+
+    /** 只看有问题的（失败或不完整），诊断页默认视图。 */
+    @Query(
+        """
+        SELECT * FROM content_fetch_log
+        WHERE ok = 0 OR (issue IS NOT NULL AND issue != 'NONE')
+        ORDER BY createdAt DESC LIMIT :limit
+        """,
+    )
+    fun observeProblems(limit: Int): kotlinx.coroutines.flow.Flow<List<ContentFetchLogEntity>>
+
+    @Query(
+        """
+        SELECT host, COUNT(*) AS total,
+               SUM(CASE WHEN ok = 0 THEN 1 ELSE 0 END) AS failures,
+               SUM(CASE WHEN ok = 1 AND issue IS NOT NULL AND issue != 'NONE' THEN 1 ELSE 0 END) AS incomplete
+        FROM content_fetch_log
+        GROUP BY host
+        ORDER BY (failures + incomplete) DESC, total DESC
+        """,
+    )
+    fun observeHostStats(): kotlinx.coroutines.flow.Flow<List<FetchHostStat>>
+
+    @Query("DELETE FROM content_fetch_log")
+    suspend fun clear()
+
+    /** 同一链接的历史：看重试与状态演变。limit 显式传入，不给 DAO 方法加默认参数（Room 代码生成边界情况）。 */
+    @Query("SELECT * FROM content_fetch_log WHERE link = :link ORDER BY createdAt DESC LIMIT :limit")
+    suspend fun historyOf(link: String, limit: Int): List<ContentFetchLogEntity>
 }

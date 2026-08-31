@@ -1,5 +1,6 @@
 package com.cycling.rssradar.data
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -11,11 +12,15 @@ import java.net.URL
 import com.cycling.rssradar.data.db.AppDatabase
 import com.cycling.rssradar.data.db.ArticleEntity
 import com.cycling.rssradar.data.db.ArticleWithFeed
+import com.cycling.rssradar.data.db.ContentFetchLogEntity
 import com.cycling.rssradar.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.data.db.FeedEntity
+import com.cycling.rssradar.data.db.FetchHostStat
 import com.cycling.rssradar.data.opml.OpmlParser
 import com.cycling.rssradar.data.parser.ContentFetcher
+import com.cycling.rssradar.data.parser.FetchLogger
 import com.cycling.rssradar.data.parser.FeedProbeResult
+import com.cycling.rssradar.data.parser.FetchOutcome
 import com.cycling.rssradar.data.store.KeepArchived
 
 /** 订阅结果，供 UI 层区分提示文案。 */
@@ -25,6 +30,15 @@ sealed interface AddFeedResult {
     data object InvalidFeed : AddFeedResult
     data object NetworkError : AddFeedResult
 }
+
+/**
+ * 清空文章结果（issue #8）：deleted = 真删条数，kept = 因收藏/稍后读豁免保留的条数。
+ * 两个数字都来自数据库真实统计，UI 直接展示，不做估算。
+ */
+data class ClearArticlesResult(
+    val deleted: Int,
+    val kept: Int,
+)
 
 /** OPML 盲导结果（ADR-0004）。 */
 data class OpmlImportResult(
@@ -47,9 +61,60 @@ class FeedRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     /** 为 null 时按需抓取不可用（见 [fetchFullContent]）。 */
     private val contentFetcher: ContentFetcher? = null,
+    /** 抓取侧的日志出口：正文不完整/放弃抓取的警告由它输出（诊断页与 logcat 同源）。 */
+    private val logger: FetchLogger? = null,
 ) {
     private val feedDao = database.feedDao()
     private val articleDao = database.articleDao()
+    private val contentFetchLogDao = database.contentFetchLogDao()
+
+    /** 归档/清空的统一入口（墓碑 + 真删），生产用真 Room 事务。 */
+    private val cleaner = ArticleCleaner(
+        articleDao,
+        transactionRunner = object : TransactionRunner {
+            override suspend fun <T> inTransaction(block: suspend () -> T): T =
+                database.withTransaction { block() }
+        },
+    )
+
+    /**
+     * 是否已有「够格」的正文。
+     * contentSource != NONE 的才够格——摘要级 feed 内容虽然也躺在 content 列，
+     * 但记的是 NONE（见 [com.cycling.rssradar.data.parser.RssParser.FULL_TEXT_MIN_CHARS]），
+     * 否则详情页永远不会去抓原文。
+     */
+    private fun hasUsableContent(article: ArticleEntity): Boolean =
+        article.content != null && article.contentSource != ArticleEntity.CONTENT_SOURCE_NONE
+
+    /** 抓取结果 → 诊断记录。失败与「成功但不完整」都留痕，只是 ok/issue 字段不同。 */
+    private fun FetchOutcome.toLog(link: String): ContentFetchLogEntity = when (this) {
+        is FetchOutcome.Success -> ContentFetchLogEntity(
+            link = link,
+            host = report.host,
+            statusCode = report.statusCode,
+            attempts = report.attempts,
+            pages = report.pages,
+            ok = true,
+            failure = null,
+            issue = content.issue.name,
+            contentChars = report.contentChars,
+            durationMs = report.durationMs,
+            createdAt = System.currentTimeMillis(),
+        )
+        is FetchOutcome.Failure -> ContentFetchLogEntity(
+            link = link,
+            host = report.host,
+            statusCode = report.statusCode,
+            attempts = report.attempts,
+            pages = 0,
+            ok = false,
+            failure = kind.name,
+            issue = null,
+            contentChars = 0,
+            durationMs = report.durationMs,
+            createdAt = System.currentTimeMillis(),
+        )
+    }
 
     fun search(query: String): Flow<List<ArticleWithFeed>> = articleDao.search("%$query%")
 
@@ -108,11 +173,13 @@ class FeedRepository(
     /**
      * 归档清理（issue #57）：按保留档位真删到期文章（starred/bookmarked 豁免，
      * 见 ArticleDao.deleteExpiredArticles）。ALWAYS 不清理。返回删除条数。
+     * 删除前写墓碑（[ArticleCleaner]），刷新不再把删掉的文章插回来。
      * 只在自动同步完成后调用，手动刷新后不清理（避免手动刷新突兀少文章）。
      */
     suspend fun archiveExpired(keep: KeepArchived): Int {
-        val cutoff = keep.cutoffMillis(System.currentTimeMillis()) ?: return 0
-        return withContext(ioDispatcher) { articleDao.deleteExpiredArticles(cutoff) }
+        val now = System.currentTimeMillis()
+        val cutoff = keep.cutoffMillis(now)
+        return withContext(ioDispatcher) { cleaner.archiveExpired(cutoff, now) }
     }
 
     fun observeFeedCount(): Flow<Int> = articleDao.observeCount()
@@ -165,6 +232,32 @@ class FeedRepository(
     /** 移动订阅源到其他分组。 */
     suspend fun moveFeed(feedId: Long, groupName: String) = feedDao.updateGroup(feedId, groupName)
 
+    /** 批量移动订阅源到分组（issue #7）：一次 UPDATE ... WHERE id IN (...)，不逐条写。 */
+    suspend fun moveFeedsToGroup(feedIds: List<Long>, groupName: String) {
+        if (feedIds.isEmpty()) return
+        feedDao.updateGroupForFeeds(feedIds, groupName)
+    }
+
+    /**
+     * 清空单个订阅源的文章（issue #8）：只删文章，源保留。
+     * 收藏/稍后读豁免（规则同归档清理）——用户主动标记的内容不因批量清空丢失。
+     * 删除前写墓碑（[ArticleCleaner]），清空后刷新不再复活。
+     */
+    suspend fun clearFeedArticles(feedId: Long): ClearArticlesResult = withContext(ioDispatcher) {
+        val kept = articleDao.countProtectedByFeed(feedId)
+        ClearArticlesResult(deleted = cleaner.clearFeed(feedId, System.currentTimeMillis()), kept = kept)
+    }
+
+    /** 清空一个分组下所有订阅源的文章（issue #8），豁免规则同上，墓碑同归档。 */
+    suspend fun clearGroupArticles(groupName: String): ClearArticlesResult = withContext(ioDispatcher) {
+        val kept = articleDao.countProtectedByGroup(groupName)
+        ClearArticlesResult(deleted = cleaner.clearGroup(groupName, System.currentTimeMillis()), kept = kept)
+    }
+
+    /** Feed 级预设：详情页是否自动抓取该源的原网页正文（issue #9）。 */
+    suspend fun setFullContentEnabled(feedId: Long, enabled: Boolean) =
+        feedDao.updateFullContentEnabled(feedId, enabled)
+
     /** 重命名订阅源标题。 */
     suspend fun renameFeed(feedId: Long, title: String) = feedDao.updateTitle(feedId, title)
 
@@ -187,28 +280,69 @@ class FeedRepository(
     suspend fun getFeedArticleIds(feedId: Long): List<Long> = articleDao.getFeedArticleIds(feedId)
 
     /**
-     * 按需抓取原网页正文（ADR-0001）：文章没有 feed 自带正文时调用。
-     * 失败返回 false，调用方静默降级——这是常态（反爬/JS 页），不是错误。
+     * 按需抓取原网页正文（ADR-0001 策略 + ADR-0012 健壮性）。
+     *
+     * 返回 false = 没拿到正文，调用方静默降级到摘要（这是常态：反爬/JS 页/付费墙）。
+     * 但**不再无声无息**：每次尝试都往 content_fetch_log 留一条（站点/状态码/重试次数/
+     * 原因分类），抓取侧的警告日志由 [com.cycling.rssradar.data.parser.FetchLogger] 输出。
+     *
+     * 两条保护：
+     * - 已有「够格」的正文（feed 自带全文或之前抓过）不重复抓；摘要级内容不算够格
+     *   （旧实现只要 content != null 就跳过，于是摘要型 feed 永远抓不到原文）。
+     * - 抓出来的正文不比现有内容长就不覆盖——避免把已有的全文越抓越少。
      */
     suspend fun fetchFullContent(id: Long): Boolean = withContext(ioDispatcher) {
         val fetcher = contentFetcher ?: return@withContext false
         val item = articleDao.getWithFeed(id) ?: return@withContext false
-        // 已有正文（feed 自带或之前抓取过）就不重复抓
-        if (item.article.contentSource != ArticleEntity.CONTENT_SOURCE_NONE && item.article.content != null) {
-            return@withContext true
+        // Feed 级预设（issue #9）：该源关闭全文抓取时，详情页不联网抓原网页，静默降级到摘要
+        val feed = feedDao.getById(item.article.feedId)
+        if (feed != null && !feed.fullContentEnabled) return@withContext false
+        if (hasUsableContent(item.article)) return@withContext true
+
+        val link = item.article.link
+        val outcome = fetcher.fetch(link)
+        contentFetchLogDao.insert(outcome.toLog(link))
+        when (outcome) {
+            is FetchOutcome.Failure -> false
+            is FetchOutcome.Success -> {
+                val content = outcome.content
+                val existingLength = item.article.contentText?.length ?: 0
+                if (content.contentText.length <= existingLength) {
+                    // 抓出来的比现有内容还短：宁可不写，也不把正文越抓越少
+                    logger?.log(
+                        FetchLogger.Level.WARN,
+                        "抓取结果比现有内容短，放弃写入 chars=${content.contentText.length} " +
+                            "existing=$existingLength host=${outcome.report.host} url=$link",
+                    )
+                    return@withContext false
+                }
+                articleDao.updateFetchedContent(
+                    id = id,
+                    content = content.contentHtml,
+                    contentText = content.contentText,
+                    contentSource = ArticleEntity.CONTENT_SOURCE_WEB,
+                    readingMinutes = estimateReadingMinutes(content.contentText),
+                    coverUrl = content.coverUrl,
+                    contentIncomplete = !content.isComplete,
+                )
+                true
+            }
         }
-        val fetched = fetcher.fetch(item.article.link) ?: return@withContext false
-        val readingMinutes = fetched.contentText.let { estimateReadingMinutes(it) }
-        articleDao.updateFetchedContent(
-            id = id,
-            content = fetched.contentHtml,
-            contentText = fetched.contentText,
-            contentSource = ArticleEntity.CONTENT_SOURCE_WEB,
-            readingMinutes = readingMinutes,
-            coverUrl = fetched.coverUrl,
-        )
-        true
     }
+
+    /** 诊断清单（ADR-0012）：有问题的抓取记录（失败或不完整），诊断页直接展示。 */
+    fun observeFetchProblems(limit: Int = 200): Flow<List<ContentFetchLogEntity>> =
+        contentFetchLogDao.observeProblems(limit)
+
+    /** 按站点聚合的失败/不完整统计。 */
+    fun observeFetchHostStats(): Flow<List<FetchHostStat>> = contentFetchLogDao.observeHostStats()
+
+    /** 清空诊断记录（用户手动重置）。 */
+    suspend fun clearFetchLogs() = contentFetchLogDao.clear()
+
+    /** 单篇的抓取历史（看重试与状态码演变）。 */
+    suspend fun fetchHistoryOf(link: String): List<ContentFetchLogEntity> =
+        contentFetchLogDao.historyOf(link, limit = 5)
 
     suspend fun addFeed(
         rawUrl: String,

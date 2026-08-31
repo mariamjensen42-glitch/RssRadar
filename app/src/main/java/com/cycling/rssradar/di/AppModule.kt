@@ -7,7 +7,10 @@ import androidx.room.withTransaction
 import com.cycling.rssradar.data.ai.AiRepository
 import com.cycling.rssradar.data.ai.DeepSeekClient
 import com.cycling.rssradar.data.db.AppDatabase
+import com.cycling.rssradar.data.parser.AndroidFetchLogger
 import com.cycling.rssradar.data.parser.ContentFetcher
+import com.cycling.rssradar.data.parser.FetchConfig
+import com.cycling.rssradar.data.parser.FetchLogger
 import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.RefreshEngine
 import com.cycling.rssradar.data.TransactionRunner
@@ -15,14 +18,20 @@ import com.cycling.rssradar.data.store.AiStore
 import com.cycling.rssradar.data.store.ArchiveStore
 import com.cycling.rssradar.data.store.GroupStore
 import com.cycling.rssradar.data.store.ListDisplayStore
+import com.cycling.rssradar.data.store.ReadingImageStore
+import com.cycling.rssradar.data.store.ReadingRendererStore
 import com.cycling.rssradar.data.store.ReadingStyleStore
 import com.cycling.rssradar.data.store.SettingsPrefs
 import com.cycling.rssradar.data.store.SyncStore
+import com.cycling.rssradar.data.store.TranslationDisplayStore
 import com.cycling.rssradar.data.db.MIGRATION_1_2
 import com.cycling.rssradar.data.db.MIGRATION_2_3
 import com.cycling.rssradar.data.db.MIGRATION_3_4
 import com.cycling.rssradar.data.db.MIGRATION_4_5
 import com.cycling.rssradar.data.db.MIGRATION_5_6
+import com.cycling.rssradar.data.db.MIGRATION_6_7
+import com.cycling.rssradar.data.db.MIGRATION_7_8
+import com.cycling.rssradar.data.db.MIGRATION_8_9
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.parser.RssParser
 import com.cycling.rssradar.data.rss.BestIconFinder
@@ -55,13 +64,32 @@ object AppModule {
     @Singleton
     fun provideAppDatabase(app: Application): AppDatabase =
         Room.databaseBuilder(app, AppDatabase::class.java, "rssradar.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+            .addMigrations(
+                MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
+                MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+            )
             .build()
+
+    /** 抓取告警出口（ADR-0012）：正文不完整/放弃抓取都会落到 logcat 的 RssRadar/Fetch。 */
+    @Provides
+    @Singleton
+    fun provideFetchLogger(): FetchLogger = AndroidFetchLogger()
 
     @Provides
     @Singleton
-    fun provideContentFetcher(app: Application): ContentFetcher =
-        ContentFetcher(cacheDir = app.cacheDir)
+    fun provideFetchConfig(): FetchConfig = FetchConfig()
+
+    @Provides
+    @Singleton
+    fun provideContentFetcher(
+        app: Application,
+        config: FetchConfig,
+        logger: FetchLogger,
+    ): ContentFetcher = ContentFetcher(
+        cacheDir = app.cacheDir,
+        config = config,
+        logger = logger,
+    )
 
     @Provides
     @Singleton
@@ -112,10 +140,12 @@ object AppModule {
         db: AppDatabase,
         engine: RefreshEngine,
         contentFetcher: ContentFetcher,
+        logger: FetchLogger,
     ): FeedRepository = FeedRepository(
         db,
         engine,
         contentFetcher = contentFetcher,
+        logger = logger,
     )
 
     /** 各 Store 构造只吃 SharedPreferences：Hilt 在此取一次，测试塞内存实例即可。 */
@@ -141,8 +171,23 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideReadingImageStore(@ApplicationContext context: Context): ReadingImageStore =
+        ReadingImageStore(SettingsPrefs.of(context))
+
+    @Provides
+    @Singleton
+    fun provideReadingRendererStore(@ApplicationContext context: Context): ReadingRendererStore =
+        ReadingRendererStore(SettingsPrefs.of(context))
+
+    @Provides
+    @Singleton
     fun provideListDisplayStore(@ApplicationContext context: Context): ListDisplayStore =
         ListDisplayStore(SettingsPrefs.of(context))
+
+    @Provides
+    @Singleton
+    fun provideTranslationDisplayStore(@ApplicationContext context: Context): TranslationDisplayStore =
+        TranslationDisplayStore(SettingsPrefs.of(context))
 
     @Provides
     @Singleton
@@ -193,6 +238,9 @@ object AppModule {
 interface AppEntryPoint {
     fun themeStore(): ThemeStore
     fun readingStyleStore(): ReadingStyleStore
+    fun readingRendererStore(): ReadingRendererStore
+    fun readingImageStore(): ReadingImageStore
+    fun translationDisplayStore(): TranslationDisplayStore
     fun listDisplayStore(): ListDisplayStore
     fun archiveStore(): ArchiveStore
     fun syncStore(): SyncStore

@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+<channel>
+    <title>OSCHINA 社区最新新闻</title>
+    <link>https://www.oschina.net/news/rss</link>
+    <description>OSCHINA - 中文开源技术交流社区</description>
+    <language>zh-CN</language>
+    <pubDate>Sat, 29 Aug 2026 12:38:28 +0800</pubDate>
+	<image>
+		<link>https://www.oschina.net</link>
+		<url>https://www.oschina.net/img/logo.gif</url>
+		<title>OsChina.NET</title>
+	</image>
+	<item>
+        <title><![CDATA[Neton 1.0.0-beta1 发布：Kotlin/Native 服务端时代，从这一刻开始]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502186]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[今天，Kotlin/Native 服务端真正拥有了自己的工程级应用框架。 欣赏 Neton 代码的魅力： 
+Neton.run(args) {
+
+    http {
+        port = 8080
+    }
+
+    routing {
+        get(&quot;/&quot;) {
+            &quot;Hello Neton!&quot;
+        }
+    }
+} Neton 是一套可对标 Spring Boot 生态的 Kotlin/Native 完整工程框架体...]]></description>
+        <pubDate>Sat, 29 Aug 2026 12:38:28 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502186]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[MsgTrans 2.0 Beta 1：把“高性能传输”升级为“可证明高性能可靠”]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502185]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[MsgTrans 是多协议高性能网络库，现在 MsgTrans 2.0 Beta 1 已经发布。 这是一次面向生产级实时网络的系统性重构，而不是在 1.x 上继续堆叠功能。 MsgTrans 继续通过统一 API 支持 TCP、WebSocket 和 QUIC，但 2.0 重新设计了事件传递、请求生命周期、写入确认、连接代际、资源限制、优雅关闭、协议扩展和公共 API。 我们...]]></description>
+        <pubDate>Sat, 29 Aug 2026 12:10:02 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502185]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[🔥MakuBoot 5.2 发布，低代码开发平台，快速开发利器]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502184]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[介绍 maku-boot 是采用 SpringBoot4.0、SpringSecurity7.0、Flowable8.0、Mybatis-Plus、Vue3、Element-plus 等技术开发的低代码开发平台，旨在为开发者提供一个简洁、高效、可扩展的低代码开发平台。 使用门槛极低，支持国密加密、达梦数据库等，符合信创需求的低代码开发平台。 采用组件模式，扩展不同的业务功能，可以...]]></description>
+        <pubDate>Fri, 28 Aug 2026 21:00:27 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502184]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[腾讯混元发布 Hy4 preview：总参数 770 B、1M 上下文，开源并接入游戏引擎和 MCP]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502183]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[腾讯混元今天发布了 Hy4 preview，总参数 770B，激活参数 4.9B，上下文长度 1M，在代码、办公、科学等生产力任务上宣称达到开源模型第一梯队。模型已在 HuggingFace、GitHub、ModelScope 和 Gitcode 开源，同时上线腾讯云 TokenHub 和 OpenRouter。 最大的变化在模型架构之外。Hy4 preview 展示了大量&quot;模型即 agent&quot;的落...]]></description>
+        <pubDate>Fri, 28 Aug 2026 19:32:20 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502183]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[🔥 新增 DeepSeek V4 Flash，支持推理续调与联网搜索：开源 AI 无代码平台 NocoBase]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502182]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[汇总一周产品更新日志，最新发布可前往我们的博客查看。 NocoBase 目前更新包括三个分支： main、next 和 develop。** main： 截至目前最稳定的版本，推荐安装此版本。 next： 包含即将发布的新功能，经过初步测试的版本，可能存在部分已知或未知问题。主要面向测试用户，用于收集反馈和进一步优化功能。适合愿意提前体验...]]></description>
+        <pubDate>Fri, 28 Aug 2026 19:24:47 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502182]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[Ultralytics YOLO Vision 2026 报名开启！开放视界，为现实而生]]></title>
+        <link><![CDATA[https://www.oschina.net/event/8598381]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[今年9月，Ultralytics YOLO Vision将第二次来到深圳！YOLO Vision 2026（YV26）将汇聚企业领袖、创业者、工程师、研究人员、学生和开源贡献者，一起聊聊视觉AI的下一步，以及它正在如何影响真实世界。 现场将带来最新技术、实战经验和深入交流，从前沿研究和模型开发，到规模化部署和生产落地，覆盖完整的视觉AI发展路线...]]></description>
+        <pubDate>Fri, 28 Aug 2026 18:21:11 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/event/8598381]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[给 AI 以“情感”，魔珐科技寻找有活人感的 Agent 作品]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502174]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[大模型技术普及到今天，AI 应用的交互形态反而显得有点缺少“人情味”。大部分 AI 产品停留在文本对话框或单向语音播报，没有形象、没有表情、没有肢体表达，冷冰冰的界面很难传递温度和信任感。展厅讲解、情感陪伴、教育科普、文旅导览、人形机器人陪伴这些场景，要的是一个能说话、有表情、会动作、能实时回应的“人”...]]></description>
+        <pubDate>Fri, 28 Aug 2026 16:57:53 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502174]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[产品更新｜Memmy 支持 Linux 啦！]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502173]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[v1.1.1 已正式发布，Linux CLI 安装资源已上线 ～ 大家千呼万唤的，Memmy 正式支持 Linux 啦！ 很多开发者的 AI 工作发生在终端里：在本地工作站处理项目，在远程开发环境中运行 Agent，或在 Linux 服务器上持续执行任务。项目背景、过去的排查过程、常用偏好和已经验证过的方案，会随着一次次会话逐渐积累。 这次 Linu...]]></description>
+        <pubDate>Fri, 28 Aug 2026 16:54:12 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502173]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[【AI 智能运维平台】本周更新：APM应用性能监测功能正式发布，性能瓶颈一目了然]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502170]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[Blueking Lite 是一个 AI First 的轻量版运维产品，具有部署资源要求低、使用成本低、渐进式体验等特点，为运维管理员提供日常运维中的必备工具。 :hammer_and_wrench: 系统管理 • 安全策略支持 OTP 白名单 • 用户管理支持OTP解绑 • AD 用户同步支持配置多个拉取 DN :desktop_computer: 节点管理 • Windows 远程安装...]]></description>
+        <pubDate>Fri, 28 Aug 2026 16:10:14 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502170]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[内核跃迁，智能原生 | openKylin 3.0 正式发布]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502168]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[万亿Token免费送 OpenAtom openKylin（以下简称&quot;openKylin&quot;）3.0 版本正式发布！本次版本升级，openKylin 将系统内核跨代升级至 Linux 7.0，完成 180 余个核心组件全面迭代；构建智能体开放底座，让 AI 贯穿系统全链路；隔空手势、语音输入、屏幕朗读等多模态交互革新；场景覆盖从智能桌面延伸至移动端、服务器等全场景。...]]></description>
+        <pubDate>Fri, 28 Aug 2026 14:15:58 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502168]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[DjangoAdmin 敏捷开发框架 Flask+AntdVue 版本 v2.8.1 发布]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502161]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[v2.8.1 更新内容： 1、修复近期用户反馈的问题； 一款 Python 语言基于 Flask、Vue3、AntDesign、MySQL 等框架精心打造的一款模块化、高性能、企业级的敏捷开发框架，本着简化开发、提升开发效率的初衷触发，框架自研了一套个性化的组件，实现了可插拔的组件式开发方式：单图上传、多图上传、下拉选择、开关按钮、单选按...]]></description>
+        <pubDate>Fri, 28 Aug 2026 09:15:29 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502161]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[Red Hat 卖了，GitHub 卖了，Hugging Face，据报道也要卖给英伟达了]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502160/oschina-futurex]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[Red Hat 卖了，GitHub 卖了，Hugging Face，据报道也要卖给英伟达了。 于是，一个很有意思的问题来了： 开源平台的宿命，是不是最终都要被巨头收购？ 但有一家走了完全相反的路。 2019 年，开源中国曾将 60% 控股权出售给百度。 后来，它没有继续走“被巨头收编”的剧本，反而把自己买了回来。 这一次，我们找来开源中国...]]></description>
+        <pubDate>Thu, 27 Aug 2026 21:22:49 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502160/oschina-futurex]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[Java Web 服务器 wastnet 路由开发实战]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502159]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[wastnet 是一款零依赖、自研的 Java Web 服务器，核心基于 JDK 原生 NIO 构建 Reactor 多路复用模型，不依赖 Netty、Tomcat 等任何第三方网络库。其 HTTP/2（h2 / h2c）协议栈从 HPACK、Huffman 到 ALPN 均为完全自研实现，是框架的核心特色之一；在基准测试中吞吐对标 Undertow。 本文介绍 wastnet 的路由分发组件 Http...]]></description>
+        <pubDate>Thu, 27 Aug 2026 20:20:02 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502159]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[无远弗届，驭光而至，通用代码生成器：光船尝鲜版，蛋糕船示例生成演示]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502158]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[无远弗届，驭光而至，通用代码生成器：光船尝鲜版，蛋糕船示例生成演示 通用代码生成器：光船发布尝鲜版及其介绍视频。此版本统一使用EasyUI的FileBox作为代码生成物的上传控件，对图片功能，哑数据模式和消除警告等进行了优化，更多测试更多修复。视频演示了使用xlsx格式的SGS2模板，即蛋糕船示例演示了代码生成器的源码...]]></description>
+        <pubDate>Thu, 27 Aug 2026 20:05:21 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502158]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[以后在 Linux 上打包，一句话就行]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502157]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[Linux 新手常常遭遇软件依赖混乱、跨发行版适配难、手动打包低效繁琐等问题。安装软件时出现大量依赖报错，缺少库、库版本不匹配是十分常见的现象。如果需要对软件进行打包，还要学习对应发行版的构建规范，手动打包也是阻碍新手进入 Linux 开发的一大难点。 现在有开源项目尝试解决这个问题。 新型独立包管理工具集如意...]]></description>
+        <pubDate>Thu, 27 Aug 2026 19:15:33 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502157]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[Agent 协作工作空间 Lody 开源：共享、隔离与持久化]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502156/lody-is-now-open-source]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[Agent 的对话、运行状态和代码改动是团队协作的新战场，但混乱也是。Lody 的开源版本试图解决这个问题。 Lody 定位是 Coding Agent 协作工作空间，8 月 26 日正式开源了 CLI 和本地桌面端。简单说，它把散在不同成员、Agent 和机器里的会话、运行状态与代码改动集中到一个空间中。团队成员可以直接打开彼此的会话继续讨论...]]></description>
+        <pubDate>Thu, 27 Aug 2026 18:05:32 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502156/lody-is-now-open-source]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[kkRepo 1.0.0 正式发布，新增 R/CRAN、Go Hosted 和多套 UI 主题]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502155]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[前言 从 0.x 一路迭代到现在，kkRepo 终于迎来了首个稳定版本：kkRepo 1.0.0。 这个版本新增了完整的 R/CRAN 仓库、Go Hosted 仓库和多套可切换 UI 主题，同时完善了 PyPI 代理、组件上传、全局搜索与 Maven Snapshot 删除等能力。 GitHub：https://github.com/klboke/kkRepo v1.0.0 Release：https://github.com/klboke...]]></description>
+        <pubDate>Thu, 27 Aug 2026 16:00:10 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502155]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[SamWaf v1.3.24 开源、轻量级、私有化部署网站防火墙]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502154]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[重要说明 1. 默认发布包不再内置 GeoLite2-Country.mmdb（IPv6 地理库） 2. 中心管理功能已移除 新增 网站可配置对外 HTTP/2 开关 统一访问认证方式 感谢 @xihefeng 防止主机远程爆破 CDN 回源 IP 威胁情报 IP 订阅 感谢 @ᴹʳXavier IP 黑白名单支持泛解析 感谢 @ᴹʳXavier IP 组，可绑定 IP 白名单、IP 黑名单、自定义...]]></description>
+        <pubDate>Thu, 27 Aug 2026 15:46:09 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502154]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[MooTool Next 1.1.3 发布！全新重写，带来更现代的界面与多窗口体验]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502152]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[MooTool Next 使用 Electron、React 和 TypeScript 全新重写， 带来更现代的界面与多窗口体验。支持 macOS、Windows 和 Linux，可与 Java 版独立安装，支持数据一键迁移。 推荐使用体验～ MooTool Next Electron 1.1.3 English Product: MooTool Next Electron Version: 1.1.3 This release is installed and updated in...]]></description>
+        <pubDate>Thu, 27 Aug 2026 14:51:41 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502152]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[Tailscale 开源 Tailcat：像 netcat 一样用，加密 + NAT 穿透，不需要账号]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502151]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[Tailscale 开源了一个叫 Tailcat 的工具。它的定位一句话就能说清楚：像 netcat 一样用，但流量走 Tailscale 的数据平面，不需要 Tailscale 账号。 对，不需要注册、不需要登录、不需要 root 权限。 怎么做到的 传统 netcat 的问题是裸 TCP/UDP，没加密，NAT 穿透基本靠撞大运。Tailcat 在这两层上补了 Tailscale 积累多...]]></description>
+        <pubDate>Thu, 27 Aug 2026 14:42:58 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502151]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[AWS 收购 DuckLabs：数据库界的“MIT 许可保卫战”]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502150/ducklabs-to-join-aws]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[DuckLabs 被 AWS 收购了。 如果关注 DuckDB 的人看到这条消息第一反应是皱眉头——这很正常。过去十年间，大公司收购开源团队的剧情反复上演，结局有好有坏。但这次收购的独特之处在于，DuckLabs 在宣布收购的同一篇文章里，花了大量篇幅解释&quot;什么不会变&quot;。 DuckDB 会继续 MIT 许可开源，DuckDB Foundation 继续掌管项目...]]></description>
+        <pubDate>Thu, 27 Aug 2026 14:24:02 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502150/ducklabs-to-join-aws]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[英伟达 130 亿美元虎视 Hugging Face，开源 AI 的“中立社区”要沦陷了？]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502149/nvidia-in-talks-to-buy-hugging-face-13-billion-dollars]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[根据 Business Insider 的独家报道，英伟达正与 Hugging Face 就收购进行谈判，估值超过 130 亿美元。这将是英伟达有史以来最大的一笔收购之一。 但更值得关注的是：Hugging Face 去年刚拒绝了英伟达 5 亿美元的投资——当时估值 70 亿美元。从拒绝投资到接受收购，中间发生了什么？ Hugging Face 是开源 AI 生态的中央枢...]]></description>
+        <pubDate>Thu, 27 Aug 2026 14:18:08 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502149/nvidia-in-talks-to-buy-hugging-face-13-billion-dollars]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[工单系统 WGCAT v1.3.0 支持 AI 派单]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502147]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[WGCAT 是 WGCLOUD 团队精心开发的一款工单管理系统，设计一如既往的的简单实用，具有部署方便，上手容易，性能优秀，界面友好等特点。 WGCAT 工单系统中，每个人都可以新建工单，每个账号都具有新建工单的权限，而且还有对外提供的工单提交接口，当工单在流转过程中，你也可以评论工单，工单每次流转都会给经办人，也就是...]]></description>
+        <pubDate>Thu, 27 Aug 2026 13:30:06 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502147]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[Qwen3.8-Flash 发布：125B MoE，激活 6B，训练成本仅前代的 1/9]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502145/qwen3-8-flash-next]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[阿里通义千问团队正式发布 Qwen3.8-Flash。 发布公告有一组让人需要停下来看两眼的数据： 125B 总参数 + 51B N-gram Embedding，每 token 只激活 6B 参数。原生支持 262K 上下文，可通过 YaRN 扩展到 1M。相比 Qwen3.7-Plus，训练开销仅为其 1/9，编码和办公任务上却有更强能力。 这代模型在架构上有四个值得关注的变化：...]]></description>
+        <pubDate>Thu, 27 Aug 2026 11:39:05 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502145/qwen3-8-flash-next]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[智谱正式上线并开源 GLM-5.3-Flash：320B 模型打到 Opus 4.8 水平，定价只要 1/40]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502144]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[「前沿智能」这四个字长期以来只跟一个词绑定在一起：贵。 不是没有便宜的大模型。但便宜往往意味着降级——参数小一号、能力差一截、在某些任务上能省则省。而智谱今天开源的 GLM-5.3-Flash（320B-A18B），正在挑战这个假设。 这是一组关键数据：320B 总参数，18B 激活参数，在 Artificial Analysis 的 AA 综合智能指数...]]></description>
+        <pubDate>Thu, 27 Aug 2026 11:06:36 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502144]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[JeecgBoot V3.9.5 重磅发布：AI Flow、Online 全面升级，安全与性能再进阶]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502143]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[前言 JeecgBoot V3.9.3 刚刚完成 Spring Boot 4 架构大升级，不到一周，V3.9.5 又接踵而至。这次并非简单修补，而是一次集中升级：Online 表单新增多数据源和外部填报，代码生成器模板大幅增强，AI 应用与 AI Flow 在模型接入、知识库、流程编排、分享 Token 和访问限流等方面全面提升，同时新增飞书集成和 OpenAPI 日志...]]></description>
+        <pubDate>Thu, 27 Aug 2026 10:48:58 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502143]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[gfast-module-dev 技能使用说明]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502142]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[gfast-module-dev 技能使用说明 让 AI 按照本项目代码生成器的规范手写业务模块，并正确调用现有组件库（富文本、上传、选择器、字典、权限），产出与 tools_gen_table 代码生成器风格完全一致的 GoFrame 后端 + Vue3 前端代码。 1. 这是什么 gfast-module-dev 是一个 Claude Code / opencode 项目级技能，沉淀自 gfast-...]]></description>
+        <pubDate>Thu, 27 Aug 2026 10:22:06 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502142]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[0day同步！商汤小浣熊 Linux 版首发支持 openKylin]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502139]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[2026年8月26日，OpenAtom openKylin（简称“openKylin”）社区完成商汤科技旗下AI办公助手 商汤小浣熊桌面端全新版本适配工作，商汤小浣熊正式登陆 openKylin ，此次首发也标志着 openKylin 正式成为商汤小浣熊桌面端的首选开源操作系统底座，进一步丰富 openKylin 生态下 AI 办公工具矩阵，为广大开源系统用户带来完整的...]]></description>
+        <pubDate>Thu, 27 Aug 2026 09:15:32 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502139]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[WIKI 本地知识库从 v1.0.0 升级 v1.1.0 的迁移指南]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502137]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[项 说明 文档日期 2026-08-25 升级路径 v1.0.0 → v1.1.0 适用对象 已部署 v1.0.0、需升到 v1.1.0 的运维 / 二次开发同学 v1.1.0 相对 v1.0.0 的工程变化 Vue 控制台 frontend/、配置优先 conf/、业务 API 统一 /api 0. 先看结论 维度 结论 知识库数据（kb_store/ 等） 一般可直接沿用；路径以配置 knowledge_base.stora...]]></description>
+        <pubDate>Wed, 26 Aug 2026 22:54:25 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502137]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[轻量级运维极速引擎 OpsFlash v0.3.0 正式发布]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502136]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[OpsFlash v0.3.0 版本发布： 新增 指令库：命令统一管理（增删改查、环境分组、搜索筛选、排序）；命令归属环境复用环境管理（与脚本库同源）；执行模式覆盖 本地 terminal（cmd / PowerShell / Bash） 与 SSH 远程 两种 命令执行引擎：三种命令类型——非交互（同步执行 + 流式实时输出可停止，cmd 多行自动逐行执行）、...]]></description>
+        <pubDate>Wed, 26 Aug 2026 22:36:03 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502136]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[“05 后”开发者两周建起 20K Star 的开源项目社区]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502135]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[要说本月技术人朋友圈里最火的东西，横空出世的 DeepSeek Harness 当之无愧。不少朋友都在 DSH 刚出来的那晚通宵把玩，各大开源技术交流群热闹非凡，基于 DSH 的二创项目很快攻占各平台趋势热榜。 但 DSH 官方版本要装 Node.js，要从命令行启动本地服务，要处理一堆环境问题，很多普通用户想试试，卡在第一步就放弃了。就...]]></description>
+        <pubDate>Wed, 26 Aug 2026 18:04:52 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502135]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[DeepSeek 今年前七个月营收约 4.75 亿元]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502134]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[5000 亿。 这是 DeepSeek 第二轮融资的投前估值。按当前汇率，约合 740 亿美元。一家成立不到三年的公司，正在以这个数字向资本市场递出投名状。 据《南华早报》和 The Information 从知情人士处获得的消息，DeepSeek 正接近完成新一轮约 500 亿元人民币的融资，预计 8 月底前关闭。老股东 Monolith、拾象资本和宁德时代...]]></description>
+        <pubDate>Wed, 26 Aug 2026 17:54:12 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502134]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[PHASE-Tree｜为长线 AI 角色构建可演化的人格骨架]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502133]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[今年 6 月，NVIDIA 在 Unreal Fest 2026 公布了面向 Unreal Engine 5 的本地 AI 角色工具，并展示了将 NPC 的角色设定与具体表演过程分开的工作流，让角色能够根据现场情况行动和回应，同时保持角色一致性。 当 AI 角色进入真实游戏运行时，一句台词通常会同时受到多组信号影响。 Quest Flag 记录任务已经推进到哪个分支...]]></description>
+        <pubDate>Wed, 26 Aug 2026 17:42:43 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502133]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[PHASE-Tree｜CPC 不只要会聊、会打，还要会成长：AI 队友的状态演化难题]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502132]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[今年 6 月，KRAFTON 与 NVIDIA 将 PUBG Ally 带入公开 Beta。这名 AI 队友能记住玩家偏好的武器、常去的跳点和过往战绩，并在下一局继续使用这些信息。跨局记忆已经进入真实游戏测试，背后的开发团队则需要进一步回答，角色记得过去以后，它的立场和说话方式会不会跟着经历变化？ 假设我们在一段长线游戏剧情里。 一名年...]]></description>
+        <pubDate>Wed, 26 Aug 2026 17:24:45 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502132]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[从导航工具到AI基础设施，上海开源大赛百度地图命题公布]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502131]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[2026 年的 AI 正在吞噬一切，互联网地图也在经历身份转变。 过去地图只是导航工具，现在已然成为 AI 时代的基础设施，给智能体和大模型应用提供位置感知能力。智能定位、路线规划、时空数据这些能力，正在从“给 App 调用”变成“给 AI 调用”。这个转变背后，是两个真实的需求场景。 一个是工业场景。工业数字化让工业园...]]></description>
+        <pubDate>Wed, 26 Aug 2026 15:32:41 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502131]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[扎心：Anthropic 最贵的模型，企业几乎不用]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502129]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[《金融时报》拿到了一份数据，然后提了一个让 Anthropic 在 IPO 之前很难堪的问题：你的最强模型到底有没有人用？ 根据支付服务集团 Ramp 收集的 7 万家公司支出数据，Anthropic 最贵的模型 Fable 5 发布两个多月后，企业支出占比仅稳定在 11% 左右。旧款、更便宜的模型吃掉了其余 89%。 这不是小样本。7 万家公司的支出...]]></description>
+        <pubDate>Wed, 26 Aug 2026 12:03:22 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502129]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[苦等四年，JPEG XL 终于要进 Mozilla 和 Chrome 浏览器了]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502128]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[Mozilla 和 Google 在同一天发出了 intent to ship。Firefox 157 和 Chrome 将默认启用 JPEG XL 解码支持。对 Web 开发者来说，这是四年来最好的图像格式新闻。 “Intent to Ship” 是 Web 标准开发流程的重要环节，特指浏览器引擎在发布新 CSS/HTML 特性前的公开声明阶段。旨在征求社区反馈、评估兼容性风险，避免破坏 ...]]></description>
+        <pubDate>Wed, 26 Aug 2026 11:56:25 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502128]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[gtk-zlang v0.7.14.0发布，基于 zlang 编程语言的 GTK 封装包装库]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502127]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[目录 一、gtk-zlang简介 二、更新日志 一、gtk-zlang介绍 gtk-zlang是基于zlang编程语言的GTK封装包装库，打造跨平台的开源GUI技术栈，让开发者快速开发跨平台的桌面应用软件。 二、底层优势 zlang编程语言是一门原创自研、支持中文编程、融合和创新语法设计并保持简洁高效、开箱即用、跨平台+高性能的编程语言； GTK是一...]]></description>
+        <pubDate>Wed, 26 Aug 2026 09:14:00 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502127]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[zlang v0.12.2.0 发布，支持中文编程、支持Web开发/桌面应用开发的国产全自研编程语言]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502126]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[目录 一、zlang简介 二、更新日志 三、技术专栏 3.1. 《zlang不需要getter、setter八股文》 3.2. 《构造和解析二进制数据包》 zlang是一门完全国产自研的、追求干净观感的、基于对象克隆、支持中文编程的编程语言： 完全从底层开始编写，语言引擎（词法 / 语法分析等）、对象库等均未基于 / 采用任何已有语言进行改造、包...]]></description>
+        <pubDate>Wed, 26 Aug 2026 09:09:20 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502126]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[告别背命令：Pragmatic AI Shell 把自然语言带进日常终端操作]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502123]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[用自然语言驱动终端，Pragmatic AI Shell 让运维排障&quot;说话就行&quot; 还在为记不住 lsof、awk、find 的参数写法头疼？还在 ps + netstat + 文档之间来回切换？Pragmatic AI Shell（smartcli） 试图改变这一切——你只需要用自然语言描述意图，它替你生成命令，安全过滤后确认执行，全程可审计。 一句话介绍 你说人话，它出命令...]]></description>
+        <pubDate>Tue, 25 Aug 2026 21:53:04 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502123]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[让经典回归：极点五笔在 openKylin 3.0的新生]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502122]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[很多使用五笔输入的小伙伴都绕不开一个名字：极点五笔。它曾是中文输入的效率神器，也是一代人的共同记忆。 现在，这份记忆有了新去处——极点五笔输入法 4.0 完成全新重构，已上架 OpenAtom openKylin（简称“openKylin”） 软件商店，同时兼容支持 fcitx5、fcitx4 和 ibus 输入法框架。 对老用户：编码规则、输入习惯都...]]></description>
+        <pubDate>Tue, 25 Aug 2026 21:30:14 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502122]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[MemOS Skill 上线｜一句话即可接入 MemOS Cloud]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502121]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[Agent 已经不只是聊天窗口了，它们在 IDE 里改代码，在终端里跑命令，在办公流里处理文档，也开始替大家连接插件、调用工具、串起自动化流程。 为了帮助开发者在 Claude Code、Cursor 等 Agent 开发工具中更快接入 MemOS Cloud，我们上线了 MemOS Skill。 我们希望，只需一句提示词，即可让 Agent 自动通过 MemOS Skill ...]]></description>
+        <pubDate>Tue, 25 Aug 2026 21:16:55 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502121]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[Linus Torvalds 的“地狱级调试”：AI 帮了大忙，但也多次准备放弃]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502120/linus-torvalds-debug-ai]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[Linus Torvalds 自己提交了一个 Intel Xe 内核图形驱动的补丁。这件事本身就不常见——Linux 图形驱动补丁通常不经过他手。 但真正让这次提交引人注目的，是 Linus 在 commit message 里写下的一段话： &gt;&gt; 这是一次地狱级的调试（debug session from hell），AI 帮我做了大量粗活，帮了很大的忙。 &gt; &gt; 我想叫它不知疲倦的...]]></description>
+        <pubDate>Tue, 25 Aug 2026 19:07:17 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502120/linus-torvalds-debug-ai]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[Go Agent 框架 covonaut v1.0.8 发布：新增行内补全与多后端可观测性支持]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502119]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[covonaut 是一款使用 Go 语言编写的生产级 AI Agent 框架。框架提供了完整的 Agent 能力，包括智能体执行循环、工具系统与中间件、MCP 工具桥接、多 Agent 协作（Handoff）、DAG/Pregel 双模式图引擎、工作流编排、会话管理与分支、HTTP 服务，以及一套无第三方依赖的终端 UI（TUI）。模型接入方面支持 OpenAI、DeepSee...]]></description>
+        <pubDate>Tue, 25 Aug 2026 18:47:36 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502119]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[从GPU池化到节省token，上海开源大赛「智算云赛道」情报公开]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502117]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[2026 上海开源软件应用创新大赛正火热报名中，本次大赛由开源中国主办，总奖池 100 万，设 AI+工业软件、智算云、开源 AI 工具三个赛道。 其中「智算云」这条赛道，面向用云加速、简化或稳定 AI 运行的开源项目。从底层的异构算力调度、GPU 池化、分布式训练，到上层的 AI 应用开发平台、模型部署服务、Serverless 推理、...]]></description>
+        <pubDate>Tue, 25 Aug 2026 16:33:38 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502117]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[deepin 电脑管家正式上线，一键守护你的系统安全！]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502113]]></link>
+        <category>综合新闻</category>
+        <description><![CDATA[电脑怎么又卡了…… 这破网络到底咋回事？ 我的硬盘空间怎么又红了？ …… 大家遇到系统问题，要么硬着头皮去终端里敲命令，要么翻论坛找教程贴，一顿操作猛如虎，问题却未必能解决。 我们一直都在思考一个问题：有没有一个工具，能让deepin 系统的日常维护变得像手机管家一样简单？答案是：有！ 现在我们正式向大家宣布...]]></description>
+        <pubDate>Tue, 25 Aug 2026 13:46:15 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502113]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[qData数据中台专业版V2.6.0发布：血缘全链路再升级，在线接口测试与帮助中心正式上线]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502112]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[qData数据中台专业版V2.6.0围绕数据血缘、数据集成、数据开发、数据服务、整库同步、数据连接等核心能力进行调整，同时新增在线接口测试、数据源诊断和帮助中心，扩展多类数据源适配，并进一步优化任务日志、作业管理、数据标准及全局交互能力。 从“能接、能算、能用”，进一步走向可追踪、可调试、可排查 企业数据中台...]]></description>
+        <pubDate>Tue, 25 Aug 2026 13:36:32 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502112]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[qData 开源版 v1.6.1 发布：数据集成和数据开发日志持续优化，任务执行更清晰]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502111]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[qData数据中台开源版V1.6.1围绕数据接入、基础数据处理、任务运行查看和部署体验进行了一轮完善，主要包括：DataX新增Excel、CSV组件，新增9种基础清洗规则，升级数据集成与数据开发日志展示，并新增SH、BAT一键部署脚本，同时调整标准数据元及部分页面交互。 从“把任务配置出来”，到把接入、处理、运行和部署链路补得...]]></description>
+        <pubDate>Tue, 25 Aug 2026 11:56:08 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502111]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[qKnow开源版v2.4.1发布：非结构化抽取逻辑优化，打造更丝滑的知识治理体验]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502110]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[qKnow智能体构建平台开源版v2.4.1围绕非结构化抽取与知识文档解析逻辑进行优化，重点处理单个抽取任务失败影响其他任务、空白文档解析报错，以及批量解析过程中单个文件失败导致整批任务失败等问题，进一步提升知识文件处理过程中的稳定性与容错能力。 从“能够解析文档”，到让批量知识处理更稳定 对于企业智能体构建平...]]></description>
+        <pubDate>Tue, 25 Aug 2026 11:52:41 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502110]]></guid>
+    </item>
+	<item>
+        <title><![CDATA[:fire::fire: API 智能管理平台 6.0 发布]]></title>
+        <link><![CDATA[https://www.oschina.net/news/502109]]></link>
+        <category>软件更新新闻</category>
+        <description><![CDATA[ApiGo（www.apigo.cn） 是一款基于 AI 技术的企业级低代码 API 开发与治理平台。 通过 AI 办公智能体使用自然语言对话即可将数据变成标准 REST API， 实现从设计、开发到运维的全生命周期AI智能化管理。支持WorkBuddy、千问办公、Trea Work、豆包等AI办公平台MCP接入。平台内置支持多数据源（mysql、oracle 、postgresq...]]></description>
+        <pubDate>Tue, 25 Aug 2026 11:47:57 +0800</pubDate>
+        <guid><![CDATA[https://www.oschina.net/news/502109]]></guid>
+    </item>
+</channel>
+</rss>
+<!-- Generated by oschina (init:0[ms],page:18[ms],ip:119.130.238.11) //-->

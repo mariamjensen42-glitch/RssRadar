@@ -8,8 +8,15 @@ import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.ai.AiRepository
 import com.cycling.rssradar.data.store.AiStore
+import com.cycling.rssradar.data.store.ReadingRenderer
+import com.cycling.rssradar.data.store.ReadingRendererState
+import com.cycling.rssradar.data.store.ReadingImageState
+import com.cycling.rssradar.data.store.ReadingImageStore
+import com.cycling.rssradar.data.store.ReadingRendererStore
 import com.cycling.rssradar.data.store.ReadingStyleState
 import com.cycling.rssradar.data.store.ReadingStyleStore
+import com.cycling.rssradar.data.store.TranslationDisplayState
+import com.cycling.rssradar.data.store.TranslationDisplayStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -43,13 +50,26 @@ sealed interface AiSummaryState {
 }
 
 /**
- * 替换式翻译状态（CONTEXT.md「AI 翻译」）。
- * Shown 持有译文 HTML；切回原文（None）不清缓存，再次 Toggle 立即免费恢复。
+ * 翻译显示状态（渐进式翻译，翻译功能 v2）。
+ * - Progressing：分段翻译中，segments 随完成度增长；未完成段 translatedHtml = null，
+ *   UI 渲染原文淡显——翻译进行中即可读已完成部分。
+ * - Shown：全部分段完成。切回原文（None）不清缓存，再次 Toggle 缓存秒出。
+ * - Failed：网络/Key 失败；进行到一半失败时已完成段不保留（下次重译）。
  */
+data class TranslationSegmentUi(
+    val originalHtml: String,
+    val translatedHtml: String?,
+)
+
 sealed interface TranslationState {
     data object None : TranslationState
-    data object Generating : TranslationState
-    data class Shown(val html: String) : TranslationState
+    data class Progressing(val segments: List<TranslationSegmentUi>) : TranslationState {
+        val doneCount: Int get() = segments.count { it.translatedHtml != null }
+        val total: Int get() = segments.size
+    }
+
+    data class Shown(val segments: List<TranslationSegmentUi>) : TranslationState
+
     data class Failed(val message: String) : TranslationState
 }
 
@@ -61,6 +81,9 @@ class ArticleDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: FeedRepository,
     private val readingStyleStore: ReadingStyleStore,
+    private val readingImageStore: ReadingImageStore,
+    private val readingRendererStore: ReadingRendererStore,
+    private val translationDisplayStore: TranslationDisplayStore,
     private val aiRepository: AiRepository,
     private val aiStore: AiStore,
 ) : ViewModel(), MviViewModel<ArticleDetailIntent> {
@@ -99,6 +122,36 @@ class ArticleDetailViewModel @Inject constructor(
         readingStyleStore.update(transform)
     }
 
+    /**
+     * 正文渲染器选择（原生双渲染器，ADR-0009）。与阅读排版同模式：VM 仅暴露状态与
+     * 写方法，数据源与主题宿主注入的 LocalReadingRenderer 是同一份 Store。
+     */
+    val readingRenderer: StateFlow<ReadingRendererState> = readingRendererStore.state
+
+    fun setRenderer(renderer: ReadingRenderer) {
+        readingRendererStore.set(renderer)
+    }
+
+    /**
+     * 阅读页图片偏好（圆角 / 点击放大，issue #60）。与阅读排版同模式：
+     * VM 只暴露状态与写方法，数据源与主题宿主注入的 LocalReadingImage 是同一份 Store。
+     */
+    val readingImage: StateFlow<ReadingImageState> = readingImageStore.state
+
+    fun updateReadingImage(transform: (ReadingImageState) -> ReadingImageState) {
+        readingImageStore.update(transform)
+    }
+
+    /**
+     * 译文显示偏好（纯译文/双语、上下/左右）。与阅读排版同模式：VM 只暴露状态与
+     * 写方法，数据源与主题宿主注入的 LocalTranslationDisplay 是同一份 Store。
+     */
+    val translationDisplay: StateFlow<TranslationDisplayState> = translationDisplayStore.state
+
+    fun updateTranslationDisplay(state: TranslationDisplayState) {
+        translationDisplayStore.update { state }
+    }
+
     init {
         // articleId 来自 nav args（类型安全路由写入 SavedStateHandle，issue #32）。
         // 进程重建时 NavController 恢复 back stack 并重放 args，本 init 重新触发 → 当前文章不丢。
@@ -113,7 +166,10 @@ class ArticleDetailViewModel @Inject constructor(
         val isNewArticle = articleId != currentArticleId
         currentArticleId = articleId
         if (isNewArticle) {
-            // 译文/摘要缓存都按文章 id 键控，换文章必须清过程状态，否则旧译文会顶在新文章上
+            // 译文/摘要缓存都按文章 id 键控，换文章必须清过程状态并取消进行中的翻译，
+            // 否则旧译文/旧进度会顶在新文章上
+            translationJob?.cancel()
+            translationJob = null
             _translationState.value = TranslationState.None
             _aiSummaryState.value = AiSummaryState.Idle
         }
@@ -183,41 +239,48 @@ class ArticleDetailViewModel @Inject constructor(
         }
     }
 
-    /** 翻译开/关：Shown → 切回原文（缓存保留）；None/Failed → 发起翻译。 */
+    /** 翻译开/关：Shown → 切回原文并取消进行中的翻译（None，缓存保留）；None/Failed → 发起翻译。 */
     private fun toggleTranslation() {
         when (val state = _translationState.value) {
             is TranslationState.Shown -> _translationState.value = TranslationState.None
-            is TranslationState.Generating -> return
-            is TranslationState.Failed, TranslationState.None -> {
-                // 失败后缓存里可能有旧译文（重译失败不清旧缓存），优先免费恢复
-                aiRepository.cachedTranslation(currentArticleId)?.let { cached ->
-                    if (state is TranslationState.None) {
-                        _translationState.value = TranslationState.Shown(cached)
-                        return
-                    }
-                }
-                startTranslation()
+            is TranslationState.Progressing -> {
+                translationJob?.cancel()
+                translationJob = null
+                _translationState.value = TranslationState.None
             }
+            is TranslationState.Failed, TranslationState.None -> startTranslation()
         }
     }
 
-    /** 清缓存重译（重译按钮）。 */
+    /** 清缓存重译（重译按钮）。进行中不可重译。 */
     private fun retranslate() {
-        if (_translationState.value is TranslationState.Generating) return
+        if (_translationState.value is TranslationState.Progressing) return
         aiRepository.clearTranslationCache(currentArticleId)
         startTranslation()
     }
+
+    private var translationJob: Job? = null
 
     private fun startTranslation() {
         if (!aiStore.hasKey()) {
             _translationState.value = TranslationState.Failed("未配置 API Key，请到「我的」页设置 DeepSeek Key")
             return
         }
-        viewModelScope.launch {
-            _translationState.value = TranslationState.Generating
-            when (val outcome = aiRepository.translate(currentArticleId)) {
+        translationJob?.cancel()
+        translationJob = viewModelScope.launch {
+            _translationState.value = TranslationState.Progressing(emptyList())
+            when (val outcome = aiRepository.translate(currentArticleId) { progress ->
+                // 渐进回调：每翻完一段推一版；缓存命中时首帧即全量
+                _translationState.value = TranslationState.Progressing(
+                    progress.originals.mapIndexed { i, original ->
+                        TranslationSegmentUi(originalHtml = original, translatedHtml = progress.translated[i])
+                    },
+                )
+            }) {
                 is AiRepository.TranslationOutcome.Success ->
-                    _translationState.value = TranslationState.Shown(outcome.html)
+                    (_translationState.value as? TranslationState.Progressing)?.let {
+                        _translationState.value = TranslationState.Shown(it.segments)
+                    }
                 is AiRepository.TranslationOutcome.AlreadyChinese ->
                     _translationState.value = TranslationState.Failed("原文已是中文，无需翻译")
                 is AiRepository.TranslationOutcome.Failure ->

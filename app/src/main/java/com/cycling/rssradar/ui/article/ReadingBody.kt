@@ -9,6 +9,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.toArgb
@@ -46,20 +48,28 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.cycling.rssradar.data.db.ArticleWithFeed
+import com.cycling.rssradar.data.store.BilingualLayout
 import com.cycling.rssradar.data.store.ReadingFontFamily
+import com.cycling.rssradar.data.store.ReadingRenderer
 import com.cycling.rssradar.data.store.ReadingStyleState
+import com.cycling.rssradar.data.store.TranslationDisplayState
+import com.cycling.rssradar.data.store.TranslationViewMode
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.components.openUrl
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.Link
+import com.cycling.rssradar.ui.theme.LocalReadingImage
+import com.cycling.rssradar.ui.theme.LocalReadingRenderer
 import com.cycling.rssradar.ui.theme.LocalReadingStyle
+import com.cycling.rssradar.ui.theme.LocalTranslationDisplay
 import com.cycling.rssradar.ui.theme.OnAccent
 import com.cycling.rssradar.ui.theme.Surface1
 import com.cycling.rssradar.ui.theme.Surface2
 import com.cycling.rssradar.ui.theme.TextPrimary
 import com.cycling.rssradar.ui.theme.TextSecondary
 import com.cycling.rssradar.ui.theme.TextTertiary
+import com.composables.icons.lucide.CircleAlert
 import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
@@ -91,20 +101,64 @@ internal fun ReadingBody(
     onGenerateSummary: () -> Unit,
     onRetranslate: () -> Unit,
     onShowOriginal: () -> Unit,
+    /** 译文显示偏好（纯译文/双语、上下/左右）变化出口，VM 写回持久化 Store。 */
+    onTranslationDisplayChange: (TranslationDisplayState) -> Unit,
+    /**
+     * 正文图片点击（ReadYou 差距表第 19 项）：收到的是图片地址，Screen 用它打开全屏查看页
+     * 并定位到对应那张。WebView 路走"img 包 a + 拦截 URL"，原生路走 Compose clickable，
+     * 两条路都收敛到这一个出口。
+     */
+    onImageClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // 水平边距不放在外层：正文 WebView 的边距由排版设置的 CSS padding 控制（issue #42），
     // 头部（源名/标题）保持固定 20dp 不随排版项变化。
-    val shownTranslation = translationState as? TranslationState.Shown
+    // 翻译激活（渐进中或已完成）时正文走 TranslationReader（原生分段渲染），
+    // 强制整页分支——视口折叠依赖 WebView 内部滚动，原生路驱动不了（与正文原生路同因）。
+    val translationUi = when (val state = translationState) {
+        is TranslationState.Progressing -> state
+        is TranslationState.Shown -> state
+        else -> null
+    }
+    val translationSegments: List<TranslationSegmentUi> = when (val state = translationState) {
+        is TranslationState.Progressing -> state.segments
+        is TranslationState.Shown -> state.segments
+        else -> emptyList()
+    }
     val bodyHtml: String? = when {
-        shownTranslation != null -> shownTranslation.html
+        translationUi != null -> null
         article.article.content != null -> article.article.content
         else -> null
+    }
+    // 原生渲染器（ADR-0009）：解析出的中间树非空才走 Compose。空树 = 解析一无所获或解析失败
+    // （ReadingNodes 会吞掉一切异常），此时自动回退 WebView——绝不把正文渲染成空白页。
+    // 解析只在 renderer 为 NATIVE 时做，WebView 路不付这份开销。
+    val renderer = LocalReadingRenderer.current.renderer
+    val nativeHtml = if (translationUi == null) article.article.content else null
+    val nativeNodes = remember(renderer, nativeHtml) {
+        if (renderer == ReadingRenderer.NATIVE && nativeHtml != null) ReadingNodes.parse(nativeHtml) else emptyList()
+    }
+    val useNative = nativeNodes.isNotEmpty()
+    // 译文分段全空（解析一无所获的怪 HTML）→ 回退 WebView 老路：显示已完成译文或原文。
+    val translationFallbackHtml = remember(translationSegments, article.article.content, article.article.summary) {
+        if (translationSegments.isNotEmpty() && translationSegments.all { seg ->
+                val html = seg.translatedHtml ?: seg.originalHtml
+                html.isBlank() || ReadingNodes.parse(html).isEmpty()
+            }
+        ) {
+            translationSegments.mapNotNull { it.translatedHtml }.joinToString("").ifBlank { null }
+                ?: (article.article.content ?: article.article.summary)
+        } else {
+            null
+        }
     }
     // OOM 防线（闪退诊断）：整页包高的 WebView 会被 Chromium 视为全部内容可见，
     // 有图文章的所有图片同时解码进 Java 堆，图多必 OOM（256MB 堆几十秒吃满）。
     // 混合模式：有图 → 视口渲染；纯文字 → 整页渲染，文字栅格内存可控。
-    val viewport = bodyHtml?.contains("<img", ignoreCase = true) == true
+    val viewport = translationUi == null &&
+        (if (useNative) false else bodyHtml?.contains("<img", ignoreCase = true) == true)
+    // 全屏查看页的多图列表与点击分流共用这一份；空串/无图正文 → 空集合，两条路都自动静默。
+    val imageUrls = remember(bodyHtml) { bodyHtml?.let { ReadingImages.extract(it) } ?: emptyList() }
 
     if (viewport) {
         Column(modifier = modifier.padding(vertical = 8.dp)) {
@@ -126,19 +180,24 @@ internal fun ReadingBody(
                     article = article,
                     aiSummaryState = aiSummaryState,
                     onGenerateSummary = onGenerateSummary,
-                    shownTranslation = shownTranslation,
+                    translationUi = null,
                     onRetranslate = onRetranslate,
                     onShowOriginal = onShowOriginal,
+                    onTranslationDisplayChange = onTranslationDisplayChange,
                     onTitleMeasured = onTitleMeasured,
                 )
             }
             BodyContent(
                 article = article,
                 isFetchingContent = isFetchingContent,
-                shownTranslation = shownTranslation,
-                translationState = translationState,
+                translationActive = false,
+                translationSegments = emptyList(),
+                translationFallbackHtml = null,
+                nativeNodes = nativeNodes,
                 viewport = true,
+                imageUrls = imageUrls,
                 onHeaderScroll = onHeaderScroll,
+                onImageClick = onImageClick,
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.height(12.dp)) // 避让底部操作栏
@@ -154,18 +213,28 @@ internal fun ReadingBody(
                 article = article,
                 aiSummaryState = aiSummaryState,
                 onGenerateSummary = onGenerateSummary,
-                shownTranslation = shownTranslation,
+                translationUi = translationUi,
                 onRetranslate = onRetranslate,
                 onShowOriginal = onShowOriginal,
+                onTranslationDisplayChange = onTranslationDisplayChange,
                 onTitleMeasured = onTitleMeasured,
             )
+            // 正文不完整提示（ADR-0012）：抓到了内容但没过完整性校验（过短/无段落/JS 渲染/
+            // 付费墙）。如实告知，不假装这就是全文，也不静默给个空白页。
+            if (article.article.contentIncomplete && translationUi == null) {
+                IncompleteContentBanner(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+            }
             BodyContent(
                 article = article,
                 isFetchingContent = isFetchingContent,
-                shownTranslation = shownTranslation,
-                translationState = translationState,
+                translationActive = translationUi != null,
+                translationSegments = translationSegments,
+                translationFallbackHtml = translationFallbackHtml,
+                nativeNodes = nativeNodes,
                 viewport = false,
+                imageUrls = imageUrls,
                 onHeaderScroll = onHeaderScroll,
+                onImageClick = onImageClick,
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(12.dp)) // 避让底部操作栏
@@ -181,25 +250,50 @@ internal fun ReadingBody(
 private fun BodyContent(
     article: ArticleWithFeed,
     isFetchingContent: Boolean,
-    shownTranslation: TranslationState.Shown?,
-    translationState: TranslationState,
+    /** 翻译激活（渐进中或已完成）。 */
+    translationActive: Boolean,
+    translationSegments: List<TranslationSegmentUi>,
+    translationFallbackHtml: String?,
+    nativeNodes: List<ReadingNode>,
     viewport: Boolean,
+    imageUrls: List<String>,
     onHeaderScroll: (Int) -> Unit,
+    onImageClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     when {
-        translationState is TranslationState.Generating ->
-            TranslatingPlaceholder(modifier)
-        shownTranslation != null -> ArticleWebView(
-            html = shownTranslation.html,
+        // 渐进/已完成的译文：原生分段渲染（渐进显示 + 双语对照，翻译功能 v2）
+        translationActive && translationFallbackHtml == null ->
+            TranslationReader(
+                segments = translationSegments,                onLinkClick = { context.openUrl(it) },
+                onImageClick = onImageClick,
+                modifier = modifier.fillMaxWidth(),
+            )
+        // 译文分段解析全空的兜底：整页 WebView 显示已完成译文（或原文）
+        translationFallbackHtml != null -> ArticleWebView(
+            html = translationFallbackHtml,
+            imageUrls = imageUrls,
             passThroughTouch = !viewport,
             onScroll = if (viewport) onHeaderScroll else null,
+            onImageClick = onImageClick,
             modifier = modifier.fillMaxWidth(),
         )
+        // 原生渲染器（ADR-0009）：中间树非空即走 Compose
+        nativeNodes.isNotEmpty() -> {
+            ArticleNativeReader(
+                nodes = nativeNodes,
+                onLinkClick = { context.openUrl(it) },
+                onImageClick = onImageClick,
+                modifier = modifier.fillMaxWidth(),
+            )
+        }
         article.article.content != null -> ArticleWebView(
             html = article.article.content!!,
+            imageUrls = imageUrls,
             passThroughTouch = !viewport,
             onScroll = if (viewport) onHeaderScroll else null,
+            onImageClick = onImageClick,
             modifier = modifier.fillMaxWidth(),
         )
         else -> NoContentBody(
@@ -220,9 +314,11 @@ private fun ArticleHeader(
     article: ArticleWithFeed,
     aiSummaryState: AiSummaryState,
     onGenerateSummary: () -> Unit,
-    shownTranslation: TranslationState.Shown?,
+    /** 翻译过程态：Progressing / Shown 时显示译文横幅，其余 null 不显示。 */
+    translationUi: TranslationState?,
     onRetranslate: () -> Unit,
     onShowOriginal: () -> Unit,
+    onTranslationDisplayChange: (TranslationDisplayState) -> Unit,
     onTitleMeasured: (Int) -> Unit,
 ) {
     Row(
@@ -279,36 +375,53 @@ private fun ArticleHeader(
 
     Spacer(Modifier.height(12.dp))
 
-    // AI 摘要常驻卡片（issue #44，ADR-0005）：无摘要给按钮，生成中 loading，有摘要显示内容
-    AiSummaryCard(
-        summary = article.article.aiSummary,
-        state = aiSummaryState,
-        onGenerate = onGenerateSummary,
-    )
-    Spacer(Modifier.height(12.dp))
+    // AI 摘要卡片：仅在有摘要或生成失败（需告知原因并可重试）时显示；
+    // 空态/生成中不放卡片（用户反馈：未生成时不要占阅读空间，生成入口移到顶栏 Sparkles）。
+    val showAiSummaryCard = article.article.aiSummary != null || aiSummaryState is AiSummaryState.Failed
+    if (showAiSummaryCard) {
+        AiSummaryCard(
+            summary = article.article.aiSummary,
+            state = aiSummaryState,
+            onGenerate = onGenerateSummary,
+        )
+        Spacer(Modifier.height(12.dp))
+    }
 
-    if (shownTranslation != null) {
+    if (translationUi != null) {
         TranslationBanner(
+            state = translationUi,
             onRetranslate = onRetranslate,
             onShowOriginal = onShowOriginal,
+            onDisplayChange = onTranslationDisplayChange,
         )
         Spacer(Modifier.height(4.dp))
     }
 }
 
-/** 翻译生成中的占位。视口模式撑满剩余空间，整页模式固定高度居中。 */
+/** 无正文分支的兜底提示：正文被判「不完整」时挂在头部下方（ADR-0012）。 */
 @Composable
-private fun TranslatingPlaceholder(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(180.dp),
-        contentAlignment = Alignment.Center,
+private fun IncompleteContentBanner(modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = Surface2,
+        modifier = modifier.fillMaxWidth(),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color = Accent, strokeWidth = 2.dp)
-            Spacer(Modifier.height(10.dp))
-            Text("正在翻译…", color = TextTertiary, style = MaterialTheme.typography.labelMedium)
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Lucide.CircleAlert,
+                contentDescription = null,
+                tint = TextTertiary,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "正文可能不完整（站点限制或动态加载），可查看原文",
+                color = TextTertiary,
+                style = MaterialTheme.typography.labelMedium,
+            )
         }
     }
 }
@@ -405,12 +518,20 @@ private fun AiSummaryCard(
     }
 }
 
-/** 译文状态条（issue #44）：标明当前显示 AI 译文，提供重译与切回原文。 */
+/**
+ * 译文状态条（翻译功能 v2）：渐进中显示「翻译中 x/y 段」+ 转圈；完成后提供
+ * 双语/纯译文切换、上下/左右排布切换（双语时）、重译与切回原文。
+ * 显示偏好经 [onDisplayChange] 写回持久化 Store（用户级偏好，记住上次选择）。
+ */
 @Composable
 private fun TranslationBanner(
+    state: TranslationState,
     onRetranslate: () -> Unit,
     onShowOriginal: () -> Unit,
+    onDisplayChange: (TranslationDisplayState) -> Unit,
 ) {
+    val display = LocalTranslationDisplay.current
+    val progressing = state is TranslationState.Progressing
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -420,15 +541,65 @@ private fun TranslationBanner(
         Icon(Lucide.Languages, contentDescription = null, tint = Accent, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(6.dp))
         Text(
-            text = "AI 译文（DeepSeek）",
+            text = if (progressing) {
+                "翻译中 ${(state as TranslationState.Progressing).doneCount}/${state.total} 段"
+            } else {
+                "AI 译文（DeepSeek）"
+            },
             color = TextTertiary,
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.weight(1f),
         )
-        TextButton(onClick = onRetranslate) {
-            Text("重新翻译", color = Accent, style = MaterialTheme.typography.labelMedium)
+        if (progressing) {
+            CircularProgressIndicator(color = Accent, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+        } else {
+            TextButton(
+                onClick = {
+                    onDisplayChange(
+                        display.copy(
+                            viewMode = if (display.viewMode == TranslationViewMode.TRANSLATION_ONLY) {
+                                TranslationViewMode.BILINGUAL
+                            } else {
+                                TranslationViewMode.TRANSLATION_ONLY
+                            },
+                        ),
+                    )
+                },
+                contentPadding = PaddingValues(horizontal = 8.dp),
+            ) {
+                Text(
+                    text = if (display.viewMode == TranslationViewMode.TRANSLATION_ONLY) "双语" else "纯译文",
+                    color = Accent,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+            if (display.viewMode == TranslationViewMode.BILINGUAL) {
+                TextButton(
+                    onClick = {
+                        onDisplayChange(
+                            display.copy(
+                                bilingualLayout = if (display.bilingualLayout == BilingualLayout.STACKED) {
+                                    BilingualLayout.SIDE_BY_SIDE
+                                } else {
+                                    BilingualLayout.STACKED
+                                },
+                            ),
+                        )
+                    },
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                ) {
+                    Text(
+                        text = if (display.bilingualLayout == BilingualLayout.STACKED) "左右" else "上下",
+                        color = Accent,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+            TextButton(onClick = onRetranslate, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                Text("重新翻译", color = Accent, style = MaterialTheme.typography.labelMedium)
+            }
         }
-        TextButton(onClick = onShowOriginal) {
+        TextButton(onClick = onShowOriginal, contentPadding = PaddingValues(horizontal = 8.dp)) {
             Text("切回原文", color = TextSecondary, style = MaterialTheme.typography.labelMedium)
         }
     }
@@ -444,10 +615,17 @@ private fun TranslationBanner(
  * WebView 必须自己消费触摸才能滚动。
  *
  * [onScroll]：视口模式头部折叠用，回调 WebView 内部滚动量（px）。
+ *
+ * [imageUrls]：本文图片地址（[ReadingImages.extract] 的结果）。"点击放大"开启时，
+ * build 阶段会把 <img> 包成指向自身的 <a class="img-link">，于是点击图片和点击链接
+ * 走同一条 shouldOverrideUrlLoading 通道——地址命中本集合就交给 [onImageClick]
+ * （全屏查看），否则照旧开浏览器。**全程不开 JS**（ADR-0007 不动，详见 ADR-0011）。
  */
 @Composable
 private fun ArticleWebView(
     html: String,
+    imageUrls: List<String>,
+    onImageClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     passThroughTouch: Boolean = true,
     onScroll: ((Int) -> Unit)? = null,
@@ -460,11 +638,31 @@ private fun ArticleWebView(
     val border = toCssColor(Surface1)
     val link = toCssColor(Link)
     val style = LocalReadingStyle.current
-    val styledHtml = remember(html, style, bg, fg, muted, codeBg, border, link) {
-        ReadingContentHtml.build(html, style, bg, fg, muted, codeBg, border, link)
+    val image = LocalReadingImage.current
+    // 关闭"点击放大"就传空集合：正文不包链接，图片点击在 WebView 里自然无反应。
+    val linkedImages = if (image.maximizeOnTap) imageUrls.toSet() else emptySet()
+    val styledHtml = remember(html, style, image, linkedImages, bg, fg, muted, codeBg, border, link) {
+        ReadingContentHtml.build(
+            contentHtml = html,
+            style = style,
+            bg = bg,
+            fg = fg,
+            muted = muted,
+            codeBg = codeBg,
+            border = border,
+            link = link,
+            imageUrls = linkedImages,
+            imageCorners = image.cornerRadius,
+        )
     }
     // factory 只跑一次，回调经 updated 引用保持最新
     val currentOnScroll by rememberUpdatedState(onScroll)
+    val currentOnImageClick by rememberUpdatedState(onImageClick)
+    val currentImageUrls by rememberUpdatedState(linkedImages)
+    // 闪烁修复（用户反馈）：AndroidView 的 update 在每次父重组时都会跑，而 ArticleWebView
+    // 的父（ReadingBody）会因顶栏 showTitle 翻转而重组 → 不加守卫就会每帧 reload 整页 HTML。
+    // 用非 State 容器记住"已加载的 HTML 串"，只有内容真变才 reload。
+    val lastLoaded = remember { arrayOf<String?>(null) }
     AndroidView(
         factory = { context ->
             object : WebView(context) {
@@ -486,8 +684,13 @@ private fun ArticleWebView(
                         view: WebView,
                         request: WebResourceRequest,
                     ): Boolean {
+                        val url = request.url.toString()
+                        if (url in currentImageUrls) {
+                            currentOnImageClick(url)
+                            return true
+                        }
                         if (request.url.scheme == "http" || request.url.scheme == "https") {
-                            context.openUrl(request.url.toString())
+                            context.openUrl(url)
                         }
                         return true
                     }
@@ -495,7 +698,10 @@ private fun ArticleWebView(
             }
         },
         update = { webView ->
-            webView.loadDataWithBaseURL(null, styledHtml, "text/html", "utf-8", null)
+            if (lastLoaded[0] != styledHtml) {
+                webView.loadDataWithBaseURL(null, styledHtml, "text/html", "utf-8", null)
+                lastLoaded[0] = styledHtml
+            }
         },
         modifier = modifier,
     )

@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -93,6 +94,28 @@ internal fun ArticleNativeReader(
     modifier: Modifier = Modifier,
 ) {
     val style = LocalReadingStyle.current
+    NativeNodesColumn(
+        nodes = nodes,
+        onLinkClick = onLinkClick,
+        onImageClick = onImageClick,
+        modifier = modifier.padding(horizontal = style.horizontalPadding.dp),
+    )
+}
+
+/**
+ * 无自身边距的节点列渲染：供 [ArticleNativeReader] 与译文渲染区（TranslationReader，
+ * 渐进/双语需要按段自由组合、外层统一控制边距与透明度）复用。
+ * [dimmed] 整列压暗（graphicsLayer alpha），双语对照里原文列用它和译文区分层级。
+ */
+@Composable
+internal fun NativeNodesColumn(
+    nodes: List<ReadingNode>,
+    onLinkClick: (String) -> Unit,
+    onImageClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    dimmed: Boolean = false,
+) {
+    val style = LocalReadingStyle.current
     val image = LocalReadingImage.current
     // 链接点击统一走 LocalUriHandler：AnnotatedString 里的 LinkAnnotation.Url 默认由它打开，
     // 换成 onLinkClick 即改即生效，且不依赖 LinkInteractionListener 这种版本敏感 API。
@@ -101,12 +124,13 @@ internal fun ArticleNativeReader(
             override fun openUri(uri: String) = onLinkClick(uri)
         }
     }
+    val alpha = if (dimmed) 0.62f else 1f
 
     CompositionLocalProvider(LocalUriHandler provides handler) {
         Column(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = style.horizontalPadding.dp),
+                .graphicsLayer { this.alpha = alpha },
         ) {
             nodes.forEach { node -> RenderNode(node, style, image, onLinkClick, onImageClick) }
         }

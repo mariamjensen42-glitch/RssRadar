@@ -1,0 +1,774 @@
+<!doctype html>
+<!--
+  PROTOTYPE — NOT PRODUCTION CODE.  Throwaway.
+  Question: 以 RSSHub 为核心的 RSS 阅读器，主界面该长什么样？
+            —— 具体说：RSSHub 的「路由发现 + 参数构建」应该占据主屏，还是藏在信息流背后的入口？
+  Variants (three structurally different answers):
+    A 路由市场优先     — 首屏就是 RSSHub 路由目录，信息流是第二个 tab
+    B 信息流优先+抽屉  — 首屏是信息流，RSSHub 从 FAB 底部抽屉进入
+    C 智能输入+瀑布流  — 顶部万能输入条解析任意链接/平台词，阅读与构建同屏
+  Switch: ?variant=A|B|C · ← → 方向键 · 底部悬浮条
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RssRadar · 原型 (prototype)</title>
+<style>
+  :root{
+    --bg-root:#000000; --surface1:#1C1C1E; --surface2:#2C2C2E; --surface3:#3A3A3C;
+    --accent:#7B7CFF; --link:#9B9CFF; --hub:#FF6B00;
+    --t1:#FFFFFF; --t2:#B0B0B6; --t3:#7E7E86; --divider:#2A2A2D;
+    --ok:#34D399; --warn:#FBBF24;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    background:#0d0d0f; color:var(--t2);
+    font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",Roboto,sans-serif;
+    display:flex; align-items:center; justify-content:center; gap:28px; padding:28px;
+  }
+  .stage{display:flex; align-items:flex-start; gap:28px}
+
+  /* ---- phone shell ---- */
+  .phone{
+    width:393px; height:852px; flex:0 0 auto;
+    background:var(--bg-root); border-radius:42px;
+    border:1px solid #2a2a2e; box-shadow:0 30px 80px rgba(0,0,0,.7);
+    overflow:hidden; position:relative; display:flex; flex-direction:column;
+  }
+  .statusbar{
+    height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between;
+    padding:0 22px; font-size:12px; font-weight:600; color:var(--t1); letter-spacing:.3px;
+  }
+  .statusbar .dots{display:flex;gap:4px;align-items:center}
+  .statusbar .dots i{width:4px;height:9px;background:var(--t1);border-radius:1px;display:block;opacity:.9}
+  #screen{flex:1 1 auto; overflow:hidden; display:flex; flex-direction:column; position:relative}
+
+  /* ---- generic atoms ---- */
+  .row{display:flex;align-items:center}
+  .between{justify-content:space-between}
+  .gap4{gap:4px}.gap6{gap:6px}.gap8{gap:8px}.gap10{gap:10px}.gap12{gap:12px}
+  .grow{flex:1 1 auto;min-width:0}
+  .ellip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .t1{color:var(--t1)}.t3{color:var(--t3)}
+  .sv{width:18px;height:18px;display:block}
+  .sv-s{width:15px;height:15px;display:block}
+  svg{stroke-linecap:round;stroke-linejoin:round}
+
+  .searchbar{
+    background:var(--surface1); border-radius:12px; height:40px; padding:0 12px;
+    display:flex; align-items:center; gap:8px; color:var(--t3);
+  }
+  .searchbar input{
+    background:none;border:none;outline:none;color:var(--t1);font-size:14px;flex:1;font-family:inherit;
+  }
+  .searchbar input::placeholder{color:var(--t3)}
+
+  .chip{
+    background:var(--surface1); color:var(--t2); border-radius:999px; padding:7px 13px;
+    font-size:12.5px; white-space:nowrap; cursor:pointer; border:1px solid transparent;
+  }
+  .chip.on{background:var(--accent); color:#fff; font-weight:600}
+  .chip.ghost{border-color:var(--surface3);background:transparent}
+
+  .btn{
+    background:var(--accent); color:#fff; border:none; border-radius:12px; height:48px;
+    font-size:15px; font-weight:600; width:100%; cursor:pointer; font-family:inherit;
+    display:flex;align-items:center;justify-content:center;gap:7px;
+  }
+  .btn.ghost{background:var(--surface2);color:var(--t1)}
+  .btn.hub{background:var(--hub)}
+  .btn:disabled{background:var(--surface2);color:var(--t3)}
+
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12.5px;color:var(--t3);margin-bottom:6px}
+  .field label b{color:var(--t2);font-weight:600}
+  .field input{
+    width:100%;height:46px;background:var(--surface1);border:1px solid var(--surface3);
+    border-radius:12px;padding:0 13px;color:var(--t1);font-size:14px;outline:none;font-family:inherit;
+  }
+  .field input:focus{border-color:var(--accent)}
+  .field .hint{font-size:11.5px;color:var(--t3);margin-top:5px}
+
+  .code{
+    background:#111114;border:1px solid var(--surface3);border-radius:10px;padding:10px 12px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;
+    color:var(--link);word-break:break-all;line-height:1.5;
+  }
+  .code .host{color:var(--hub)}
+
+  .src{
+    width:22px;height:22px;border-radius:6px;flex:0 0 auto;display:flex;align-items:center;
+    justify-content:center;font-size:11px;font-weight:800;color:#fff;
+  }
+  .thumb{border-radius:10px;background:linear-gradient(135deg,#2b2b30,#3d3d44)}
+
+  /* ---- bottom navs ---- */
+  .navbar{
+    flex:0 0 auto;display:flex;border-top:1px solid var(--divider);background:#0a0a0c;
+    padding:8px 0 14px;
+  }
+  .navbar .item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;color:var(--t3);cursor:pointer}
+  .navbar .item.on{color:var(--accent)}
+
+  .fab{
+    position:absolute;right:20px;bottom:88px;width:56px;height:56px;border-radius:18px;
+    background:var(--accent);display:flex;align-items:center;justify-content:center;
+    box-shadow:0 8px 22px rgba(123,124,255,.45);cursor:pointer;z-index:5;
+  }
+
+  /* ---- sheet ---- */
+  .scrim{position:absolute;inset:0;background:rgba(0,0,0,.6);z-index:8}
+  .sheet{
+    position:absolute;left:0;right:0;bottom:0;z-index:9;
+    background:#111114;border-radius:22px 22px 0 0;border-top:1px solid var(--surface3);
+    padding:8px 0 0;max-height:78%;display:flex;flex-direction:column;
+  }
+  .sheet .grab{width:36px;height:4px;background:var(--surface3);border-radius:2px;margin:4px auto 10px}
+  .sheet-body{overflow:auto;padding:0 18px 18px}
+
+  /* ---- switcher ---- */
+  .switcher{
+    position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
+    display:flex;align-items:center;gap:2px;background:#1a1a1f;
+    border:1px solid #34343a;border-radius:999px;padding:5px;
+    box-shadow:0 10px 30px rgba(0,0,0,.7);z-index:99;font-size:13px;
+  }
+  .switcher button{
+    background:none;border:none;color:#c9c9d1;cursor:pointer;padding:6px 9px;border-radius:999px;
+    display:flex;align-items:center;
+  }
+  .switcher button:hover{background:#2a2a31;color:#fff}
+  .switcher .lbl{padding:0 10px;color:#fff;font-weight:600;min-width:190px;text-align:center}
+  .switcher .lbl small{display:block;font-weight:400;color:#8b8b96;font-size:11px}
+  .switcher .tag{
+    background:#FF6B00;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;margin-right:6px;
+  }
+
+  /* ---- state panel ---- */
+  .panel{
+    width:340px;flex:0 0 auto;align-self:stretch;display:flex;flex-direction:column;gap:12px;
+  }
+  .panel h3{margin:0;font-size:12px;color:#6f6f7a;letter-spacing:1.4px;text-transform:uppercase}
+  .panel .card{
+    background:#121215;border:1px solid #26262b;border-radius:14px;padding:14px 16px;
+  }
+  .panel .q{font-size:14px;color:#e6e6ea;line-height:1.6}
+  .panel .q em{color:#FF6B00;font-style:normal;font-weight:600}
+  .panel pre{
+    margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:11.5px;line-height:1.6;color:#9ef;white-space:pre-wrap;word-break:break-word;
+    max-height:330px;overflow:auto;
+  }
+  .panel .desc{font-size:12.5px;color:#8b8b96;line-height:1.6}
+  .panel .desc b{color:#d5d5db}
+  .verdict{background:#1a1508;border-color:#4a3308}
+  .verdict ul{margin:8px 0 0;padding-left:18px;color:#c9c9d1;font-size:12.5px;line-height:1.7}
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="phone">
+    <div class="statusbar">
+      <span>14:32</span>
+      <div class="dots"><i></i><i></i><i></i><i></i></div>
+    </div>
+    <div id="screen"></div>
+  </div>
+
+  <div class="panel">
+    <h3>问题</h3>
+    <div class="card q">
+      以 <em>RSSHub</em> 为核心的阅读器：路由的<strong>发现与参数构建</strong>该占主屏，
+      还是该藏在信息流背后的入口里？
+    </div>
+    <h3>当前变体</h3>
+    <div class="card desc" id="variantDesc"></div>
+    <h3>State</h3>
+    <div class="card"><pre id="state"></pre></div>
+    <h3>怎么用</h3>
+    <div class="card desc">
+      <b>← →</b> 方向键切换变体，或点底部悬浮条。<br>
+      每个变体都能真的走一遍：选路由 → 填参数 → 生成 URL → 订阅。
+      URL 会带上 <b>?variant=</b>，可直接分享。
+    </div>
+  </div>
+</div>
+
+<div class="switcher">
+  <button data-nav="-1" title="上一个变体">
+    <svg class="sv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <div class="lbl" id="swLabel"></div>
+  <button data-nav="1" title="下一个变体">
+    <svg class="sv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+</div>
+
+<script>
+/* ============================ 图标 ============================ */
+const I = {
+  compass:'<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
+  rss:'<path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/>',
+  layers:'<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+  user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  plus:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  search:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  back:'<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+  check:'<polyline points="20 6 9 17 4 12"/>',
+  ext:'<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
+  mark:'<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
+  zap:'<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  clock:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  star:'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  globe:'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+  x:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  filter:'<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
+  arrowRight:'<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
+  sparkle:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
+  copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  tv:'<rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/>',
+};
+const ic = (n, cls, w) => `<svg class="${cls||'sv'}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w||1.8}">${I[n]||''}</svg>`;
+
+/* ============================ 数据（模拟 RSSHub 路由表） ============================ */
+const ROUTES = [
+  {id:'bili-dyn',  name:'B站 UP 主动态', cat:'视频', hot:1, subs:'12.4k', c:'#FB7299', g:'#FB7299',
+   path:'/bilibili/user/dynamic/:uid', params:[{k:'uid',label:'UP 主 UID',ph:'946974',ex:'946974'}]},
+  {id:'bili-video',name:'B站 视频投稿',  cat:'视频', hot:1, subs:'8.1k', c:'#FB7299', g:'#FB7299',
+   path:'/bilibili/user/video/:uid',   params:[{k:'uid',label:'UP 主 UID',ph:'946974',ex:'946974'}]},
+  {id:'weibo',     name:'微博 用户时间线',cat:'社交', hot:1, subs:'23.0k', c:'#E6162D', g:'#E6162D',
+   path:'/weibo/user/:uid',            params:[{k:'uid',label:'用户 UID',ph:'1669879400',ex:'1669879400'}]},
+  {id:'zhihu-day', name:'知乎日报',      cat:'资讯', hot:0, subs:'31.2k', c:'#0084FF', g:'#0084FF',
+   path:'/zhihu/daily',                 params:[]},
+  {id:'zhihu-col', name:'知乎 收藏夹',   cat:'资讯', hot:0, subs:'4.6k', c:'#0084FF', g:'#0084FF',
+   path:'/zhihu/collection/:id',        params:[{k:'id',label:'收藏夹 ID',ph:'26459656',ex:'26459656'}]},
+  {id:'gh-rel',    name:'GitHub Releases',cat:'技术',hot:1, subs:'18.9k', c:'#C9D1D9', g:'#C9D1D9',
+   path:'/github/repos/:owner/:repo/releases', params:[{k:'owner',label:'Owner',ph:'JetBrains',ex:'JetBrains'},{k:'repo',label:'Repo',ph:'kotlin',ex:'kotlin'}]},
+  {id:'gh-trend',  name:'GitHub Trending',cat:'技术',hot:0, subs:'9.3k', c:'#C9D1D9', g:'#C9D1D9',
+   path:'/github/trending/:since/:lang', params:[{k:'since',label:'Since',ph:'daily',ex:'daily'},{k:'lang',label:'Language',ph:'kotlin',ex:'kotlin'}]},
+  {id:'v2ex',      name:'V2EX 节点主题', cat:'技术', hot:0, subs:'6.7k', c:'#A3B615', g:'#A3B615',
+   path:'/v2ex/topics/:node',           params:[{k:'node',label:'节点名',ph:'programmer',ex:'programmer'}]},
+  {id:'sspai',     name:'少数派 最新',    cat:'资讯', hot:0, subs:'11.5k',c:'#D70A1C', g:'#D70A1C',
+   path:'/sspai/index',                 params:[]},
+  {id:'db-group',  name:'豆瓣小组',      cat:'社交', hot:0, subs:'3.2k', c:'#2E963B', g:'#2E963B',
+   path:'/douban/group/:id',            params:[{k:'id',label:'小组 ID',ph:'726094',ex:'726094'}]},
+  {id:'yt',        name:'YouTube 频道',  cat:'视频', hot:0, subs:'15.8k',c:'#FF0000', g:'#FF0000',
+   path:'/youtube/channel/:id',         params:[{k:'id',label:'Channel ID',ph:'UC...',ex:'UCF0pVplsI8R5kcAqgtoRqoA'}]},
+  {id:'tw',        name:'X / Twitter',   cat:'社交', hot:0, subs:'7.4k', c:'#7E7E86', g:'#7E7E86',
+   path:'/twitter/user/:id',            params:[{k:'id',label:'用户名',ph:'elonmusk',ex:'elonmusk'}]},
+  {id:'pixiv',     name:'Pixiv 排行榜',  cat:'图库', hot:0, subs:'5.1k', c:'#0096FA', g:'#0096FA',
+   path:'/pixiv/ranking/:mode',         params:[{k:'mode',label:'模式',ph:'daily',ex:'daily'}]},
+  {id:'hn',        name:'Hacker News',   cat:'技术', hot:0, subs:'8.8k', c:'#FF6600', g:'#FF6600',
+   path:'/hackernews/:section',         params:[{k:'section',label:'Section',ph:'front',ex:'front'}]},
+];
+const CATS = ['全部','视频','社交','技术','资讯','图库'];
+
+const FEEDS = [
+  {id:1, name:'影视飓风',      route:'bili-dyn',  c:'#FB7299', unread:12, tag:'视频'},
+  {id:2, name:'JetBrains/kotlin',route:'gh-rel', c:'#C9D1D9', unread:3,  tag:'技术'},
+  {id:3, name:'知乎日报',      route:'zhihu-day', c:'#0084FF', unread:41, tag:'资讯'},
+  {id:4, name:'少数派',        route:'sspai',    c:'#D70A1C', unread:8,  tag:'资讯'},
+  {id:5, name:'程序员 (V2EX)', route:'v2ex',     c:'#A3B615', unread:22, tag:'技术'},
+];
+
+const ARTICLES = [
+  {src:'影视飓风',    c:'#FB7299', t:'我们做了一台能拍 120fps 的国产相机', s:'从传感器选型到整机散热，这半年踩过的坑比想象中多得多。这期视频把整个过程完整拆开讲。', time:'12 分钟前', big:1},
+  {src:'少数派',      c:'#D70A1C', t:'把你的 RSS 阅读器接到 RSSHub 上',   s:'几乎任何网站都能变成 RSS。这篇文章手把手讲清楚实例搭建、路由查找和参数拼接。', time:'48 分钟前', big:0},
+  {src:'知乎日报',    c:'#0084FF', t:'为什么现在的手机越来越重？',        s:'影像模组、散热堆叠、电池密度三者互相挤压的结果，厂商在做的取舍比宣传页上写的复杂。', time:'2 小时前', big:1},
+  {src:'kotlin',      c:'#C9D1D9', t:'Kotlin 2.2.20 Released',            s:'K2 compiler improvements, better error messages, and faster incremental compilation.', time:'5 小时前', big:0},
+  {src:'V2EX',        c:'#A3B615', t:'独立开发者都怎么给自己做推广？',     s:'试过小红书、也试过 Product Hunt，最后发现最有效的还是长期写点东西。', time:'7 小时前', big:0},
+  {src:'影视飓风',    c:'#FB7299', t:'关于色彩管理，90% 的人都做错了',     s:'从 sRGB 到 Display P3，一个视频讲清楚色彩空间到底该怎么选。', time:'昨天', big:1},
+];
+
+const hub = 'https://rsshub.app';
+
+/* ============================ state ============================ */
+const S = {
+  variant:'A',
+  tab:'discover',       // A: discover|feed|subs|me
+  bTab:'feed',          // B
+  cTab:'all',           // C: all|discover
+  cat:'全部',
+  query:'',
+  route:null,           // 正在配置的 route id
+  params:{},            // {key: value}
+  url:null,             // 生成的 URL
+  preview:false,
+  sheet:null,           // B: null|'catalog'|'form'
+  subscribed:FEEDS.map(f=>f.id),
+  smart:'',
+  parsed:null,
+  toast:'',
+};
+const R = id => ROUTES.find(r=>r.id===id);
+
+function buildUrl(route, params){
+  if(!route) return null;
+  let p = route.path;
+  route.params.forEach(({k,ex})=>{ p = p.replace(':'+k, encodeURIComponent((params[k]||'').trim() || ex)); });
+  return hub + p;
+}
+function fillMissing(){
+  const r = R(S.route); if(!r) return;
+  r.params.forEach(({k,ex})=>{ if(S.params[k]===undefined) S.params[k]=ex; });
+}
+
+/* 智能解析输入：识别平台词 / 链接 → 路由 + 参数 */
+function parseSmart(q){
+  const raw=(q||'').trim(); if(!raw) return null;
+  const s=raw.toLowerCase();
+  const m = {
+    'bilibili.com':{id:'bili-dyn', grab:/space\.bilibili\.com\/(\d+)/, key:'uid'},
+    'b23.tv':{id:'bili-dyn', grab:/b23\.tv\/(\w+)/, key:'uid'},
+    'weibo.com':{id:'weibo', grab:/weibo\.com\/u?\/(\d+)/, key:'uid'},
+    'github.com':{id:'gh-rel', grab:/github\.com\/([\w.-]+)\/([\w.-]+)/, keys:['owner','repo']},
+    'v2ex.com':{id:'v2ex', grab:/v2ex\.com\/go\/(\w+)/, key:'node'},
+    'youtube.com':{id:'yt', grab:/channel\/([\w-]+)/, key:'id'},
+    'x.com':{id:'tw', grab:/x\.com\/(\w+)/, key:'id'},
+    'twitter.com':{id:'tw', grab:/(?:twitter|x)\.com\/(\w+)/, key:'id'},
+    'zhihu.com':{id:'zhihu-col', grab:/zhihu\.com\/collection\/(\d+)/, key:'id'},
+  };
+  for(const host in m){
+    if(!s.includes(host)) continue;
+    const cfg = m[host], r = R(cfg.id), got = raw.match(cfg.grab);
+    if(got && cfg.keys){ const out={}; cfg.keys.forEach((k,i)=>out[k]=got[i+1]||''); return {route:r, params:out, auto:true}; }
+    if(got && cfg.key)  return {route:r, params:{[cfg.key]:got[1]}, auto:true};
+    return {route:r, params:{}, auto:false};
+  }
+  const words = {bili:['bili','bilibili','b站','哔哩'], weibo:['weibo','微博'], github:['github','gh','仓库'],
+                 v2ex:['v2ex','节点'], zhihu:['知乎'], youtube:['youtube','yt','油管'], twitter:['twitter','x.com','推特']};
+  const map = {bili:'bili-dyn', weibo:'weibo', github:'gh-rel', v2ex:'v2ex', zhihu:'zhihu-col', youtube:'yt', twitter:'tw'};
+  for(const w in words){ if(words[w].some(t=>s.includes(t))) return {route:R(map[w]), params:{}, auto:false}; }
+  const byName = ROUTES.find(r=>s.includes(r.name.toLowerCase().split(' ')[0]));
+  if(byName) return {route:byName, params:{}, auto:false};
+  return null;
+}
+
+/* ============================ 共用片段 ============================ */
+const navItem = (key, label, icon, cur) =>
+  `<div class="navbar item ${cur===key?'on':''}" data-act="nav" data-key="${key}">
+     ${ic(icon,'sv',1.7)}<span>${label}</span></div>`;
+
+const previewBlock = () => {
+  const r = R(S.route), u = S.url; if(!r || !u) return '';
+  return `
+    <div class="code" style="margin-top:6px"><span class="host">${hub}</span>${u.slice(hub.length)}</div>
+    <div style="display:flex;align-items:center;gap:6px;margin:12px 0 8px">
+      ${ic('check','sv-s',2)}<span style="font-size:12.5px;color:var(--ok);font-weight:600">连通 · 抓到 3 条</span>
+      <span style="font-size:12px;color:var(--t3)">· 约 240ms</span>
+    </div>
+    ${[0,1,2].map(i=>`
+      <div class="row gap10" style="padding:9px 0;border-bottom:1px solid var(--divider)">
+        <div class="src" style="background:${r.c}">${r.name[0]}</div>
+        <div class="grow">
+          <div class="t1" style="font-size:13.5px;line-height:1.35">${['第 128 期：关于色彩管理的那些事','更新：新增对 K2 编译器的支持','【讨论】你最常用的信息源是什么？'][i]}</div>
+          <div class="t3" style="font-size:11.5px;margin-top:3px">${['2 小时前','昨天','3 天前'][i]}</div>
+        </div>
+      </div>`).join('')}`;
+};
+
+const feedList = () => ARTICLES.map((a,i)=>`
+  <div style="padding:14px 0;border-bottom:1px solid var(--divider)" data-act="open" data-i="${i}">
+    <div class="row gap8" style="margin-bottom:7px">
+      <div class="src" style="background:${a.c};width:20px;height:20px;font-size:10px">${a.src[0]}</div>
+      <span style="font-size:12px;color:var(--t2);font-weight:600">${a.src}</span>
+      <span class="t3" style="font-size:11.5px">· ${a.time}</span>
+      <div class="grow"></div>
+      <span style="color:var(--t3)">${ic('mark','sv-s',1.7)}</span>
+    </div>
+    <div class="row gap12">
+      <div class="grow">
+        <div class="t1" style="font-size:15px;font-weight:600;line-height:1.35">${a.t}</div>
+        <div class="t3" style="font-size:12.5px;line-height:1.5;margin-top:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${a.s}</div>
+      </div>
+      ${a.big?`<div class="thumb" style="width:76px;height:56px;flex:0 0 auto;background:linear-gradient(135deg,${a.c}44,${a.c}1a)"></div>`:''}
+    </div>
+  </div>`).join('');
+
+/* ============================ 变体 A：路由市场优先 ============================ */
+function renderA(){
+  // 路由详情页
+  if(S.route){
+    const r = R(S.route); fillMissing();
+    const u = buildUrl(r, S.params);
+    return `
+      <div style="padding:6px 18px 0" class="row gap10">
+        <div data-act="closeRoute" style="cursor:pointer;color:var(--t1)">${ic('back','sv',2)}</div>
+        <div class="grow t1" style="font-size:17px;font-weight:700">${r.name}</div>
+        <span style="font-size:11px;background:#2a1608;color:var(--hub);padding:4px 8px;border-radius:6px;font-weight:700">RSSHub</span>
+      </div>
+      <div style="padding:14px 18px 20px;overflow:auto;flex:1">
+        <div class="row gap8" style="margin-bottom:14px">
+          <span class="chip ghost" style="cursor:default">${r.cat}</span>
+          <span class="chip ghost" style="cursor:default">${r.subs} 人订阅</span>
+        </div>
+        <div class="code">${r.path}</div>
+        ${r.params.length?`<div style="height:18px"></div>
+          ${r.params.map(p=>`
+            <div class="field">
+              <label><b>${p.label}</b> · <span style="color:var(--t1)">:${p.k}</span></label>
+              <input data-param="${p.k}" value="${(S.params[p.k]||'')}" placeholder="${p.ph}">
+              <div class="hint">示例：${p.ex}</div>
+            </div>`).join('')}`
+          :`<div style="font-size:12.5px;color:var(--t3);margin-top:14px">此路由无需参数，直接订阅即可。</div>`}
+        <div style="height:8px"></div>
+        <button class="btn ghost" data-act="preview">${ic('zap','sv-s',2)} 生成并预览</button>
+        ${S.preview?`<div style="margin-top:16px">${previewBlock()}
+          <button class="btn" style="margin-top:16px" data-act="subscribe">
+            ${S.subscribed.includes(r.id)?ic('check','sv-s',2.2)+' 已订阅':ic('plus','sv-s',2.2)+' 订阅到「未分类」'}</button>
+          <button class="btn ghost" style="margin-top:10px;height:44px" data-act="copyUrl">${ic('copy','sv-s',1.8)} 复制 Feed 地址</button>
+        </div>`:''}
+        <div style="height:20px"></div>
+      </div>`;
+  }
+
+  const list = ROUTES.filter(r =>
+    (S.cat==='全部'||r.cat===S.cat) &&
+    (!S.query || (r.name+r.path).toLowerCase().includes(S.query.toLowerCase())));
+
+  if(S.tab==='feed') return `
+    <div style="padding:0 18px;height:48px" class="row between">
+      <div class="t1" style="font-size:24px;font-weight:800">信息流</div>
+      <span style="color:var(--t3)">${ic('filter','sv',1.9)}</span>
+    </div>
+    <div style="padding:10px 18px 0;flex:1;overflow:auto">${feedList()}<div style="height:20px"></div></div>
+    <div class="navbar">${navItem('discover','发现','compass',S.tab)}${navItem('feed','信息流','rss',S.tab)}${navItem('subs','订阅','layers',S.tab)}${navItem('me','我的','user',S.tab)}</div>`;
+
+  if(S.tab==='subs') return `
+    <div style="padding:0 18px 8px" class="row between">
+      <div class="t1" style="font-size:24px;font-weight:800">订阅</div>
+      <span style="color:var(--accent)">${ic('plus','sv',2)}</span>
+    </div>
+    <div style="padding:0 18px;flex:1;overflow:auto">
+      ${FEEDS.map(f=>`<div class="row gap12" style="padding:13px 0;border-bottom:1px solid var(--divider)">
+        <div class="src" style="background:${f.c};width:38px;height:38px;border-radius:10px;font-size:14px">${f.name[0]}</div>
+        <div class="grow">
+          <div class="t1" style="font-size:14.5px;font-weight:600" >${f.name}</div>
+          <div class="t3" style="font-size:11.5px;margin-top:3px">${R(f.route)?R(f.route).path:'/rss'} · ${f.tag}</div>
+        </div>
+        <div style="background:var(--surface2);color:var(--t2);font-size:11.5px;padding:4px 9px;border-radius:999px">${f.unread}</div>
+      </div>`).join('')}
+      <div style="height:20px"></div>
+    </div>
+    <div class="navbar">${navItem('discover','发现','compass',S.tab)}${navItem('feed','信息流','rss',S.tab)}${navItem('subs','订阅','layers',S.tab)}${navItem('me','我的','user',S.tab)}</div>`;
+
+  // 发现（默认）
+  return `
+    <div style="padding:2px 18px 10px">
+      <div class="row gap8" style="margin-bottom:3px">
+        <span style="color:var(--hub)">${ic('rss','sv-s',2.2)}</span>
+        <span style="font-size:11.5px;color:var(--hub);font-weight:700;letter-spacing:.6px">RSSHUB 路由</span>
+      </div>
+      <div class="t1" style="font-size:26px;font-weight:800;line-height:1.2">发现</div>
+      <div class="t3" style="font-size:12px;margin-top:4px">1,600+ 官方路由 · 实例 ${hub.replace('https://','')}</div>
+    </div>
+    <div style="padding:0 18px 12px">
+      <div class="searchbar">${ic('search','sv-s',2)}
+        <input data-in="query" value="${S.query}" placeholder="搜索路由，如 b站 / github / 日报"></div>
+    </div>
+    <div style="padding:0 18px 12px;display:flex;gap:8px;overflow:auto">
+      ${CATS.map(c=>`<div class="chip ${S.cat===c?'on':''}" data-act="cat" data-key="${c}">${c}</div>`).join('')}
+    </div>
+    <div style="padding:0 18px 8px" class="row between">
+      <span class="t1" style="font-size:14px;font-weight:700">热门路由</span>
+      <span style="font-size:11.5px;color:var(--t3)">${list.length} 个</span>
+    </div>
+    <div style="padding:0 18px 18px;flex:1;overflow:auto">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        ${list.map(r=>`
+          <div data-act="openRoute" data-key="${r.id}" style="background:var(--surface1);border-radius:14px;padding:12px;cursor:pointer;position:relative;border:1px solid ${S.subscribed.includes(r.id)?'var(--accent)':'transparent'}">
+            <div class="row gap8" style="margin-bottom:8px">
+              <div class="src" style="background:${r.c};width:26px;height:26px;border-radius:8px;font-size:12px">${r.name[0]}</div>
+              ${r.hot?`<span style="font-size:9.5px;background:#2a1608;color:var(--hub);padding:2px 5px;border-radius:4px;font-weight:800">HOT</span>`:''}
+            </div>
+            <div class="t1" style="font-size:13.5px;font-weight:700;line-height:1.25">${r.name}</div>
+            <div class="t3" style="font-size:10.5px;margin-top:5px;font-family:ui-monospace,Menlo,monospace" >${r.path}</div>
+            <div class="row between" style="margin-top:9px">
+              <span style="font-size:11px;color:var(--t3)">${r.subs}</span>
+              <span style="color:${S.subscribed.includes(r.id)?'var(--ok)':'var(--accent)'}">${S.subscribed.includes(r.id)?ic('check','sv-s',2.4):ic('plus','sv-s',2.2)}</span>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div style="height:16px"></div>
+    </div>
+    <div class="navbar">${navItem('discover','发现','compass',S.tab)}${navItem('feed','信息流','rss',S.tab)}${navItem('subs','订阅','layers',S.tab)}${navItem('me','我的','user',S.tab)}</div>`;
+}
+
+/* ============================ 变体 B：信息流优先 + 底部抽屉 ============================ */
+function renderB(){
+  let sheetHtml = '';
+  if(S.sheet){
+    const inner = S.route ? `
+      <div class="row gap10" style="margin-bottom:12px">
+        <div data-act="backCatalog" style="color:var(--t1);cursor:pointer">${ic('back','sv',1.9)}</div>
+        <div class="src" style="background:${R(S.route).c}">${R(S.route).name[0]}</div>
+        <div class="grow t1" style="font-size:16px;font-weight:700">${R(S.route).name}</div>
+      </div>
+      <div class="code" style="margin-bottom:14px">${R(S.route).path}</div>
+      ${R(S.route).params.map(p=>`
+        <div class="field">
+          <label><b>${p.label}</b> · :${p.k}</label>
+          <input data-param="${p.k}" value="${(S.params[p.k]||'')}" placeholder="${p.ph}">
+        </div>`).join('') || `<div style="font-size:12.5px;color:var(--t3);margin-bottom:12px">无需参数。</div>`}
+      <button class="btn ghost" data-act="preview">${ic('zap','sv-s',2)} 生成并预览</button>
+      ${S.preview?`<div style="margin-top:14px">${previewBlock()}
+        <button class="btn" style="margin-top:14px" data-act="subscribe">${ic('plus','sv-s',2.2)} 订阅</button></div>`:''}
+    ` : `
+      <div class="row between" style="margin-bottom:12px">
+        <span class="t1" style="font-size:17px;font-weight:700">添加 RSSHub 路由</span>
+        <div data-act="closeSheet" style="color:var(--t3);cursor:pointer">${ic('x','sv',2)}</div>
+      </div>
+      <div class="searchbar" style="margin-bottom:12px">${ic('search','sv-s',2)}
+        <input data-in="query" value="${S.query}" placeholder="搜索 1,600+ 路由…"></div>
+      <div style="display:flex;gap:8px;overflow:auto;padding-bottom:12px">
+        ${CATS.map(c=>`<div class="chip ${S.cat===c?'on':''}" data-act="cat" data-key="${c}">${c}</div>`).join('')}
+      </div>
+      <div style="font-size:11.5px;color:var(--t3);margin-bottom:6px">常用</div>
+      ${ROUTES.filter(r=>(S.cat==='全部'||r.cat===S.cat)&&(!S.query||(r.name+r.path).toLowerCase().includes(S.query.toLowerCase())))
+        .map(r=>`
+        <div class="row gap10" data-act="openRoute" data-key="${r.id}"
+             style="padding:11px 0;border-bottom:1px solid var(--divider);cursor:pointer">
+          <div class="src" style="background:${r.c}">${r.name[0]}</div>
+          <div class="grow">
+            <div class="t1" style="font-size:14px;font-weight:600">${r.name}</div>
+            <div class="t3" style="font-size:11px;font-family:ui-monospace,Menlo,monospace;margin-top:2px">${r.path}</div>
+          </div>
+          ${S.subscribed.includes(r.id)?`<span style="color:var(--ok)">${ic('check','sv-s',2.2)}</span>`:ic('arrowRight','sv-s',2)}
+        </div>`).join('')}
+      <div style="height:8px"></div>`;
+    sheetHtml = `<div class="scrim" data-act="closeSheet"></div>
+      <div class="sheet"><div class="grab"></div><div class="sheet-body">${inner}</div></div>`;
+  }
+
+  const body = S.bTab==='subs' ? `
+    <div style="padding:0 18px;flex:1;overflow:auto">
+      ${FEEDS.map(f=>`<div class="row gap12" style="padding:13px 0;border-bottom:1px solid var(--divider)">
+        <div class="src" style="background:${f.c};width:38px;height:38px;border-radius:10px">${f.name[0]}</div>
+        <div class="grow">
+          <div class="t1" style="font-size:14.5px;font-weight:600">${f.name}</div>
+          <div class="t3" style="font-size:11.5px;margin-top:3px">${R(f.route)?R(f.route).path:''}</div>
+        </div>
+        <div style="background:var(--surface2);font-size:11.5px;padding:4px 9px;border-radius:999px">${f.unread}</div>
+      </div>`).join('')}<div style="height:20px"></div></div>`
+  : `
+    <div style="padding:2px 18px 8px" class="row between">
+      <div>
+        <div class="t1" style="font-size:22px;font-weight:800">全部</div>
+        <div class="t3" style="font-size:12px;margin-top:2px">86 条未读 · 5 个订阅源</div>
+      </div>
+      <div class="row gap12" style="color:var(--t2)">${ic('search','sv',1.9)}${ic('mark','sv',1.9)}</div>
+    </div>
+    <div style="padding:0 18px 10px;display:flex;gap:8px">
+      ${['全部','未读','收藏'].map((t,i)=>`<div class="chip ${i===0?'on':'ghost'}">${t}</div>`).join('')}
+    </div>
+    <div style="padding:0 18px;flex:1;overflow:auto">${feedList()}<div style="height:24px"></div></div>`;
+
+  return `
+    <div style="flex:1;display:flex;flex-direction:column;position:relative">${body}
+      <div class="fab" data-act="openSheet">${ic('plus','sv',2.4)}</div>
+      ${sheetHtml}
+    </div>
+    <div class="navbar">${navItem('feed','信息流','rss',S.bTab)}${navItem('subs','订阅','layers',S.bTab)}${navItem('me','我的','user',S.bTab)}</div>`;
+}
+
+/* ============================ 变体 C：智能输入 + 瀑布流 ============================ */
+function renderC(){
+  const parsed = S.parsed;
+  const card = parsed ? `
+    <div style="margin:0 18px 12px;background:var(--surface1);border-radius:16px;padding:14px;border:1px solid ${parsed.auto?'var(--hub)':'var(--surface3)'}">
+      <div class="row gap8" style="margin-bottom:10px">
+        <div class="src" style="background:${parsed.route.c}">${parsed.route.name[0]}</div>
+        <div class="grow">
+          <div class="t1" style="font-size:14px;font-weight:700">${parsed.route.name}</div>
+          <div class="t3" style="font-size:11px;font-family:ui-monospace,Menlo,monospace">${parsed.route.path}</div>
+        </div>
+        ${parsed.auto?`<span style="font-size:10px;background:#2a1608;color:var(--hub);padding:3px 7px;border-radius:5px;font-weight:800">已识别</span>`:''}
+      </div>
+      ${parsed.route.params.length?`
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          ${parsed.route.params.map(p=>`
+            <div style="background:var(--surface2);border-radius:10px;padding:7px 10px">
+              <span style="font-size:10.5px;color:var(--t3)">:${p.k}</span>
+              <input data-param="${p.k}" value="${(parsed.params[p.k]||'')}" placeholder="${p.ph}"
+                style="background:none;border:none;outline:none;color:var(--t1);font-size:13px;width:${Math.max(60,(parsed.params[p.k]||p.ph).length*8+20)}px;font-family:inherit">
+            </div>`).join('')}
+        </div>`:`<div style="font-size:12px;color:var(--t3);margin-bottom:12px">无需参数</div>`}
+      ${S.preview?previewBlock():''}
+      <div class="row gap8" style="margin-top:${S.preview?'14px':'0'}">
+        <button class="btn ghost" style="flex:1;height:44px" data-act="preview">${ic('zap','sv-s',2)} 预览</button>
+        <button class="btn" style="flex:1.3;height:44px" data-act="subscribe">${ic('plus','sv-s',2.2)} 订阅</button>
+      </div>
+    </div>` : (S.smart ? `
+    <div style="margin:0 18px 12px;padding:12px 14px;background:var(--surface1);border-radius:12px;font-size:12.5px;color:var(--t3)">
+      没认出来。试试粘贴 <span style="color:var(--t2)">space.bilibili.com/946974</span> 或输入 <span style="color:var(--t2)">github JetBrains/kotlin</span>
+    </div>` : '');
+
+  const masonry = ARTICLES.map((a,i)=>`
+    <div data-act="open" data-i="${i}" style="break-inside:avoid;margin-bottom:12px;background:var(--surface1);border-radius:14px;overflow:hidden">
+      <div style="height:${a.big?110:64}px;background:linear-gradient(135deg,${a.c}55,${a.c}12)"></div>
+      <div style="padding:10px 11px 12px">
+        <div class="row gap6" style="margin-bottom:6px">
+          <div class="src" style="background:${a.c};width:16px;height:16px;font-size:9px;border-radius:5px">${a.src[0]}</div>
+          <span style="font-size:10.5px;color:var(--t3)" class="ellip">${a.src} · ${a.time}</span>
+        </div>
+        <div class="t1" style="font-size:13.5px;font-weight:600;line-height:1.35">${a.t}</div>
+        <div class="t3" style="font-size:11.5px;line-height:1.5;margin-top:5px;display:-webkit-box;-webkit-line-clamp:${a.big?3:2};-webkit-box-orient:vertical;overflow:hidden">${a.s}</div>
+      </div>
+    </div>`).join('');
+
+  return `
+    <div style="padding:2px 18px 10px">
+      <div class="searchbar" style="height:48px;border-radius:14px;border:1px solid var(--surface3)">
+        <span style="color:var(--hub)">${ic('sparkle','sv-s',2)}</span>
+        <input data-in="smart" value="${S.smart}" placeholder="粘贴链接，或输入 平台 + ID…">
+        ${S.smart?`<span data-act="clearSmart" style="color:var(--t3);cursor:pointer">${ic('x','sv-s',2)}</span>`:''}
+      </div>
+    </div>
+    ${card}
+    <div style="padding:0 18px 10px;display:flex;gap:8px">
+      ${['all:全部订阅','discover:发现'].map(x=>{const [k,l]=x.split(':');
+        return `<div class="chip ${S.cTab===k?'on':'ghost'}" data-act="cTab" data-key="${k}">${l}</div>`}).join('')}
+    </div>
+    <div style="padding:0 18px;flex:1;overflow:auto">
+      ${S.cTab==='all'
+        ? `<div style="columns:2;column-gap:12px">${masonry}</div>`
+        : `<div style="columns:2;column-gap:12px">
+            ${ROUTES.slice(0,8).map(r=>`
+              <div data-act="pickC" data-key="${r.id}" style="break-inside:avoid;margin-bottom:12px;background:var(--surface1);border-radius:14px;padding:12px">
+                <div class="row gap8" style="margin-bottom:7px">
+                  <div class="src" style="background:${r.c};width:24px;height:24px;border-radius:7px;font-size:11px">${r.name[0]}</div>
+                  <span style="font-size:10px;color:var(--t3)">${r.cat}</span>
+                </div>
+                <div class="t1" style="font-size:13px;font-weight:700">${r.name}</div>
+                <div class="t3" style="font-size:10.5px;margin-top:4px;font-family:ui-monospace,Menlo,monospace">${r.path}</div>
+                <div class="row between" style="margin-top:9px">
+                  <span style="font-size:10.5px;color:var(--t3)">${r.subs}</span>
+                  <span style="color:var(--accent)">${ic('plus','sv-s',2.2)}</span>
+                </div>
+              </div>`).join('')}
+           </div>`}
+      <div style="height:24px"></div>
+    </div>
+    <div class="navbar">${navItem('feed','阅读','rss','feed')}${navItem('me','我的','user','me')}</div>`;
+}
+
+/* ============================ 变体元信息 ============================ */
+const VARIANTS = {
+  A:{name:'路由市场优先', render:renderA,
+     desc:'<b>首屏即路由目录。</b>底部 4 tab，「发现」是默认页：大标题 + 搜索 + 分类 chips + 2 列热门路由卡片；点卡片进详情页填参数、预览、订阅。<br><br>赌的是：用户来这儿就是为了<b>用 RSSHub 挖新源</b>，阅读是次要动作。'},
+  B:{name:'信息流优先 + 抽屉', render:renderB,
+     desc:'<b>首屏是信息流</b>，标准阅读器布局（未读数 + 分段筛选 + 列表）。RSSHub 藏在右下 FAB 的<b>底部抽屉</b>里：搜索 → 分类 → 纵向路由列表 → 参数表单都在 sheet 内完成。<br><br>赌的是：日常动作是<b>读</b>，加源是低频动作，不该占主屏。'},
+  C:{name:'智能输入 + 瀑布流', render:renderC,
+     desc:'<b>顶部万能输入条</b>：粘贴 b站主页 / GitHub 仓库链接，自动识别路由并回填参数（标「已识别」）；认不出时直接搜平台词。阅读区是<b>双列瀑布流</b>，构建卡片与阅读同屏。<br><br>赌的是：路由表太长了，<b>不该让用户去翻</b>，该让输入框去猜。'},
+};
+
+/* ============================ 渲染 & 事件 ============================ */
+const screen = document.getElementById('screen');
+const swLabel = document.getElementById('swLabel');
+
+function render(){
+  const v = VARIANTS[S.variant];
+  screen.innerHTML = v.render();
+  swLabel.innerHTML = `<span class="tag">PROTOTYPE</span><span>${S.variant}</span><small>${v.name}</small>`;
+  document.getElementById('variantDesc').innerHTML = v.desc;
+  document.getElementById('state').textContent = JSON.stringify({
+    variant:S.variant, tab:S.tab, bTab:S.bTab, cTab:S.cTab, cat:S.cat,
+    query:S.query||'(空)', smart:S.smart||'(空)',
+    route:S.route||null, params:S.params, url:S.url, preview:S.preview,
+    sheet:S.sheet, subscribedCount:S.subscribed.length
+  }, null, 1);
+  const url = new URL(location.href);
+  if(url.searchParams.get('variant')!==S.variant){ url.searchParams.set('variant',S.variant); history.replaceState(null,'',url); }
+}
+
+function go(d){
+  const keys = Object.keys(VARIANTS);
+  const i = keys.indexOf(S.variant);
+  S.variant = keys[(i + d + keys.length) % keys.length];
+  // 切变体时重置各自的局部视图状态
+  S.route=null; S.params={}; S.url=null; S.preview=false; S.sheet=null; S.parsed=null;
+  render();
+}
+
+/* 事件委托 */
+screen.addEventListener('click', e=>{
+  const el = e.target.closest('[data-act]'); if(!el) return;
+  const act = el.dataset.act, key = el.dataset.key;
+
+  if(act==='nav'){ S.tab=key; S.bTab=key; render(); }
+  else if(act==='cat'){ S.cat=key; render(); }
+  else if(act==='openRoute'){ S.route=key; S.params={}; S.url=null; S.preview=false; render(); }
+  else if(act==='closeRoute'){ S.route=null; S.params={}; S.url=null; S.preview=false; render(); }
+  else if(act==='openSheet'){ S.sheet='catalog'; render(); }
+  else if(act==='closeSheet'){ S.sheet=null; S.route=null; S.params={}; S.url=null; S.preview=false; render(); }
+  else if(act==='backCatalog'){ S.route=null; S.params={}; S.url=null; S.preview=false; render(); }
+  else if(act==='preview'){
+    fillMissing();
+    S.url = buildUrl(R(S.route), S.params);
+    S.preview = true; render();
+  }
+  else if(act==='subscribe'){
+    if(!S.subscribed.includes(S.route)) S.subscribed.push(S.route);
+    S.toast='已订阅'; render();
+  }
+  else if(act==='copyUrl'){ S.toast='已复制'; render(); }
+  else if(act==='cTab'){ S.cTab=key; render(); }
+  else if(act==='pickC'){ S.parsed={route:R(key), params:{}, auto:false}; S.route=key; S.params={}; S.preview=false; render(); }
+  else if(act==='clearSmart'){ S.smart=''; S.parsed=null; S.route=null; S.preview=false; render(); }
+  else if(act==='open'||act==='copy'){ /* 阅读态：原型里不展开详情，保持只读 */ }
+});
+
+/* 输入 */
+function bindInput(){
+  screen.addEventListener('input', e=>{
+    const el = e.target;
+    if(el.dataset.in==='query'){ S.query = el.value; renderKeepFocus('[data-in="query"]', el.selectionStart); }
+    else if(el.dataset.in==='smart'){
+      S.smart = el.value;
+      S.parsed = parseSmart(el.value);
+      S.route = S.parsed ? S.parsed.route.id : null;
+      S.params = S.parsed ? {...S.parsed.params} : {};
+      S.preview = false; S.url=null;
+      renderKeepFocus('[data-in="smart"]', el.selectionStart);
+    }
+    else if(el.dataset.param){
+      const k = el.dataset.param;
+      S.params[k] = el.value;
+      if(S.parsed) S.parsed.params[k] = el.value;
+      S.preview = false;
+      // 只更新 state 面板，避免重绘打断输入
+      document.getElementById('state').textContent = JSON.stringify({
+        variant:S.variant, route:S.route||null, params:S.params, url:S.url, preview:S.preview,
+        subscribedCount:S.subscribed.length, note:'typing…'
+      }, null, 1);
+    }
+  });
+}
+function renderKeepFocus(sel, pos){
+  render();
+  const el = document.querySelector(sel);
+  if(el){ el.focus(); try{ el.setSelectionRange(pos,pos); }catch(_){} }
+}
+bindInput();
+
+/* 切换条 + 键盘 */
+document.querySelectorAll('[data-nav]').forEach(b=>{
+  b.addEventListener('click', ()=>go(parseInt(b.dataset.nav,10)));
+});
+window.addEventListener('keydown', e=>{
+  const t = e.target;
+  if(t && (t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable)) return;
+  if(e.key==='ArrowLeft'){ go(-1); }
+  else if(e.key==='ArrowRight'){ go(1); }
+});
+
+/* init */
+const init = new URL(location.href).searchParams.get('variant');
+if(init && VARIANTS[init.toUpperCase()]) S.variant = init.toUpperCase();
+render();
+</script>
+</body>
+</html>

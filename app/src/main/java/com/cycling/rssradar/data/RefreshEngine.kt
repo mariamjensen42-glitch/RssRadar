@@ -141,10 +141,15 @@ class RefreshEngine(
         transactionRunner.inTransaction {
             // 一次查询建 link→id 映射，替代逐篇 findIdByLink（#48：消除 N+1 写放大）
             val existing = articleDao.getIdLinkPairsByFeed(feedId).associate { it.link to it.id }
+            // 墓碑过滤（归档/清空真删的文章）：feed XML 还挂着它们，不跳过就会「删了又回来」
+            val tombstoned = articleDao.getTombstonedLinks(feedId).toHashSet()
             val newArticles = mutableListOf<ArticleEntity>()
             articles.forEach { article ->
+                if (article.link in tombstoned) return@forEach
                 val readingMinutes = article.contentText?.let { estimateReadingMinutes(it) }
-                val contentSource = if (article.contentHtml != null) {
+                // 摘要级内容不当正文：contentSource 记 NONE，详情页才会去抓原文
+                // （RssParser.FULL_TEXT_MIN_CHARS，详见该常量注释）
+                val contentSource = if (RssParser.isFullText(article.contentHtml, article.contentText)) {
                     ArticleEntity.CONTENT_SOURCE_FEED
                 } else {
                     ArticleEntity.CONTENT_SOURCE_NONE

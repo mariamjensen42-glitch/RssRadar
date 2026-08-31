@@ -37,12 +37,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.ui.theme.Accent
+import com.cycling.rssradar.ui.theme.Danger
 import com.cycling.rssradar.ui.theme.OnAccent
 import com.cycling.rssradar.ui.theme.Surface1
 import com.cycling.rssradar.ui.theme.Surface2
 import com.cycling.rssradar.ui.theme.TextPrimary
 import com.cycling.rssradar.ui.theme.TextSecondary
 import com.cycling.rssradar.ui.theme.TextTertiary
+import com.composables.icons.lucide.Eraser
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Trash2
@@ -64,6 +66,7 @@ fun FeedActionScreen(
     val feed by viewModel.getFeed(feedId).collectAsState()
     val groupOptions by viewModel.groupsList.collectAsState()
     var renameTarget by remember { mutableStateOf<String?>(null) }
+    var confirmClear by remember { mutableStateOf(false) }
 
     feed?.let { f ->
         ModalBottomSheet(
@@ -116,34 +119,31 @@ fun FeedActionScreen(
                     }
                 }
                 Spacer(Modifier.height(16.dp))
+                Text(
+                    text = "同步与预设",
+                    color = TextTertiary,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Spacer(Modifier.height(8.dp))
                 // 自动同步开关（issue #58）：屏蔽后不参与后台自动同步，手动刷新照常
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = "参与自动同步",
-                            color = TextPrimary,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Text(
-                            text = "关闭后此订阅源不再后台自动刷新",
-                            color = TextTertiary,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    Switch(
-                        checked = f.syncEnabled,
-                        onCheckedChange = { v ->
-                            viewModel.onIntent(SubscriptionsIntent.SetSyncEnabled(f.id, v))
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = OnAccent,
-                            checkedTrackColor = Accent,
-                        ),
-                    )
-                }
+                SwitchRow(
+                    title = "参与自动同步",
+                    subtitle = "关闭后此订阅源不再后台自动刷新",
+                    checked = f.syncEnabled,
+                    onCheckedChange = { v ->
+                        viewModel.onIntent(SubscriptionsIntent.SetSyncEnabled(f.id, v))
+                    },
+                )
+                Spacer(Modifier.height(4.dp))
+                // 全文抓取开关（issue #9）：关闭后详情页不再自动抓原网页正文
+                SwitchRow(
+                    title = "自动抓取全文",
+                    subtitle = "关闭后详情页只显示订阅源自带内容",
+                    checked = f.fullContentEnabled,
+                    onCheckedChange = { v ->
+                        viewModel.onIntent(SubscriptionsIntent.SetFullContentEnabled(f.id, v))
+                    },
+                )
                 Spacer(Modifier.height(16.dp))
                 Surface(
                     shape = RoundedCornerShape(12.dp),
@@ -159,6 +159,24 @@ fun FeedActionScreen(
                         Icon(Lucide.Pencil, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("重命名", color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                // 清空文章（issue #8）：只删文章保留订阅源，与「删除订阅（含其文章）」区分
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Surface2,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { confirmClear = true },
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Lucide.Eraser, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("清空文章（保留订阅）", color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -216,6 +234,65 @@ fun FeedActionScreen(
                     Text("取消", color = TextTertiary)
                 }
             },
+        )
+    }
+
+    // 清空文章二次确认（issue #8）：删的是文章，订阅源保留
+    if (confirmClear) {
+        val title = feed?.title.orEmpty()
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            containerColor = Surface1,
+            titleContentColor = TextPrimary,
+            textContentColor = TextSecondary,
+            title = { Text("清空文章", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
+            text = {
+                Text(
+                    "将删除「$title」的全部文章，收藏与稍后读保留，操作不可撤销。",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.onIntent(SubscriptionsIntent.ClearFeedArticles(feedId, title))
+                        confirmClear = false
+                        onDismiss()
+                    },
+                ) {
+                    Text("清空", color = Danger, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClear = false }) { Text("取消", color = TextTertiary) }
+            },
+        )
+    }
+}
+
+/** 带副标题的开关行：Feed 级预设统一形态（issue #9）。 */
+@Composable
+private fun SwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
+            Text(subtitle, color = TextTertiary, style = MaterialTheme.typography.bodySmall)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = OnAccent,
+                checkedTrackColor = Accent,
+            ),
         )
     }
 }
