@@ -195,7 +195,10 @@ class RssParserTest {
         val article = parser.parse(ByteArrayInputStream(xml.toByteArray())).articles[0]
 
         assertEquals("only a summary", article.summary)
-        assertNull(article.contentHtml)
+        // 摘要留在 content 列（列表检索与详情页兜底要用），但**不够格当正文**——
+        // contentSource 因此记 NONE，详情页才会去抓原文。这是"正文只有摘要"的根因修复
+        // （ADR-0012 / RssParser.FULL_TEXT_MIN_CHARS）。
+        assertFalse(RssParser.isFullText(article.contentHtml, article.contentText))
     }
 
     @Test
@@ -429,5 +432,88 @@ class RssParserTest {
         val out = RssParser.sanitizeHtml(html)
 
         assertFalse(out.contains("evil"))
+    }
+
+    // ———————————————————————————————————————————————
+    // style 声明级白名单（行内样式放行，原生渲染器 + WebView 共用）
+    // ———————————————————————————————————————————————
+
+    @Test
+    fun `sanitize keeps whitelisted style declarations`() {
+        val html = """<span style="color:#ff0000; font-weight:bold; text-align:center">x</span>"""
+
+        val out = RssParser.sanitizeHtml(html)
+
+        assertTrue(out.contains("color:#ff0000"))
+        assertTrue(out.contains("font-weight:bold"))
+        assertTrue(out.contains("text-align:center"))
+    }
+
+    @Test
+    fun `sanitize strips unsafe style declarations`() {
+        val html = """<span style="position:fixed; background:url(https://evil.example.com/x.png); color:red">x</span>"""
+
+        val out = RssParser.sanitizeHtml(html)
+
+        // url()/position 剥掉，安全 color 保留
+        assertFalse(out.contains("position"))
+        assertFalse(out.contains("url"))
+        assertTrue(out.contains("color:red"))
+    }
+
+    @Test
+    fun `sanitize drops style attribute entirely when nothing survives`() {
+        val html = """<span style="position:fixed">x</span>"""
+
+        val out = RssParser.sanitizeHtml(html)
+
+        assertFalse(out.contains("style"))
+    }
+
+    // ———————————————————————————————————————————————
+    // 全文门槛（ADR-0012）：摘要级 feed 内容不能挡住按需抓原文
+    // ———————————————————————————————————————————————
+
+    @Test
+    fun `summary length content is not treated as full text`() {
+        // 只给摘要的 feed（RSSHub 大量路由如此）：描述不到 300 字
+        val summary = "这是一篇文章摘要，".repeat(20) // 约 180 字
+
+        assertFalse(RssParser.isFullText("<p>$summary</p>", summary))
+    }
+
+    @Test
+    fun `long content is treated as full text`() {
+        val body = "这是正文内容，".repeat(200) // 约 1400 字
+
+        assertTrue(RssParser.isFullText("<p>$body</p>", body))
+    }
+
+    @Test
+    fun `null or blank content is never full text`() {
+        assertFalse(RssParser.isFullText(null, null))
+        assertFalse(RssParser.isFullText("", ""))
+        assertFalse(RssParser.isFullText("   ", "  "))
+    }
+
+    @Test
+    fun `summary only feed still stores the summary but is not marked as sourced`() {
+        val xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0"><channel>
+                <title>Summary Only</title>
+                <item>
+                    <title>只有摘要的文章</title>
+                    <link>https://example.com/only-summary</link>
+                    <description>短摘要，长度远低于正文阈值。</description>
+                </item>
+            </channel></rss>
+        """.trimIndent()
+
+        val article = parser.parse(ByteArrayInputStream(xml.toByteArray())).articles.single()
+
+        // 摘要仍要留下（列表与检索用），但这段内容不够格当正文
+        assertFalse(RssParser.isFullText(article.contentHtml, article.contentText))
+        assertTrue(article.summary.orEmpty().contains("短摘要"))
     }
 }

@@ -22,7 +22,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -123,8 +126,16 @@ private const val IMAGE_MAX_HEIGHT_DP = 4000
 // 图片解码防线
 // ———————————————————————————————————————————————
 
-/** 解码像素预算：≤20M px（ARGB_8888 ≈ 80MB），低于 RecordingCanvas 100MB 画布上限。 */
-internal const val MAX_DECODE_PIXELS = 20_000_000
+/**
+ * 解码像素预算：≤5M px（ARGB_8888 ≈ 20MB）。
+ *
+ * 关键：显式 `.size()` 并不能封顶实际解码尺寸。Coil 3.3.0 的
+ * `DecodeUtils.calculateInSampleSize` 用 `(src / dst).takeHighestOneBit()` 算采样率——
+ * 只有 src 每边 ≥ 2×dst 才降采样；src 落在 (1×, 2×)dst 区间时 inSampleSize=1，按原图解码。
+ * 因此最坏解码面积可达 4×dst，须保证 4×预算×4B < 100MB Canvas 上限 → 预算 ≤ 6.25M，取 5M 留余量。
+ * 回归测试：ArticleImageDecodeTest。
+ */
+internal const val MAX_DECODE_PIXELS = 5_000_000
 
 /**
  * 把期望解码尺寸收进像素预算。`Canvas: trying to draw too large(N bytes) bitmap` 的直接防线：
@@ -166,6 +177,7 @@ private fun RenderNode(
                         lineHeight = (style.fontSize * style.lineHeight).sp,
                         fontFamily = style.fontFamily.toComposeFontFamily(),
                     ),
+                    textAlign = node.align.toCompose(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = bottomPadding),
@@ -301,6 +313,108 @@ private fun RenderNode(
                     .then(click)
                     .padding(bottom = bottomPadding),
             )
+            node.caption?.let { caption ->
+                Text(
+                    text = caption,
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = bottomPadding),
+                )
+            }
+        }
+        is NodeCaption -> {
+            val annotated = runsToAnnotated(node.runs, style)
+            if (annotated.text.isNotBlank()) {
+                Text(
+                    text = annotated,
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = bottomPadding),
+                )
+            }
+        }
+        is NodeDefList -> {
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = bottomPadding)) {
+                node.items.forEachIndexed { index, item ->
+                    if (item.termRuns.isNotEmpty()) {
+                        Text(
+                            text = runsToAnnotated(item.termRuns, style),
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = style.fontSize.sp,
+                                fontFamily = style.fontFamily.toComposeFontFamily(),
+                            ),
+                        )
+                    }
+                    if (item.descRuns.isNotEmpty()) {
+                        Text(
+                            text = runsToAnnotated(item.descRuns, style),
+                            color = TextPrimary,
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = style.fontSize.sp,
+                                lineHeight = (style.fontSize * style.lineHeight).sp,
+                                fontFamily = style.fontFamily.toComposeFontFamily(),
+                            ),
+                            modifier = Modifier.padding(start = 16.dp),
+                        )
+                    }
+                    if (index < node.items.lastIndex) Spacer(Modifier.height(6.dp))
+                }
+            }
+        }
+        is NodeDetails -> {
+            var expanded by remember { mutableStateOf(false) }
+            Surface(
+                color = Surface2,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = bottomPadding),
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    ) {
+                        Text(
+                            text = node.summaryRuns
+                                ?.let { runsToAnnotated(it, style) }
+                                ?.takeIf { it.text.isNotBlank() }
+                                ?: AnnotatedString("详情"),
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = style.fontSize.sp,
+                                fontFamily = style.fontFamily.toComposeFontFamily(),
+                            ),
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(if (expanded) "−" else "+", color = TextSecondary)
+                    }
+                    if (expanded) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 10.dp)) {
+                            node.blocks.forEachIndexed { index, block ->
+                                RenderNode(
+                                    node = block,
+                                    style = style,
+                                    image = image,
+                                    onLinkClick = onLinkClick,
+                                    onImageClick = onImageClick,
+                                    depth = depth + 1,
+                                    // 块间保留默认间距，最后一块交给卡片的 bottom padding
+                                    bottomPadding = if (index < node.blocks.lastIndex) BLOCK_GAP_DP.dp else 0.dp,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
         is NodeMediaCard -> {
             Surface(
@@ -337,10 +451,19 @@ private fun RenderNode(
                         .horizontalScroll(rememberScrollState())
                         .padding(bottom = bottomPadding),
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, Divider),
-                    ) {
+                    Column {
+                        node.caption?.let { caption ->
+                            Text(
+                                text = caption,
+                                color = TextSecondary,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(bottom = 6.dp),
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Divider),
+                        ) {
                         Column {
                             node.rows.forEachIndexed { idx, row ->
                                 Row(
@@ -371,6 +494,7 @@ private fun RenderNode(
                                     )
                                 }
                             }
+                        }
                         }
                     }
                 }
@@ -467,18 +591,30 @@ private fun runsToAnnotated(runs: List<InlineRun>, style: ReadingStyleState): An
                             fontWeight = if (run.bold) FontWeight.Bold else null,
                             fontStyle = if (run.italic) FontStyle.Italic else null,
                             fontFamily = if (run.code) FontFamily.Monospace else baseFamily,
-                            background = if (run.code) Surface2 else Color.Unspecified,
-                            textDecoration = if (run.strike) TextDecoration.LineThrough else null,
+                            background = when {
+                                run.code -> Surface2
+                                run.mark -> MarkHighlight
+                                else -> Color.Unspecified
+                            },
+                            color = run.color?.let { Color(it) } ?: Color.Unspecified,
+                            textDecoration = when {
+                                run.strike && run.underline -> TextDecoration.combine(
+                                    listOf(TextDecoration.LineThrough, TextDecoration.Underline),
+                                )
+                                run.strike -> TextDecoration.LineThrough
+                                run.underline -> TextDecoration.Underline
+                                else -> null
+                            },
                             // <sup>/<sub>：真上标/下标（脚注、化学式、指数），字号收一档
                             baselineShift = when (run.script) {
                                 MathScript.NORMAL -> null
                                 MathScript.SUPER -> BaselineShift.Superscript
                                 MathScript.SUB -> BaselineShift.Subscript
                             },
-                            fontSize = if (run.script == MathScript.NORMAL) {
-                                TextUnit.Unspecified
-                            } else {
-                                (style.fontSize * SCRIPT_SIZE_FACTOR).sp
+                            fontSize = when {
+                                run.script != MathScript.NORMAL -> (style.fontSize * SCRIPT_SIZE_FACTOR).sp
+                                run.small -> (style.fontSize * SMALL_SIZE_FACTOR).sp
+                                else -> TextUnit.Unspecified
                             },
                         ),
                     )
@@ -505,6 +641,21 @@ private fun runsToAnnotated(runs: List<InlineRun>, style: ReadingStyleState): An
 
 /** 上下标相对正文的字号比例。 */
 private const val SCRIPT_SIZE_FACTOR = 0.75f
+
+/** <small> 相对正文的字号比例。 */
+private const val SMALL_SIZE_FACTOR = 0.85f
+
+/** mark / style background-color 的高亮底色：半透明琥珀，深浅主题下都可见。 */
+private val MarkHighlight = Color(0x66FFC107)
+
+/** 解析端的段落对齐枚举 → Compose TextAlign。 */
+private fun ParagraphAlign?.toCompose(): TextAlign? = when (this) {
+    ParagraphAlign.LEFT -> TextAlign.Left
+    ParagraphAlign.CENTER -> TextAlign.Center
+    ParagraphAlign.RIGHT -> TextAlign.Right
+    ParagraphAlign.JUSTIFY -> TextAlign.Justify
+    null -> null
+}
 
 /** 公式片段 → SpanStyle 序列：变量斜体、上下标缩放。 */
 private fun AnnotatedString.Builder.mathSpans(
