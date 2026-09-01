@@ -57,6 +57,8 @@ sealed interface SubscriptionsIntent {
     data class RenameFeed(val feedId: Long, val title: String) : SubscriptionsIntent
     data class DeleteFeed(val feedId: Long, val feedTitle: String) : SubscriptionsIntent
     data class ImportOpml(val uri: Uri) : SubscriptionsIntent
+    /** OPML 导出（#4）：把全部订阅源写进 [uri]（SAF 另存为，用户决定存哪）。 */
+    data class ExportOpml(val uri: Uri) : SubscriptionsIntent
     /** 自动同步开关（issue #58）：屏蔽后不参与自动同步，手动刷新照常。 */
     data class SetSyncEnabled(val feedId: Long, val enabled: Boolean) : SubscriptionsIntent
 }
@@ -121,6 +123,7 @@ class SubscriptionsViewModel @Inject constructor(
             is SubscriptionsIntent.RenameFeed -> renameFeed(intent.feedId, intent.title)
             is SubscriptionsIntent.DeleteFeed -> deleteFeed(intent.feedId, intent.feedTitle)
             is SubscriptionsIntent.ImportOpml -> importOpml(intent.uri)
+            is SubscriptionsIntent.ExportOpml -> exportOpml(intent.uri)
             is SubscriptionsIntent.SetSyncEnabled -> setSyncEnabled(intent.feedId, intent.enabled)
         }
     }
@@ -313,6 +316,23 @@ class SubscriptionsViewModel @Inject constructor(
             viewModelScope.launch {
                 repository.refreshFeeds(result.newFeedIds)
             }
+        }
+    }
+
+    /**
+     * OPML 导出（#4）：序列化全部订阅源 → 写进用户选的 URI。
+     * 写失败（没有写权限/存储被移除）如实报错，不假装成功。
+     */
+    private fun exportOpml(uri: Uri) {
+        viewModelScope.launch {
+            val opml = repository.exportOpml()
+            val written = runCatching {
+                appContext.contentResolver.openOutputStream(uri)?.use { stream ->
+                    stream.write(opml.toByteArray(Charsets.UTF_8))
+                    true
+                } ?: false
+            }.getOrDefault(false)
+            uiMessage = if (written) "已导出 OPML" else "导出失败，请重试"
         }
     }
 

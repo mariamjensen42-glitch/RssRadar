@@ -24,7 +24,7 @@
 
 | # | 功能 | ReadYou 依据 | 状态 |
 |---|------|--------------|------|
-| 4 | OPML **导出**（RssRadar 只有导入） | `domain/service/OpmlService.kt`（`saveToString`） | |
+| 4 | OPML **导出**（RssRadar 只有导入） | `domain/service/OpmlService.kt`（`saveToString`） | ✅ 2026-09-01 |
 | 5 | Feed 自动发现（输入网址自动探测 feed 链接） | `infrastructure/rss/RssHelper.kt`（`discoverFeedLink`） | |
 | 6 | Favicon 自动抓取（Besticon 服务） | `infrastructure/rss/BestIconFinder.kt`（RssRadar 有 iconUrl 字段但无抓取链路） | ✅ 2026-08-30 |
 | 7 | 批量移动 feed 到分组 | `drawer/group/AllMoveToGroupDialog.kt` | ✅ 2026-08-31 |
@@ -40,10 +40,20 @@
 
 ### 三、信息流体验
 
+> 2026-09-01 实施记录（#4 / #10 / #11）：
+> - **#4 OPML 导出**：`OpmlWriter`（纯函数，分组路径 `技术/后端` 还原成嵌套 outline）+ `FeedRepository.exportOpml()`，
+>   订阅管理页顶栏导出图标走 SAF 另存为（`rssradar-subscriptions-yyyyMMdd.opml`）。往返测试覆盖导入→导出→再导入。
+> - **#10 标记已读条件**：`MarkAsReadCondition`（1/3/7 天前/全部，时间基准 `COALESCE(publishedAt, fetchedAt)`，
+>   与归档清理一致）；信息流顶栏 CheckCheck 入口 + 通用档位弹层；数字来自 DAO 真实影响行数。
+> - **#11 滚动时自动标记已读**：`ListDisplayState.markReadOnScroll`（默认关——会改用户数据，必须显式选择）。
+>   列表按"槽位表"（粘性日期头占 null 槽）算出滚出视口顶部的卡片，批量写库；卡片状态走快照翻转，
+>   未读 tab 下不当场消失，避免滚动时列表在脚下抽掉。设置页「列表显示」内开关。
+
+
 | # | 功能 | ReadYou 依据 |
 |---|------|--------------|
-| 10 | 标记已读条件（1/3/7 天前或全部） | `domain/model/general/MarkAsReadConditions.kt` |
-| 11 | 滚动时自动标记已读（可关） | `MarkAsReadOnScrollPreference.kt` |
+| 10 | 标记已读条件（1/3/7 天前或全部） | `domain/model/general/MarkAsReadConditions.kt` | ✅ 2026-09-01 |
+| 11 | 滚动时自动标记已读（可关） | `MarkAsReadOnScrollPreference.kt` | ✅ 2026-09-01 |
 | 12 | 列表显示项逐项可配：feed 图标/名称、日期、缩略图、描述、粘性日期头、已读进度指示 | `FlowArticleList*Preference.kt` |
 | 13 | 文章归档策略（保留天数） | `KeepArchivedPreference.kt` |
 | 14 | 未读排序方式可配 | `SortUnreadItemsPreference.kt` |

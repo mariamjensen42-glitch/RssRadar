@@ -410,6 +410,24 @@ interface ArticleDao {
     @Query("UPDATE articles SET isRead = :read WHERE id = :id")
     suspend fun setRead(id: Long, read: Boolean)
 
+    /**
+     * 按条件批量标记已读（#10）：只更新未读行，返回真实影响行数（UI 如实汇报数字）。
+     * 时间基准 = COALESCE(publishedAt, fetchedAt)，与归档清理、MarkAsReadCondition 一致。
+     */
+    @Query(
+        "UPDATE articles SET isRead = 1 WHERE isRead = 0 " +
+            "AND COALESCE(publishedAt, fetchedAt) < :cutoff",
+    )
+    suspend fun markReadOlderThan(cutoff: Long): Int
+
+    /** 全部未读 → 已读，返回真实影响行数。 */
+    @Query("UPDATE articles SET isRead = 1 WHERE isRead = 0")
+    suspend fun markAllUnreadRead(): Int
+
+    /** 滚动自动标记已读（#11）用：只更新给定 id 里仍未读的行。 */
+    @Query("UPDATE articles SET isRead = 1 WHERE isRead = 0 AND id IN (:ids)")
+    suspend fun markReadBatch(ids: List<Long>): Int
+
     /** 删除单篇文章（撤销由 restore 带原 id 插回）。 */
     @Query("DELETE FROM articles WHERE id = :id")
     suspend fun deleteById(id: Long)

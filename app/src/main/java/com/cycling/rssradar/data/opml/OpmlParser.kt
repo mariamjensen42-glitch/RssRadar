@@ -5,13 +5,15 @@ import org.jsoup.nodes.Element
 import org.jsoup.parser.Parser
 import java.io.InputStream
 
-/** OPML 中的一条订阅源：分组路径 + 标题 + 订阅地址。 */
+/** OPML 中的一条订阅源：分组路径 + 标题 + 订阅地址（+ 可选站点主页）。 */
 data class OpmlEntry(
     /** 文件夹路径，多级用 `/` 拼接；空串表示无文件夹（归默认分组）。 */
     val group: String,
     /** OPML 的 text/title 属性；两者都缺省时回退为 xmlUrl。 */
     val title: String,
     val xmlUrl: String,
+    /** 站点主页（htmlUrl 属性）：导入不用，导出回填，避免往返丢信息。 */
+    val htmlUrl: String? = null,
 )
 
 /**
@@ -38,7 +40,12 @@ object OpmlParser {
             val name = child.attr("text").trim().ifBlank { child.attr("title").trim() }
             val xmlUrl = child.attr("xmlUrl").trim()
             if (xmlUrl.isNotEmpty()) {
-                into += OpmlEntry(group = group, title = name.ifEmpty { xmlUrl }, xmlUrl = xmlUrl)
+                into += OpmlEntry(
+                    group = group,
+                    title = name.ifEmpty { xmlUrl },
+                    xmlUrl = xmlUrl,
+                    htmlUrl = child.attr("htmlUrl").trim().takeIf { it.isNotEmpty() },
+                )
             } else {
                 // 文件夹：子级分组路径向下累积
                 walk(child, group = if (group.isEmpty()) name else "$group/$name", into = into)

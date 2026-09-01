@@ -8,6 +8,7 @@ import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.ai.AiRepository
 import com.cycling.rssradar.data.store.GroupStore
+import com.cycling.rssradar.data.store.MarkAsReadCondition
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -68,6 +69,10 @@ sealed interface FeedListIntent {
     data object Refresh : FeedListIntent
     data object LoadMore : FeedListIntent
     data class AddFeed(val rawUrl: String, val groupName: String) : FeedListIntent
+    /** 批量标记已读（#10）：按条件（1/3/7 天前或全部）清空未读。 */
+    data class MarkAllRead(val condition: MarkAsReadCondition) : FeedListIntent
+    /** 滚动自动标记已读（#11）：卡片滚出视口后由列表上报的 id 批次。 */
+    data class MarkReadPassed(val ids: List<Long>) : FeedListIntent
 }
 
 @HiltViewModel
@@ -108,6 +113,49 @@ class FeedListViewModel @Inject constructor(
             FeedListIntent.Refresh -> refresh()
             FeedListIntent.LoadMore -> loadMore()
             is FeedListIntent.AddFeed -> addFeed(intent.rawUrl, intent.groupName)
+            is FeedListIntent.MarkAllRead -> markAllRead(intent.condition)
+            is FeedListIntent.MarkReadPassed -> markReadPassed(intent.ids)
+        }
+    }
+
+    /**
+     * 批量标记已读（#10）：只写库，不重查整表（数万行重查是 OOM 根源）。
+     * 列表内的卡片状态由快照原地翻转，数字来自 DAO 的真实影响行数——不猜、不编。
+     */
+    private fun markAllRead(condition: MarkAsReadCondition) {
+        viewModelScope.launch {
+            val count = repository.markReadByCondition(condition)
+            update {
+                it.copy(
+                    articles = it.articles.map { item ->
+                        if (item.article.isRead) item else item.copy(article = item.article.copy(isRead = true))
+                    },
+                    uiMessage = if (count > 0) "已标记 $count 篇为已读" else "没有需要标记的文章",
+                )
+            }
+        }
+    }
+
+    /**
+     * 滚动自动标记已读（#11）：只更新仍未读的行。卡片状态走快照翻转，
+     * 未读 tab 下卡片不会当场消失（下次刷新才移除）——避免滚动时列表在脚下抽掉。
+     */
+    private fun markReadPassed(ids: List<Long>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            repository.markReadBatch(ids)
+            val passed = ids.toSet()
+            update {
+                it.copy(
+                    articles = it.articles.map { item ->
+                        if (item.article.id in passed && !item.article.isRead) {
+                            item.copy(article = item.article.copy(isRead = true))
+                        } else {
+                            item
+                        }
+                    },
+                )
+            }
         }
     }
 

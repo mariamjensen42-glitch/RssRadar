@@ -20,10 +20,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -41,7 +39,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -60,6 +57,7 @@ import com.cycling.rssradar.data.store.SyncStore
 import com.cycling.rssradar.data.store.ThemeMode
 import com.cycling.rssradar.data.store.ThemeStore
 import com.cycling.rssradar.sync.SyncScheduler
+import com.cycling.rssradar.ui.components.OptionPickerSheet
 import com.cycling.rssradar.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
@@ -70,7 +68,6 @@ import com.cycling.rssradar.ui.theme.Surface3
 import com.cycling.rssradar.ui.theme.TextPrimary
 import com.cycling.rssradar.ui.theme.TextSecondary
 import com.cycling.rssradar.ui.theme.TextTertiary
-import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.CircleAlert
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.CircleCheckBig
@@ -469,6 +466,13 @@ fun RssHubSettingsScreen(
                     label = "已读弱化",
                     checked = display.dimRead,
                     onChange = { v -> viewModel.updateListDisplay { it.copy(dimRead = v) } },
+                )
+                // 滚动自动标记已读（#11）：卡片滚出视口顶部即标为已读。默认关——
+                // 会改变用户数据，必须显式选择。
+                SettingSwitchRow(
+                    label = "滚动时自动标记已读",
+                    checked = display.markReadOnScroll,
+                    onChange = { v -> viewModel.updateListDisplay { it.copy(markReadOnScroll = v) } },
                 )
             }
         }
@@ -887,55 +891,3 @@ fun RssHubSettingsScreen(
     }
 }
 
-/** 通用档位选择弹层（GroupFilterSheet 同款形态），归档/间隔档位共用。 */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun <T> OptionPickerSheet(
-    title: String,
-    options: List<T>,
-    selected: T,
-    label: (T) -> String,
-    onSelect: (T) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Surface1) {
-        Column(modifier = Modifier.padding(bottom = 24.dp)) {
-            Text(
-                text = title,
-                color = TextPrimary,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-            )
-            options.forEach { option ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            onSelect(option)
-                            onDismiss()
-                        }
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = label(option),
-                        color = if (option == selected) Accent else TextPrimary,
-                        style = MaterialTheme.typography.bodyLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (option == selected) {
-                        Icon(
-                            imageVector = Lucide.Check,
-                            contentDescription = "已选",
-                            tint = Accent,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}

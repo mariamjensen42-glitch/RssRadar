@@ -39,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -46,6 +47,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,11 +60,13 @@ import coil3.compose.AsyncImage
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.store.ListDescMode
 import com.cycling.rssradar.data.store.ListDisplayState
+import com.cycling.rssradar.data.store.MarkAsReadCondition
 import com.cycling.rssradar.ui.theme.LocalListDisplay
 import com.cycling.rssradar.ui.components.ArticleContextMenu
 import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.ArticleMenuActions
 import com.cycling.rssradar.ui.components.FeedIcon
+import com.cycling.rssradar.ui.components.OptionPickerSheet
 import com.cycling.rssradar.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
@@ -72,6 +76,7 @@ import com.cycling.rssradar.ui.theme.TextSecondary
 import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Check
+import com.composables.icons.lucide.CheckCheck
 import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Search
@@ -91,6 +96,8 @@ fun FeedListScreen(
     val unreadCount by viewModel.unreadCount.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showGroupSheet by remember { mutableStateOf(false) }
+    /** 批量标记已读条件弹层（#10）。 */
+    var showMarkReadSheet by remember { mutableStateOf(false) }
     val message = uiState.uiMessage
 
     LaunchedEffect(message) {
@@ -126,6 +133,7 @@ fun FeedListScreen(
             FeedListTopBar(
                 onOpenSearch = onOpenSearch,
                 onOpenFilter = { showGroupSheet = true },
+                onMarkAllRead = { showMarkReadSheet = true },
                 filterActive = uiState.selectedGroup != null,
             )
         },
@@ -169,6 +177,9 @@ fun FeedListScreen(
                         },
                         // 四个 tab 均分页；滚动到底自动加载下一页
                         onScrolledToEnd = { viewModel.onIntent(FeedListIntent.LoadMore) },
+                        markReadPassed = { ids ->
+                            viewModel.onIntent(FeedListIntent.MarkReadPassed(ids))
+                        },
                     )
                     Box(
                         modifier = Modifier
@@ -202,12 +213,31 @@ fun FeedListScreen(
             onDismiss = { showGroupSheet = false },
         )
     }
+
+    // 批量标记已读（#10）：选条件后一次性写库，数字由 DAO 的真实影响行数汇报
+    if (showMarkReadSheet) {
+        OptionPickerSheet(
+            title = "标记已读",
+            options = MarkAsReadCondition.entries.toList(),
+            selected = null,
+            label = { it.label },
+            subtitle = { condition ->
+                when (condition) {
+                    MarkAsReadCondition.ALL -> "把全部文章标为已读"
+                    else -> "把 ${condition.label}发布的未读文章标为已读"
+                }
+            },
+            onSelect = { condition -> viewModel.onIntent(FeedListIntent.MarkAllRead(condition)) },
+            onDismiss = { showMarkReadSheet = false },
+        )
+    }
 }
 
 @Composable
 private fun FeedListTopBar(
     onOpenSearch: () -> Unit,
     onOpenFilter: () -> Unit,
+    onMarkAllRead: () -> Unit,
     filterActive: Boolean,
 ) {
     Row(
@@ -226,6 +256,10 @@ private fun FeedListTopBar(
         )
         IconButton(onClick = onOpenSearch) {
             Icon(Lucide.Search, contentDescription = "搜索", tint = TextPrimary)
+        }
+        // 批量标记已读（#10）：积累几天未读刷不完的信息流，一键按时间范围清空
+        IconButton(onClick = onMarkAllRead) {
+            Icon(Lucide.CheckCheck, contentDescription = "标记已读", tint = TextPrimary)
         }
         IconButton(onClick = onOpenFilter) {
             Box {
@@ -370,6 +404,11 @@ fun ArticleCardList(
     bottomPadding: Dp = tabBarBottomClearance(),
     // 单源页强制隐藏订阅源名称（同源重复是噪音）；null = 跟随全局配置
     showFeedName: Boolean? = null,
+    /**
+     * 滚动自动标记已读（#11）：上报"已滚出视口顶部"的文章 id 批次。
+     * 由 [LocalListDisplay] 的开关决定是否启用，关闭时本回调不会被调用。
+     */
+    markReadPassed: (List<Long>) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val display = LocalListDisplay.current.let {
@@ -391,6 +430,35 @@ fun ArticleCardList(
         remember(articles) { dayGroups(articles) }
     } else {
         emptyList()
+    }
+    // 滚动自动标记已读（#11）：把"列表槽位 → 文章 id"铺平（粘性日期头也占一个槽位，
+    // 用 null 占位），滚过视口顶部的槽位即视为已读。槽位表与列表结构严格同构，
+    // 否则粘性头开启时索引会错位。
+    val slotIds: List<Long?> = if (display.stickyDateHeader) {
+        remember(dayGroups) {
+            buildList {
+                dayGroups.forEach { group ->
+                    if (group.label != null) add(null)
+                    group.items.forEach { add(it.article.id) }
+                }
+            }
+        }
+    } else {
+        remember(articles) { articles.map { it.article.id } }
+    }
+    val unreadIds = remember(articles) {
+        articles.filter { !it.article.isRead }.map { it.article.id }.toSet()
+    }
+    LaunchedEffect(listState, display.markReadOnScroll, slotIds, unreadIds, markReadPassed) {
+        if (!display.markReadOnScroll) return@LaunchedEffect
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .distinctUntilChanged()
+            .collect { firstVisible ->
+                val passed = slotIds.subList(0, firstVisible.coerceAtMost(slotIds.size))
+                    .filterNotNull()
+                    .filter { it in unreadIds }
+                if (passed.isNotEmpty()) markReadPassed(passed)
+            }
     }
     LazyColumn(
         state = listState,

@@ -16,12 +16,15 @@ import com.cycling.rssradar.data.db.ContentFetchLogEntity
 import com.cycling.rssradar.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.data.db.FeedEntity
 import com.cycling.rssradar.data.db.FetchHostStat
+import com.cycling.rssradar.data.opml.OpmlEntry
 import com.cycling.rssradar.data.opml.OpmlParser
+import com.cycling.rssradar.data.opml.OpmlWriter
 import com.cycling.rssradar.data.parser.ContentFetcher
 import com.cycling.rssradar.data.parser.FetchLogger
 import com.cycling.rssradar.data.parser.FeedProbeResult
 import com.cycling.rssradar.data.parser.FetchOutcome
 import com.cycling.rssradar.data.store.KeepArchived
+import com.cycling.rssradar.data.store.MarkAsReadCondition
 
 /** 订阅结果，供 UI 层区分提示文案。 */
 sealed interface AddFeedResult {
@@ -210,6 +213,19 @@ class FeedRepository(
     suspend fun setStarred(id: Long, starred: Boolean) = articleDao.setStarred(id, starred)
     suspend fun setBookmarked(id: Long, bookmarked: Boolean) = articleDao.setBookmarked(id, bookmarked)
     suspend fun markAllRead() = articleDao.markAllRead()
+
+    /**
+     * 按条件批量标记已读（#10）：[condition] 为 ALL 时清空全部未读，否则只标记
+     * 早于 cutoff 的未读文章。返回真实影响行数——数字必须来自数据库，不猜。
+     */
+    suspend fun markReadByCondition(condition: MarkAsReadCondition): Int {
+        val cutoff = condition.cutoffMillis()
+        return if (cutoff == null) articleDao.markAllUnreadRead() else articleDao.markReadOlderThan(cutoff)
+    }
+
+    /** 滚动自动标记已读（#11）：给定的 id 里仍未读的置为已读，返回实际标记数。 */
+    suspend fun markReadBatch(ids: List<Long>): Int =
+        if (ids.isEmpty()) 0 else articleDao.markReadBatch(ids)
 
     /** 已读/未读互切（长按菜单，issue #46）。 */
     suspend fun setRead(id: Long, read: Boolean) = articleDao.setRead(id, read)
@@ -412,6 +428,23 @@ class FeedRepository(
             newFeedIds = newIds,
             groups = entries.map { it.group }.filter { it.isNotBlank() }.toSet(),
         )
+    }
+
+    /**
+     * OPML 导出（#4）：把全部订阅源按分组序列化成 OPML 文本。
+     * 分组即 OPML 文件夹（`技术/后端` 会被 [OpmlWriter] 还原成嵌套 outline）。
+     * 库里没有站点主页字段（FeedEntity 无 siteUrl），HTML 链接属性留空——不捏造。
+     * 这是导入的逆操作：用户的订阅清单不被本应用绑架。
+     */
+    suspend fun exportOpml(): String = withContext(ioDispatcher) {
+        val entries = feedDao.getAll().map { feed ->
+            OpmlEntry(
+                group = feed.groupName,
+                title = feed.title,
+                xmlUrl = feed.url,
+            )
+        }
+        OpmlWriter.write(entries)
     }
 
     private fun normalizeUrl(raw: String): String? {

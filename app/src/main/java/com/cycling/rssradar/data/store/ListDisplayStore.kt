@@ -27,6 +27,11 @@ data class ListDisplayState(
     val descMode: ListDescMode = ListDescMode.SHORT,
     val stickyDateHeader: Boolean = false,
     val dimRead: Boolean = false,
+    /**
+     * 滚动时自动标记已读（#11）：卡片滚出视口顶部即标记为已读。
+     * 默认关——这是会改变用户数据的行为，必须显式选择。
+     */
+    val markReadOnScroll: Boolean = false,
 )
 
 /**
@@ -48,6 +53,7 @@ class ListDisplayStore(private val prefs: SharedPreferences) {
             .putString(KEY_DESC_MODE, next.descMode.name)
             .putBoolean(KEY_STICKY_DATE, next.stickyDateHeader)
             .putBoolean(KEY_DIM_READ, next.dimRead)
+            .putBoolean(KEY_MARK_READ_ON_SCROLL, next.markReadOnScroll)
             .apply()
         _state.value = next
     }
@@ -62,6 +68,7 @@ class ListDisplayStore(private val prefs: SharedPreferences) {
             ?: ListDescMode.SHORT,
         stickyDateHeader = prefs.getBoolean(KEY_STICKY_DATE, false),
         dimRead = prefs.getBoolean(KEY_DIM_READ, false),
+        markReadOnScroll = prefs.getBoolean(KEY_MARK_READ_ON_SCROLL, false),
     )
 
     companion object {
@@ -72,5 +79,6 @@ class ListDisplayStore(private val prefs: SharedPreferences) {
         private const val KEY_DESC_MODE = "list_desc_mode"
         private const val KEY_STICKY_DATE = "list_sticky_date_header"
         private const val KEY_DIM_READ = "list_dim_read"
+        private const val KEY_MARK_READ_ON_SCROLL = "list_mark_read_on_scroll"
     }
 }

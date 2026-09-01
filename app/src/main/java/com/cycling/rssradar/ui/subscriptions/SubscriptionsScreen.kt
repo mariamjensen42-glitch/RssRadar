@@ -65,6 +65,7 @@ import com.composables.icons.lucide.CheckCheck
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Ellipsis
+import com.composables.icons.lucide.FileDown
 import com.composables.icons.lucide.FileUp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Check
@@ -109,6 +110,13 @@ fun SubscriptionsScreen(
     ) { uri ->
         uri?.let { viewModel.onIntent(SubscriptionsIntent.ImportOpml(it)) }
     }
+    // OPML 导出（#4）：SAF 另存为，用户自己决定存哪/分享给谁。
+    // 文件名固定带日期，避免多次导出互相覆盖。
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/x-opml"),
+    ) { uri ->
+        uri?.let { viewModel.onIntent(SubscriptionsIntent.ExportOpml(it)) }
+    }
 
     LaunchedEffect(message) {
         message?.let {
@@ -135,6 +143,9 @@ fun SubscriptionsScreen(
                         opmlLauncher.launch(
                             arrayOf("text/*", "application/xml", "application/octet-stream"),
                         )
+                    },
+                    onExport = {
+                        exportLauncher.launch("rssradar-subscriptions-${todayStamp()}.opml")
                     },
                     onSort = { viewModel.onIntent(SubscriptionsIntent.ToggleSort) },
                     onBatchMove = { viewModel.onIntent(SubscriptionsIntent.ToggleSelectionMode) },
@@ -269,6 +280,7 @@ fun SubscriptionsScreen(
 @Composable
 private fun SubscriptionsTopBar(
     onImport: () -> Unit,
+    onExport: () -> Unit,
     onSort: () -> Unit,
     onBatchMove: () -> Unit,
     onAdd: () -> Unit,
@@ -289,6 +301,10 @@ private fun SubscriptionsTopBar(
         )
         IconButton(onClick = onImport) {
             Icon(Lucide.FileUp, contentDescription = "导入 OPML", tint = TextPrimary)
+        }
+        // OPML 导出（#4）：导入的逆操作，订阅清单不被本应用绑架
+        IconButton(onClick = onExport) {
+            Icon(Lucide.FileDown, contentDescription = "导出 OPML", tint = TextPrimary)
         }
         // 批量移动入口（issue #7）：进入多选态，勾选后一次移动到目标分组
         IconButton(onClick = onBatchMove) {
@@ -604,6 +620,10 @@ private fun BatchMoveToGroupDialog(
 }
 
 private fun String.withoutScheme(): String = removePrefix("https://").removePrefix("http://")
+
+/** 导出文件名日期后缀：多次导出不互相覆盖。 */
+private fun todayStamp(): String =
+    java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())
 
 /** 通用单行输入对话框：新建/重命名分组、重命名订阅共用。 */
 @Composable
