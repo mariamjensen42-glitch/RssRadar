@@ -23,14 +23,23 @@ class AutoSync(
     private val archiveStore: ArchiveStore,
     private val refreshAutoSyncFeeds: suspend () -> Int,
     private val archiveExpired: suspend (KeepArchived) -> Int,
+    /**
+     * 新文章通知（#31）：入参是本轮同步的起点时间戳，实现方据此取"新进库"的文章。
+     * 默认空实现——通知是可选附加行为，不注入就完全不碰（老调用方与测试不受影响）。
+     */
+    private val notifyNewArticles: suspend (sinceMillis: Long) -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
 
-    /** 刷新参与自动同步的源 → 归档清理。 */
+    /** 刷新参与自动同步的源 → 归档清理 → 通知。 */
     suspend fun run() {
-        syncStore.update { it.copy(lastAutoSyncAt = clock()) }
+        // 起点时间戳必须在刷新之前取：新文章的 fetchedAt 落在它之后才算新
+        val startedAt = clock()
+        syncStore.update { it.copy(lastAutoSyncAt = startedAt) }
         refreshAutoSyncFeeds()
         archiveNow()
+        // 归档之后再统计：刚被清理掉的旧文章不该出现在通知里
+        notifyNewArticles(startedAt)
     }
 
     /** 仅归档清理，不刷新（启动时未到启动同步去抖阈值时走这条）。 */

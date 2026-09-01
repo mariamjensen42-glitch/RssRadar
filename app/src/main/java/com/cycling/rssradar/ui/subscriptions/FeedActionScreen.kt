@@ -144,6 +144,16 @@ fun FeedActionScreen(
                         viewModel.onIntent(SubscriptionsIntent.SetFullContentEnabled(f.id, v))
                     },
                 )
+                Spacer(Modifier.height(4.dp))
+                // 通知开关（#31）：Feed 级第二道闸；全局通知开关关时一律不发
+                SwitchRow(
+                    title = "新文章通知",
+                    subtitle = "关闭后此订阅源的新文章不进系统通知",
+                    checked = f.notificationsEnabled,
+                    onCheckedChange = { v ->
+                        viewModel.onIntent(SubscriptionsIntent.SetNotificationsEnabled(f.id, v))
+                    },
+                )
                 Spacer(Modifier.height(16.dp))
                 Surface(
                     shape = RoundedCornerShape(12.dp),

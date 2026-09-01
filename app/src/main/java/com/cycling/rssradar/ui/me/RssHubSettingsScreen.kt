@@ -1,6 +1,8 @@
 package com.cycling.rssradar.ui.me
 
 import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,7 +52,9 @@ import com.cycling.rssradar.data.store.ArchiveStore
 import com.cycling.rssradar.data.store.KeepArchived
 import com.cycling.rssradar.data.store.ListDescMode
 import com.cycling.rssradar.data.store.ListDisplayState
+import com.cycling.rssradar.data.notify.NotificationHelper
 import com.cycling.rssradar.data.store.ListDisplayStore
+import com.cycling.rssradar.data.store.NotificationStore
 import com.cycling.rssradar.data.store.SyncInterval
 import com.cycling.rssradar.data.store.SyncState
 import com.cycling.rssradar.data.store.SyncStore
@@ -103,6 +107,12 @@ data class RssHubSettingsUiState(
     val keepArchived: KeepArchived = KeepArchived.ALWAYS,
     /** 自动同步状态（issue #58）。 */
     val sync: SyncState = SyncState(),
+    /** 新文章通知总开关（#31）。 */
+    val notifyEnabled: Boolean = false,
+    /** 系统通知权限是否已授予（Android 13+）；true = 低版本无需权限。 */
+    val notifyPermissionGranted: Boolean = true,
+    /** 通知设置的提示文案（权限被拒时说明原因）。 */
+    val notifyMessage: String? = null,
     /** 路由目录（issue #59）：条数 / 数据时间 / 来源。 */
     val catalogRouteCount: Int = 0,
     val catalogGeneratedAt: Long? = null,
@@ -127,6 +137,7 @@ class RssHubSettingsViewModel @Inject constructor(
     private val listDisplayStore: ListDisplayStore,
     private val archiveStore: ArchiveStore,
     private val syncStore: SyncStore,
+    private val notificationStore: NotificationStore,
     private val catalogStore: RouteCatalogStore,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
@@ -135,6 +146,8 @@ class RssHubSettingsViewModel @Inject constructor(
         RssHubSettingsUiState(
             activeHost = store.currentOrDefault(),
             aiKeyInput = aiStore.apiKey.orEmpty(),
+            notifyEnabled = notificationStore.state.value,
+            notifyPermissionGranted = NotificationHelper.hasPermission(appContext),
             aiKeyConfigured = aiStore.hasKey(),
         ),
     )
@@ -163,6 +176,12 @@ class RssHubSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             syncStore.state.collect { sync ->
                 _state.value = _state.value.copy(sync = sync)
+            }
+        }
+        // 通知总开关（#31）
+        viewModelScope.launch {
+            notificationStore.state.collect { enabled ->
+                _state.value = _state.value.copy(notifyEnabled = enabled)
             }
         }
         // 路由目录（issue #59）：装载一次，之后跟随 Store 的更新广播
@@ -198,6 +217,29 @@ class RssHubSettingsViewModel @Inject constructor(
                     )
                 }
         }
+    }
+
+    /**
+     * 通知总开关（#31）：只改开关不发权限请求——权限由设置页在用户点开时
+     * 通过 [onNotifyPermissionResult] 的结果回填。
+     */
+    fun setNotifyEnabled(enabled: Boolean) {
+        val granted = NotificationHelper.hasPermission(appContext)
+        _state.value = _state.value.copy(
+            notifyPermissionGranted = granted,
+            notifyMessage = if (enabled && !granted) "请在系统弹窗中允许通知权限" else null,
+        )
+        if (enabled && !granted) return // 等权限结果回来（见 onNotifyPermissionResult）
+        notificationStore.set(enabled)
+    }
+
+    /** 权限请求结果回填：给了就开开关，没给就关掉并如实说明。 */
+    fun onNotifyPermissionResult(granted: Boolean) {
+        notificationStore.set(granted)
+        _state.value = _state.value.copy(
+            notifyPermissionGranted = granted,
+            notifyMessage = if (granted) null else "没有通知权限，无法开启新文章通知",
+        )
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -326,6 +368,10 @@ fun RssHubSettingsScreen(
     val state by viewModel.state.collectAsState()
     var showKeepSheet by remember { mutableStateOf(false) }
     var showIntervalSheet by remember { mutableStateOf(false) }
+    // Android 13+ 的通知运行时权限：用户点开开关时才请求，不在进页面时打扰
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> viewModel.onNotifyPermissionResult(granted) }
 
     Column(
         modifier = modifier
@@ -512,6 +558,45 @@ fun RssHubSettingsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ---- 新文章通知（#31）----
+        Text(
+            text = "新文章通知",
+            color = TextSecondary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "自动同步后发现新文章时发一条汇总通知。逐个订阅源可在订阅操作页单独关闭。",
+            color = TextTertiary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+        )
+        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                SettingSwitchRow(
+                    label = "开启通知",
+                    checked = state.notifyEnabled,
+                    onChange = { enabled ->
+                        if (enabled && !state.notifyPermissionGranted && needsNotificationPermission()) {
+                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            viewModel.setNotifyEnabled(enabled)
+                        }
+                    },
+                )
+                state.notifyMessage?.let { message ->
+                    Text(
+                        text = message,
+                        color = TextTertiary,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(vertical = 4.dp),
+                    )
+                }
             }
         }
 
@@ -891,3 +976,7 @@ fun RssHubSettingsScreen(
     }
 }
 
+
+/** Android 13（API 33）起通知是运行时权限；低版本由系统默认授予。 */
+private fun needsNotificationPermission(): Boolean =
+    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU

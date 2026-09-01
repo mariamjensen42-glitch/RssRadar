@@ -37,7 +37,7 @@
 | 6 | Favicon 自动抓取（Besticon 服务） | `infrastructure/rss/BestIconFinder.kt`（RssRadar 有 iconUrl 字段但无抓取链路） | ✅ 2026-08-30 |
 | 7 | 批量移动 feed 到分组 | `drawer/group/AllMoveToGroupDialog.kt` | ✅ 2026-08-31 |
 | 8 | 清空 feed / 分组文章 | `ClearFeedDialog.kt`、`ClearGroupDialog.kt` | ✅ 2026-08-31 |
-| 9 | Feed 级预设：单独开关通知、单独开关全文抓取 | `ui/page/home/feeds/drawer/feed/FeedOptionDrawer.kt` | ⚠️ 部分 |
+| 9 | Feed 级预设：单独开关通知、单独开关全文抓取 | `ui/page/home/feeds/drawer/feed/FeedOptionDrawer.kt` | ✅ 2026-09-01 |
 
 > 订阅源管理三项实施记录（2026-08-31）：
 > - **#7 批量移动**：订阅管理页顶栏入口进入多选态 → 勾选 → 选目标分组一次写库（`FeedDao.updateGroupForFeeds`）。
@@ -94,9 +94,19 @@
 
 ### 六、系统级
 
+> 2026-09-01 实施记录（#31 新文章通知，顺带补完 #9 的通知开关）：
+> - **两道开关**：全局 `NotificationStore`（默认关）+ Feed 级 `feeds.notificationsEnabled`（DB v10，默认开）。
+> - **触发点**：`AutoSync.run()` 在刷新前取起点时间戳，归档之后调 `notifyNewArticles(startedAt)`。
+>   同步 Worker 与启动同步共用同一实现；`NotifyNewArticles` 由 DI 注入，AutoSync 本身不碰 Android 通知代码。
+> - **查询**：`ArticleDao.loadNewUnreadSince` 按 `fetchedAt >= since` 取新进库未读文章，SQL 层直接过滤掉
+>   关了通知的源——归档之后再统计，刚清理掉的旧文章不会出现在通知里。
+> - **文案**：`NewArticleSummary`（纯函数）汇总成「N 篇新文章 + 前 3 条标题 + 还有 X 篇」，数字全部真实。
+> - **权限**：Android 13+ 的 POST_NOTIFICATIONS 在用户点开开关时才请求（不在进页面时打扰），被拒就关掉并如实说明。
+> - **图标**：状态栏图标必须是白色单色剪影，单独做了 `res/drawable/ic_stat_rssradar.xml`，不与彩色启动器图标共用。
+
 | # | 功能 | ReadYou 依据 |
 |---|------|--------------|
-| 31 | 新文章系统通知（含渠道分组、Feed 级开关）——RssRadar 零 notification 代码 | `infrastructure/android/NotificationHelper.kt` |
+| 31 | 新文章系统通知（含渠道分组、Feed 级开关）——RssRadar 零 notification 代码 | `infrastructure/android/NotificationHelper.kt` | ✅ 2026-09-01 |
 | 32 | 桌面小部件（文章卡片 + 列表两种，带配置页） | `ui/widget/ArticleCardWidget.kt`、`ArticleListWidget.kt` |
 | 33 | 应用内多语言切换 | `ui/page/settings/languages/` |
 | 34 | 系统分享/文本选择/翻译 intent 接入 | `AndroidManifest.xml`（SEND / PROCESS_TEXT / TRANSLATE） |

@@ -61,6 +61,8 @@ sealed interface SubscriptionsIntent {
     data class ExportOpml(val uri: Uri) : SubscriptionsIntent
     /** 自动同步开关（issue #58）：屏蔽后不参与自动同步，手动刷新照常。 */
     data class SetSyncEnabled(val feedId: Long, val enabled: Boolean) : SubscriptionsIntent
+    /** Feed 级通知开关（#31）。 */
+    data class SetNotificationsEnabled(val feedId: Long, val enabled: Boolean) : SubscriptionsIntent
 }
 
 @HiltViewModel
@@ -125,6 +127,7 @@ class SubscriptionsViewModel @Inject constructor(
             is SubscriptionsIntent.ImportOpml -> importOpml(intent.uri)
             is SubscriptionsIntent.ExportOpml -> exportOpml(intent.uri)
             is SubscriptionsIntent.SetSyncEnabled -> setSyncEnabled(intent.feedId, intent.enabled)
+            is SubscriptionsIntent.SetNotificationsEnabled -> setNotificationsEnabled(intent.feedId, intent.enabled)
         }
     }
 
@@ -316,6 +319,14 @@ class SubscriptionsViewModel @Inject constructor(
             viewModelScope.launch {
                 repository.refreshFeeds(result.newFeedIds)
             }
+        }
+    }
+
+    /** Feed 级通知开关（#31）：写库即生效，FeedAction 页的 feed 是 Room flow，自动刷新。 */
+    private fun setNotificationsEnabled(feedId: Long, enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setNotificationsEnabled(feedId, enabled)
+            uiMessage = if (enabled) "已开启此源的通知" else "已关闭此源的通知"
         }
     }
 

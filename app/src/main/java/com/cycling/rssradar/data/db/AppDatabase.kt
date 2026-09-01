@@ -45,6 +45,11 @@ data class FeedEntity(
      * 关闭后详情页只显示 feed 自带内容，不再联网抓全文。
      */
     @ColumnInfo(defaultValue = "1") val fullContentEnabled: Boolean = true,
+    /**
+     * Feed 级通知开关（#31）：关闭后该源的新文章不进系统通知，其他行为不变。
+     * 默认开（与全局通知开关默认关不冲突：全局关时一条都不发）。
+     */
+    @ColumnInfo(defaultValue = "1") val notificationsEnabled: Boolean = true,
 ) {
     companion object {
         const val SOURCE_TYPE_RSS = 0
@@ -216,6 +221,10 @@ interface FeedDao {
     /** Feed 级预设：全文抓取开关（issue #9）。 */
     @Query("UPDATE feeds SET fullContentEnabled = :enabled WHERE id = :feedId")
     suspend fun updateFullContentEnabled(feedId: Long, enabled: Boolean)
+
+    /** Feed 级通知开关（#31）。 */
+    @Query("UPDATE feeds SET notificationsEnabled = :enabled WHERE id = :feedId")
+    suspend fun updateNotificationsEnabled(feedId: Long, enabled: Boolean)
 
     /** 参与自动同步的源 id 清单（issue #58）。 */
     @Query("SELECT id FROM feeds WHERE syncEnabled = 1")
@@ -427,6 +436,24 @@ interface ArticleDao {
     /** 滚动自动标记已读（#11）用：只更新给定 id 里仍未读的行。 */
     @Query("UPDATE articles SET isRead = 1 WHERE isRead = 0 AND id IN (:ids)")
     suspend fun markReadBatch(ids: List<Long>): Int
+
+    /**
+     * 同步后新进库且未读的文章（#31 通知用）："入库时间 ≥ 本轮同步起点"即为新文章，
+     * 逐个源的通知开关在这一层过滤——关掉的源一条都不进通知。
+     * [limit] 只是通知里要展示的条数上限。
+     */
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.fetchedAt >= :since AND articles.isRead = 0 AND feeds.notificationsEnabled = 1
+        ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun loadNewUnreadSince(since: Long, limit: Int): List<ArticleWithFeed>
 
     /** 删除单篇文章（撤销由 restore 带原 id 插回）。 */
     @Query("DELETE FROM articles WHERE id = :id")
@@ -643,9 +670,18 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
     }
 }
 
+/** v9 → v10（#31）：feeds 增加 Feed 级通知开关列，默认开（存量源行为不变）。 */
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE feeds ADD COLUMN notificationsEnabled INTEGER NOT NULL DEFAULT 1",
+        )
+    }
+}
+
 @Database(
     entities = [FeedEntity::class, ArticleEntity::class, ContentFetchLogEntity::class, ArchivedArticleTombstoneEntity::class],
-    version = 9,
+    version = 10,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

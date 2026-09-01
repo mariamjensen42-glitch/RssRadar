@@ -282,6 +282,17 @@ class FeedRepository(
     suspend fun markReadBatch(ids: List<Long>): Int =
         if (ids.isEmpty()) 0 else articleDao.markReadBatch(ids)
 
+    /**
+     * 本轮同步新进库的未读文章（#31 通知用；Feed 级开关在 SQL 层过滤）。
+     * [limit] 只是通知里要展示的条数。
+     */
+    suspend fun newUnreadSince(since: Long, limit: Int): List<ArticleWithFeed> =
+        articleDao.loadNewUnreadSince(since, limit)
+
+    /** Feed 级通知开关（#31）。 */
+    suspend fun setNotificationsEnabled(feedId: Long, enabled: Boolean) =
+        feedDao.updateNotificationsEnabled(feedId, enabled)
+
     /** 已读/未读互切（长按菜单，issue #46）。 */
     suspend fun setRead(id: Long, read: Boolean) = articleDao.setRead(id, read)
 

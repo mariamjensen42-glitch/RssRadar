@@ -22,6 +22,9 @@ import com.cycling.rssradar.data.store.ReadingImageStore
 import com.cycling.rssradar.data.store.ReadingRendererStore
 import com.cycling.rssradar.data.store.ReadingStyleStore
 import com.cycling.rssradar.data.store.SettingsPrefs
+import com.cycling.rssradar.data.notify.NewArticleSummary
+import com.cycling.rssradar.data.notify.NotificationHelper
+import com.cycling.rssradar.data.store.NotificationStore
 import com.cycling.rssradar.data.store.SyncStore
 import com.cycling.rssradar.data.store.TranslationDisplayStore
 import com.cycling.rssradar.data.db.MIGRATION_1_2
@@ -32,6 +35,7 @@ import com.cycling.rssradar.data.db.MIGRATION_5_6
 import com.cycling.rssradar.data.db.MIGRATION_6_7
 import com.cycling.rssradar.data.db.MIGRATION_7_8
 import com.cycling.rssradar.data.db.MIGRATION_8_9
+import com.cycling.rssradar.data.db.MIGRATION_9_10
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.parser.RssParser
 import com.cycling.rssradar.data.rss.BestIconFinder
@@ -67,6 +71,7 @@ object AppModule {
             .addMigrations(
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                 MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+                MIGRATION_9_10,
             )
             .build()
 
@@ -219,16 +224,43 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideNotificationStore(@ApplicationContext context: Context): NotificationStore =
+        NotificationStore(SettingsPrefs.of(context))
+
+    /**
+     * 新文章通知（#31）：把「查新文章 → 汇总文案 → 发通知」串成一个 suspend 函数注入 AutoSync。
+     * 全局开关关 / 没权限时静默不发；Feed 级开关在 SQL 查询里过滤。
+     */
+    @Provides
+    @Singleton
+    fun provideNotifyNewArticles(
+        @ApplicationContext context: Context,
+        notificationStore: NotificationStore,
+        feedRepository: FeedRepository,
+    ): NotifyNewArticles = NotifyNewArticles { since ->
+        if (!notificationStore.state.value) return@NotifyNewArticles
+        val articles = feedRepository.newUnreadSince(since, NOTIFY_SAMPLE_LIMIT)
+        val summary = NewArticleSummary.build(articles) ?: return@NotifyNewArticles
+        NotificationHelper.postNewArticles(context, summary)
+    }
+
+    @Provides
+    @Singleton
     fun provideAutoSync(
         syncStore: SyncStore,
         archiveStore: ArchiveStore,
         feedRepository: FeedRepository,
+        notifyNewArticles: NotifyNewArticles,
     ): AutoSync = AutoSync(
         syncStore = syncStore,
         archiveStore = archiveStore,
         refreshAutoSyncFeeds = feedRepository::refreshAutoSyncFeeds,
         archiveExpired = feedRepository::archiveExpired,
+        notifyNewArticles = { since -> notifyNewArticles(since) },
     )
+
+    /** 通知里取多少篇来汇总（真实总数由 [NewArticleSummary] 另行统计展示）。 */
+    const val NOTIFY_SAMPLE_LIMIT = 6
 }
 
 /**
