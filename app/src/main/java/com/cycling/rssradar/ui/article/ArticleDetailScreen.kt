@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.store.ReadingFontFamily
 import com.cycling.rssradar.data.store.ReadingImageState
+import com.cycling.rssradar.data.store.ReadingPrefs
 import com.cycling.rssradar.data.store.ReadingRenderer
 import com.cycling.rssradar.data.store.ReadingStyleState
 import com.cycling.rssradar.data.store.coerceFontSize
@@ -64,7 +65,6 @@ import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.shareArticle
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
-import com.cycling.rssradar.ui.theme.LocalReadingStyle
 import com.cycling.rssradar.ui.theme.OnAccent
 import com.cycling.rssradar.ui.theme.Surface1
 import com.cycling.rssradar.ui.theme.Surface2
@@ -105,8 +105,7 @@ fun ArticleDetailScreen(
     val aiSummaryState by viewModel.aiSummaryState.collectAsState()
     val translationState by viewModel.translationState.collectAsState()
     val neighbors by viewModel.neighbors.collectAsState()
-    val renderer by viewModel.readingRenderer.collectAsState()
-    val imagePrefs by viewModel.readingImage.collectAsState()
+    val readingPrefs by viewModel.readingPrefs.collectAsState()
     val linkShare by viewModel.linkShare.collectAsState()
     // 分享文章（#26）需要 Context 起系统分享面板
     val context = LocalContext.current
@@ -205,7 +204,9 @@ fun ArticleDetailScreen(
             onGenerateSummary = { viewModel.onIntent(ArticleDetailIntent.GenerateSummary) },
             onRetranslate = { viewModel.onIntent(ArticleDetailIntent.RetranslateArticle) },
             onShowOriginal = { viewModel.onIntent(ArticleDetailIntent.ToggleTranslation) },
-            onTranslationDisplayChange = viewModel::updateTranslationDisplay,
+            onTranslationDisplayChange = { next ->
+                viewModel.updateReadingPrefs { it.copy(translation = next) }
+            },
             onImageClick = { url -> imageViewer = openImageViewer(current, url) },
             modifier = Modifier
                 .fillMaxSize()
@@ -223,15 +224,22 @@ fun ArticleDetailScreen(
 
     if (showStyleSheet) {
         ReadingStyleSheet(
-            renderer = renderer.renderer,
-            image = imagePrefs,
-            onRenderer = { viewModel.setRenderer(it) },
-            onFontSize = { v -> viewModel.updateReadingStyle { it.copy(fontSize = v) } },
-            onLineHeight = { v -> viewModel.updateReadingStyle { it.copy(lineHeight = v) } },
-            onPadding = { v -> viewModel.updateReadingStyle { it.copy(horizontalPadding = v) } },
-            onFontFamily = { v -> viewModel.updateReadingStyle { it.copy(fontFamily = v) } },
-            onImageCornerRadius = { v -> viewModel.updateReadingImage { it.copy(cornerRadius = v) } },
-            onImageMaximize = { v -> viewModel.updateReadingImage { it.copy(maximizeOnTap = v) } },
+            prefs = readingPrefs,
+            onRenderer = { r -> viewModel.updateReadingPrefs { it.copy(renderer = r) } },
+            onFontSize = { v -> viewModel.updateReadingPrefs { it.copy(style = it.style.copy(fontSize = v)) } },
+            onLineHeight = { v -> viewModel.updateReadingPrefs { it.copy(style = it.style.copy(lineHeight = v)) } },
+            onPadding = { v ->
+                viewModel.updateReadingPrefs { it.copy(style = it.style.copy(horizontalPadding = v)) }
+            },
+            onFontFamily = { v ->
+                viewModel.updateReadingPrefs { it.copy(style = it.style.copy(fontFamily = v)) }
+            },
+            onImageCornerRadius = { v ->
+                viewModel.updateReadingPrefs { it.copy(image = it.image.copy(cornerRadius = v)) }
+            },
+            onImageMaximize = { v ->
+                viewModel.updateReadingPrefs { it.copy(image = it.image.copy(maximizeOnTap = v)) }
+            },
             onDismiss = { showStyleSheet = false },
         )
     }
@@ -327,14 +335,16 @@ private fun ArticleDetailTopBar(
 }
 
 /**
- * 排版设置弹层（issue #42）：字号步进、行距/边距滑杆、字体族三选一。
- * 显示值读 LocalReadingStyle，写入经 VM 直达 ReadingStyleStore，无确认按钮即改即见。
+ * 排版设置弹层（issue #42）：渲染器、字号步进、行距/边距滑杆、字体族、图片圆角/放大。
+ * 显示值读 [LocalReadingPrefs]，写入经 VM 直达 ReadingPrefsStore，无确认按钮即改即见。
+ *
+ * 整份偏好作为一个参数进出，而不是拆成「渲染器 + 图片 + 排版」若干组回调——
+ * 四项同属阅读偏好，拆开只会把接线成本再复制一遍。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReadingStyleSheet(
-    renderer: ReadingRenderer,
-    image: ReadingImageState,
+    prefs: ReadingPrefs,
     onRenderer: (ReadingRenderer) -> Unit,
     onFontSize: (Int) -> Unit,
     onLineHeight: (Float) -> Unit,
@@ -344,7 +354,9 @@ private fun ReadingStyleSheet(
     onImageMaximize: (Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val style = LocalReadingStyle.current
+    val style = prefs.style
+    val image = prefs.image
+    val renderer = prefs.renderer
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Surface1) {
         Column(
             modifier = Modifier

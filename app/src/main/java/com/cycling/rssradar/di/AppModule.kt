@@ -12,6 +12,7 @@ import com.cycling.rssradar.data.parser.ContentFetcher
 import com.cycling.rssradar.data.parser.FetchConfig
 import com.cycling.rssradar.data.parser.FetchLogger
 import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.data.OnDemandFetch
 import com.cycling.rssradar.data.RefreshEngine
 import com.cycling.rssradar.data.TransactionRunner
 import com.cycling.rssradar.data.store.AiStore
@@ -19,15 +20,12 @@ import com.cycling.rssradar.data.store.ArchiveStore
 import com.cycling.rssradar.data.store.GroupStore
 import com.cycling.rssradar.data.store.LinkStore
 import com.cycling.rssradar.data.store.ListDisplayStore
-import com.cycling.rssradar.data.store.ReadingImageStore
-import com.cycling.rssradar.data.store.ReadingRendererStore
-import com.cycling.rssradar.data.store.ReadingStyleStore
+import com.cycling.rssradar.data.store.ReadingPrefsStore
 import com.cycling.rssradar.data.store.SettingsPrefs
 import com.cycling.rssradar.data.notify.NewArticleSummary
 import com.cycling.rssradar.data.notify.NotificationHelper
 import com.cycling.rssradar.data.store.NotificationStore
 import com.cycling.rssradar.data.store.SyncStore
-import com.cycling.rssradar.data.store.TranslationDisplayStore
 import com.cycling.rssradar.data.db.MIGRATION_1_2
 import com.cycling.rssradar.data.db.MIGRATION_2_3
 import com.cycling.rssradar.data.db.MIGRATION_3_4
@@ -146,13 +144,23 @@ object AppModule {
         db: AppDatabase,
         engine: RefreshEngine,
         http: HttpFetcher,
+    ): FeedRepository = FeedRepository(db, engine, http = http)
+
+    /**
+     * 按需抓取（ADR-0001 + ADR-0012）：抓取正文与写抓取日志是一个模块的两半，
+     * 诊断页与详情页都直连它，不经过 FeedRepository 转发。
+     */
+    @Provides
+    @Singleton
+    fun provideOnDemandFetch(
+        db: AppDatabase,
         contentFetcher: ContentFetcher,
         logger: FetchLogger,
-    ): FeedRepository = FeedRepository(
-        db,
-        engine,
-        http = http,
-        contentFetcher = contentFetcher,
+    ): OnDemandFetch = OnDemandFetch(
+        articleDao = db.articleDao(),
+        feedDao = db.feedDao(),
+        contentFetchLogDao = db.contentFetchLogDao(),
+        fetchOutcome = { link -> contentFetcher.fetch(link) },
         logger = logger,
     )
 
@@ -172,30 +180,20 @@ object AppModule {
     fun provideThemeStore(@ApplicationContext context: Context): ThemeStore =
         ThemeStore(SettingsPrefs.of(context))
 
+    /**
+     * 阅读偏好（排版 / 图片 / 渲染器 / 译文显示）合成一个模块：一份 state、一条 provide。
+     * 此前四项各是一个 Store，每项都要重复 provides → EntryPoint → CompositionLocal
+     * 九点接线；合成后接线只剩一条。
+     */
     @Provides
     @Singleton
-    fun provideReadingStyleStore(@ApplicationContext context: Context): ReadingStyleStore =
-        ReadingStyleStore(SettingsPrefs.of(context))
-
-    @Provides
-    @Singleton
-    fun provideReadingImageStore(@ApplicationContext context: Context): ReadingImageStore =
-        ReadingImageStore(SettingsPrefs.of(context))
-
-    @Provides
-    @Singleton
-    fun provideReadingRendererStore(@ApplicationContext context: Context): ReadingRendererStore =
-        ReadingRendererStore(SettingsPrefs.of(context))
+    fun provideReadingPrefsStore(@ApplicationContext context: Context): ReadingPrefsStore =
+        ReadingPrefsStore(SettingsPrefs.of(context))
 
     @Provides
     @Singleton
     fun provideListDisplayStore(@ApplicationContext context: Context): ListDisplayStore =
         ListDisplayStore(SettingsPrefs.of(context))
-
-    @Provides
-    @Singleton
-    fun provideTranslationDisplayStore(@ApplicationContext context: Context): TranslationDisplayStore =
-        TranslationDisplayStore(SettingsPrefs.of(context))
 
     @Provides
     @Singleton
@@ -277,10 +275,7 @@ object AppModule {
 @InstallIn(SingletonComponent::class)
 interface AppEntryPoint {
     fun themeStore(): ThemeStore
-    fun readingStyleStore(): ReadingStyleStore
-    fun readingRendererStore(): ReadingRendererStore
-    fun readingImageStore(): ReadingImageStore
-    fun translationDisplayStore(): TranslationDisplayStore
+    fun readingPrefsStore(): ReadingPrefsStore
     fun listDisplayStore(): ListDisplayStore
     fun archiveStore(): ArchiveStore
     fun syncStore(): SyncStore

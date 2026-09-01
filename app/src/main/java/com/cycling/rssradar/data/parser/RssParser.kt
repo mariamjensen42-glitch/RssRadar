@@ -171,7 +171,7 @@ class RssParser {
          *
          * 背景（正文不完整的根因）：description 与 content 取较长者，只给摘要的 feed
          * （RSSHub 大量路由如此）拿到的就是两三百字的摘要；旧实现只要 `contentHtml != null`
-         * 就标 `CONTENT_SOURCE_FEED`，于是 `FeedRepository.fetchFullContent` 的
+         * 就标 `CONTENT_SOURCE_FEED`，于是 `OnDemandFetch.fetch` 的
          * 「已有正文就不抓」早退条件命中 → 详情页永远不去抓原文 → 用户只看到摘要，
          * 且没有任何失败记录。
          *

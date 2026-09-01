@@ -52,21 +52,19 @@ object SyncScheduler {
 
     /**
      * 应用启动入口：先按最新偏好重建周期任务（覆盖系统重启/任务被清的场景），
-     * 再 fire-and-forget 执行自动同步用例：应跑启动同步走完整链路，否则只做归档清理。
-     * 顺序规则由 [AutoSync] 承载，此处不再复述。
+     * 再 fire-and-forget 跑自动同步用例。
+     *
+     * 跑哪条（完整同步还是只归档）以及启动去抖的判定都在 [AutoSync.runOnStart] 里 ——
+     * 那里有可注入的 clock，且 lastAutoSyncAt 也是它写的。本类只做 WorkManager 装配，
+     * 不参与同步策略。
      */
     fun onAppStart(context: Context, externalScope: CoroutineScope) {
         reschedule(context)
         externalScope.launch {
-            val entryPoint = EntryPointAccessors
+            val autoSync = EntryPointAccessors
                 .fromApplication(context.applicationContext, AppEntryPoint::class.java)
-            val state = entryPoint.syncStore().state.value
-            val shouldSync = state.syncOnStart &&
-                System.currentTimeMillis() - state.lastAutoSyncAt >= SyncStore.START_SYNC_DEBOUNCE_MS
-            runCatching {
-                if (shouldSync) entryPoint.autoSync().run()
-                else entryPoint.autoSync().archiveOnly()
-            }
+                .autoSync()
+            runCatching { autoSync.runOnStart() }
         }
     }
 }

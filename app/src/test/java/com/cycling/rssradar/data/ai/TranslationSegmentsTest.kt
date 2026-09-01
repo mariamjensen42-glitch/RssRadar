@@ -96,28 +96,37 @@ class TranslationSegmentsTest {
         assertEquals(emptyList<String>(), TranslationSegments.splitBlocks("   "))
     }
 
-    // ---- pairBlocks：原文块 ↔ 译文块逐一对应 ----
+    // ---- pair：原文块 ↔ 译文块逐一对应（原文块边界由 chunk 给定） ----
+
+    /** 按 UI 侧的真实用法构造输入：原文块边界来自 chunk，译文是模型新产出的 HTML。 */
+    private fun pairOf(original: String, translated: String?) =
+        TranslationSegments.pair(
+            listOf(
+                TranslationPairInput(
+                    originalBlocks = TranslationSegments.splitBlocks(original),
+                    translatedHtml = translated,
+                ),
+            ),
+        )
 
     @Test
-    fun `pairBlocks - one to one by index preserves block order`() {
-        val original = "<p>one</p><h2>title</h2><p>two</p>"
-        val translated = "<p>一</p><h2>标题</h2><p>二</p>"
-        val pairs = TranslationSegments.pairBlocks(listOf(original to translated))
+    fun `pair - one to one by index preserves block order`() {
+        val pairs = pairOf("<p>one</p><h2>title</h2><p>two</p>", "<p>一</p><h2>标题</h2><p>二</p>")
         assertEquals(3, pairs.size)
         assertEquals(listOf("<p>one</p>", "<h2>title</h2>", "<p>two</p>"), pairs.map { it.originalHtml })
         assertEquals(listOf("<p>一</p>", "<h2>标题</h2>", "<p>二</p>"), pairs.map { it.translatedHtml })
     }
 
     @Test
-    fun `pairBlocks - untranslated chunk keeps originals with null translation`() {
-        val pairs = TranslationSegments.pairBlocks(listOf("<p>a</p><p>b</p>" to null))
+    fun `pair - untranslated chunk keeps originals with null translation`() {
+        val pairs = pairOf("<p>a</p><p>b</p>", null)
         assertEquals(2, pairs.size)
         assertTrue(pairs.all { it.translatedHtml == null })
     }
 
     @Test
-    fun `pairBlocks - model returns fewer blocks leaves the tail untranslated`() {
-        val pairs = TranslationSegments.pairBlocks(listOf("<p>a</p><p>b</p><p>c</p>" to "<p>甲</p>"))
+    fun `pair - model returns fewer blocks leaves the tail untranslated`() {
+        val pairs = pairOf("<p>a</p><p>b</p><p>c</p>", "<p>甲</p>")
         assertEquals(3, pairs.size)
         assertEquals("<p>甲</p>", pairs[0].translatedHtml)
         assertEquals(null, pairs[1].translatedHtml)
@@ -125,8 +134,8 @@ class TranslationSegmentsTest {
     }
 
     @Test
-    fun `pairBlocks - model returns more blocks keeps extra translations at the tail`() {
-        val pairs = TranslationSegments.pairBlocks(listOf("<p>a</p>" to "<p>甲</p><p>乙</p>"))
+    fun `pair - model returns more blocks keeps extra translations at the tail`() {
+        val pairs = pairOf("<p>a</p>", "<p>甲</p><p>乙</p>")
         assertEquals(2, pairs.size)
         assertEquals("<p>甲</p>", pairs[0].translatedHtml)
         assertEquals("<p>乙</p>", pairs[1].translatedHtml)
@@ -134,15 +143,57 @@ class TranslationSegmentsTest {
     }
 
     @Test
-    fun `pairBlocks - multiple chunks keep global block order`() {
-        val pairs = TranslationSegments.pairBlocks(
+    fun `pair - multiple chunks keep global block order`() {
+        val pairs = TranslationSegments.pair(
             listOf(
-                "<p>a1</p><p>a2</p>" to "<p>甲一</p><p>甲二</p>",
-                "<p>b1</p>" to null,
+                TranslationPairInput(
+                    originalBlocks = TranslationSegments.splitBlocks("<p>a1</p><p>a2</p>"),
+                    translatedHtml = "<p>甲一</p><p>甲二</p>",
+                ),
+                TranslationPairInput(
+                    originalBlocks = TranslationSegments.splitBlocks("<p>b1</p>"),
+                    translatedHtml = null,
+                ),
             ),
         )
         // 块序 = 原文块序：a1, a2, b1（译文按索引对位）
         assertEquals(listOf("<p>a1</p>", "<p>a2</p>", "<p>b1</p>"), pairs.map { it.originalHtml })
         assertEquals(listOf("<p>甲一</p>", "<p>甲二</p>", null), pairs.map { it.translatedHtml })
+    }
+
+    // ---- 两级单位的一致性：chunk 与 block 必须是同一套边界 ----
+
+    @Test
+    fun `chunk - blocks are exactly the concatenation of the chunk html`() {
+        val html = "<p>one</p><h2>title</h2><p>two</p>"
+
+        val chunks = TranslationSegments.chunk(html)
+
+        assertEquals(1, chunks.size)
+        // chunk.html 拼接起来 === 逐块切出来的块，边界是同一套
+        assertEquals(TranslationSegments.splitBlocks(html), chunks.single().blocks)
+        assertEquals(chunks.single().blocks.joinToString(""), chunks.single().html)
+    }
+
+    @Test
+    fun `chunk - every block lands in exactly one chunk`() {
+        // 撑到必然分成多个 chunk
+        val longHtml = (1..60).joinToString("") { "<p>第 ${it} 段，内容paddingpaddingpaddingpadding</p>" }
+
+        val chunks = TranslationSegments.chunk(longHtml)
+        assertTrue("应切成多个 chunk", chunks.size > 1)
+
+        val chunkedBlocks = chunks.flatMap { it.blocks }
+        assertEquals(TranslationSegments.splitBlocks(longHtml), chunkedBlocks)
+        // 不重不漏：块总数守恒
+        assertEquals(TranslationSegments.splitBlocks(longHtml).size, chunkedBlocks.size)
+        assertTrue(chunks.all { it.html == it.blocks.joinToString("") })
+    }
+
+    @Test
+    fun `split - equals chunk htmls`() {
+        val html = (1..60).joinToString("") { "<p>第 ${it} 段，内容paddingpaddingpaddingpadding</p>" }
+
+        assertEquals(TranslationSegments.chunk(html).map { it.html }, TranslationSegments.split(html))
     }
 }

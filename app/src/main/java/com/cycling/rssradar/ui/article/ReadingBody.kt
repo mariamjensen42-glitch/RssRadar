@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,7 +49,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.store.BilingualLayout
 import com.cycling.rssradar.data.store.ReadingFontFamily
-import com.cycling.rssradar.data.store.ReadingRenderer
 import com.cycling.rssradar.data.store.ReadingStyleState
 import com.cycling.rssradar.data.store.TranslationDisplayState
 import com.cycling.rssradar.data.store.TranslationViewMode
@@ -59,10 +57,7 @@ import com.cycling.rssradar.ui.components.openUrl
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.Link
-import com.cycling.rssradar.ui.theme.LocalReadingImage
-import com.cycling.rssradar.ui.theme.LocalReadingRenderer
-import com.cycling.rssradar.ui.theme.LocalReadingStyle
-import com.cycling.rssradar.ui.theme.LocalTranslationDisplay
+import com.cycling.rssradar.ui.theme.LocalReadingPrefs
 import com.cycling.rssradar.ui.theme.OnAccent
 import com.cycling.rssradar.ui.theme.Surface1
 import com.cycling.rssradar.ui.theme.Surface2
@@ -125,40 +120,37 @@ internal fun ReadingBody(
         is TranslationState.Shown -> state.segments
         else -> emptyList()
     }
-    val bodyHtml: String? = when {
-        translationUi != null -> null
-        article.article.content != null -> article.article.content
-        else -> null
-    }
-    // 原生渲染器（ADR-0009）：解析出的中间树非空才走 Compose。空树 = 解析一无所获或解析失败
-    // （ReadingNodes 会吞掉一切异常），此时自动回退 WebView——绝不把正文渲染成空白页。
-    // 解析只在 renderer 为 NATIVE 时做，WebView 路不付这份开销。
-    val renderer = LocalReadingRenderer.current.renderer
-    val nativeHtml = if (translationUi == null) article.article.content else null
-    val nativeNodes = remember(renderer, nativeHtml) {
-        if (renderer == ReadingRenderer.NATIVE && nativeHtml != null) ReadingNodes.parse(nativeHtml) else emptyList()
-    }
-    val useNative = nativeNodes.isNotEmpty()
-    // 译文分段全空（解析一无所获的怪 HTML）→ 回退 WebView 老路：显示已完成译文或原文。
-    val translationFallbackHtml = remember(translationSegments, article.article.content, article.article.summary) {
-        if (translationSegments.isNotEmpty() && translationSegments.all { seg ->
-                val html = seg.translatedHtml ?: seg.originalHtml
-                html.isBlank() || ReadingNodes.parse(html).isEmpty()
-            }
-        ) {
-            translationSegments.mapNotNull { it.translatedHtml }.joinToString("").ifBlank { null }
-                ?: (article.article.content ?: article.article.summary)
-        } else {
-            null
-        }
+    val renderer = LocalReadingPrefs.current.renderer
+    // 渲染模式与它所需的产物一次算清：判据本身要解析 HTML 才能知道"解析一无所获"，
+    // 分开算就是同一份 HTML 解析两遍。纯函数，见 BodyMode.kt（可 JVM 单测）。
+    val plan = remember(
+        translationUi,
+        translationSegments,
+        article.article.content,
+        article.article.summary,
+        renderer,
+    ) {
+        resolveBodyPlan(
+            translationActive = translationUi != null,
+            translationSegments = translationSegments,
+            content = article.article.content,
+            summary = article.article.summary,
+            renderer = renderer,
+        )
     }
     // OOM 防线（闪退诊断）：整页包高的 WebView 会被 Chromium 视为全部内容可见，
     // 有图文章的所有图片同时解码进 Java 堆，图多必 OOM（256MB 堆几十秒吃满）。
-    // 混合模式：有图 → 视口渲染；纯文字 → 整页渲染，文字栅格内存可控。
-    val viewport = translationUi == null &&
-        (if (useNative) false else bodyHtml?.contains("<img", ignoreCase = true) == true)
-    // 全屏查看页的多图列表与点击分流共用这一份；空串/无图正文 → 空集合，两条路都自动静默。
-    val imageUrls = remember(bodyHtml) { bodyHtml?.let { ReadingImages.extract(it) } ?: emptyList() }
+    // 只有含图的 WebView 路受限，原生路与译文路没有这个约束。
+    val viewport = shouldUseViewport(plan.mode, article.article.content)
+    // 全屏查看页的多图列表与点击分流共用这一份；只有 WebView 路需要（译文路与原生路
+    // 由 Compose 直接处理图片点击）。空串/无图正文 → 空集合，自动静默。
+    val imageUrls = remember(plan.mode, article.article.content) {
+        if (plan.mode == BodyMode.WEBVIEW) {
+            article.article.content?.let { ReadingImages.extract(it) } ?: emptyList()
+        } else {
+            emptyList()
+        }
+    }
 
     if (viewport) {
         Column(modifier = modifier.padding(vertical = 8.dp)) {
@@ -190,10 +182,8 @@ internal fun ReadingBody(
             BodyContent(
                 article = article,
                 isFetchingContent = isFetchingContent,
-                translationActive = false,
-                translationSegments = emptyList(),
-                translationFallbackHtml = null,
-                nativeNodes = nativeNodes,
+                translationSegments = translationSegments,
+                plan = plan,
                 viewport = true,
                 imageUrls = imageUrls,
                 onHeaderScroll = onHeaderScroll,
@@ -227,10 +217,8 @@ internal fun ReadingBody(
             BodyContent(
                 article = article,
                 isFetchingContent = isFetchingContent,
-                translationActive = translationUi != null,
                 translationSegments = translationSegments,
-                translationFallbackHtml = translationFallbackHtml,
-                nativeNodes = nativeNodes,
+                plan = plan,
                 viewport = false,
                 imageUrls = imageUrls,
                 onHeaderScroll = onHeaderScroll,
@@ -243,18 +231,19 @@ internal fun ReadingBody(
 }
 
 /**
- * 正文槽位：译文/原文/无内容三分支的唯一实现（原视口与整页两份逐行重复的 when 已合并）。
+ * 正文槽位：五条渲染路径的唯一实现（原视口与整页两份逐行重复的 when 已合并）。
+ *
+ * 走哪条路由 [BodyPlan] 给定（纯函数 [resolveBodyPlan] 算好并 memo 过），本组合函数
+ * 不再自己拼判据——判据错了是 [BodyModeTest] 的事，不是这里的事。
  * [viewport] 只决定触摸与滚动的归属；宽度由内部 fillMaxWidth 统一。
  */
 @Composable
 private fun BodyContent(
     article: ArticleWithFeed,
     isFetchingContent: Boolean,
-    /** 翻译激活（渐进中或已完成）。 */
-    translationActive: Boolean,
+    /** 译文分段（[BodyMode.TRANSLATION] 用）。 */
     translationSegments: List<TranslationSegmentUi>,
-    translationFallbackHtml: String?,
-    nativeNodes: List<ReadingNode>,
+    plan: BodyPlan,
     viewport: Boolean,
     imageUrls: List<String>,
     onHeaderScroll: (Int) -> Unit,
@@ -262,48 +251,42 @@ private fun BodyContent(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    when {
+    when (plan.mode) {
         // 渐进/已完成的译文：原生分段渲染（渐进显示 + 双语对照，翻译功能 v2）
-        translationActive && translationFallbackHtml == null ->
-            TranslationReader(
-                segments = translationSegments,                onLinkClick = { context.openUrl(it) },
-                onImageClick = onImageClick,
-                modifier = modifier.fillMaxWidth(),
-            )
+        BodyMode.TRANSLATION -> TranslationReader(
+            segments = translationSegments,
+            onLinkClick = { context.openUrl(it) },
+            onImageClick = onImageClick,
+            modifier = modifier.fillMaxWidth(),
+        )
         // 译文分段解析全空的兜底：整页 WebView 显示已完成译文（或原文）
-        translationFallbackHtml != null -> ArticleWebView(
-            html = translationFallbackHtml,
+        BodyMode.TRANSLATION_FALLBACK -> ArticleWebView(
+            html = plan.fallbackHtml ?: article.article.summary.orEmpty(),
             imageUrls = imageUrls,
             passThroughTouch = !viewport,
             onScroll = if (viewport) onHeaderScroll else null,
             onImageClick = onImageClick,
             modifier = modifier.fillMaxWidth(),
         )
-        // 原生渲染器（ADR-0009）：中间树非空即走 Compose
-        nativeNodes.isNotEmpty() -> {
-            ArticleNativeReader(
-                nodes = nativeNodes,
-                onLinkClick = { context.openUrl(it) },
-                onImageClick = onImageClick,
-                modifier = modifier.fillMaxWidth(),
-            )
-        }
-        article.article.content != null -> ArticleWebView(
-            html = article.article.content!!,
+        // 原生渲染器（ADR-0009）：中间树非空才走到这个模式
+        BodyMode.NATIVE -> ArticleNativeReader(
+            nodes = plan.nativeNodes,
+            onLinkClick = { context.openUrl(it) },
+            onImageClick = onImageClick,
+            modifier = modifier.fillMaxWidth(),
+        )
+        BodyMode.WEBVIEW -> ArticleWebView(
+            html = article.article.content ?: article.article.summary.orEmpty(),
             imageUrls = imageUrls,
             passThroughTouch = !viewport,
             onScroll = if (viewport) onHeaderScroll else null,
             onImageClick = onImageClick,
             modifier = modifier.fillMaxWidth(),
         )
-        else -> NoContentBody(
+        BodyMode.NO_CONTENT -> NoContentBody(
             summary = article.article.summary,
             isFetchingContent = isFetchingContent,
-            modifier = if (viewport) {
-                modifier.verticalScroll(rememberScrollState())
-            } else {
-                Modifier.padding(horizontal = 20.dp)
-            },
+            modifier = Modifier.padding(horizontal = 20.dp),
         )
     }
 }
@@ -530,7 +513,7 @@ private fun TranslationBanner(
     onShowOriginal: () -> Unit,
     onDisplayChange: (TranslationDisplayState) -> Unit,
 ) {
-    val display = LocalTranslationDisplay.current
+    val display = LocalReadingPrefs.current.translation
     val progressing = state is TranslationState.Progressing
     Row(
         modifier = Modifier
@@ -608,7 +591,7 @@ private fun TranslationBanner(
 /**
  * 净化后的正文 HTML 用 WebView 渲染：排版参数与主题色注入 CSS（issue #42）。
  * 模板构建在 [ReadingContentHtml]（纯函数，JVM 单测覆盖）；本组合函数只负责
- * 从 RssRadarPalette / LocalReadingStyle 读实时值。
+ * 从 RssRadarPalette / LocalReadingPrefs 读实时值。
  *
  * [passThroughTouch]：整页模式（高度包内容）为 true——触摸穿透给外层 Compose 滚动，
  * 否则 WebView 会吞掉滑动手势；视口模式（有图文章，内部滚动）为 false——
@@ -637,8 +620,8 @@ private fun ArticleWebView(
     val codeBg = toCssColor(Surface2)
     val border = toCssColor(Surface1)
     val link = toCssColor(Link)
-    val style = LocalReadingStyle.current
-    val image = LocalReadingImage.current
+    val style = LocalReadingPrefs.current.style
+    val image = LocalReadingPrefs.current.image
     // 关闭"点击放大"就传空集合：正文不包链接，图片点击在 WebView 里自然无反应。
     val linkedImages = if (image.maximizeOnTap) imageUrls.toSet() else emptySet()
     val styledHtml = remember(html, style, image, linkedImages, bg, fg, muted, codeBg, border, link) {
@@ -720,7 +703,7 @@ private fun ReadingFontFamily.toComposeFontFamily(): FontFamily = when (this) {
 
 @Composable
 private fun BodyParagraph(text: String) {
-    val style = LocalReadingStyle.current
+    val style = LocalReadingPrefs.current.style
     Text(
         text = text,
         color = TextPrimary,

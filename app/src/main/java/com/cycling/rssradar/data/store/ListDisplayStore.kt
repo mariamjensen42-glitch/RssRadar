@@ -35,7 +35,7 @@ data class ListDisplayState(
 )
 
 /**
- * 列表显示项偏好持久化 + 运行态共享（ReadingStyleStore 同款模式）。
+ * 列表显示项偏好持久化 + 运行态共享（与 [ReadingPrefsStore] 同款模式）。
  * 设置页改开关 → StateFlow 更新 → 主题宿主注入的 CompositionLocal 跟着重组，即改即见。
  */
 class ListDisplayStore(private val prefs: SharedPreferences) {

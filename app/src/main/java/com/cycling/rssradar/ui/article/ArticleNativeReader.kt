@@ -61,8 +61,7 @@ import com.cycling.rssradar.data.store.ReadingStyleState
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.Divider
 import com.cycling.rssradar.ui.theme.Link
-import com.cycling.rssradar.ui.theme.LocalReadingImage
-import com.cycling.rssradar.ui.theme.LocalReadingStyle
+import com.cycling.rssradar.ui.theme.LocalReadingPrefs
 import com.cycling.rssradar.ui.theme.Surface2
 import com.cycling.rssradar.ui.theme.TextPrimary
 import com.cycling.rssradar.ui.theme.TextSecondary
@@ -84,7 +83,7 @@ import kotlin.math.sqrt
  * 否则解析一无所获的文章会显示成空白页。
  * [onLinkClick]：所有外链（含媒体卡）的统一出口，调用方传 context.openUrl。
  * [onImageClick]：正文图片点击出口（ReadYou 差距表第 19 项）。图片圆角与"点图放大"
- * 开关直接读 LocalReadingImage——与 WebView 路读的是同一份偏好。
+ * 开关直接读 LocalReadingPrefs——与 WebView 路读的是同一份偏好。
  */
 @Composable
 internal fun ArticleNativeReader(
@@ -93,7 +92,7 @@ internal fun ArticleNativeReader(
     onImageClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val style = LocalReadingStyle.current
+    val style = LocalReadingPrefs.current.style
     NativeNodesColumn(
         nodes = nodes,
         onLinkClick = onLinkClick,
@@ -115,8 +114,8 @@ internal fun NativeNodesColumn(
     modifier: Modifier = Modifier,
     dimmed: Boolean = false,
 ) {
-    val style = LocalReadingStyle.current
-    val image = LocalReadingImage.current
+    val style = LocalReadingPrefs.current.style
+    val image = LocalReadingPrefs.current.image
     // 链接点击统一走 LocalUriHandler：AnnotatedString 里的 LinkAnnotation.Url 默认由它打开，
     // 换成 onLinkClick 即改即生效，且不依赖 LinkInteractionListener 这种版本敏感 API。
     val handler = remember(onLinkClick) {

@@ -75,8 +75,5 @@ class SyncStore(private val prefs: SharedPreferences) {
         private const val KEY_ONLY_CHARGING = "sync_only_charging"
         private const val KEY_SYNC_ON_START = "sync_on_start"
         private const val KEY_LAST_AUTO_SYNC = "sync_last_auto_sync_at"
-
-        /** 启动同步去抖阈值：距上次自动同步不足 30 分钟则跳过。写死，不做配置项。 */
-        const val START_SYNC_DEBOUNCE_MS = 30 * 60_000L
     }
 }

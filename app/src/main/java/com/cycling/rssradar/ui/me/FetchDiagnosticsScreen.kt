@@ -29,7 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.data.OnDemandFetch
 import com.cycling.rssradar.data.db.ContentFetchLogEntity
 import com.cycling.rssradar.data.db.FetchHostStat
 import com.cycling.rssradar.data.parser.ExtractionIssue
@@ -58,21 +58,22 @@ import java.util.Locale
 
 @HiltViewModel
 class FetchDiagnosticsViewModel @Inject constructor(
-    private val repository: FeedRepository,
+    /** 抓取日志的唯一读取方，直连按需抓取模块，不再经过 FeedRepository 转发。 */
+    private val onDemandFetch: OnDemandFetch,
 ) : ViewModel() {
 
     /** 有问题的记录：抓取失败 + 抓到但不完整。 */
     val problems: StateFlow<List<ContentFetchLogEntity>> =
-        repository.observeFetchProblems()
+        onDemandFetch.observeProblems()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** 按站点聚合：总数 / 失败数 / 不完整数。 */
     val hostStats: StateFlow<List<FetchHostStat>> =
-        repository.observeFetchHostStats()
+        onDemandFetch.observeHostStats()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun clear() {
-        viewModelScope.launch { repository.clearFetchLogs() }
+        viewModelScope.launch { onDemandFetch.clearLogs() }
     }
 }
 

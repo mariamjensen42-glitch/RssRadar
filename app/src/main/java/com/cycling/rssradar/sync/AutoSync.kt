@@ -42,6 +42,21 @@ class AutoSync(
         notifyNewArticles(startedAt)
     }
 
+    /**
+     * 应用启动入口：判定「这次启动要不要跑一次完整同步」，然后只跑该跑的那条。
+     *
+     * 去抖判定原先住在 SyncScheduler 的 WorkManager plumbing 里，直接调
+     * `System.currentTimeMillis()`，而本类手里就有一个可注入的 [clock] ——
+     * 判定偏偏住在唯一测不到的那侧。挪进来之后，去抖阈值与写 lastAutoSyncAt 的代码
+     * 同处一模块，测试注入 fake clock 就能跨过这条缝。
+     */
+    suspend fun runOnStart() {
+        val state = syncStore.state.value
+        val due = state.syncOnStart &&
+            clock() - state.lastAutoSyncAt >= START_SYNC_DEBOUNCE_MS
+        if (due) run() else archiveOnly()
+    }
+
     /** 仅归档清理，不刷新（启动时未到启动同步去抖阈值时走这条）。 */
     suspend fun archiveOnly() {
         // 归档不因取消而跳过一半：删一半留一半不可接受
@@ -55,5 +70,13 @@ class AutoSync(
         withContext(NonCancellable) {
             archiveExpired(archiveStore.state.value)
         }
+    }
+
+    companion object {
+        /**
+         * 启动同步去抖窗口：距上次自动同步不足这个时长就不再刷新，只做归档清理。
+         * 常数随判定住在本模块（原先在 SyncStore，判定在 SyncScheduler，隔文件对账）。
+         */
+        const val START_SYNC_DEBOUNCE_MS = 30 * 60_000L
     }
 }

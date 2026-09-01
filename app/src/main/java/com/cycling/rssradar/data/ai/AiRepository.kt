@@ -16,15 +16,18 @@ private data class TranslationCacheEntry(
 
 /**
  * 渐进式翻译的进度快照（翻译功能 v2）：
- * [originals] 恒定（分段切分一次成型）；[translated] 与之按序对齐，
+ * [chunks] 恒定（两级切分一次成型，块边界随分段带到渲染侧）；[translated] 与之按序对齐，
  * 元素为 null 表示该段尚未翻完。完成段数 = translated.count { it != null }。
  */
 data class TranslationProgress(
-    val originals: List<String>,
+    val chunks: List<TranslationChunk>,
     val translated: List<String?>,
 ) {
+    /** 各分段的原文（API 往返单位）。 */
+    val originals: List<String> get() = chunks.map { it.html }
+
     val doneCount: Int get() = translated.count { it != null }
-    val total: Int get() = originals.size
+    val total: Int get() = chunks.size
 }
 
 /**
@@ -110,31 +113,32 @@ class AiRepository(
         if (AiText.isMostlyChinese(article.contentText ?: html)) {
             return TranslationOutcome.AlreadyChinese
         }
-        val originals = TranslationSegments.split(html)
-        if (originals.isEmpty()) return TranslationOutcome.Failure("本文没有可翻译的内容")
+        // 两级一次切好：chunk 送 API，块边界随进度带到渲染侧（渲染侧不再二次切分）
+        val chunks = TranslationSegments.chunk(html)
+        if (chunks.isEmpty()) return TranslationOutcome.Failure("本文没有可翻译的内容")
 
         // 缓存秒出：同一段序的整篇译文直接回调全量进度
         translationCache[articleId]?.let { entry ->
-            if (entry.originalsHash == originals.hashCode() && entry.translated.size == originals.size) {
-                onProgress(TranslationProgress(originals, entry.translated))
+            if (entry.originalsHash == chunks.hashCode() && entry.translated.size == chunks.size) {
+                onProgress(TranslationProgress(chunks, entry.translated))
                 return TranslationOutcome.Success
             }
             translationCache.remove(articleId) // 正文变了，旧缓存作废
         }
 
-        val translated = arrayOfNulls<String>(originals.size)
-        onProgress(TranslationProgress(originals, translated.toList()))
+        val translated = arrayOfNulls<String>(chunks.size)
+        onProgress(TranslationProgress(chunks, translated.toList()))
         return try {
-            for (i in originals.indices) {
-                val (input, _) = AiText.truncateForPrompt(originals[i])
+            for (i in chunks.indices) {
+                val (input, _) = AiText.truncateForPrompt(chunks[i].html)
                 val out = client.chat(TRANSLATE_SYSTEM, input, temperature = 0.3)
                     .takeIf { it.isNotBlank() }
-                    ?: originals[i] // 单段失败回退原文，不中断整篇
+                    ?: chunks[i].html // 单段失败回退原文，不中断整篇
                 translated[i] = out
-                onProgress(TranslationProgress(originals, translated.toList()))
+                onProgress(TranslationProgress(chunks, translated.toList()))
             }
             translationCache[articleId] = TranslationCacheEntry(
-                originalsHash = originals.hashCode(),
+                originalsHash = chunks.hashCode(),
                 translated = translated.map { it.orEmpty() },
             )
             TranslationOutcome.Success

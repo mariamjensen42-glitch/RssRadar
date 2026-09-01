@@ -16,12 +16,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.data.ai.TranslationBlockPair
+import com.cycling.rssradar.data.ai.TranslationPairInput
 import com.cycling.rssradar.data.ai.TranslationSegments
 import com.cycling.rssradar.data.store.BilingualLayout
 import com.cycling.rssradar.data.store.TranslationViewMode
 import com.cycling.rssradar.ui.theme.Divider
-import com.cycling.rssradar.ui.theme.LocalReadingStyle
-import com.cycling.rssradar.ui.theme.LocalTranslationDisplay
+import com.cycling.rssradar.ui.theme.LocalReadingPrefs
 
 /**
  * 译文渲染区（翻译功能 v2）：渐进显示 + 双语对照的唯一实现。
@@ -31,12 +31,14 @@ import com.cycling.rssradar.ui.theme.LocalTranslationDisplay
  * [ReadingNodes.parse] 解析后走原生渲染（ADR-0009 的渲染半边复用，
  * 图片/媒体卡/链接点击行为与正文原生路一致）。
  *
- * 配对单位是**块**（[TranslationSegments.splitBlocks] 的顶层块，不是翻译分块）：
+ * 配对单位是**块**（[TranslationSegments] 两级切分里的顶层块，不是翻译分块）：
  * 双语对照严格"一段原文 → 它自己的译文"交替出现，标题/引用/代码块各自独立成对，
  * 不合并、不拆分，因此不会出现连续多段同为原文或同为译文的堆叠。
  * 列表块进一步拆到条目级（项一原文→项一译文→项二原文…），见 [buildRenderUnits]。
- * 翻译 API 仍按 ~1800 字的分块往返（省请求），块级配对在渲染侧摊平
- * （[TranslationSegments.pairBlocks]）。
+ *
+ * 两级单位（chunk = API 往返单位、block = 配对单位）都由 [TranslationSegments] 定：
+ * 原文块边界随 [TranslationSegmentUi.blocks] 带过来，这里只负责把**译文**切成块
+ * 再按下标配对，不再自己重切原文。
  *
  * - 纯译文：有译文显示译文，未翻出的块显示原文淡显（翻到哪亮到哪）。
  * - 双语·上下：原文块（淡显）在上、其译文块紧贴在下，成对向下推进。
@@ -55,11 +57,14 @@ internal fun TranslationReader(
     onImageClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val display = LocalTranslationDisplay.current
-    val style = LocalReadingStyle.current
+    val display = LocalReadingPrefs.current.translation
+    val style = LocalReadingPrefs.current.style
     // 块级配对：原文块与其译文块一一对应。分段内容变了才重算（渐进更新不重排已翻部分）。
+    // 原文块边界由分段计划给定，这里只切译文侧。
     val pairs: List<TranslationBlockPair> = remember(segments) {
-        TranslationSegments.pairBlocks(segments.map { it.originalHtml to it.translatedHtml })
+        TranslationSegments.pair(
+            segments.map { TranslationPairInput(it.blocks, it.translatedHtml) },
+        )
     }
 
     Column(

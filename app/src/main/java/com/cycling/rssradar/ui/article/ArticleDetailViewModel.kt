@@ -6,19 +6,13 @@ import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.data.db.ArticleEntity
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.data.OnDemandFetch
 import com.cycling.rssradar.data.ai.AiRepository
 import com.cycling.rssradar.data.store.AiStore
-import com.cycling.rssradar.data.store.ReadingRenderer
-import com.cycling.rssradar.data.store.ReadingRendererState
-import com.cycling.rssradar.data.store.ReadingImageState
-import com.cycling.rssradar.data.store.ReadingImageStore
-import com.cycling.rssradar.data.store.ReadingRendererStore
-import com.cycling.rssradar.data.store.ReadingStyleState
 import com.cycling.rssradar.data.store.LinkShareState
 import com.cycling.rssradar.data.store.LinkStore
-import com.cycling.rssradar.data.store.ReadingStyleStore
-import com.cycling.rssradar.data.store.TranslationDisplayState
-import com.cycling.rssradar.data.store.TranslationDisplayStore
+import com.cycling.rssradar.data.store.ReadingPrefs
+import com.cycling.rssradar.data.store.ReadingPrefsStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -61,6 +55,11 @@ sealed interface AiSummaryState {
 data class TranslationSegmentUi(
     val originalHtml: String,
     val translatedHtml: String?,
+    /**
+     * 本段原文内的顶层块（双语对照的配对单位）。由 [com.cycling.rssradar.data.ai.TranslationSegments]
+     * 分段时一次切好带过来——渲染侧不再把原文切第二遍，两级单位由同一个模块说了算。
+     */
+    val blocks: List<String>,
 )
 
 sealed interface TranslationState {
@@ -82,10 +81,9 @@ private const val KEY_ARTICLE_ID = "articleId"
 class ArticleDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: FeedRepository,
-    private val readingStyleStore: ReadingStyleStore,
-    private val readingImageStore: ReadingImageStore,
-    private val readingRendererStore: ReadingRendererStore,
-    private val translationDisplayStore: TranslationDisplayStore,
+    /** 按需抓取原网页正文（ADR-0001）。直连模块，不经过 FeedRepository 转发。 */
+    private val onDemandFetch: OnDemandFetch,
+    private val readingPrefsStore: ReadingPrefsStore,
     private val linkStore: LinkStore,
     private val aiRepository: AiRepository,
     private val aiStore: AiStore,
@@ -115,48 +113,21 @@ class ArticleDetailViewModel @Inject constructor(
     private var loadJob: Job? = null
 
     /**
-     * 阅读排版状态（issue #42）。偏好属 UI 环境而非业务事件，按 ADR-0003
-     * 「纯函数与状态 producer 保持 fun」的先例走普通方法，不进 Intent 面；
-     * 数据源与主题宿主注入的 LocalReadingStyle 是同一份 Store。
+     * 阅读偏好（排版 / 图片 / 渲染器 / 译文显示）。偏好属 UI 环境而非业务事件，
+     * 按 ADR-0003「纯函数与状态 producer 保持 fun」的先例走普通方法，不进 Intent 面；
+     * 数据源与主题宿主注入的 [com.cycling.rssradar.ui.theme.LocalReadingPrefs] 是同一份 Store。
+     *
+     * 四项偏好合成一份 state，因此这里只暴露两个成员，而不是原先的八个
+     * （四个 StateFlow + 四个写方法）。
      */
-    val readingStyle: StateFlow<ReadingStyleState> = readingStyleStore.state
+    val readingPrefs: StateFlow<ReadingPrefs> = readingPrefsStore.state
 
-    fun updateReadingStyle(transform: (ReadingStyleState) -> ReadingStyleState) {
-        readingStyleStore.update(transform)
+    fun updateReadingPrefs(transform: (ReadingPrefs) -> ReadingPrefs) {
+        readingPrefsStore.update(transform)
     }
-
-    /**
-     * 正文渲染器选择（原生双渲染器，ADR-0009）。与阅读排版同模式：VM 仅暴露状态与
-     * 写方法，数据源与主题宿主注入的 LocalReadingRenderer 是同一份 Store。
-     */
-    val readingRenderer: StateFlow<ReadingRendererState> = readingRendererStore.state
-
-    fun setRenderer(renderer: ReadingRenderer) {
-        readingRendererStore.set(renderer)
-    }
-
-    /**
-     * 阅读页图片偏好（圆角 / 点击放大，issue #60）。与阅读排版同模式：
-     * VM 只暴露状态与写方法，数据源与主题宿主注入的 LocalReadingImage 是同一份 Store。
-     */
-    val readingImage: StateFlow<ReadingImageState> = readingImageStore.state
-
-    fun updateReadingImage(transform: (ReadingImageState) -> ReadingImageState) {
-        readingImageStore.update(transform)
-    }
-
-    /**
-     * 译文显示偏好（纯译文/双语、上下/左右）。与阅读排版同模式：VM 只暴露状态与
-     * 写方法，数据源与主题宿主注入的 LocalTranslationDisplay 是同一份 Store。
-     */
-    val translationDisplay: StateFlow<TranslationDisplayState> = translationDisplayStore.state
 
     /** 外链打开方式与分享格式（#26）：阅读页分享/打开链接时按此偏好执行。 */
     val linkShare: StateFlow<LinkShareState> = linkStore.state
-
-    fun updateTranslationDisplay(state: TranslationDisplayState) {
-        translationDisplayStore.update { state }
-    }
 
     init {
         // articleId 来自 nav args（类型安全路由写入 SavedStateHandle，issue #32）。
@@ -210,7 +181,7 @@ class ArticleDetailViewModel @Inject constructor(
         val current = _article.value ?: return
         if (current.article.contentSource != ArticleEntity.CONTENT_SOURCE_NONE) return
         _isFetchingContent.value = true
-        runCatching { repository.fetchFullContent(articleId) }
+        runCatching { onDemandFetch.fetch(articleId) }
         _isFetchingContent.value = false
         _article.value = repository.getArticle(articleId)
     }
@@ -278,8 +249,12 @@ class ArticleDetailViewModel @Inject constructor(
             when (val outcome = aiRepository.translate(currentArticleId) { progress ->
                 // 渐进回调：每翻完一段推一版；缓存命中时首帧即全量
                 _translationState.value = TranslationState.Progressing(
-                    progress.originals.mapIndexed { i, original ->
-                        TranslationSegmentUi(originalHtml = original, translatedHtml = progress.translated[i])
+                    progress.chunks.mapIndexed { i, chunk ->
+                        TranslationSegmentUi(
+                            originalHtml = chunk.html,
+                            translatedHtml = progress.translated[i],
+                            blocks = chunk.blocks,
+                        )
                     },
                 )
             }) {
