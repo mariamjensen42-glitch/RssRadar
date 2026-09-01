@@ -103,6 +103,12 @@ data class ArticleEntity(
     @ColumnInfo(defaultValue = "0") val contentIncomplete: Boolean = false,
     /** AI 摘要：LLM 基于正文生成的内容概括。生成物语义同用户状态——刷新永不覆盖。见 ADR-0005。 */
     val aiSummary: String? = null,
+    /**
+     * 最近一次打开详情页的时间（推荐流画像的唯一采集信号，ADR-0013）。
+     * 每次打开都更新——只记首开时间就无法区分"最近常看"和"三个月前看过一次"，
+     * 源亲和度的时间衰减也就无从算起。null = 从未打开过。
+     */
+    val lastOpenedAt: Long? = null,
 ) {
     companion object {
         const val CONTENT_SOURCE_NONE = 0
@@ -134,7 +140,34 @@ private const val ARTICLE_LIST_COLUMNS =
     "articles.id, articles.feedId, articles.link, articles.title, articles.summary, " +
         "articles.publishedAt, articles.fetchedAt, articles.author, articles.contentSource, " +
         "articles.isRead, articles.isStarred, articles.isBookmarked, articles.readingMinutes, " +
-        "articles.coverUrl, articles.aiSummary, articles.contentIncomplete"
+        "articles.coverUrl, articles.aiSummary, articles.contentIncomplete, articles.lastOpenedAt"
+
+/**
+ * 推荐画像的输入行（ADR-0013）：所有"用户真实表达过兴趣"的文章。
+ * 打开过（lastOpenedAt 非空）、收藏、稍后读都算——三选一即可入样本，
+ * 没有这些信号的文章不参与画像（画像只由真实行为驱动，不预置兴趣类别）。
+ */
+data class EngagementRow(
+    val id: Long,
+    val feedId: Long,
+    val title: String,
+    val summary: String?,
+    val lastOpenedAt: Long?,
+    val isStarred: Boolean,
+    val isBookmarked: Boolean,
+)
+
+/**
+ * 推荐负反馈（ADR-0013「减少此类」）：一个订阅源一行，penalty 是推荐流里的降权系数。
+ * 只作用于推荐流，不影响常规信息流与订阅本身；撤销即删行。
+ */
+@Entity(tableName = "recommendation_feedback")
+data class RecommendationFeedbackEntity(
+    @PrimaryKey val feedId: Long,
+    /** 推荐流降权系数 (0,1]，越小越靠后。1 = 不降权。 */
+    val penalty: Double,
+    val updatedAt: Long,
+)
 
 /** 文章 id 与 link 的轻量对，供刷新时一次建 link→id 映射（#48 批量 upsert）。 */
 data class ArticleIdLink(
@@ -304,6 +337,76 @@ interface ArticleDao {
     )
     @Suppress("QUERY_MISMATCH")
     suspend fun loadFeedWithFeedPaged(feedId: Long, limit: Int, offset: Int): List<ArticleWithFeed>
+
+    /**
+     * 推荐候选池（ADR-0013）：未读 且 发布时间在窗口内。
+     * 已读文章永不进推荐。窗口基准与归档一致（COALESCE(publishedAt, fetchedAt)）。
+     * [limit] 是候选池上限（不是分页），打分在内存里做。
+     */
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.isRead = 0
+            AND COALESCE(articles.publishedAt, articles.fetchedAt) >= :since
+        ORDER BY COALESCE(articles.publishedAt, articles.fetchedAt) DESC
+        LIMIT :limit
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun loadRecommendationCandidates(since: Long, limit: Int): List<ArticleWithFeed>
+
+    /**
+     * 画像样本（ADR-0013）：真实表达过兴趣的文章——打开过、收藏或稍后读。
+     * 按最近一次打开时间倒序取前 [limit] 条，越近的行为在画像里权重越高。
+     */
+    @Query(
+        """
+        SELECT articles.id, articles.feedId, articles.title, articles.summary,
+               articles.lastOpenedAt, articles.isStarred, articles.isBookmarked
+        FROM articles
+        WHERE articles.lastOpenedAt IS NOT NULL
+            OR articles.isStarred = 1 OR articles.isBookmarked = 1
+        ORDER BY COALESCE(articles.lastOpenedAt, articles.fetchedAt) DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun loadEngagementSamples(limit: Int): List<EngagementRow>
+
+    /** 窗口内每个订阅源的文章总数：源亲和度的分母（打开率，ADR-0013）。 */
+    @Query(
+        """
+        SELECT feedId AS feedId, COUNT(*) AS cnt
+        FROM articles
+        WHERE COALESCE(publishedAt, fetchedAt) >= :since
+        GROUP BY feedId
+        """,
+    )
+    suspend fun countByFeedSince(since: Long): List<FeedUnreadCount>
+
+    /** 按 id 批量取文章（推荐流把打分后的 id 序还原成列表，顺序由调用方还原）。 */
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.id IN (:ids)
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun loadByIds(ids: List<Long>): List<ArticleWithFeed>
+
+    /**
+     * 记录一次打开（ADR-0013）：每次打开详情页都更新，画像靠它做时间衰减。
+     * 只写这一列，不碰用户状态（已读/收藏/稍后读）。
+     */
+    @Query("UPDATE articles SET lastOpenedAt = :now WHERE id = :id")
+    suspend fun markOpened(id: Long, now: Long)
+
+    /** 文章所属订阅源（推荐流「减少此类」按 feed 级降权，需要这一列）。 */
+    @Query("SELECT feedId FROM articles WHERE id = :id LIMIT 1")
+    suspend fun feedIdOf(id: Long): Long?
 
     @Query(
         """
@@ -679,15 +782,43 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
     }
 }
 
+/**
+ * v10 → v11：推荐流（ADR-0013）。
+ * - articles.lastOpenedAt：最近一次打开详情页的时间，画像的唯一采集信号。
+ * - recommendation_feedback：一个订阅源一行的降权系数（「减少此类」的负反馈，可撤销）。
+ */
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE articles ADD COLUMN lastOpenedAt INTEGER")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS recommendation_feedback (
+                feedId INTEGER NOT NULL,
+                penalty REAL NOT NULL,
+                updatedAt INTEGER NOT NULL,
+                PRIMARY KEY(feedId)
+            )
+            """.trimIndent(),
+        )
+    }
+}
+
 @Database(
-    entities = [FeedEntity::class, ArticleEntity::class, ContentFetchLogEntity::class, ArchivedArticleTombstoneEntity::class],
-    version = 10,
+    entities = [
+        FeedEntity::class,
+        ArticleEntity::class,
+        ContentFetchLogEntity::class,
+        ArchivedArticleTombstoneEntity::class,
+        RecommendationFeedbackEntity::class,
+    ],
+    version = 11,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun feedDao(): FeedDao
     abstract fun articleDao(): ArticleDao
     abstract fun contentFetchLogDao(): ContentFetchLogDao
+    abstract fun recommendationFeedbackDao(): RecommendationFeedbackDao
 }
 
 /**
@@ -717,6 +848,19 @@ data class ContentFetchLogEntity(
     val durationMs: Long,
     val createdAt: Long,
 )
+
+@Dao
+interface RecommendationFeedbackDao {
+    @Query("SELECT * FROM recommendation_feedback")
+    suspend fun getAll(): List<RecommendationFeedbackEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: RecommendationFeedbackEntity)
+
+    /** 撤销「减少此类」：整行删除，降权归零（ADR-0013）。 */
+    @Query("DELETE FROM recommendation_feedback WHERE feedId = :feedId")
+    suspend fun clear(feedId: Long)
+}
 
 /** 按站点聚合：总数 / 失败数 / 不完整数。诊断页的分组统计直接吃这个。 */
 data class FetchHostStat(

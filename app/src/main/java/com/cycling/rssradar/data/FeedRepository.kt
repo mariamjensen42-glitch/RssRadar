@@ -218,6 +218,12 @@ class FeedRepository(
     }
 
     suspend fun markRead(id: Long) = articleDao.markRead(id)
+
+    /**
+     * 记录一次打开（ADR-0013）：推荐画像的唯一采集信号，每次打开详情页都更新。
+     * 只写 lastOpenedAt 一列，不碰已读/收藏/稍后读等用户状态。
+     */
+    suspend fun markOpened(id: Long) = articleDao.markOpened(id, System.currentTimeMillis())
     suspend fun setStarred(id: Long, starred: Boolean) = articleDao.setStarred(id, starred)
     suspend fun setBookmarked(id: Long, bookmarked: Boolean) = articleDao.setBookmarked(id, bookmarked)
     suspend fun markAllRead() = articleDao.markAllRead()

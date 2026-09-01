@@ -157,6 +157,9 @@ class ArticleDetailViewModel @Inject constructor(
             if (_article.value?.article?.isRead == false) {
                 repository.markRead(articleId)
             }
+            // 推荐画像的采集点（ADR-0013）：每次打开都记，源亲和度的时间衰减靠它。
+            // 这一列不参与内容状态刷新，也不影响已读语义。
+            repository.markOpened(articleId)
             fetchFullContentIfNeeded(articleId)
         }
     }

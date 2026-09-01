@@ -13,6 +13,7 @@ import com.cycling.rssradar.data.parser.FetchConfig
 import com.cycling.rssradar.data.parser.FetchLogger
 import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.OnDemandFetch
+import com.cycling.rssradar.data.Recommendation
 import com.cycling.rssradar.data.RefreshEngine
 import com.cycling.rssradar.data.TransactionRunner
 import com.cycling.rssradar.data.store.AiStore
@@ -21,6 +22,7 @@ import com.cycling.rssradar.data.store.GroupStore
 import com.cycling.rssradar.data.store.LinkStore
 import com.cycling.rssradar.data.store.ListDisplayStore
 import com.cycling.rssradar.data.store.ReadingPrefsStore
+import com.cycling.rssradar.data.store.RecommendationStore
 import com.cycling.rssradar.data.store.SettingsPrefs
 import com.cycling.rssradar.data.notify.NewArticleSummary
 import com.cycling.rssradar.data.notify.NotificationHelper
@@ -35,6 +37,7 @@ import com.cycling.rssradar.data.db.MIGRATION_6_7
 import com.cycling.rssradar.data.db.MIGRATION_7_8
 import com.cycling.rssradar.data.db.MIGRATION_8_9
 import com.cycling.rssradar.data.db.MIGRATION_9_10
+import com.cycling.rssradar.data.db.MIGRATION_10_11
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.parser.RssParser
 import com.cycling.rssradar.data.rss.BestIconFinder
@@ -70,7 +73,7 @@ object AppModule {
             .addMigrations(
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                 MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-                MIGRATION_9_10,
+                MIGRATION_9_10, MIGRATION_10_11,
             )
             .build()
 
@@ -247,6 +250,18 @@ object AppModule {
         val summary = NewArticleSummary.build(articles) ?: return@NotifyNewArticles
         NotificationHelper.postNewArticles(context, summary)
     }
+
+    /** 推荐流开关（#推荐，ADR-0013）。 */
+    @Provides
+    @Singleton
+    fun provideRecommendationStore(@ApplicationContext context: Context): RecommendationStore =
+        RecommendationStore(SettingsPrefs.of(context))
+
+    /** 推荐流（ADR-0013）：候选池加载 + 打分 + 负反馈的家。 */
+    @Provides
+    @Singleton
+    fun provideRecommendation(database: AppDatabase): Recommendation =
+        Recommendation(database)
 
     @Provides
     @Singleton

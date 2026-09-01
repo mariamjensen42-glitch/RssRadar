@@ -37,6 +37,7 @@ import com.cycling.rssradar.ui.feed.FeedListScreen
 import com.cycling.rssradar.ui.feed.FeedListViewModel
 import com.cycling.rssradar.ui.me.FetchDiagnosticsScreen
 import com.cycling.rssradar.ui.me.FetchDiagnosticsViewModel
+import com.cycling.rssradar.ui.me.InterestProfileScreen
 import com.cycling.rssradar.ui.me.RssHubSettingsScreen
 import com.cycling.rssradar.ui.me.RssHubSettingsViewModel
 import com.cycling.rssradar.ui.search.SearchScreen
@@ -50,6 +51,7 @@ import com.cycling.rssradar.ui.navigation.FeedArticlesRoute
 import com.cycling.rssradar.ui.navigation.FeedActionRoute
 import com.cycling.rssradar.ui.navigation.FeedRoute
 import com.cycling.rssradar.ui.navigation.FetchDiagnosticsRoute
+import com.cycling.rssradar.ui.navigation.InterestProfileRoute
 import com.cycling.rssradar.ui.navigation.MeRoute
 import com.cycling.rssradar.ui.navigation.SearchRoute
 import com.cycling.rssradar.ui.navigation.SubscriptionsRoute
@@ -128,7 +130,12 @@ private fun RssRadarAppContent() {
                 RssHubSettingsScreen(
                     viewModel = vm,
                     onOpenFetchDiagnostics = { navController.navigate(FetchDiagnosticsRoute) },
+                    onOpenInterestProfile = { navController.navigate(InterestProfileRoute) },
                 )
+            }
+            // 兴趣画像（ADR-0013）：推荐流的可解释性出口
+            composable<InterestProfileRoute> {
+                InterestProfileScreen(onBack = { navController.popBackStack() })
             }
             composable<FetchDiagnosticsRoute> {
                 FetchDiagnosticsScreen(

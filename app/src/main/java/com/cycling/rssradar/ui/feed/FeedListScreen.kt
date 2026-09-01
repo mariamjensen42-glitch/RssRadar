@@ -94,6 +94,7 @@ fun FeedListScreen(
     val uiState by viewModel.uiState.collectAsState()
     val groupOptions by viewModel.groupOptions.collectAsState()
     val unreadCount by viewModel.unreadCount.collectAsState()
+    val recommendationEnabled by viewModel.recommendationEnabled.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showGroupSheet by remember { mutableStateOf(false) }
     /** 批量标记已读条件弹层（#10）。 */
@@ -104,6 +105,22 @@ fun FeedListScreen(
         message?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.onIntent(FeedListIntent.ConsumeMessage)
+        }
+    }
+
+    // 「减少此类」撤销（ADR-0013）：Snackbar 期内可撤销，超时自动丢弃（降权保留）
+    val pendingUndoReduce = uiState.pendingUndoReduceFeedId
+    LaunchedEffect(pendingUndoReduce) {
+        pendingUndoReduce?.let {
+            val result = snackbarHostState.showSnackbar(
+                message = "已减少此订阅源的推荐",
+                actionLabel = "撤销",
+                duration = SnackbarDuration.Short,
+            )
+            when (result) {
+                SnackbarResult.ActionPerformed -> viewModel.onIntent(FeedListIntent.UndoReduceSuch)
+                SnackbarResult.Dismissed -> viewModel.onIntent(FeedListIntent.DiscardUndoReduce)
+            }
         }
     }
 
@@ -146,6 +163,8 @@ fun FeedListScreen(
             FeedListTabRow(
                 selected = uiState.selectedTab,
                 unreadCount = unreadCount,
+                // 推荐流开关（ADR-0013）：关掉就不渲染「推荐」tab
+                tabs = if (recommendationEnabled) FeedTab.entries else FeedTab.entries.filter { it != FeedTab.Recommended },
                 onSelect = { viewModel.onIntent(FeedListIntent.SelectTab(it)) },
             )
             Spacer(Modifier.height(8.dp))
@@ -154,7 +173,9 @@ fun FeedListScreen(
                 onRefresh = { viewModel.onIntent(FeedListIntent.Refresh) },
                 modifier = Modifier.fillMaxSize(),
             ) {
-                if (currentList.isEmpty()) {
+                if (uiState.isRanking) {
+                    RecommendationLoading(modifier = Modifier.fillMaxSize())
+                } else if (currentList.isEmpty()) {
                     EmptyState(selectedTab = uiState.selectedTab, modifier = Modifier.fillMaxSize())
                 } else {
                     ArticleCardList(
@@ -175,7 +196,13 @@ fun FeedListScreen(
                         onDelete = { id ->
                             viewModel.onIntent(FeedListIntent.DeleteArticle(id))
                         },
-                        // 四个 tab 均分页；滚动到底自动加载下一页
+                        // 推荐 tab 才有「减少此类」：只有这里的排序由画像决定
+                        onReduceSuch = if (uiState.selectedTab == FeedTab.Recommended) {
+                            { id -> viewModel.onIntent(FeedListIntent.ReduceSuch(id)) }
+                        } else {
+                            null
+                        },
+                        // 各 tab 均分页；滚动到底自动加载下一页
                         onScrolledToEnd = { viewModel.onIntent(FeedListIntent.LoadMore) },
                         markReadPassed = { ids ->
                             viewModel.onIntent(FeedListIntent.MarkReadPassed(ids))
@@ -282,6 +309,8 @@ private fun FeedListTopBar(
 private fun FeedListTabRow(
     selected: FeedTab,
     unreadCount: Int,
+    /** 实际渲染的 tab（推荐流可关，ADR-0013）。 */
+    tabs: List<FeedTab> = FeedTab.entries,
     onSelect: (FeedTab) -> Unit,
 ) {
     Row(
@@ -290,12 +319,13 @@ private fun FeedListTabRow(
             .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        FeedTab.entries.forEach { tab ->
+        tabs.forEach { tab ->
             val label = when (tab) {
                 FeedTab.All -> "全部"
                 FeedTab.Unread -> "未读 $unreadCount"
                 FeedTab.Starred -> "收藏"
                 FeedTab.Bookmarked -> "稍后读"
+                FeedTab.Recommended -> "推荐"
             }
             FilterChip(
                 label = label,
@@ -400,6 +430,11 @@ fun ArticleCardList(
     onToggleBookmarked: (Long) -> Unit,
     onDelete: (Long) -> Unit,
     onScrolledToEnd: () -> Unit,
+    /**
+     * 「减少此类」（ADR-0013）：非空时卡片的上下文菜单出现该动作。
+     * 只有推荐流传——其余列表的排序与画像无关，负反馈无处落地。
+     */
+    onReduceSuch: ((Long) -> Unit)? = null,
     // 底部让位：tab 屏传悬浮 TabBar 让位；无 TabBar 的页面传普通间距
     bottomPadding: Dp = tabBarBottomClearance(),
     // 单源页强制隐藏订阅源名称（同源重复是噪音）；null = 跟随全局配置
@@ -492,6 +527,7 @@ fun ArticleCardList(
                         onToggleStarred = { onToggleStarred(item.article.id) },
                         onToggleBookmarked = { onToggleBookmarked(item.article.id) },
                         onDelete = { onDelete(item.article.id) },
+                        onReduceSuch = onReduceSuch?.let { reduce -> { reduce(item.article.id) } },
                     )
                 }
             }
@@ -541,6 +577,8 @@ fun ArticleCard(
     onToggleStarred: () -> Unit,
     onToggleBookmarked: () -> Unit,
     onDelete: () -> Unit,
+    /** 「减少此类」（ADR-0013）：非空时上下文菜单出现该动作。 */
+    onReduceSuch: (() -> Unit)? = null,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     // 已读弱化（issue #56）：开关开启时已读卡片降弱色；未读卡片永不因此改变
@@ -632,6 +670,7 @@ fun ArticleCard(
                 onToggleStarred = onToggleStarred,
                 onToggleBookmarked = onToggleBookmarked,
                 onDelete = onDelete,
+                onReduceSuch = onReduceSuch,
             ),
             onDismiss = { menuExpanded = false },
         )
@@ -711,6 +750,8 @@ private fun EmptyState(selectedTab: FeedTab, modifier: Modifier = Modifier) {
         FeedTab.Unread -> "没有未读文章" to "所有文章都看完了，休息一下"
         FeedTab.Starred -> "还没有收藏" to "阅读时点击星标，把好文章留下来"
         FeedTab.Bookmarked -> "暂无稍后读" to "阅读时点击书签，稍后再看"
+        // 推荐流空态（ADR-0013）：候选池 = 未读 + 14 天窗，读完就没了——如实说，不编内容
+        FeedTab.Recommended -> "暂无推荐" to "最近未读都读完了，或还没有订阅源"
     }
     // verticalScroll 让空态页也能响应下拉刷新手势
     Column(
@@ -733,6 +774,20 @@ private fun EmptyState(selectedTab: FeedTab, modifier: Modifier = Modifier) {
             color = TextSecondary,
             style = MaterialTheme.typography.bodyMedium,
         )
+    }
+}
+
+/** 推荐流首屏打分中的占位（候选池加载 + 打分在 IO 线程，通常一闪而过）。 */
+@Composable
+private fun RecommendationLoading(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(bottom = tabBarBottomClearance()),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        CircularProgressIndicator(color = Accent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.height(10.dp))
+        Text("正在按你的阅读偏好排序…", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

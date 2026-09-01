@@ -58,6 +58,7 @@ import com.cycling.rssradar.data.store.LinkShareState
 import com.cycling.rssradar.data.store.LinkStore
 import com.cycling.rssradar.data.store.ListDisplayStore
 import com.cycling.rssradar.data.store.NotificationStore
+import com.cycling.rssradar.data.store.RecommendationStore
 import com.cycling.rssradar.data.store.ShareContentFormat
 import com.cycling.rssradar.data.store.SyncInterval
 import com.cycling.rssradar.data.store.SyncState
@@ -113,6 +114,8 @@ data class RssHubSettingsUiState(
     val sync: SyncState = SyncState(),
     /** 外链打开方式与分享格式（#26）。 */
     val linkShare: LinkShareState = LinkShareState(),
+    /** 推荐流开关（ADR-0013）。 */
+    val recommendationEnabled: Boolean = true,
     /** 新文章通知总开关（#31）。 */
     val notifyEnabled: Boolean = false,
     /** 系统通知权限是否已授予（Android 13+）；true = 低版本无需权限。 */
@@ -144,6 +147,7 @@ class RssHubSettingsViewModel @Inject constructor(
     private val archiveStore: ArchiveStore,
     private val syncStore: SyncStore,
     private val notificationStore: NotificationStore,
+    private val recommendationStore: RecommendationStore,
     private val linkStore: LinkStore,
     private val catalogStore: RouteCatalogStore,
     @ApplicationContext private val appContext: Context,
@@ -155,6 +159,7 @@ class RssHubSettingsViewModel @Inject constructor(
             aiKeyInput = aiStore.apiKey.orEmpty(),
             linkShare = linkStore.state.value,
             notifyEnabled = notificationStore.state.value,
+            recommendationEnabled = recommendationStore.state.value,
             notifyPermissionGranted = NotificationHelper.hasPermission(appContext),
             aiKeyConfigured = aiStore.hasKey(),
         ),
@@ -196,6 +201,12 @@ class RssHubSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             notificationStore.state.collect { enabled ->
                 _state.value = _state.value.copy(notifyEnabled = enabled)
+            }
+        }
+        // 推荐流开关（ADR-0013）
+        viewModelScope.launch {
+            recommendationStore.state.collect { enabled ->
+                _state.value = _state.value.copy(recommendationEnabled = enabled)
             }
         }
         // 路由目录（issue #59）：装载一次，之后跟随 Store 的更新广播
@@ -254,6 +265,11 @@ class RssHubSettingsViewModel @Inject constructor(
             notifyPermissionGranted = granted,
             notifyMessage = if (granted) null else "没有通知权限，无法开启新文章通知",
         )
+    }
+
+    /** 推荐流开关（ADR-0013）：关闭后信息流不再显示「推荐」tab。 */
+    fun setRecommendationEnabled(enabled: Boolean) {
+        recommendationStore.set(enabled)
     }
 
     /** 外链与分享偏好（#26）。 */
@@ -419,6 +435,8 @@ fun RssHubSettingsScreen(
     modifier: Modifier = Modifier,
     /** 打开全文抓取诊断页（ADR-0012）。 */
     onOpenFetchDiagnostics: () -> Unit = {},
+    /** 打开兴趣画像页（ADR-0013）。 */
+    onOpenInterestProfile: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     var showKeepSheet by remember { mutableStateOf(false) }
@@ -577,6 +595,53 @@ fun RssHubSettingsScreen(
                     checked = display.markReadOnScroll,
                     onChange = { v -> viewModel.updateListDisplay { it.copy(markReadOnScroll = v) } },
                 )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ---- 推荐流（ADR-0013）----
+        Text(
+            text = "推荐",
+            color = TextSecondary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "按你的真实阅读行为给未读文章排序，全部计算在本机完成，画像不上传。",
+            color = TextTertiary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+        )
+        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                SettingSwitchRow(
+                    label = "显示「推荐」标签页",
+                    checked = state.recommendationEnabled,
+                    onChange = viewModel::setRecommendationEnabled,
+                )
+                if (state.recommendationEnabled) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenInterestProfile)
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "兴趣画像",
+                            color = TextPrimary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            imageVector = Lucide.ChevronRight,
+                            contentDescription = "进入",
+                            tint = TextTertiary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
             }
         }
 
