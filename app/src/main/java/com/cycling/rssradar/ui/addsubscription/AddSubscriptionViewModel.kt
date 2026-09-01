@@ -18,6 +18,7 @@ import com.cycling.rssradar.data.rsshub.RouteCatalogQuery
 import com.cycling.rssradar.data.rsshub.RouteCatalogStore
 import com.cycling.rssradar.data.rsshub.RouteCategory
 import com.cycling.rssradar.data.rsshub.RouteExample
+import com.cycling.rssradar.data.rsshub.RouteParam
 import com.cycling.rssradar.data.rsshub.RoutePath
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.rsshub.RssHubRoute
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** 链接校验结果。 */
 sealed interface ValidationInfo {
@@ -80,10 +82,15 @@ data class AddSubscriptionUiState(
     val catalogSource: CatalogSource = CatalogSource.BUILTIN,
     /** 当前检索结果。单独存而不用派生属性：3800 条打分不该在每次 state 拷贝时重算。 */
     val visibleRoutes: List<RssHubRoute> = emptyList(),
-) {
+    ) {
     /** 当前参数拼出来的完整地址；必填参数没填时为 null。 */
     val builtUrl: String? get() = selectedRoute?.let { RssHubRoutes.buildUrl(it, paramValues, host) }
-    val canPreview: Boolean get() = selectedRoute?.let { RssHubRoutes.canBuild(it, paramValues) } == true
+    /** 还没填的必填参数（顺序与表单一致）。空 = 能生成。缺参数时必须说缺哪个，不能只把按钮置灰。 */
+    val missingParams: List<RouteParam>
+        get() = selectedRoute?.requiredParams
+            ?.filter { paramValues[it.key]?.isBlank() != false }
+            .orEmpty()
+    val canPreview: Boolean get() = selectedRoute != null && missingParams.isEmpty()
     val isUrlFromRoute: Boolean get() = selectedRoute != null && url.isNotBlank()
     val canSubmit: Boolean get() = url.isNotBlank() && validation is ValidationInfo.Valid && !isAdding
 }
@@ -132,6 +139,16 @@ class AddSubscriptionViewModel @Inject constructor(
 
     init {
         loadCatalog()
+    }
+
+    companion object {
+        /** 手填链接的防抖；点「生成并预览」是明确意图，直接发请求。 */
+        private const val VALIDATE_DEBOUNCE_MS = 400L
+        /**
+         * 单次探测的兜底超时。HTTP 层是 10s 连接 / 15s 读取，这里留一点余量，
+         * 卡住时也能在有限时间内给用户一句交代，而不是无限转圈。
+         */
+        private const val PROBE_TIMEOUT_MS = 20_000L
     }
 
     override fun onIntent(intent: AddSubscriptionIntent) {
@@ -265,27 +282,67 @@ class AddSubscriptionViewModel @Inject constructor(
         previewRoute()
     }
 
-    /** 把拼好的地址塞进统一的 url 通道，走与手填完全相同的校验。 */
+    /**
+     * 生成并预览：把拼好的地址塞进统一的 url 通道，走与手填相同的校验（少数步骤不同，见 [validate]）。
+     *
+     * 必填参数没填时**必须给出反馈**——早期版本只把按钮置灰，点了毫无动静，
+     * 用户只会以为功能坏了。这里就地报错 + 弹提示，把缺哪个参数说清楚。
+     */
     private fun previewRoute() {
+        // 实例可能刚在「我的 → RSSHub 实例」改过：以设置里的当前值为准，别用抽屉打开时的旧值
+        _state.value = _state.value.copy(host = instanceStore.currentOrDefault())
         val state = _state.value
-        val built = state.builtUrl
-        if (built == null) {
-            uiMessage = "请先填写必填参数"
+        val missing = state.missingParams
+        if (missing.isNotEmpty()) {
+            val names = missing.joinToString("、") { it.label.ifBlank { it.key } }
+            _state.value = _state.value.copy(validation = ValidationInfo.Invalid("请先填写：$names"))
+            uiMessage = "请先填写：$names"
             return
         }
-        urlChange(built)
+        val built = state.builtUrl
+        if (built == null) {
+            uiMessage = "参数拼不出完整地址，请检查参数"
+            return
+        }
+        validate(built, fromRoute = true)
     }
 
     /* ------------------------------ 手填链接 ------------------------------ */
 
     private fun urlChange(raw: String) {
+        validate(raw, fromRoute = false)
+    }
+
+    /**
+     * 统一校验：记录地址 → 联网探测 → 落到 [ValidationInfo]。
+     *
+     * [fromRoute] = 地址由路由拼出，与手填有两处不同：
+     * 1. **不做自动发现**。RSSHub 对一条路由只会返回 feed 或错误页，去站点 HTML 里翻
+     *    feed 候选既得不到有用结果，还要让用户多等几十秒（旧行为：预览一次卡到半分钟无反馈）。
+     * 2. **先探活内置实例**。官方实例在部分网络完全不可达，5 秒探活失败就直说，
+     *    好过让用户干等到 HTTP 超时；自建实例不做这一步（/healthz 可能被反代挡掉）。
+     */
+    private fun validate(raw: String, fromRoute: Boolean) {
         _state.value = _state.value.copy(url = raw, validation = ValidationInfo.Idle)
         validationJob?.cancel()
         if (raw.isBlank()) return
         validationJob = viewModelScope.launch {
-            delay(400) // debounce
+            if (!fromRoute) delay(VALIDATE_DEBOUNCE_MS) // 手填才防抖；点按钮是明确意图，立即发
             _state.value = _state.value.copy(isValidating = true)
-            val probe = repository.probeFeed(raw)
+            val host = _state.value.host
+            // 只对内置实例用 /healthz 探活当判据：形态已知，探活可信，5 秒就能说"这个实例不通"。
+            // 自建实例可能把 /healthz 挡在反代后面，探活失败不代表 feed 不通，照常请求。
+            val probeHost = host in RssHubInstanceStore.BUILTIN_INSTANCES
+            if (fromRoute && probeHost && !isReachable(host)) {
+                _state.value = _state.value.copy(
+                    isValidating = false,
+                    validation = ValidationInfo.Network("$host 不可达，到「我的 → RSSHub 实例」换个实例"),
+                )
+                return@launch
+            }
+            val probe = runCatching {
+                withTimeoutOrNull(PROBE_TIMEOUT_MS) { repository.probeFeed(raw) }
+            }.getOrNull()
             if (probe is FeedProbeResult.Valid) {
                 _state.value = _state.value.copy(
                     isValidating = false,
@@ -294,22 +351,39 @@ class AddSubscriptionViewModel @Inject constructor(
                 )
                 return@launch
             }
-            // 不是 feed 地址 → 试着从站点里发现（#5）。贴个首页也能订阅，这是订阅体验的下限。
-            _state.value = _state.value.copy(isValidating = false, isDiscovering = true)
-            val found = runCatching { repository.discoverFeeds(raw) }.getOrDefault(emptyList())
-            _state.value = _state.value.copy(
-                isDiscovering = false,
-                discovered = found,
-                validation = if (found.isNotEmpty()) {
-                    ValidationInfo.Discovered("这个地址不是订阅源，但发现了 ${found.size} 个可订阅的源")
-                } else {
-                    when (probe) {
-                        FeedProbeResult.InvalidUrl -> ValidationInfo.Invalid("链接格式不正确")
-                        FeedProbeResult.NetworkError -> ValidationInfo.Network("无法访问链接，请检查网络")
-                        else -> ValidationInfo.Invalid("不是有效的 RSS/Atom 源，也没找到可用的订阅源")
-                    }
-                },
-            )
+            // 手填不是 feed 地址 → 试着从站点里发现（#5）。贴个首页也能订阅，这是订阅体验的下限。
+            if (!fromRoute) {
+                _state.value = _state.value.copy(isValidating = false, isDiscovering = true)
+                val found = runCatching { repository.discoverFeeds(raw) }.getOrDefault(emptyList())
+                _state.value = _state.value.copy(
+                    isDiscovering = false,
+                    discovered = found,
+                    validation = if (found.isNotEmpty()) {
+                        ValidationInfo.Discovered("这个地址不是订阅源，但发现了 ${found.size} 个可订阅的源")
+                    } else {
+                        validationOf(probe, fromRoute)
+                    },
+                )
+                return@launch
+            }
+            _state.value = _state.value.copy(isValidating = false, validation = validationOf(probe, fromRoute))
+        }
+    }
+
+    private suspend fun isReachable(host: String): Boolean =
+        runCatching { instanceStore.isReachable(host) }.getOrDefault(false)
+
+    private fun validationOf(probe: FeedProbeResult?, fromRoute: Boolean): ValidationInfo = when (probe) {
+        // 超时：probe 被 withTimeoutOrNull 掐断。超时是实例问题，不是链接问题。
+        null -> ValidationInfo.Network("请求超时，实例响应太慢，建议换个实例")
+        // 调通了也算一种结果：这里兜住它，免得掉进 else 被说成「不是有效源」
+        is FeedProbeResult.Valid -> ValidationInfo.Valid(probe.articleCount)
+        FeedProbeResult.InvalidUrl -> ValidationInfo.Invalid("链接格式不正确")
+        FeedProbeResult.NetworkError -> ValidationInfo.Network("无法访问链接，请检查网络")
+        else -> if (fromRoute) {
+            ValidationInfo.Invalid("实例没能返回有效内容：参数可能不对，或该路由已失效")
+        } else {
+            ValidationInfo.Invalid("不是有效的 RSS/Atom 源，也没找到可用的订阅源")
         }
     }
 
@@ -318,7 +392,7 @@ class AddSubscriptionViewModel @Inject constructor(
         validationJob?.cancel()
         validationJob = viewModelScope.launch {
             _state.value = _state.value.copy(isValidating = true)
-            val probe = repository.probeFeed(feed.url)
+            val probe = runCatching { repository.probeFeed(feed.url) }.getOrNull()
             _state.value = _state.value.copy(
                 url = feed.url,
                 isValidating = false,

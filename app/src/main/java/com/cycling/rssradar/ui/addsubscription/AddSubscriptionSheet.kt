@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
@@ -45,6 +46,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -570,7 +572,18 @@ private fun ColumnScope.ParamsContent(
     route: RssHubRoute,
     viewModel: AddSubscriptionViewModel,
 ) {
+    val listState = rememberLazyListState()
+    // 生成地址后把结果区滚进视野：参数一多，结果就在屏幕外，用户会以为点了没反应。
+    // 等一帧再滚——重组刚把结果 item 加进列表，这一帧的 layoutInfo 还没它。
+    LaunchedEffect(state.url) {
+        if (state.url.isNotBlank()) {
+            withFrameMillis { }
+            listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1)
+        }
+    }
+
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .weight(1f)
             .fillMaxWidth()
@@ -620,66 +633,49 @@ private fun ColumnScope.ParamsContent(
         }
 
         item {
-            Button(
-                onClick = { viewModel.onIntent(AddSubscriptionIntent.PreviewRoute) },
-                enabled = state.canPreview,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Surface2,
-                    contentColor = TextPrimary,
-                    disabledContainerColor = Surface2.copy(alpha = 0.5f),
-                    disabledContentColor = TextTertiary,
-                ),
-            ) {
-                Icon(
-                    imageVector = Lucide.Zap,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
+            Column {
+                // 结果由哪个实例解析，写在按钮上方：实例不可达时这是最先要核对的信息
                 Text(
-                    text = "生成并预览",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    text = "由 ${state.host} 解析",
+                    color = TextTertiary,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-            }
-        }
-
-        if (state.isUrlFromRoute) {
-            item {
-                CodeBlock(text = state.url, accent = true)
-                Spacer(Modifier.height(8.dp))
-                ValidationBanner(info = state.validation)
-                if (state.validation is ValidationInfo.Valid) {
-                    Spacer(Modifier.height(6.dp))
-                    GroupChips(
-                        options = viewModel.groupOptions,
-                        selected = state.selectedGroup,
-                        onSelect = { viewModel.onIntent(AddSubscriptionIntent.GroupSelected(it)) },
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    PrimaryButton(
-                        text = "订阅",
-                        enabled = state.canSubmit,
-                        loading = state.isAdding,
-                        onClick = { viewModel.onIntent(AddSubscriptionIntent.Submit) },
-                    )
-                }
-            }
-        } else if (state.isValidating) {
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(
-                        color = Accent,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(14.dp),
+                Spacer(Modifier.height(6.dp))
+                Button(
+                    // 缺参数时按钮照样可点——点了就在下面说缺哪个。置灰不吭声 = 用户只会以为坏了。
+                    onClick = { viewModel.onIntent(AddSubscriptionIntent.PreviewRoute) },
+                    enabled = !state.isValidating && !state.isAdding,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Surface2,
+                        contentColor = TextPrimary,
+                        disabledContainerColor = Surface2.copy(alpha = 0.5f),
+                        disabledContentColor = TextTertiary,
+                    ),
+                ) {
+                    Icon(
+                        imageVector = Lucide.Zap,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "正在校验…",
+                        text = "生成并预览",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                if (state.missingParams.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "还需填写：" + state.missingParams.joinToString("、") {
+                            it.label.ifBlank { it.key }
+                        },
                         color = TextTertiary,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -687,7 +683,59 @@ private fun ColumnScope.ParamsContent(
             }
         }
 
+        // 结果区：校验中 / 成功 / 失败都在这里出，且 loading 与结果不互斥——
+        // 之前两者写成 if/else，生成地址后校验的那十几秒里界面上什么都没有。
+        if (state.isUrlFromRoute || state.isValidating || state.validation !is ValidationInfo.Idle) {
+            item {
+                PreviewResult(state = state, viewModel = viewModel)
+            }
+        }
+
         item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun PreviewResult(
+    state: AddSubscriptionUiState,
+    viewModel: AddSubscriptionViewModel,
+) {
+    Column {
+        if (state.url.isNotBlank()) {
+            CodeBlock(text = state.url, accent = true)
+            Spacer(Modifier.height(8.dp))
+        }
+        if (state.isValidating) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(
+                    color = Accent,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "正在校验…",
+                    color = TextTertiary,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+        ValidationBanner(info = state.validation)
+        if (state.validation is ValidationInfo.Valid) {
+            Spacer(Modifier.height(6.dp))
+            GroupChips(
+                options = viewModel.groupOptions,
+                selected = state.selectedGroup,
+                onSelect = { viewModel.onIntent(AddSubscriptionIntent.GroupSelected(it)) },
+            )
+            Spacer(Modifier.height(12.dp))
+            PrimaryButton(
+                text = "订阅",
+                enabled = state.canSubmit,
+                loading = state.isAdding,
+                onClick = { viewModel.onIntent(AddSubscriptionIntent.Submit) },
+            )
+        }
     }
 }
 
