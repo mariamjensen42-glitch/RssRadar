@@ -49,6 +49,13 @@ class RssHubInstanceStore(private val prefs: SharedPreferences, private val ioDi
         }.awaitAll().firstOrNull { it.second }?.first
     }
 
+    /**
+     * 主机是否活着。**拿到任何 HTTP 响应都算活着**，包括 404。
+     *
+     * 判定放宽的原因：实测 rss.injahow.cn 的 `/healthz` 返回 404，但它的
+     * `/zhihu/daily` 正常返回 200 的 feed——要求 2xx 等于把一个能用的实例判死。
+     * 真正该判死的是连不上：超时 / DNS 失败 / 拒连。
+     */
     suspend fun isReachable(host: String): Boolean = withContext(ioDispatcher) {
         try {
             val connection = URL(host.trimEnd('/') + "/healthz").openConnection() as HttpURLConnection
@@ -58,7 +65,7 @@ class RssHubInstanceStore(private val prefs: SharedPreferences, private val ioDi
             connection.setRequestProperty("User-Agent", USER_AGENT)
             val code = connection.responseCode
             connection.disconnect()
-            code in 200..299
+            code > 0
         } catch (_: Exception) {
             false
         }

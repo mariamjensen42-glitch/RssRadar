@@ -148,6 +148,9 @@ fun AddSubscriptionSheet(
 ) {
     val state by viewModel.state.collectAsState()
 
+    // 每次打开都确认一次实例可达：默认实例在部分网络不通，早发现早换，别等预览失败才知道
+    LaunchedEffect(Unit) { viewModel.onShown() }
+
     // 填参步骤按系统返回键 = 返回目录，而不是直接关掉抽屉（与原导航 popBackStack 行为一致）
     BackHandler(enabled = state.selectedRoute != null) {
         viewModel.onIntent(AddSubscriptionIntent.BackToCatalog)

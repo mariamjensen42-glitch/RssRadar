@@ -12,10 +12,16 @@ import java.net.URL
  */
 fun interface HttpFetcher {
 
-    /** 返回响应体流；非 2xx 与网络失败抛 [IOException]，调用方统一按「抓取失败」处理。 */
+    /** 返回响应体流；非 2xx 抛 [HttpStatusException]（带状态码），网络失败抛 [IOException]。 */
     @Throws(IOException::class)
     fun fetch(url: String): InputStream
 }
+
+/**
+ * 非 2xx 响应。继承 [IOException] 是为了不改动既有调用方（刷新链路一律按失败处理，
+ * 本来就该 catch IOException）；需要区分状态码的地方（加订阅预览）再单独 catch。
+ */
+class HttpStatusException(val code: Int) : IOException("HTTP $code")
 
 /** 默认 adapter：HttpURLConnection + 超时 + UA，行为与原 FeedRepository.fetch 一致。 */
 class HttpUrlFetcher(
@@ -30,9 +36,10 @@ class HttpUrlFetcher(
         connection.readTimeout = readTimeoutMs
         connection.instanceFollowRedirects = true
         connection.setRequestProperty("User-Agent", userAgent)
-        if (connection.responseCode !in 200..299) {
+        val code = connection.responseCode
+        if (code !in 200..299) {
             connection.disconnect()
-            throw IOException("HTTP ${connection.responseCode}")
+            throw HttpStatusException(code)
         }
         return connection.inputStream
     }

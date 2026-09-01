@@ -20,6 +20,7 @@ import com.cycling.rssradar.data.opml.OpmlWriter
 import com.cycling.rssradar.data.parser.FeedProbeResult
 import com.cycling.rssradar.data.rss.FeedDiscovery
 import com.cycling.rssradar.data.rss.HttpFetcher
+import com.cycling.rssradar.data.rss.HttpStatusException
 import com.cycling.rssradar.data.store.KeepArchived
 import com.cycling.rssradar.data.store.MarkAsReadCondition
 
@@ -211,6 +212,9 @@ class FeedRepository(
             engine.fetchAndParse(url)
         } catch (_: IllegalArgumentException) {
             return@withContext FeedProbeResult.InvalidFeed
+        } catch (e: HttpStatusException) {
+            // 服务端回了响应，只是不成功：状态码交给 UI 翻译成人话
+            return@withContext FeedProbeResult.HttpError(e.code)
         } catch (_: IOException) {
             return@withContext FeedProbeResult.NetworkError
         }

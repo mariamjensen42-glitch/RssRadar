@@ -379,12 +379,28 @@ class AddSubscriptionViewModel @Inject constructor(
         // 调通了也算一种结果：这里兜住它，免得掉进 else 被说成「不是有效源」
         is FeedProbeResult.Valid -> ValidationInfo.Valid(probe.articleCount)
         FeedProbeResult.InvalidUrl -> ValidationInfo.Invalid("链接格式不正确")
-        FeedProbeResult.NetworkError -> ValidationInfo.Network("无法访问链接，请检查网络")
+        is FeedProbeResult.HttpError -> httpErrorInfo(probe.code, fromRoute)
+        FeedProbeResult.NetworkError -> ValidationInfo.Network("连不上这个地址，检查网络或换个实例")
         else -> if (fromRoute) {
             ValidationInfo.Invalid("实例没能返回有效内容：参数可能不对，或该路由已失效")
         } else {
             ValidationInfo.Invalid("不是有效的 RSS/Atom 源，也没找到可用的订阅源")
         }
+    }
+
+    /**
+     * 服务端真实回了响应但不成功。这里的关键是**别什么都赖网络**——
+     * 公共实例的日常失败各有各的原因，说错了用户就无从下手。
+     */
+    private fun httpErrorInfo(code: Int, fromRoute: Boolean): ValidationInfo = when (code) {
+        404 -> ValidationInfo.Invalid(
+            if (fromRoute) "实例返回 404：参数可能不对，或这个实例没收录该路由"
+            else "404，这个地址不存在",
+        )
+        429 -> ValidationInfo.Network("实例限流（429）：公共实例有频率限制，稍后再试或换个实例")
+        401, 403 -> ValidationInfo.Network("实例拒绝访问（$code）：公共实例常这样，建议自建实例")
+        in 500..599 -> ValidationInfo.Network("实例报错 $code：它自己出问题了，换个实例试试")
+        else -> ValidationInfo.Network("实例返回 $code")
     }
 
     /** 采用发现结果：地址栏换成候选地址，再走一次常规校验（成功后即可订阅）。 */
@@ -428,6 +444,34 @@ class AddSubscriptionViewModel @Inject constructor(
     /** 抽屉整体关闭（非流程内返回目录）：VM 是 Activity 作用域、不随弹层销毁，需手动重置。 */
     fun onDismissed() {
         reset()
+    }
+
+    /**
+     * 抽屉每次打开时调用：确认当前实例还活着，不活就自己换一个。
+     *
+     * 官方实例 rsshub.app 在部分网络完全不可达（issue #14，实测连接直接超时），
+     * 而默认 host 恰恰就是它；此前只有手动去设置页点「自动探测」才会换。
+     * 结果就是用户第一次预览必失败，还以为是自己网络坏了。
+     *
+     * 自定义实例不自动换：那是用户显式指定的，只提示，不覆盖。
+     */
+    fun onShown() {
+        viewModelScope.launch {
+            val host = instanceStore.currentOrDefault()
+            _state.value = _state.value.copy(host = host)
+            if (isReachable(host)) return@launch
+            if (instanceStore.customHost != null) {
+                uiMessage = "自定义实例 $host 不可达，到「我的 → RSSHub 实例」检查"
+                return@launch
+            }
+            val found = instanceStore.refreshAvailableHost()
+            if (found == null) {
+                uiMessage = "所有内置实例都不可达，请检查网络或填入自建实例"
+                return@launch
+            }
+            _state.value = _state.value.copy(host = found)
+            uiMessage = "已切换到可用实例：$found"
+        }
     }
 
     private fun submit() {
