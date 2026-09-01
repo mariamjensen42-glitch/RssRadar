@@ -22,6 +22,8 @@ import com.cycling.rssradar.data.opml.OpmlWriter
 import com.cycling.rssradar.data.parser.ContentFetcher
 import com.cycling.rssradar.data.parser.FetchLogger
 import com.cycling.rssradar.data.parser.FeedProbeResult
+import com.cycling.rssradar.data.rss.FeedDiscovery
+import com.cycling.rssradar.data.rss.HttpFetcher
 import com.cycling.rssradar.data.parser.FetchOutcome
 import com.cycling.rssradar.data.store.KeepArchived
 import com.cycling.rssradar.data.store.MarkAsReadCondition
@@ -43,6 +45,16 @@ data class ClearArticlesResult(
     val kept: Int,
 )
 
+/**
+ * 自动发现出来的一条 feed（#5）。字段全部来自真实抓取解析：
+ * [title] 是 feed 自己的标题，[articleCount] 是解析出的文章数——不猜、不补默认值。
+ */
+data class DiscoveredFeed(
+    val url: String,
+    val title: String,
+    val articleCount: Int,
+)
+
 /** OPML 盲导结果（ADR-0004）。 */
 data class OpmlImportResult(
     val imported: Int,
@@ -61,6 +73,8 @@ data class OpmlImportResult(
 class FeedRepository(
     private val database: AppDatabase,
     private val engine: RefreshEngine,
+    /** 站点 HTML 抓取（feed 自动发现 #5 用）。与刷新链路同一条 HTTP 缝，测试可塞 fake。 */
+    private val http: HttpFetcher,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     /** 为 null 时按需抓取不可用（见 [fetchFullContent]）。 */
     private val contentFetcher: ContentFetcher? = null,
@@ -191,6 +205,47 @@ class FeedRepository(
     fun observeFeeds(): Flow<List<FeedEntity>> = feedDao.observeAll()
     fun observeFeedUnreadCounts(): Flow<Map<Long, Int>> =
         articleDao.observeUnreadCountByFeed().map { rows -> rows.associate { it.feedId to it.cnt } }
+
+    /**
+     * Feed 自动发现（#5）：用户贴一个网址（可能只是站点首页），探测出可订阅的 feed。
+     *
+     * 三步降级，每步都靠"真能解析出文章"来判定，不看 Content-Type 之类不可靠的信号：
+     * 1. 该地址本身就是 feed → 直接返回一条；
+     * 2. 抓 HTML，读 `<link rel=alternate>` 声明的候选 → 逐个校验；
+     * 3. 站点没声明 → 试常见路径（/feed、/rss.xml…）→ 逐个校验。
+     *
+     * 返回按"文章数多的在前"排序（主 feed 通常更全）。全部失败返回空表——
+     * 不猜、不返回没验证过的地址。
+     */
+    suspend fun discoverFeeds(rawUrl: String): List<DiscoveredFeed> = withContext(ioDispatcher) {
+        val url = normalizeUrl(rawUrl) ?: return@withContext emptyList()
+        // 1) 本身就是 feed
+        runCatching { engine.fetchAndParse(url) }.getOrNull()?.let { parsed ->
+            if (parsed.articles.isNotEmpty()) {
+                return@withContext listOf(
+                    DiscoveredFeed(url = url, title = parsed.title, articleCount = parsed.articles.size),
+                )
+            }
+        }
+        // 2) 站点 HTML 里声明的候选
+        val html = runCatching { http.fetch(url).use { it.readBytes().toString(Charsets.UTF_8) } }
+            .getOrNull() ?: return@withContext emptyList()
+        val declared = FeedDiscovery.candidateLinks(url, html)
+        val candidates = declared.ifEmpty { FeedDiscovery.guessedLinks(url) }
+        val verified = ArrayList<DiscoveredFeed>()
+        for (candidate in candidates.distinct().take(FeedDiscovery.MAX_CANDIDATES)) {
+            verifyFeed(candidate)?.let { verified += it }
+        }
+        verified.sortByDescending { it.articleCount }
+        verified
+    }
+
+    /** 校验一个候选地址：抓下来能解析出文章才算数。 */
+    private suspend fun verifyFeed(url: String): DiscoveredFeed? {
+        val parsed = runCatching { engine.fetchAndParse(url) }.getOrNull() ?: return null
+        if (parsed.articles.isEmpty()) return null
+        return DiscoveredFeed(url = url, title = parsed.title, articleCount = parsed.articles.size)
+    }
 
     /**
      * 仅抓取+解析一次，用于"添加订阅"页的实时预览。不写入数据库。

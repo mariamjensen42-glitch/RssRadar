@@ -139,11 +139,13 @@ object AppModule {
     fun provideFeedRepository(
         db: AppDatabase,
         engine: RefreshEngine,
+        http: HttpFetcher,
         contentFetcher: ContentFetcher,
         logger: FetchLogger,
     ): FeedRepository = FeedRepository(
         db,
         engine,
+        http = http,
         contentFetcher = contentFetcher,
         logger = logger,
     )

@@ -1,5 +1,7 @@
 package com.cycling.rssradar.ui.addsubscription
 
+import com.cycling.rssradar.data.DiscoveredFeed
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -273,6 +275,35 @@ private fun ColumnScope.CatalogContent(
                     isLoading = state.isValidating,
                 )
                 ValidationBanner(info = state.validation)
+                // 自动发现（#5）：贴的是站点首页时列出找到的订阅源，点一条即采用
+                if (state.isDiscovering) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            color = Accent,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "正在探测订阅源…",
+                            color = TextTertiary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+                if (state.discovered.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    state.discovered.forEach { feed ->
+                        DiscoveredFeedRow(
+                            feed = feed,
+                            onClick = {
+                                viewModel.onIntent(AddSubscriptionIntent.PickDiscovered(feed))
+                            },
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
                 if (state.validation is ValidationInfo.Valid) {
                     Spacer(Modifier.height(10.dp))
                     GroupChips(
@@ -934,6 +965,8 @@ private fun ValidationBanner(info: ValidationInfo) {
     if (info is ValidationInfo.Idle) return
     val color = when (info) {
         is ValidationInfo.Valid -> Success
+        // 发现到候选不是错误，是进展：用强调色而非报错红
+        is ValidationInfo.Discovered -> Accent
         else -> MaterialTheme.colorScheme.error
     }
     Row(
@@ -956,6 +989,55 @@ private fun ValidationBanner(info: ValidationInfo) {
             color = color,
             style = MaterialTheme.typography.bodySmall,
         )
+    }
+}
+
+/** 自动发现（#5）的一条候选：标题 + 地址 + 真实文章数，点一下即采用。 */
+@Composable
+private fun DiscoveredFeedRow(
+    feed: DiscoveredFeed,
+    onClick: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = Surface1,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Lucide.Rss,
+                contentDescription = null,
+                tint = Accent,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = feed.title.ifBlank { feed.url },
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = feed.url,
+                    color = TextTertiary,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                text = "${feed.articleCount} 篇",
+                color = TextSecondary,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
     }
 }
 

@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.data.AddFeedResult
+import com.cycling.rssradar.data.DiscoveredFeed
 import com.cycling.rssradar.data.db.FeedEntity
 import com.cycling.rssradar.data.parser.FeedProbeResult
 import com.cycling.rssradar.data.FeedRepository
@@ -40,6 +41,11 @@ sealed interface ValidationInfo {
     }
     data class Invalid(override val message: String) : ValidationInfo
     data class Network(override val message: String) : ValidationInfo
+    /**
+     * 地址本身不是 feed，但自动发现（#5）找到了候选：让用户挑一个。
+     * [message] 说明"这不是 feed，发现了 N 个"。
+     */
+    data class Discovered(override val message: String) : ValidationInfo
 }
 
 /**
@@ -66,6 +72,9 @@ data class AddSubscriptionUiState(
     /** 目录更新中。 */
     val isCatalogRefreshing: Boolean = false,
     val catalogRouteCount: Int = 0,
+    /** 自动发现（#5）找到的候选 feed；非空时 UI 列出供选择。 */
+    val discovered: List<DiscoveredFeed> = emptyList(),
+    val isDiscovering: Boolean = false,
     /** 目录数据的生成时刻；null 表示还没装载。 */
     val catalogGeneratedAt: Long? = null,
     val catalogSource: CatalogSource = CatalogSource.BUILTIN,
@@ -96,6 +105,8 @@ sealed interface AddSubscriptionIntent {
     data object RefreshCatalog : AddSubscriptionIntent
     data object Submit : AddSubscriptionIntent
     data object ConsumeMessage : AddSubscriptionIntent
+    /** 采用自动发现（#5）找到的某条候选：填进地址栏并校验。 */
+    data class PickDiscovered(val feed: DiscoveredFeed) : AddSubscriptionIntent
 }
 
 @HiltViewModel
@@ -137,6 +148,7 @@ class AddSubscriptionViewModel @Inject constructor(
             AddSubscriptionIntent.RefreshCatalog -> refreshCatalog()
             AddSubscriptionIntent.Submit -> submit()
             AddSubscriptionIntent.ConsumeMessage -> uiMessage = null
+            is AddSubscriptionIntent.PickDiscovered -> pickDiscovered(intent.feed)
         }
     }
 
@@ -274,13 +286,47 @@ class AddSubscriptionViewModel @Inject constructor(
             delay(400) // debounce
             _state.value = _state.value.copy(isValidating = true)
             val probe = repository.probeFeed(raw)
+            if (probe is FeedProbeResult.Valid) {
+                _state.value = _state.value.copy(
+                    isValidating = false,
+                    discovered = emptyList(),
+                    validation = ValidationInfo.Valid(probe.articleCount),
+                )
+                return@launch
+            }
+            // 不是 feed 地址 → 试着从站点里发现（#5）。贴个首页也能订阅，这是订阅体验的下限。
+            _state.value = _state.value.copy(isValidating = false, isDiscovering = true)
+            val found = runCatching { repository.discoverFeeds(raw) }.getOrDefault(emptyList())
             _state.value = _state.value.copy(
+                isDiscovering = false,
+                discovered = found,
+                validation = if (found.isNotEmpty()) {
+                    ValidationInfo.Discovered("这个地址不是订阅源，但发现了 ${found.size} 个可订阅的源")
+                } else {
+                    when (probe) {
+                        FeedProbeResult.InvalidUrl -> ValidationInfo.Invalid("链接格式不正确")
+                        FeedProbeResult.NetworkError -> ValidationInfo.Network("无法访问链接，请检查网络")
+                        else -> ValidationInfo.Invalid("不是有效的 RSS/Atom 源，也没找到可用的订阅源")
+                    }
+                },
+            )
+        }
+    }
+
+    /** 采用发现结果：地址栏换成候选地址，再走一次常规校验（成功后即可订阅）。 */
+    private fun pickDiscovered(feed: DiscoveredFeed) {
+        validationJob?.cancel()
+        validationJob = viewModelScope.launch {
+            _state.value = _state.value.copy(isValidating = true)
+            val probe = repository.probeFeed(feed.url)
+            _state.value = _state.value.copy(
+                url = feed.url,
                 isValidating = false,
-                validation = when (probe) {
-                    is FeedProbeResult.Valid -> ValidationInfo.Valid(probe.articleCount)
-                    FeedProbeResult.InvalidUrl -> ValidationInfo.Invalid("链接格式不正确")
-                    FeedProbeResult.InvalidFeed -> ValidationInfo.Invalid("不是有效的 RSS/Atom 源")
-                    FeedProbeResult.NetworkError -> ValidationInfo.Network("无法访问链接，请检查网络")
+                discovered = emptyList(),
+                validation = if (probe is FeedProbeResult.Valid) {
+                    ValidationInfo.Valid(probe.articleCount)
+                } else {
+                    ValidationInfo.Invalid("这个源暂时无法访问")
                 },
             )
         }

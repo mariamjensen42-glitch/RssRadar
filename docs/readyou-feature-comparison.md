@@ -22,10 +22,18 @@
 
 ### 二、订阅源管理
 
+> 2026-09-01 实施记录（#5 Feed 自动发现）：
+> - `FeedDiscovery`（纯函数）：从站点 HTML 提取 `<link rel=alternate>` 的 feed 候选（只认 feed 类 MIME，
+>   排除 `application/xml` 这种会被 sitemap 污染的类型），相对地址按 baseUrl 解析为绝对地址，去重保序上限 8 条。
+> - `FeedRepository.discoverFeeds()` 三步降级：地址本身是 feed → 直接返回；否则抓 HTML 取声明的候选 → 逐个
+>   **真抓取真解析**验证；站点没声明 → 试常见路径（/feed、/rss.xml、/atom.xml…）再验证。
+> - 加订阅抽屉：手填地址校验失败即触发发现，候选列表（标题 + 地址 + 真实文章数）点一条即采用并重新校验。
+> - 原则：只返回真能解析出文章的候选，不猜、不返回没验证过的地址。
+
 | # | 功能 | ReadYou 依据 | 状态 |
 |---|------|--------------|------|
 | 4 | OPML **导出**（RssRadar 只有导入） | `domain/service/OpmlService.kt`（`saveToString`） | ✅ 2026-09-01 |
-| 5 | Feed 自动发现（输入网址自动探测 feed 链接） | `infrastructure/rss/RssHelper.kt`（`discoverFeedLink`） | |
+| 5 | Feed 自动发现（输入网址自动探测 feed 链接） | `infrastructure/rss/RssHelper.kt`（`discoverFeedLink`） | ✅ 2026-09-01 |
 | 6 | Favicon 自动抓取（Besticon 服务） | `infrastructure/rss/BestIconFinder.kt`（RssRadar 有 iconUrl 字段但无抓取链路） | ✅ 2026-08-30 |
 | 7 | 批量移动 feed 到分组 | `drawer/group/AllMoveToGroupDialog.kt` | ✅ 2026-08-31 |
 | 8 | 清空 feed / 分组文章 | `ClearFeedDialog.kt`、`ClearGroupDialog.kt` | ✅ 2026-08-31 |
