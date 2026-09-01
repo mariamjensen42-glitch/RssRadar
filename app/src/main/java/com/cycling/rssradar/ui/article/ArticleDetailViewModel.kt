@@ -14,6 +14,8 @@ import com.cycling.rssradar.data.store.ReadingImageState
 import com.cycling.rssradar.data.store.ReadingImageStore
 import com.cycling.rssradar.data.store.ReadingRendererStore
 import com.cycling.rssradar.data.store.ReadingStyleState
+import com.cycling.rssradar.data.store.LinkShareState
+import com.cycling.rssradar.data.store.LinkStore
 import com.cycling.rssradar.data.store.ReadingStyleStore
 import com.cycling.rssradar.data.store.TranslationDisplayState
 import com.cycling.rssradar.data.store.TranslationDisplayStore
@@ -84,6 +86,7 @@ class ArticleDetailViewModel @Inject constructor(
     private val readingImageStore: ReadingImageStore,
     private val readingRendererStore: ReadingRendererStore,
     private val translationDisplayStore: TranslationDisplayStore,
+    private val linkStore: LinkStore,
     private val aiRepository: AiRepository,
     private val aiStore: AiStore,
 ) : ViewModel(), MviViewModel<ArticleDetailIntent> {
@@ -147,6 +150,9 @@ class ArticleDetailViewModel @Inject constructor(
      * 写方法，数据源与主题宿主注入的 LocalTranslationDisplay 是同一份 Store。
      */
     val translationDisplay: StateFlow<TranslationDisplayState> = translationDisplayStore.state
+
+    /** 外链打开方式与分享格式（#26）：阅读页分享/打开链接时按此偏好执行。 */
+    val linkShare: StateFlow<LinkShareState> = linkStore.state
 
     fun updateTranslationDisplay(state: TranslationDisplayState) {
         translationDisplayStore.update { state }

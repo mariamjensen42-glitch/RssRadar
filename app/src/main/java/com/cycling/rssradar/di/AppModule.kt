@@ -17,6 +17,7 @@ import com.cycling.rssradar.data.TransactionRunner
 import com.cycling.rssradar.data.store.AiStore
 import com.cycling.rssradar.data.store.ArchiveStore
 import com.cycling.rssradar.data.store.GroupStore
+import com.cycling.rssradar.data.store.LinkStore
 import com.cycling.rssradar.data.store.ListDisplayStore
 import com.cycling.rssradar.data.store.ReadingImageStore
 import com.cycling.rssradar.data.store.ReadingRendererStore
@@ -226,6 +227,11 @@ object AppModule {
     @Singleton
     fun provideNotificationStore(@ApplicationContext context: Context): NotificationStore =
         NotificationStore(SettingsPrefs.of(context))
+
+    @Provides
+    @Singleton
+    fun provideLinkStore(@ApplicationContext context: Context): LinkStore =
+        LinkStore(SettingsPrefs.of(context))
 
     /**
      * 新文章通知（#31）：把「查新文章 → 汇总文案 → 发通知」串成一个 suspend 函数注入 AutoSync。

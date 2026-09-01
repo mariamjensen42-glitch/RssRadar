@@ -45,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -60,6 +61,7 @@ import com.cycling.rssradar.data.store.coerceImageCornerRadius
 import com.cycling.rssradar.data.store.coerceLineHeight
 import com.cycling.rssradar.data.store.coercePadding
 import com.cycling.rssradar.ui.components.AppSnackbarHost
+import com.cycling.rssradar.ui.components.shareArticle
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.LocalReadingStyle
@@ -78,6 +80,7 @@ import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Share2
 import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.Type
@@ -104,6 +107,9 @@ fun ArticleDetailScreen(
     val neighbors by viewModel.neighbors.collectAsState()
     val renderer by viewModel.readingRenderer.collectAsState()
     val imagePrefs by viewModel.readingImage.collectAsState()
+    val linkShare by viewModel.linkShare.collectAsState()
+    // 分享文章（#26）需要 Context 起系统分享面板
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var showStyleSheet by remember { mutableStateOf(false) }
     // 全屏图片查看（issue #60）：瞬时 UI，不入路由、不占 back 栈
@@ -140,6 +146,16 @@ fun ArticleDetailScreen(
                     headerScrollY >= titleHideOffset,
                 onBack = onBack,
                 onOpenStyle = { showStyleSheet = true },
+                onShare = {
+                    article?.let { item ->
+                        context.shareArticle(
+                            title = item.article.title,
+                            link = item.article.link,
+                            summary = item.article.summary,
+                            state = linkShare,
+                        )
+                    }
+                },
                 onToggleTranslation = { viewModel.onIntent(ArticleDetailIntent.ToggleTranslation) },
                 isShowingTranslation = translationState is TranslationState.Shown ||
                     translationState is TranslationState.Progressing,
@@ -240,6 +256,8 @@ private fun ArticleDetailTopBar(
     showTitle: Boolean,
     onBack: () -> Unit,
     onOpenStyle: () -> Unit,
+    /** 分享本文（#26）：内容格式由「我的」页偏好决定。 */
+    onShare: () -> Unit,
     onToggleTranslation: () -> Unit,
     isShowingTranslation: Boolean,
     isGeneratingTranslation: Boolean,
@@ -296,6 +314,10 @@ private fun ArticleDetailTopBar(
                 contentDescription = if (isShowingTranslation) "切回原文" else "AI 翻译",
                 tint = if (isShowingTranslation || isGeneratingTranslation) Accent else TextPrimary,
             )
+        }
+        // 分享（#26）
+        IconButton(onClick = onShare) {
+            Icon(Lucide.Share2, contentDescription = "分享", tint = TextPrimary)
         }
         // 排版设置入口（issue #42）
         IconButton(onClick = onOpenStyle) {

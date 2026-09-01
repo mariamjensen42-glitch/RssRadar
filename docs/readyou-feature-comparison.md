@@ -68,6 +68,14 @@
 
 ### 四、阅读页（ReadYou 最重的部分）
 
+> 2026-09-01 实施记录（#26 链接与分享，部分）：
+> - **分享**：此前零分享代码。阅读页顶栏加分享入口，`Context.shareArticle` 按偏好格式拼内容
+>   （标题+链接 / 仅链接 / 标题+摘要+链接；无摘要时退化为标题+链接，不塞空行凑格式）。
+> - **打开链接**：`LinkOpenMode` 支持「系统浏览器」（默认，升级无感知）与「每次询问」（系统选择器）。
+>   偏好放在 `LinkStore`，openUrl 直接读 SharedPreferences，避免为一个开关把 Store 传到每个调用点。
+> - **Custom Tabs 暂缺**：需要引入 `androidx.browser:browser` 依赖（当前依赖表里没有），
+>   属构建配置变更，设置页已如实标注。
+
 | # | 功能 | ReadYou 依据 |
 |---|------|--------------|
 | 15 | 双渲染器：WebView 或原生 Compose 二选一（RssRadar 只有 styled-HTML 一条路） | `ReadingRendererPreference.kt`、`ui/component/webview/`、`ui/component/reader/` |
@@ -81,7 +89,7 @@
 | 23 | 手势：下拉/上拉切换上/下篇、列表条目左右滑动自定义动作、下拉加载下一个 feed | `PullToSwitchArticlePreference.kt`、`ui/component/swipe/`、`PullToLoadNextFeedPreference.kt` |
 | 24 | 大屏/平板双栏自适应（列表+阅读同屏） | `ui/page/adaptive/` |
 | 25 | 自定义字体导入（TTF） | `ui/ext/ExternalFonts.kt` |
-| 26 | 分享内容格式可配、链接打开方式可配（Custom Tabs/指定浏览器/询问） | `SharedContentPreference.kt`、`OpenLinkPreference.kt` |
+| 26 | 分享内容格式可配、链接打开方式可配（Custom Tabs/指定浏览器/询问） | `SharedContentPreference.kt`、`OpenLinkPreference.kt` | ⚠️ 部分（2026-09-01） |
 
 ### 五、主题
 

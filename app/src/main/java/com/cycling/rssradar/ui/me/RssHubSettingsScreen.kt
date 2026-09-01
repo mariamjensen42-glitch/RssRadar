@@ -53,8 +53,12 @@ import com.cycling.rssradar.data.store.KeepArchived
 import com.cycling.rssradar.data.store.ListDescMode
 import com.cycling.rssradar.data.store.ListDisplayState
 import com.cycling.rssradar.data.notify.NotificationHelper
+import com.cycling.rssradar.data.store.LinkOpenMode
+import com.cycling.rssradar.data.store.LinkShareState
+import com.cycling.rssradar.data.store.LinkStore
 import com.cycling.rssradar.data.store.ListDisplayStore
 import com.cycling.rssradar.data.store.NotificationStore
+import com.cycling.rssradar.data.store.ShareContentFormat
 import com.cycling.rssradar.data.store.SyncInterval
 import com.cycling.rssradar.data.store.SyncState
 import com.cycling.rssradar.data.store.SyncStore
@@ -107,6 +111,8 @@ data class RssHubSettingsUiState(
     val keepArchived: KeepArchived = KeepArchived.ALWAYS,
     /** 自动同步状态（issue #58）。 */
     val sync: SyncState = SyncState(),
+    /** 外链打开方式与分享格式（#26）。 */
+    val linkShare: LinkShareState = LinkShareState(),
     /** 新文章通知总开关（#31）。 */
     val notifyEnabled: Boolean = false,
     /** 系统通知权限是否已授予（Android 13+）；true = 低版本无需权限。 */
@@ -138,6 +144,7 @@ class RssHubSettingsViewModel @Inject constructor(
     private val archiveStore: ArchiveStore,
     private val syncStore: SyncStore,
     private val notificationStore: NotificationStore,
+    private val linkStore: LinkStore,
     private val catalogStore: RouteCatalogStore,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
@@ -146,6 +153,7 @@ class RssHubSettingsViewModel @Inject constructor(
         RssHubSettingsUiState(
             activeHost = store.currentOrDefault(),
             aiKeyInput = aiStore.apiKey.orEmpty(),
+            linkShare = linkStore.state.value,
             notifyEnabled = notificationStore.state.value,
             notifyPermissionGranted = NotificationHelper.hasPermission(appContext),
             aiKeyConfigured = aiStore.hasKey(),
@@ -176,6 +184,12 @@ class RssHubSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             syncStore.state.collect { sync ->
                 _state.value = _state.value.copy(sync = sync)
+            }
+        }
+        // 外链与分享偏好（#26）
+        viewModelScope.launch {
+            linkStore.state.collect { linkShare ->
+                _state.value = _state.value.copy(linkShare = linkShare)
             }
         }
         // 通知总开关（#31）
@@ -240,6 +254,11 @@ class RssHubSettingsViewModel @Inject constructor(
             notifyPermissionGranted = granted,
             notifyMessage = if (granted) null else "没有通知权限，无法开启新文章通知",
         )
+    }
+
+    /** 外链与分享偏好（#26）。 */
+    fun updateLinkShare(transform: (LinkShareState) -> LinkShareState) {
+        linkStore.update(transform)
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -351,6 +370,42 @@ private fun SettingSwitchRow(label: String, checked: Boolean, onChange: (Boolean
     }
 }
 
+/** 「标签 + 当前值 + 箭头」的跳转行（归档保留期同款形态，链接/分享偏好复用）。 */
+@Composable
+private fun OptionRow(
+    label: String,
+    value: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            color = TextPrimary,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = value,
+            color = Accent,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.width(6.dp))
+        Icon(
+            imageVector = Lucide.ChevronRight,
+            contentDescription = "选择",
+            tint = TextTertiary,
+            modifier = Modifier.size(16.dp),
+        )
+    }
+}
+
 /** 目录数据时间精确到分钟：更新完能一眼看出「确实换了」。 */
 private fun formatCatalogTimestamp(millis: Long?): String {
     if (millis == null) return "—"
@@ -368,6 +423,8 @@ fun RssHubSettingsScreen(
     val state by viewModel.state.collectAsState()
     var showKeepSheet by remember { mutableStateOf(false) }
     var showIntervalSheet by remember { mutableStateOf(false) }
+    var showLinkModeSheet by remember { mutableStateOf(false) }
+    var showShareFormatSheet by remember { mutableStateOf(false) }
     // Android 13+ 的通知运行时权限：用户点开开关时才请求，不在进页面时打扰
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -557,6 +614,42 @@ fun RssHubSettingsScreen(
                     color = Accent,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ---- 链接与分享（#26）----
+        Text(
+            text = "链接与分享",
+            color = TextSecondary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "外链怎么打开、分享文章时带哪些内容。阅读页顶栏可分享本文。",
+            color = TextTertiary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+        )
+        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                OptionRow(
+                    label = "打开链接",
+                    value = state.linkShare.linkOpenMode.label,
+                    onClick = { showLinkModeSheet = true },
+                )
+                OptionRow(
+                    label = "分享内容",
+                    value = state.linkShare.shareFormat.label,
+                    onClick = { showShareFormatSheet = true },
+                )
+                Text(
+                    text = "Custom Tabs（应用内打开）需引入 androidx.browser 依赖，暂未提供。",
+                    color = TextTertiary,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(vertical = 4.dp),
                 )
             }
         }
@@ -961,6 +1054,28 @@ fun RssHubSettingsScreen(
             label = { it.label },
             onSelect = viewModel::setKeepArchived,
             onDismiss = { showKeepSheet = false },
+        )
+    }
+
+    if (showLinkModeSheet) {
+        OptionPickerSheet(
+            title = "打开链接",
+            options = LinkOpenMode.entries.toList(),
+            selected = state.linkShare.linkOpenMode,
+            label = { it.label },
+            onSelect = { mode -> viewModel.updateLinkShare { it.copy(linkOpenMode = mode) } },
+            onDismiss = { showLinkModeSheet = false },
+        )
+    }
+
+    if (showShareFormatSheet) {
+        OptionPickerSheet(
+            title = "分享内容",
+            options = ShareContentFormat.entries.toList(),
+            selected = state.linkShare.shareFormat,
+            label = { it.label },
+            onSelect = { format -> viewModel.updateLinkShare { it.copy(shareFormat = format) } },
+            onDismiss = { showShareFormatSheet = false },
         )
     }
 
