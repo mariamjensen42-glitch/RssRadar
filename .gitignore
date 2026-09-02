@@ -19,3 +19,4 @@ local.properties
 .gradle.bad/
 .idea/
 .workbuddy/
+prototype/__pycache__/

@@ -10,7 +10,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -24,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.TextPrimary
@@ -56,7 +56,7 @@ fun FeedArticlesScreen(
 
     Scaffold(
         containerColor = BgRoot,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -120,6 +120,8 @@ fun FeedArticlesScreen(
                     viewModel.onIntent(FeedArticlesIntent.DeleteArticle(id))
                 },
                 onScrolledToEnd = { viewModel.onIntent(FeedArticlesIntent.LoadMore) },
+                // 单源页强制隐藏订阅源名称（issue #56）：同源卡片重复源名是纯噪音
+                showFeedName = false,
                 // 本页无悬浮 TabBar，普通间距即可
                 bottomPadding = 16.dp,
                 modifier = Modifier.padding(padding),

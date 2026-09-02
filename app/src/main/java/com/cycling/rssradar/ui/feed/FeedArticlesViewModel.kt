@@ -109,7 +109,11 @@ class FeedArticlesViewModel @Inject constructor(
             isLoadingMore = true
             val current = articles
             val page = repository.loadFeedPage(feedId, PAGE_SIZE, current.size)
-            articles = current + page
+            // 去重保护（同 FeedListViewModel）：DB 删除使 OFFSET 位移后，
+            // 下一页可能与快照尾部重叠，重复 id 会让 LazyColumn key 冲突崩溃。
+            val loadedIds = current.mapTo(HashSet()) { it.article.id }
+            val fresh = page.filterNot { it.article.id in loadedIds }
+            articles = current + fresh
             hasMore = page.size == PAGE_SIZE
             isLoadingMore = false
         }

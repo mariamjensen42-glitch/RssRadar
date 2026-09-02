@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 新文章通知（#31）：Android 13+ 需运行时授权，设置页在用户开启时请求 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- RSS 生态仍有 http 源，MVP 阶段放行明文流量 -->
     <application

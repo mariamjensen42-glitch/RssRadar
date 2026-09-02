@@ -30,3 +30,12 @@ import kotlinx.serialization.Serializable
 @Serializable data class FeedArticlesRoute(val feedId: Long)
 
 @Serializable data class FeedActionRoute(val feedId: Long)
+
+/** 全文抓取诊断（ADR-0012）：抓不到/抓不全的记录清单与按站点归因。 */
+@Serializable data object FetchDiagnosticsRoute
+
+/** 兴趣画像（ADR-0013）：推荐流的画像只读展示，回答"为什么推荐这些"。 */
+@Serializable data object InterestProfileRoute
+
+/** 崩溃日志（issue #61）：最近 5 次崩溃的清单与全文导出。 */
+@Serializable data object CrashLogRoute

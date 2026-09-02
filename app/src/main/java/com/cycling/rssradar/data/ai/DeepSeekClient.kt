@@ -37,15 +37,21 @@ class DeepSeekClient(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
-    suspend fun chat(system: String, user: String): String = withContext(ioDispatcher) {
-        val key = apiKeyProvider()?.takeIf { it.isNotBlank() } ?: throw AiException.MissingKey()
-        val request = ChatRequest(
-            model = MODEL,
-            messages = listOf(
-                ChatRequest.Msg(role = "system", content = system),
-                ChatRequest.Msg(role = "user", content = user),
-            ),
-        )
+    /**
+     * [temperature] 为 null 时不发送该字段（走 DeepSeek 默认 1.0）。
+     * 摘要等忠实性任务传低值（如 0.4）压发散，减少套话和注水。
+     */
+    suspend fun chat(system: String, user: String, temperature: Double? = null): String =
+        withContext(ioDispatcher) {
+            val key = apiKeyProvider()?.takeIf { it.isNotBlank() } ?: throw AiException.MissingKey()
+            val request = ChatRequest(
+                model = MODEL,
+                messages = listOf(
+                    ChatRequest.Msg(role = "system", content = system),
+                    ChatRequest.Msg(role = "user", content = user),
+                ),
+                temperature = temperature,
+            )
         try {
             execute(key, request)
         } catch (e: AiException) {
@@ -82,6 +88,7 @@ class DeepSeekClient(
         val model: String,
         val messages: List<Msg>,
         val stream: Boolean = false,
+        val temperature: Double? = null,
     ) {
         @Serializable
         data class Msg(val role: String, val content: String)
@@ -92,6 +99,6 @@ class DeepSeekClient(
         const val MODEL = "deepseek-chat"
         private const val CONNECT_TIMEOUT_MS = 10_000
         private const val READ_TIMEOUT_MS = 60_000
-        private val json = Json { ignoreUnknownKeys = true }
+        private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
     }
 }

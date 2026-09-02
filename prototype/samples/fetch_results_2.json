@@ -1,0 +1,180 @@
+[
+  {
+    "name": "upstream_github_kotlin_releases.atom",
+    "url": "https://github.com/JetBrains/kotlin/releases.atom",
+    "ok": true,
+    "status": 200,
+    "content_type": "application/atom+xml; charset=utf-8",
+    "final_url": "https://github.com/JetBrains/kotlin/releases.atom",
+    "bytes": 5083,
+    "elapsed": 5.51,
+    "error": null
+  },
+  {
+    "name": "upstream_hackernews_frontpage.xml",
+    "url": "https://hnrss.org/frontpage",
+    "ok": true,
+    "status": 200,
+    "content_type": "application/xml; charset=utf-8",
+    "final_url": "https://hnrss.org/frontpage",
+    "bytes": 15939,
+    "elapsed": 1.92,
+    "error": null
+  },
+  {
+    "name": "cn_36kr.xml",
+    "url": "https://36kr.com/feed",
+    "ok": true,
+    "status": 200,
+    "content_type": "text/html",
+    "final_url": "https://36kr.com/feed",
+    "bytes": 17603,
+    "elapsed": 0.24,
+    "error": null
+  },
+  {
+    "name": "cn_huxiu.xml",
+    "url": "https://www.huxiu.com/rss/0.xml",
+    "ok": false,
+    "error": "TimeoutError: The read operation timed out",
+    "elapsed": 20.21,
+    "bytes": 0
+  },
+  {
+    "name": "cn_ithome.xml",
+    "url": "https://www.ithome.com/rss/",
+    "ok": true,
+    "status": 200,
+    "content_type": "text/xml; charset=utf-8",
+    "final_url": "https://www.ithome.com/rss/",
+    "bytes": 204921,
+    "elapsed": 0.25,
+    "error": null
+  },
+  {
+    "name": "cn_ifanr.xml",
+    "url": "https://www.ifanr.com/feed",
+    "ok": true,
+    "status": 200,
+    "content_type": "application/rss+xml; charset=UTF-8",
+    "final_url": "https://www.ifanr.com/feed",
+    "bytes": 457371,
+    "elapsed": 0.19,
+    "error": null
+  },
+  {
+    "name": "cn_solidot.xml",
+    "url": "https://www.solidot.org/index.rss",
+    "ok": true,
+    "status": 200,
+    "content_type": "application/xml;charset=utf-8",
+    "final_url": "https://www.solidot.org/index.rss",
+    "bytes": 20738,
+    "elapsed": 0.41,
+    "error": null
+  },
+  {
+    "name": "cn_linuxcn.xml",
+    "url": "https://linux.cn/feed/",
+    "ok": false,
+    "error": "URLError: <urlopen error [Errno 11001] getaddrinfo failed>",
+    "elapsed": 0.11,
+    "bytes": 0
+  },
+  {
+    "name": "cn_infoq.xml",
+    "url": "https://www.infoq.cn/feed",
+    "ok": true,
+    "status": 200,
+    "content_type": "application/xml; charset=utf-8",
+    "final_url": "https://www.infoq.cn/feed",
+    "bytes": 13467,
+    "elapsed": 0.22,
+    "error": null
+  },
+  {
+    "name": "cn_meituan_tech.xml",
+    "url": "https://tech.meituan.com/feed/",
+    "ok": true,
+    "status": 200,
+    "content_type": "application/xml",
+    "final_url": "https://tech.meituan.com/rss.xml",
+    "bytes": 173738,
+    "elapsed": 0.45,
+    "error": null
+  },
+  {
+    "name": "blog_coolshell.xml",
+    "url": "https://coolshell.cn/feed",
+    "ok": true,
+    "status": 200,
+    "content_type": "application/rss+xml; charset=UTF-8",
+    "final_url": "https://coolshell.cn/feed",
+    "bytes": 293385,
+    "elapsed": 1.55,
+    "error": null
+  },
+  {
+    "name": "blog_yinwang.xml",
+    "url": "https://www.yinwang.org/atom.xml",
+    "ok": true,
+    "status": 200,
+    "content_type": "text/html",
+    "final_url": "https://www.yinwang.org/atom.xml",
+    "bytes": 467,
+    "elapsed": 2.53,
+    "error": null
+  },
+  {
+    "name": "blog_codingnow.xml",
+    "url": "https://blog.codingnow.com/atom.xml",
+    "ok": true,
+    "status": 200,
+    "content_type": "application/xml",
+    "final_url": "https://blog.codingnow.com/atom.xml",
+    "bytes": 220453,
+    "elapsed": 3.06,
+    "error": null
+  },
+  {
+    "name": "blog_appinn.xml",
+    "url": "https://feeds.appinn.com/appinns/",
+    "ok": true,
+    "status": 200,
+    "content_type": "application/rss+xml; charset=utf-8",
+    "final_url": "http://feeds-origin.appinn.com/appinns",
+    "bytes": 97322,
+    "elapsed": 0.34,
+    "error": null
+  },
+  {
+    "name": "cn_geekpark.xml",
+    "url": "https://www.geekpark.net/rss",
+    "ok": true,
+    "status": 200,
+    "content_type": "application/xml; charset=utf-8;",
+    "final_url": "https://www.geekpark.net/rss",
+    "bytes": 703309,
+    "elapsed": 0.41,
+    "error": null
+  },
+  {
+    "name": "en_rustlang_blog.xml",
+    "url": "https://blog.rust-lang.org/feed.xml",
+    "ok": true,
+    "status": 200,
+    "content_type": "application/xml",
+    "final_url": "https://blog.rust-lang.org/feed.xml",
+    "bytes": 162068,
+    "elapsed": 0.6,
+    "error": null
+  },
+  {
+    "name": "en_androiddev_reddit.xml",
+    "url": "https://www.reddit.com/r/androiddev/.rss",
+    "ok": false,
+    "error": "URLError: <urlopen error timed out>",
+    "elapsed": 40.03,
+    "bytes": 0
+  }
+]

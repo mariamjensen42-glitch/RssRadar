@@ -1,6 +1,6 @@
 package com.cycling.rssradar.data.store
 
-import android.content.Context
+import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,12 +11,10 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 /**
  * 主题偏好持久化 + 运行态共享。
- * 用 StateFlow 让设置页与主题宿主（MainActivity）共享同一份状态：
+ * 用 StateFlow 让设置页与主题宿主共享同一份状态：
  * 设置页改 mode → flow 更新 → 宿主重组换主题。
  */
-class ThemeStore(context: Context) {
-
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+class ThemeStore(private val prefs: SharedPreferences) {
 
     private val _mode = MutableStateFlow(readPersisted())
     val mode: StateFlow<ThemeMode> = _mode.asStateFlow()
@@ -32,7 +30,6 @@ class ThemeStore(context: Context) {
     }
 
     companion object {
-        private const val PREFS_NAME = "rssradar_settings"
         private const val KEY_THEME_MODE = "theme_mode"
     }
 }

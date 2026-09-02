@@ -15,9 +15,12 @@ Infer the repo from `git remote -v`; `gh` does this automatically when run insid
 
 ## Branch & PR workflow
 
-- **Branch naming**: `feat/<issue#>-<short-name>`（feature）、`fix/<issue#>-<short-name>`（修复）。
-- **PR 自动关闭 issue**: PR 描述中包含 `Closes #<n>`，合并即自动关闭对应 issue。
-- 一个 issue 一个分支一个 PR，不跨 issue 混合提交。
+**Trunk model: `dev` / `main` 双分支（2026-08-30 起，替代"每 issue 一分支一 PR"）。**
+
+- **日常改动（修复 / 小功能）**：直接在 `dev` 上 commit + push，**不开分支、不开 PR**。提交信息里带 `Closes #<n>` 即可在 push 时自动关闭对应 issue。
+- **发布 / 稳定点**：攒到一批后开一个 PR `dev → main`（标题如 `Release: <主题>`，正文列出包含的 issue），合并即发布。`main` 上打 `v*` tag 触发 Release workflow 出 APK。
+- **例外（仅高风险大改动才开 feature 分支）**：跨多文件的架构级改动、拿不准会搞坏构建的实验，才开 `feat/<issue#>-<short-name>` / `fix/<issue#>-<short-name>` 分支，PR 目的地填 `dev`。
+- **CI**：push 到 `dev` / `main` 自动跑单测；PR `dev → main` 也跑。
 
 ## Pull requests as a triage surface
 

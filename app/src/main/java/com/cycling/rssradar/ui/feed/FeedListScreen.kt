@@ -27,19 +27,20 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -47,30 +48,37 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.cycling.rssradar.data.db.ArticleWithFeed
+import com.cycling.rssradar.data.store.ListDescMode
+import com.cycling.rssradar.data.store.ListDisplayState
+import com.cycling.rssradar.data.store.MarkAsReadCondition
+import com.cycling.rssradar.ui.theme.LocalListDisplay
 import com.cycling.rssradar.ui.components.ArticleContextMenu
+import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.ArticleMenuActions
 import com.cycling.rssradar.ui.components.FeedIcon
-import com.cycling.rssradar.ui.components.FloatingTabBarFabOffset
+import com.cycling.rssradar.ui.components.OptionPickerSheet
 import com.cycling.rssradar.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
-import com.cycling.rssradar.ui.theme.OnAccent
 import com.cycling.rssradar.ui.theme.Surface1
 import com.cycling.rssradar.ui.theme.TextPrimary
 import com.cycling.rssradar.ui.theme.TextSecondary
 import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Check
+import com.composables.icons.lucide.CheckCheck
 import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
@@ -84,19 +92,19 @@ fun FeedListScreen(
     viewModel: FeedListViewModel,
     onOpenSearch: () -> Unit = {},
     onOpenArticle: (ArticleWithFeed) -> Unit = {},
-    onAddSubscription: () -> Unit = {},
+    /** 空态「添加订阅源」直达入口（新用户第一分钟不该被卡在找入口上）。 */
+    onAddFeed: () -> Unit = {},
 ) {
-    val selectedTab by viewModel.selectedTab.collectAsState()
-    val pagedArticles by viewModel.pagedArticles.collectAsState()
-    val selectedGroup by viewModel.selectedGroup.collectAsState()
+    // MVI 候选 C（ADR-0003）：单一 UiState 快照驱动渲染
+    val uiState by viewModel.uiState.collectAsState()
     val groupOptions by viewModel.groupOptions.collectAsState()
     val unreadCount by viewModel.unreadCount.collectAsState()
+    val recommendationEnabled by viewModel.recommendationEnabled.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showGroupSheet by remember { mutableStateOf(false) }
-    val message = viewModel.uiMessage
-    val isRefreshing = viewModel.isRefreshing
-    val isLoadingMore = viewModel.isLoadingMore
-    val hasMore = viewModel.hasMore
+    /** 批量标记已读条件弹层（#10）。 */
+    var showMarkReadSheet by remember { mutableStateOf(false) }
+    val message = uiState.uiMessage
 
     LaunchedEffect(message) {
         message?.let {
@@ -105,8 +113,24 @@ fun FeedListScreen(
         }
     }
 
+    // 「减少此类」撤销（ADR-0013）：Snackbar 期内可撤销，超时自动丢弃（降权保留）
+    val pendingUndoReduce = uiState.pendingUndoReduceFeedId
+    LaunchedEffect(pendingUndoReduce) {
+        pendingUndoReduce?.let {
+            val result = snackbarHostState.showSnackbar(
+                message = "已减少此订阅源的推荐",
+                actionLabel = "撤销",
+                duration = SnackbarDuration.Short,
+            )
+            when (result) {
+                SnackbarResult.ActionPerformed -> viewModel.onIntent(FeedListIntent.UndoReduceSuch)
+                SnackbarResult.Dismissed -> viewModel.onIntent(FeedListIntent.DiscardUndoReduce)
+            }
+        }
+    }
+
     // 删除撤销（issue #46）：Snackbar 期内可撤销，超时自动丢弃
-    val pendingUndo = viewModel.pendingUndoDelete
+    val pendingUndo = uiState.pendingUndoDelete
     LaunchedEffect(pendingUndo) {
         pendingUndo?.let { deleted ->
             val result = snackbarHostState.showSnackbar(
@@ -122,23 +146,17 @@ fun FeedListScreen(
     }
 
     // 四个 tab 统一分页快照，分组筛选仍是对已加载页的内存过滤
-    val currentList = viewModel.filterByGroup(pagedArticles)
+    val currentList = viewModel.filterByGroup(uiState.articles)
 
     Scaffold(
         containerColor = BgRoot,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
             FeedListTopBar(
                 onOpenSearch = onOpenSearch,
                 onOpenFilter = { showGroupSheet = true },
-                filterActive = selectedGroup != null,
-            )
-        },
-        // 加源是低频动作，收进 FAB，不占主屏。抬高是为了让开底部胶囊 TabBar。
-        floatingActionButton = {
-            AddSubscriptionFab(
-                onClick = onAddSubscription,
-                modifier = Modifier.padding(bottom = FAB_BOTTOM_OFFSET),
+                onMarkAllRead = { showMarkReadSheet = true },
+                filterActive = uiState.selectedGroup != null,
             )
         },
     ) { padding ->
@@ -148,18 +166,26 @@ fun FeedListScreen(
                 .padding(padding),
         ) {
             FeedListTabRow(
-                selected = selectedTab,
+                selected = uiState.selectedTab,
                 unreadCount = unreadCount,
+                // 推荐流开关（ADR-0013）：关掉就不渲染「推荐」tab
+                tabs = if (recommendationEnabled) FeedTab.entries else FeedTab.entries.filter { it != FeedTab.Recommended },
                 onSelect = { viewModel.onIntent(FeedListIntent.SelectTab(it)) },
             )
             Spacer(Modifier.height(8.dp))
             PullToRefreshBox(
-                isRefreshing = isRefreshing,
+                isRefreshing = uiState.isRefreshing,
                 onRefresh = { viewModel.onIntent(FeedListIntent.Refresh) },
                 modifier = Modifier.fillMaxSize(),
             ) {
-                if (currentList.isEmpty()) {
-                    EmptyState(selectedTab = selectedTab, modifier = Modifier.fillMaxSize())
+                if (uiState.isRanking) {
+                    RecommendationLoading(modifier = Modifier.fillMaxSize())
+                } else if (currentList.isEmpty()) {
+                    EmptyState(
+                        selectedTab = uiState.selectedTab,
+                        onAddFeed = onAddFeed,
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 } else {
                     ArticleCardList(
                         articles = currentList,
@@ -179,8 +205,17 @@ fun FeedListScreen(
                         onDelete = { id ->
                             viewModel.onIntent(FeedListIntent.DeleteArticle(id))
                         },
-                        // 四个 tab 均分页；滚动到底自动加载下一页
+                        // 推荐 tab 才有「减少此类」：只有这里的排序由画像决定
+                        onReduceSuch = if (uiState.selectedTab == FeedTab.Recommended) {
+                            { id -> viewModel.onIntent(FeedListIntent.ReduceSuch(id)) }
+                        } else {
+                            null
+                        },
+                        // 各 tab 均分页；滚动到底自动加载下一页
                         onScrolledToEnd = { viewModel.onIntent(FeedListIntent.LoadMore) },
+                        markReadPassed = { ids ->
+                            viewModel.onIntent(FeedListIntent.MarkReadPassed(ids))
+                        },
                     )
                     Box(
                         modifier = Modifier
@@ -188,13 +223,13 @@ fun FeedListScreen(
                             .padding(vertical = 16.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (isLoadingMore) {
+                        if (uiState.isLoadingMore) {
                             CircularProgressIndicator(
                                 color = Accent,
                                 strokeWidth = 2.dp,
                                 modifier = Modifier.size(18.dp),
                             )
-                        } else if (hasMore) {
+                        } else if (uiState.hasMore) {
                             LoadMoreHint()
                         }
                     }
@@ -206,12 +241,30 @@ fun FeedListScreen(
     if (showGroupSheet) {
         GroupFilterSheet(
             groups = groupOptions,
-            selected = selectedGroup,
+            selected = uiState.selectedGroup,
             onSelect = { group ->
                 viewModel.onIntent(FeedListIntent.SelectGroup(group))
                 showGroupSheet = false
             },
             onDismiss = { showGroupSheet = false },
+        )
+    }
+
+    // 批量标记已读（#10）：选条件后一次性写库，数字由 DAO 的真实影响行数汇报
+    if (showMarkReadSheet) {
+        OptionPickerSheet(
+            title = "标记已读",
+            options = MarkAsReadCondition.entries.toList(),
+            selected = null,
+            label = { it.label },
+            subtitle = { condition ->
+                when (condition) {
+                    MarkAsReadCondition.ALL -> "把全部文章标为已读"
+                    else -> "把 ${condition.label}发布的未读文章标为已读"
+                }
+            },
+            onSelect = { condition -> viewModel.onIntent(FeedListIntent.MarkAllRead(condition)) },
+            onDismiss = { showMarkReadSheet = false },
         )
     }
 }
@@ -220,6 +273,7 @@ fun FeedListScreen(
 private fun FeedListTopBar(
     onOpenSearch: () -> Unit,
     onOpenFilter: () -> Unit,
+    onMarkAllRead: () -> Unit,
     filterActive: Boolean,
 ) {
     Row(
@@ -239,6 +293,10 @@ private fun FeedListTopBar(
         IconButton(onClick = onOpenSearch) {
             Icon(Lucide.Search, contentDescription = "搜索", tint = TextPrimary)
         }
+        // 批量标记已读（#10）：积累几天未读刷不完的信息流，一键按时间范围清空
+        IconButton(onClick = onMarkAllRead) {
+            Icon(Lucide.CheckCheck, contentDescription = "标记已读", tint = TextPrimary)
+        }
         IconButton(onClick = onOpenFilter) {
             Box {
                 Icon(Lucide.SlidersHorizontal, contentDescription = "分组筛选", tint = TextPrimary)
@@ -256,35 +314,12 @@ private fun FeedListTopBar(
     }
 }
 
-/** 让开底部胶囊 TabBar 的抬升量，与 FloatingBottomBar 实际占位联动（BottomTabBar.kt）。 */
-private val FAB_BOTTOM_OFFSET = FloatingTabBarFabOffset
-
-@Composable
-private fun AddSubscriptionFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = Accent,
-        tonalElevation = 0.dp,
-        shadowElevation = 8.dp,
-        modifier = modifier
-            .size(56.dp)
-            .clickable(onClick = onClick),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = Lucide.Plus,
-                contentDescription = "添加订阅",
-                tint = OnAccent,
-                modifier = Modifier.size(26.dp),
-            )
-        }
-    }
-}
-
 @Composable
 private fun FeedListTabRow(
     selected: FeedTab,
     unreadCount: Int,
+    /** 实际渲染的 tab（推荐流可关，ADR-0013）。 */
+    tabs: List<FeedTab> = FeedTab.entries,
     onSelect: (FeedTab) -> Unit,
 ) {
     Row(
@@ -293,12 +328,13 @@ private fun FeedListTabRow(
             .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        FeedTab.entries.forEach { tab ->
+        tabs.forEach { tab ->
             val label = when (tab) {
                 FeedTab.All -> "全部"
                 FeedTab.Unread -> "未读 $unreadCount"
                 FeedTab.Starred -> "收藏"
                 FeedTab.Bookmarked -> "稍后读"
+                FeedTab.Recommended -> "推荐"
             }
             FilterChip(
                 label = label,
@@ -393,6 +429,7 @@ private fun GroupOption(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ArticleCardList(
     articles: List<ArticleWithFeed>,
@@ -402,10 +439,25 @@ fun ArticleCardList(
     onToggleBookmarked: (Long) -> Unit,
     onDelete: (Long) -> Unit,
     onScrolledToEnd: () -> Unit,
+    /**
+     * 「减少此类」（ADR-0013）：非空时卡片的上下文菜单出现该动作。
+     * 只有推荐流传——其余列表的排序与画像无关，负反馈无处落地。
+     */
+    onReduceSuch: ((Long) -> Unit)? = null,
     // 底部让位：tab 屏传悬浮 TabBar 让位；无 TabBar 的页面传普通间距
     bottomPadding: Dp = tabBarBottomClearance(),
+    // 单源页强制隐藏订阅源名称（同源重复是噪音）；null = 跟随全局配置
+    showFeedName: Boolean? = null,
+    /**
+     * 滚动自动标记已读（#11）：上报"已滚出视口顶部"的文章 id 批次。
+     * 由 [LocalListDisplay] 的开关决定是否启用，关闭时本回调不会被调用。
+     */
+    markReadPassed: (List<Long>) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val display = LocalListDisplay.current.let {
+        it.copy(showFeedName = showFeedName ?: it.showFeedName)
+    }
     val listState = rememberLazyListState()
     val shouldLoadMore = remember {
         derivedStateOf {
@@ -415,6 +467,42 @@ fun ArticleCardList(
     }
     LaunchedEffect(shouldLoadMore.value) {
         if (shouldLoadMore.value) onScrolledToEnd()
+    }
+    // 分组必须在 LazyColumn builder 外算：builder lambda 不是 composable 上下文，
+    // remember 放里面编不过。不开启粘性头时不算，零开销。
+    val dayGroups = if (display.stickyDateHeader) {
+        remember(articles) { dayGroups(articles) }
+    } else {
+        emptyList()
+    }
+    // 滚动自动标记已读（#11）：把"列表槽位 → 文章 id"铺平（粘性日期头也占一个槽位，
+    // 用 null 占位），滚过视口顶部的槽位即视为已读。槽位表与列表结构严格同构，
+    // 否则粘性头开启时索引会错位。
+    val slotIds: List<Long?> = if (display.stickyDateHeader) {
+        remember(dayGroups) {
+            buildList {
+                dayGroups.forEach { group ->
+                    add(null) // 日期头占一个槽位
+                    group.items.forEach { add(it.article.id) }
+                }
+            }
+        }
+    } else {
+        remember(articles) { articles.map { it.article.id } }
+    }
+    val unreadIds = remember(articles) {
+        articles.filter { !it.article.isRead }.map { it.article.id }.toSet()
+    }
+    LaunchedEffect(listState, display.markReadOnScroll, slotIds, unreadIds, markReadPassed) {
+        if (!display.markReadOnScroll) return@LaunchedEffect
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .distinctUntilChanged()
+            .collect { firstVisible ->
+                val passed = slotIds.subList(0, firstVisible.coerceAtMost(slotIds.size))
+                    .filterNotNull()
+                    .filter { it in unreadIds }
+                if (passed.isNotEmpty()) markReadPassed(passed)
+            }
     }
     LazyColumn(
         state = listState,
@@ -428,15 +516,40 @@ fun ArticleCardList(
         ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(articles, key = { it.article.id }) { item ->
-            ArticleCard(
-                item = item,
-                onClick = { onArticleClick(item) },
-                onToggleRead = { onToggleRead(item.article.id, !item.article.isRead) },
-                onToggleStarred = { onToggleStarred(item.article.id) },
-                onToggleBookmarked = { onToggleBookmarked(item.article.id) },
-                onDelete = { onDelete(item.article.id) },
-            )
+        if (display.stickyDateHeader) {
+            // 粘性日期头（issue #56）：按自然日分组，吸附在顶部。
+            // 只做视觉分组，不改变排序与分页；列表本身已按 publishedAt DESC 排序。
+            dayGroups.forEach { group ->
+                // stickyHeader 是 LazyListScope 接口成员（foundation 1.10+，真值表已核），
+                // DSL 内直接调用，不可 import
+                stickyHeader(key = "date-${group.key}") {
+                    StickyDateHeader(group.label)
+                }
+                items(group.items, key = { it.article.id }) { item ->
+                    ArticleCard(
+                        item = item,
+                        display = display,
+                        onClick = { onArticleClick(item) },
+                        onToggleRead = { onToggleRead(item.article.id, !item.article.isRead) },
+                        onToggleStarred = { onToggleStarred(item.article.id) },
+                        onToggleBookmarked = { onToggleBookmarked(item.article.id) },
+                        onDelete = { onDelete(item.article.id) },
+                        onReduceSuch = onReduceSuch?.let { reduce -> { reduce(item.article.id) } },
+                    )
+                }
+            }
+        } else {
+            items(articles, key = { it.article.id }) { item ->
+                ArticleCard(
+                    item = item,
+                    display = display,
+                    onClick = { onArticleClick(item) },
+                    onToggleRead = { onToggleRead(item.article.id, !item.article.isRead) },
+                    onToggleStarred = { onToggleStarred(item.article.id) },
+                    onToggleBookmarked = { onToggleBookmarked(item.article.id) },
+                    onDelete = { onDelete(item.article.id) },
+                )
+            }
         }
     }
 }
@@ -444,17 +557,41 @@ fun ArticleCardList(
 /** 距列表尾部还剩这么多项时预加载下一页。 */
 private const val LOAD_MORE_THRESHOLD = 5
 
+/** 粘性日期头：不透明底色（页面底色）保证滚动时干净压住下方卡片。 */
+@Composable
+private fun StickyDateHeader(label: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(BgRoot)
+            .padding(vertical = 4.dp),
+    ) {
+        Text(
+            text = label,
+            color = TextTertiary,
+            style = MaterialTheme.typography.labelMedium,
+        )
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ArticleCard(
     item: ArticleWithFeed,
+    display: ListDisplayState,
     onClick: () -> Unit,
     onToggleRead: () -> Unit,
     onToggleStarred: () -> Unit,
     onToggleBookmarked: () -> Unit,
     onDelete: () -> Unit,
+    /** 「减少此类」（ADR-0013）：非空时上下文菜单出现该动作。 */
+    onReduceSuch: (() -> Unit)? = null,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    // 已读弱化（issue #56）：开关开启时已读卡片降弱色；未读卡片永不因此改变
+    val dimmed = display.dimRead && item.article.isRead
+    val titleColor = if (dimmed) TextTertiary else TextPrimary
+    val descColor = if (dimmed) TextTertiary else TextSecondary
     Box {
         Surface(
             shape = RoundedCornerShape(14.dp),
@@ -470,23 +607,30 @@ fun ArticleCard(
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 UnreadDot(visible = !item.article.isRead)
-                Spacer(Modifier.width(6.dp))
-                FeedIcon(title = item.feedTitle, size = 18.dp, cornerRadius = 5.dp)
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = item.feedTitle,
-                    color = TextPrimary,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                item.article.publishedAt?.let { ts ->
+                if (display.showFeedIcon) {
+                    Spacer(Modifier.width(6.dp))
+                    FeedIcon(title = item.feedTitle, iconUrl = item.feedIconUrl, size = 18.dp, cornerRadius = 5.dp)
+                }
+                if (display.showFeedName) {
+                    Spacer(Modifier.width(6.dp))
                     Text(
-                        text = DateUtils.getRelativeTimeSpanString(ts).toString(),
-                        color = TextTertiary,
-                        style = MaterialTheme.typography.labelSmall,
+                        text = item.feedTitle,
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                }
+                if (display.showDate) {
+                    if (!display.showFeedName) Spacer(Modifier.weight(1f))
+                    item.article.publishedAt?.let { ts ->
+                        Text(
+                            text = DateUtils.getRelativeTimeSpanString(ts).toString(),
+                            color = TextTertiary,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -494,25 +638,29 @@ fun ArticleCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.article.title,
-                        color = TextPrimary,
+                        color = titleColor,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    item.article.summary?.takeIf { it.isNotBlank() }?.let { summary ->
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = summary,
-                            color = TextSecondary,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                    if (display.descMode != ListDescMode.NONE) {
+                        item.article.summary?.takeIf { it.isNotBlank() }?.let { summary ->
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = summary,
+                                color = descColor,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = display.descMode.lines,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
-                Spacer(Modifier.width(10.dp))
-                CoverThumb(url = item.article.coverUrl?.takeIf { it.isNotBlank() })
+                if (display.showThumbnail) {
+                    Spacer(Modifier.width(10.dp))
+                    CoverThumb(url = item.article.coverUrl?.takeIf { it.isNotBlank() })
+                }
             }
         }
         }
@@ -529,6 +677,7 @@ fun ArticleCard(
                 onToggleStarred = onToggleStarred,
                 onToggleBookmarked = onToggleBookmarked,
                 onDelete = onDelete,
+                onReduceSuch = onReduceSuch,
             ),
             onDismiss = { menuExpanded = false },
         )
@@ -602,12 +751,18 @@ private fun LoadMoreHint() {
 }
 
 @Composable
-private fun EmptyState(selectedTab: FeedTab, modifier: Modifier = Modifier) {
+private fun EmptyState(
+    selectedTab: FeedTab,
+    onAddFeed: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     val (title, hint) = when (selectedTab) {
         FeedTab.All -> "还没有订阅" to "去订阅页添加你的第一个 RSS / Atom 源"
         FeedTab.Unread -> "没有未读文章" to "所有文章都看完了，休息一下"
         FeedTab.Starred -> "还没有收藏" to "阅读时点击星标，把好文章留下来"
         FeedTab.Bookmarked -> "暂无稍后读" to "阅读时点击书签，稍后再看"
+        // 推荐流空态（ADR-0013）：候选池 = 未读 + 14 天窗，读完就没了——如实说，不编内容
+        FeedTab.Recommended -> "暂无推荐" to "最近未读都读完了，或还没有订阅源"
     }
     // verticalScroll 让空态页也能响应下拉刷新手势
     Column(
@@ -629,7 +784,36 @@ private fun EmptyState(selectedTab: FeedTab, modifier: Modifier = Modifier) {
             hint,
             color = TextSecondary,
             style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
         )
+        // 「全部」为空 = 一篇文章都没有，必然是还没订阅。这里给直达入口：
+        // 让用户自己去找添加订阅的按钮，是新用户流失最快的一步。
+        if (selectedTab == FeedTab.All) {
+            Spacer(Modifier.height(24.dp))
+            FilledTonalButton(onClick = onAddFeed) {
+                Icon(
+                    Lucide.Plus,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("添加订阅源")
+            }
+        }
+    }
+}
+
+/** 推荐流首屏打分中的占位（候选池加载 + 打分在 IO 线程，通常一闪而过）。 */
+@Composable
+private fun RecommendationLoading(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(bottom = tabBarBottomClearance()),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        CircularProgressIndicator(color = Accent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.height(10.dp))
+        Text("正在按你的阅读偏好排序…", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

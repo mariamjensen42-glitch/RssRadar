@@ -24,6 +24,7 @@ import com.composables.icons.lucide.Link
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Share2
 import com.composables.icons.lucide.Star
+import com.composables.icons.lucide.ThumbsDown
 import com.composables.icons.lucide.Trash2
 
 /**
@@ -39,6 +40,11 @@ data class ArticleMenuActions(
     val onToggleStarred: () -> Unit,
     val onToggleBookmarked: () -> Unit,
     val onDelete: () -> Unit,
+    /**
+     * 「减少此类」（ADR-0013）：非空时菜单里出现该项，点击后该文章所属订阅源
+     * 在推荐流里降权。只有推荐流传这个回调——常规列表不做推荐负反馈。
+     */
+    val onReduceSuch: (() -> Unit)? = null,
 )
 
 /**
@@ -88,6 +94,13 @@ fun ArticleContextMenu(
             enabled = hasLink,
             onClick = { onDismiss(); openInBrowser(context, actions.link) },
         )
+        actions.onReduceSuch?.let { reduce ->
+            DropdownMenuItem(
+                text = { Text("减少此类") },
+                leadingIcon = { MenuIcon(Lucide.ThumbsDown) },
+                onClick = { onDismiss(); reduce() },
+            )
+        }
         DropdownMenuItem(
             text = { Text("删除") },
             leadingIcon = { MenuIcon(Lucide.Trash2) },

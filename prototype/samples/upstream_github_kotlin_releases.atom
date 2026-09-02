@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xml:lang="en-US">
+  <id>tag:github.com,2008:https://github.com/JetBrains/kotlin/releases</id>
+  <link type="text/html" rel="alternate" href="https://github.com/JetBrains/kotlin/releases"/>
+  <link type="application/atom+xml" rel="self" href="https://github.com/JetBrains/kotlin/releases.atom"/>
+  <title>Release notes from kotlin</title>
+  <updated>2026-08-29T01:15:26Z</updated>
+  <entry>
+    <id>tag:github.com,2008:Repository/3432266/build-2.5.0-dev-6141</id>
+    <updated>2026-08-29T01:15:26Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/JetBrains/kotlin/releases/tag/build-2.5.0-dev-6141"/>
+    <title>build-2.5.0-dev-6141</title>
+    <content type="html">&lt;p&gt;automatically created by TeamCity VCS labeling build feature&lt;/p&gt;</content>
+    <author><name>unknown</name></author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/3432266/build-2.4.20-RC3-358</id>
+    <updated>2026-08-29T01:15:56Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/JetBrains/kotlin/releases/tag/build-2.4.20-RC3-358"/>
+    <title>build-2.4.20-RC3-358</title>
+    <content type="html">&lt;p&gt;automatically created by TeamCity VCS labeling build feature&lt;/p&gt;</content>
+    <author><name>unknown</name></author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/3432266/build-2.5.0-dev-6136</id>
+    <updated>2026-08-28T21:32:38Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/JetBrains/kotlin/releases/tag/build-2.5.0-dev-6136"/>
+    <title>build-2.5.0-dev-6136</title>
+    <content type="html">&lt;p&gt;automatically created by TeamCity VCS labeling build feature&lt;/p&gt;</content>
+    <author><name>unknown</name></author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/3432266/build-2.5.0-dev-6135</id>
+    <updated>2026-08-28T21:04:38Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/JetBrains/kotlin/releases/tag/build-2.5.0-dev-6135"/>
+    <title>build-2.5.0-dev-6135</title>
+    <content type="html">&lt;p&gt;automatically created by TeamCity VCS labeling build feature&lt;/p&gt;</content>
+    <author><name>unknown</name></author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/3432266/build-2.5.0-dev-6134</id>
+    <updated>2026-08-28T20:50:29Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/JetBrains/kotlin/releases/tag/build-2.5.0-dev-6134"/>
+    <title>build-2.5.0-dev-6134</title>
+    <content type="html">&lt;p&gt;automatically created by TeamCity VCS labeling build feature&lt;/p&gt;</content>
+    <author><name>unknown</name></author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/3432266/build-2.5.0-dev-6131</id>
+    <updated>2026-08-28T20:29:21Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/JetBrains/kotlin/releases/tag/build-2.5.0-dev-6131"/>
+    <title>build-2.5.0-dev-6131</title>
+    <content type="html">&lt;p&gt;automatically created by TeamCity VCS labeling build feature&lt;/p&gt;</content>
+    <author><name>unknown</name></author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/3432266/build-2.5.0-dev-6130</id>
+    <updated>2026-08-28T20:00:33Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/JetBrains/kotlin/releases/tag/build-2.5.0-dev-6130"/>
+    <title>build-2.5.0-dev-6130</title>
+    <content type="html">&lt;p&gt;automatically created by TeamCity VCS labeling build feature&lt;/p&gt;</content>
+    <author><name>unknown</name></author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/3432266/build-2.5.0-dev-6127</id>
+    <updated>2026-08-28T19:34:08Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/JetBrains/kotlin/releases/tag/build-2.5.0-dev-6127"/>
+    <title>build-2.5.0-dev-6127</title>
+    <content type="html">&lt;p&gt;automatically created by TeamCity VCS labeling build feature&lt;/p&gt;</content>
+    <author><name>unknown</name></author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/3432266/build-2.5.0-dev-6124</id>
+    <updated>2026-08-28T19:05:42Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/JetBrains/kotlin/releases/tag/build-2.5.0-dev-6124"/>
+    <title>build-2.5.0-dev-6124</title>
+    <content type="html">&lt;p&gt;automatically created by TeamCity VCS labeling build feature&lt;/p&gt;</content>
+    <author><name>unknown</name></author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/3432266/build-2.5.0-dev-6116</id>
+    <updated>2026-08-28T17:01:30Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/JetBrains/kotlin/releases/tag/build-2.5.0-dev-6116"/>
+    <title>build-2.5.0-dev-6116</title>
+    <content type="html">&lt;p&gt;automatically created by TeamCity VCS labeling build feature&lt;/p&gt;</content>
+    <author><name>unknown</name></author>
+  </entry>
+</feed>

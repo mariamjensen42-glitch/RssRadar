@@ -41,6 +41,9 @@ val Success = Color(0xFF34D399)
 /** 警告。 */
 val Warning = Color(0xFFFBBF24)
 
+/** 危险 / 破坏性操作（删除、清空）。深浅两套主题下都可读，故不进 palette。 */
+val Danger = Color(0xFFEF4444)
+
 // —— 浅色主题常量（与深色同一套强调色，表面/文字反色） ——
 
 /** 浅色背景。 */

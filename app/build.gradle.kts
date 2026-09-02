@@ -24,10 +24,35 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // CI 签名（Release workflow）：密钥经 GitHub Secrets 以环境变量注入。
+    // 本地没有这些环境变量时自动缺省，日常构建不受影响。
+    signingConfigs {
+        create("release") {
+            val ksPath = System.getenv("RSSRADAR_KEYSTORE_PATH") ?: return@create
+            storeFile = file(ksPath)
+            storePassword = System.getenv("RSSRADAR_STORE_PASSWORD")
+            keyAlias = System.getenv("RSSRADAR_KEY_ALIAS")
+            keyPassword = System.getenv("RSSRADAR_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
+            // AGP 9.3+ 新版 optimization DSL：enable = true 一次性启用代码优化（R8）
+            // 与优化版资源裁剪，二者绑定，无需再写 isShrinkResources；平台默认 keep 规则
+            // 也自动包含（等价 proguard-android-optimize.txt）。
+            // keep 规则统一放 app/src/main/keepRules/*.keep（.keep 后缀源集自动收集）。
+            // 回退：改回 enable = false 即完全恢复原状，无迁移成本。
             optimization {
-                enable = false
+                enable = true
+            }
+            // 有 CI 密钥就用它；没有则回退 debug 签名。
+            // 回退的目的是让 release 变体在没有密钥时仍能构建并安装（R8 冒烟必须真装真跑），
+            // debug key 签出的包不可发布——正式发版由 CI 注入 RSSRADAR_KEYSTORE_PATH 走 release 密钥。
+            signingConfig = if (System.getenv("RSSRADAR_KEYSTORE_PATH").isNullOrBlank()) {
+                signingConfigs.getByName("debug")
+            } else {
+                signingConfigs.getByName("release")
             }
         }
     }
@@ -78,6 +103,8 @@ dependencies {
     implementation(libs.readability4j)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.okhttp)
+    implementation(libs.androidx.work.runtime.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

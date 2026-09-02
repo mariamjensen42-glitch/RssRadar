@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  通知状态栏图标（#31）：状态栏图标必须是「白色 + 透明底」的单色剪影，
+  彩色图标在 Android 5.0+ 会被系统涂成一坨白块，所以这里单独做一份 RSS 剪影，
+  不与启动器图标（带品牌色）共用。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7.2,19a2.2,2.2 0,1 1,-4.4 0a2.2,2.2 0,1 1,4.4 0" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4,12.5a9.5,9.5 0,0 1,9.5 9.5h-2.6a6.9,6.9 0,0 0,-6.9 -6.9z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4,6.4a15.6,15.6 0,0 1,15.6 15.6h-2.6A13,13 0,0 0,4 9z" />
+</vector>

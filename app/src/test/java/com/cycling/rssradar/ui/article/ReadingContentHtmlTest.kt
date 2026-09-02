@@ -1,5 +1,6 @@
 package com.cycling.rssradar.ui.article
 
+import com.cycling.rssradar.data.store.ReadingImageState
 import com.cycling.rssradar.data.store.ReadingFontFamily
 import com.cycling.rssradar.data.store.ReadingStyleState
 import org.junit.Assert.assertEquals
@@ -17,7 +18,12 @@ class ReadingContentHtmlTest {
         "link" to "#9B9CFF",
     )
 
-    private fun build(content: String, style: ReadingStyleState = ReadingStyleState()) =
+    private fun build(
+        content: String,
+        style: ReadingStyleState = ReadingStyleState(),
+        imageUrls: Set<String> = emptySet(),
+        imageCorners: Int = ReadingImageState.DEFAULT_CORNER_RADIUS,
+    ) =
         ReadingContentHtml.build(
             contentHtml = content,
             style = style,
@@ -27,6 +33,8 @@ class ReadingContentHtmlTest {
             codeBg = colors["codeBg"]!!,
             border = colors["border"]!!,
             link = colors["link"]!!,
+            imageUrls = imageUrls,
+            imageCorners = imageCorners,
         )
 
     @Test
@@ -75,5 +83,51 @@ class ReadingContentHtmlTest {
         assertTrue(html.startsWith("<!DOCTYPE html>"))
         assertTrue(html.contains("<meta name=\"viewport\""))
         assertTrue(html.trim().endsWith("</html>"))
+    }
+
+    @Test
+    fun `typography css covers tables headings lists and code`() {
+        val html = build("<p>x</p>")
+
+        assertTrue(html.contains("table { display:block"))
+        assertTrue(html.contains("th,td { border:1px solid"))
+        assertTrue(html.contains("h1 { font-size:1.45em"))
+        assertTrue(html.contains("ul,ol { margin:0 0 1em 0"))
+        assertTrue(html.contains("hr { border:none"))
+        assertTrue(html.contains("figcaption { text-align:center"))
+        assertTrue(html.contains(":not(pre) > code"))
+        assertTrue(html.contains("pre code { background:none"))
+    }
+
+    @Test
+    fun `image corner radius lands in the img rule`() {
+        assertTrue(build("<p>x</p>").contains("border-radius:8px"))
+        assertTrue(build("<p>x</p>", imageCorners = 0).contains("border-radius:0px"))
+        assertTrue(build("<p>x</p>", imageCorners = 24).contains("border-radius:24px"))
+    }
+
+    @Test
+    fun `image urls turn images into img-link anchors`() {
+        val content = """<p>x</p><img src="https://a.com/1.png">"""
+        val html = build(content, imageUrls = setOf("https://a.com/1.png"))
+
+        assertTrue(html.contains("""<a class="img-link" href="https://a.com/1.png">"""))
+        assertTrue(html.contains("a.img-link { text-decoration:none"))
+    }
+
+    @Test
+    fun `no image urls leaves the body verbatim`() {
+        val content = """<p>x</p><img src="https://a.com/1.png">"""
+
+        assertTrue(build(content).contains("<body>$content</body>"))
+    }
+
+    @Test
+    fun `media card and underline styles present`() {
+        val html = build("<p>x</p>")
+
+        assertTrue(html.contains(".media-card { display:flex"))
+        assertTrue(html.contains(".media-card span { color:#9B9CFF"))
+        assertTrue(html.contains("text-decoration:underline"))
     }
 }

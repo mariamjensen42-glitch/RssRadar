@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.data.db.FeedEntity
+import com.cycling.rssradar.data.ClearArticlesResult
 import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.db.GROUP_DESIGN
 import com.cycling.rssradar.data.db.GROUP_DEV
@@ -44,9 +45,24 @@ sealed interface SubscriptionsIntent {
     data class RenameGroup(val oldName: String, val newName: String) : SubscriptionsIntent
     data class DeleteGroup(val name: String) : SubscriptionsIntent
     data class MoveFeed(val feedId: Long, val targetGroup: String) : SubscriptionsIntent
+    /** 批量移动（issue #7）：进入/退出多选、勾选、清空勾选、执行移动。 */
+    data object ToggleSelectionMode : SubscriptionsIntent
+    data class ToggleFeedSelected(val feedId: Long) : SubscriptionsIntent
+    data class MoveSelectedFeeds(val targetGroup: String) : SubscriptionsIntent
+    /** 清空文章（issue #8）：只删文章，源与分组都保留；收藏/稍后读豁免。 */
+    data class ClearFeedArticles(val feedId: Long, val feedTitle: String) : SubscriptionsIntent
+    data class ClearGroupArticles(val group: String) : SubscriptionsIntent
+    /** Feed 级预设：全文抓取开关（issue #9）。 */
+    data class SetFullContentEnabled(val feedId: Long, val enabled: Boolean) : SubscriptionsIntent
     data class RenameFeed(val feedId: Long, val title: String) : SubscriptionsIntent
     data class DeleteFeed(val feedId: Long, val feedTitle: String) : SubscriptionsIntent
     data class ImportOpml(val uri: Uri) : SubscriptionsIntent
+    /** OPML 导出（#4）：把全部订阅源写进 [uri]（SAF 另存为，用户决定存哪）。 */
+    data class ExportOpml(val uri: Uri) : SubscriptionsIntent
+    /** 自动同步开关（issue #58）：屏蔽后不参与自动同步，手动刷新照常。 */
+    data class SetSyncEnabled(val feedId: Long, val enabled: Boolean) : SubscriptionsIntent
+    /** Feed 级通知开关（#31）。 */
+    data class SetNotificationsEnabled(val feedId: Long, val enabled: Boolean) : SubscriptionsIntent
 }
 
 @HiltViewModel
@@ -58,6 +74,13 @@ class SubscriptionsViewModel @Inject constructor(
 
     private val _expandedIds = MutableStateFlow(setOf(GROUP_TECH, GROUP_DEV, GROUP_DESIGN))
     val expandedGroupIds: StateFlow<Set<String>> = _expandedIds.asStateFlow()
+
+    /** 批量移动的多选模式（issue #7）：开启后列表行变勾选行，整行点击 = 勾选而非进文章列表。 */
+    private val _selectionMode = MutableStateFlow(false)
+    val selectionMode: StateFlow<Boolean> = _selectionMode.asStateFlow()
+
+    private val _selectedFeedIds = MutableStateFlow(emptySet<Long>())
+    val selectedFeedIds: StateFlow<Set<Long>> = _selectedFeedIds.asStateFlow()
 
     /** 分组注册表：保证空分组也显示。 */
     private val _groupsList = MutableStateFlow(groupStore.getGroups())
@@ -93,9 +116,18 @@ class SubscriptionsViewModel @Inject constructor(
             is SubscriptionsIntent.RenameGroup -> renameGroup(intent.oldName, intent.newName)
             is SubscriptionsIntent.DeleteGroup -> deleteGroup(intent.name)
             is SubscriptionsIntent.MoveFeed -> moveFeed(intent.feedId, intent.targetGroup)
+            SubscriptionsIntent.ToggleSelectionMode -> toggleSelectionMode()
+            is SubscriptionsIntent.ToggleFeedSelected -> toggleFeedSelected(intent.feedId)
+            is SubscriptionsIntent.MoveSelectedFeeds -> moveSelectedFeeds(intent.targetGroup)
+            is SubscriptionsIntent.ClearFeedArticles -> clearFeedArticles(intent.feedId, intent.feedTitle)
+            is SubscriptionsIntent.ClearGroupArticles -> clearGroupArticles(intent.group)
+            is SubscriptionsIntent.SetFullContentEnabled -> setFullContentEnabled(intent.feedId, intent.enabled)
             is SubscriptionsIntent.RenameFeed -> renameFeed(intent.feedId, intent.title)
             is SubscriptionsIntent.DeleteFeed -> deleteFeed(intent.feedId, intent.feedTitle)
             is SubscriptionsIntent.ImportOpml -> importOpml(intent.uri)
+            is SubscriptionsIntent.ExportOpml -> exportOpml(intent.uri)
+            is SubscriptionsIntent.SetSyncEnabled -> setSyncEnabled(intent.feedId, intent.enabled)
+            is SubscriptionsIntent.SetNotificationsEnabled -> setNotificationsEnabled(intent.feedId, intent.enabled)
         }
     }
 
@@ -161,6 +193,73 @@ class SubscriptionsViewModel @Inject constructor(
         }
     }
 
+    // —— 批量移动（issue #7） ——
+
+    /** 进出多选模式；退出即清空勾选，不留残留状态。 */
+    private fun toggleSelectionMode() {
+        _selectionMode.value = !_selectionMode.value
+        if (!_selectionMode.value) _selectedFeedIds.value = emptySet()
+    }
+
+    private fun toggleFeedSelected(feedId: Long) {
+        _selectedFeedIds.value = _selectedFeedIds.value.toMutableSet().also { set ->
+            if (!set.add(feedId)) set.remove(feedId)
+        }
+    }
+
+    /** 执行批量移动：目标分组不在注册表时顺带注册（分组是注册表 + 字符串，见 GroupStore）。 */
+    private fun moveSelectedFeeds(targetGroup: String) {
+        val ids = _selectedFeedIds.value.toList()
+        val group = targetGroup.trim().ifBlank { DEFAULT_GROUP }
+        _selectionMode.value = false
+        _selectedFeedIds.value = emptySet()
+        if (ids.isEmpty()) return
+        if (group !in groupStore.getGroups()) groupStore.addGroup(group)
+        refreshGroups()
+        viewModelScope.launch {
+            repository.moveFeedsToGroup(ids, group)
+            uiMessage = "已移动 ${ids.size} 个订阅到「$group」"
+        }
+    }
+
+    // —— 清空文章（issue #8） ——
+
+    private fun clearFeedArticles(feedId: Long, feedTitle: String) {
+        viewModelScope.launch {
+            uiMessage = clearMessage(repository.clearFeedArticles(feedId), "「$feedTitle」")
+        }
+    }
+
+    private fun clearGroupArticles(group: String) {
+        viewModelScope.launch {
+            uiMessage = clearMessage(repository.clearGroupArticles(group), "「$group」")
+        }
+    }
+
+    /** 提示文案：数字全部来自 ClearArticlesResult 的真实统计，不估算。 */
+    private fun clearMessage(result: ClearArticlesResult, subject: String): String = buildString {
+        append(
+            if (result.deleted == 0) {
+                "$subject 没有可清空的文章"
+            } else {
+                "已清空 $subject 的 ${result.deleted} 篇文章"
+            },
+        )
+        if (result.kept > 0) append("，保留 ${result.kept} 篇收藏/稍后读")
+    }
+
+    /** Feed 级预设：全文抓取开关（issue #9）。 */
+    private fun setFullContentEnabled(feedId: Long, enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setFullContentEnabled(feedId, enabled)
+            uiMessage = if (enabled) {
+                "已开启全文抓取，详情页会自动抓原网页正文"
+            } else {
+                "已关闭全文抓取，详情页只显示订阅源自带内容"
+            }
+        }
+    }
+
     /** 重命名订阅源标题。 */
     private fun renameFeed(feedId: Long, title: String) {
         if (title.isBlank()) {
@@ -178,6 +277,14 @@ class SubscriptionsViewModel @Inject constructor(
         viewModelScope.launch {
             repository.deleteFeed(feedId)
             uiMessage = "已删除「$feedTitle」"
+        }
+    }
+
+    /** 自动同步开关（issue #58）。 */
+    private fun setSyncEnabled(feedId: Long, enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setSyncEnabled(feedId, enabled)
+            uiMessage = if (enabled) "已参与自动同步" else "已屏蔽自动同步（手动刷新不受影响）"
         }
     }
 
@@ -212,6 +319,31 @@ class SubscriptionsViewModel @Inject constructor(
             viewModelScope.launch {
                 repository.refreshFeeds(result.newFeedIds)
             }
+        }
+    }
+
+    /** Feed 级通知开关（#31）：写库即生效，FeedAction 页的 feed 是 Room flow，自动刷新。 */
+    private fun setNotificationsEnabled(feedId: Long, enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setNotificationsEnabled(feedId, enabled)
+            uiMessage = if (enabled) "已开启此源的通知" else "已关闭此源的通知"
+        }
+    }
+
+    /**
+     * OPML 导出（#4）：序列化全部订阅源 → 写进用户选的 URI。
+     * 写失败（没有写权限/存储被移除）如实报错，不假装成功。
+     */
+    private fun exportOpml(uri: Uri) {
+        viewModelScope.launch {
+            val opml = repository.exportOpml()
+            val written = runCatching {
+                appContext.contentResolver.openOutputStream(uri)?.use { stream ->
+                    stream.write(opml.toByteArray(Charsets.UTF_8))
+                    true
+                } ?: false
+            }.getOrDefault(false)
+            uiMessage = if (written) "已导出 OPML" else "导出失败，请重试"
         }
     }
 

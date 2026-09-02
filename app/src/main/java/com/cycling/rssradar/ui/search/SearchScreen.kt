@@ -27,7 +27,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
@@ -49,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.ui.components.ArticleContextMenu
+import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.ArticleMenuActions
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.components.tabBarBottomClearance
@@ -119,7 +119,7 @@ fun SearchScreen(
                 )
             }
         }
-        SnackbarHost(
+        AppSnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
@@ -336,7 +336,7 @@ private fun SearchResultRow(
             }
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                FeedIcon(title = article.feedTitle, size = 14.dp, cornerRadius = 4.dp)
+                FeedIcon(title = article.feedTitle, iconUrl = article.feedIconUrl, size = 14.dp, cornerRadius = 4.dp)
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = article.feedTitle,
