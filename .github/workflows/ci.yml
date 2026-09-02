@@ -5,6 +5,8 @@ on:
     branches: [dev, main]
   pull_request:
     branches: [main]
+  # 手动触发：push 事件偶发丢投递时，可在 Actions 页手动跑一遍单测
+  workflow_dispatch:
 
 permissions:
   contents: read
