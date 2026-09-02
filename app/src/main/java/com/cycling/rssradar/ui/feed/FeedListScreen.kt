@@ -37,8 +37,12 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxState
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +51,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -83,6 +88,7 @@ import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Search
+import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.SlidersHorizontal
 import com.cycling.rssradar.ui.theme.Surface2
 
@@ -526,7 +532,7 @@ fun ArticleCardList(
                     StickyDateHeader(group.label)
                 }
                 items(group.items, key = { it.article.id }) { item ->
-                    ArticleCard(
+                    SwipeableArticleCard(
                         item = item,
                         display = display,
                         onClick = { onArticleClick(item) },
@@ -540,7 +546,7 @@ fun ArticleCardList(
             }
         } else {
             items(articles, key = { it.article.id }) { item ->
-                ArticleCard(
+                SwipeableArticleCard(
                     item = item,
                     display = display,
                     onClick = { onArticleClick(item) },
@@ -571,6 +577,111 @@ private fun StickyDateHeader(label: String) {
             color = TextTertiary,
             style = MaterialTheme.typography.labelMedium,
         )
+    }
+}
+
+/**
+ * 列表手势：右滑收藏 / 左滑切换已读——RSS 阅读器的肌肉记忆。
+ *
+ * 两个动作都不该让卡片从列表里消失（标已读后它只是变灰，收藏后只是多颗星），
+ * 所以走的是「落定即执行 + 立刻弹回」的路子：动作在 [LaunchedEffect] 里执行，
+ * 随后 [SwipeToDismissBoxState.reset] 把卡片动画回原位。
+ *
+ * 动作刻意不挂在 `SwipeToDismissBox(onDismiss = …)` 上：onDismiss 与 reset 各在
+ * 自己的协程里跑，先后顺序不受控，抢跑会把 settledValue 冲成 Settled 导致动作漏执行。
+ */
+@Composable
+private fun SwipeableArticleCard(
+    item: ArticleWithFeed,
+    display: ListDisplayState,
+    onClick: () -> Unit,
+    onToggleRead: () -> Unit,
+    onToggleStarred: () -> Unit,
+    onToggleBookmarked: () -> Unit,
+    onDelete: () -> Unit,
+    onReduceSuch: (() -> Unit)? = null,
+) {
+    val state = rememberSwipeToDismissBoxState()
+    // 回调每次重组都是新 lambda，而本协程的 key 只有 settledValue（不能带回调，
+    // 否则每次重组都会重启并重复触发动作）——用 UpdatedState 保证拿到最新回调。
+    val currentToggleRead by rememberUpdatedState(onToggleRead)
+    val currentToggleStarred by rememberUpdatedState(onToggleStarred)
+    // 动作不走 onDismiss（理由见函数注释），但 SwipeToDismissBox 内部把它当作
+    // 协程 key——用稳定实例，避免列表每次重组都白重启一次内部协程。
+    val noopDismiss: (SwipeToDismissBoxValue) -> Unit = remember { {} }
+
+    LaunchedEffect(state.settledValue) {
+        when (state.settledValue) {
+            SwipeToDismissBoxValue.StartToEnd -> currentToggleStarred() // 右滑：收藏
+            SwipeToDismissBoxValue.EndToStart -> currentToggleRead() // 左滑：切换已读
+            SwipeToDismissBoxValue.Settled -> return@LaunchedEffect
+        }
+        state.reset()
+    }
+
+    SwipeToDismissBox(
+        state = state,
+        onDismiss = noopDismiss,
+        backgroundContent = {
+            SwipeActionBackground(
+                direction = state.dismissDirection,
+                isRead = item.article.isRead,
+                isStarred = item.article.isStarred,
+            )
+        },
+        content = {
+            ArticleCard(
+                item = item,
+                display = display,
+                onClick = onClick,
+                onToggleRead = onToggleRead,
+                onToggleStarred = onToggleStarred,
+                onToggleBookmarked = onToggleBookmarked,
+                onDelete = onDelete,
+                onReduceSuch = onReduceSuch,
+            )
+        },
+    )
+}
+
+/** 滑动时露出的背景：图标 + 文案说明会发生什么（文案随当前状态变，避免猜）。 */
+@Composable
+private fun SwipeActionBackground(
+    direction: SwipeToDismissBoxValue,
+    isRead: Boolean,
+    isStarred: Boolean,
+) {
+    val (label, icon, tint) = when (direction) {
+        SwipeToDismissBoxValue.StartToEnd ->
+            Triple(
+                if (isStarred) "取消收藏" else "收藏",
+                Lucide.Star,
+                Accent,
+            )
+
+        SwipeToDismissBoxValue.EndToStart ->
+            Triple(
+                if (isRead) "标未读" else "标已读",
+                Lucide.Check,
+                TextSecondary,
+            )
+
+        SwipeToDismissBoxValue.Settled -> return
+    }
+    // 卡片往左移 → 背景右侧露出 → 内容靠右；反之靠左
+    Box(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+        contentAlignment = if (direction == SwipeToDismissBoxValue.EndToStart) {
+            Alignment.CenterEnd
+        } else {
+            Alignment.CenterStart
+        },
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(label, color = tint, style = MaterialTheme.typography.labelLarge)
+        }
     }
 }
 
