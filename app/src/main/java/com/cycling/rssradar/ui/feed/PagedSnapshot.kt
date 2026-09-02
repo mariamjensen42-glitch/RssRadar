@@ -1,8 +1,8 @@
 package com.cycling.rssradar.ui.feed
 
-import android.text.format.DateUtils
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 
 /**
@@ -36,21 +36,25 @@ object PagedSnapshot {
 
 /** 粘性日期头分组（issue #56）：一个自然日一组。 */
 data class DayGroup(
-    /** 自然日的 epochDay，作 LazyColumn key；无日期组为负数哨兵。 */
+    /** 自然日的 epochDay，作 LazyColumn key；无日期组为 [UNDATED_DAY_KEY]。 */
     val key: Long,
-    /** 粘性头文案；无发布日期的文章组不带日期头。 */
-    val label: String?,
+    /** 粘性头文案，恒有值——包括无发布日期的沉底组。 */
+    val label: String,
     val items: List<ArticleWithFeed>,
 )
 
+/** 无发布日期组的 key 哨兵：真实 epochDay 可正可负，用极小值避免撞车。 */
+const val UNDATED_DAY_KEY = Long.MIN_VALUE
+
 /**
- * 按自然日分组（issue #56）。无发布日期的文章沉底为独立组，不参与日期头。
- * 输入须已按时间倒序（DAO 排序保证）；groupBy 保持首次出现顺序，无需再排。
- * [labelOf] 是标签缝：生产用 DateUtils 相对时间，JVM 测试注入固定文案。
+ * 按自然日分组（issue #56）。无发布日期的文章沉底为「未知日期」组。
+ * 输入须已按时间倒序（DAO 排序保证，SQLite 视 NULL 最小故沉底）；
+ * groupBy 保持首次出现顺序，无需再排。
+ * [labelOf] 是标签缝：入参为 epochDay，生产用日历日文案，JVM 测试注入固定文案。
  */
 fun dayGroups(
     articles: List<ArticleWithFeed>,
-    labelOf: (Long) -> String = ::relativeDayLabel,
+    labelOf: (Long) -> String = { day -> calendarDayLabel(day) },
 ): List<DayGroup> {
     val dated = mutableListOf<Pair<Long, ArticleWithFeed>>()
     val undated = mutableListOf<ArticleWithFeed>()
@@ -63,15 +67,40 @@ fun dayGroups(
             Instant.ofEpochMilli(ts).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
         }
         .map { (day, list) ->
-            DayGroup(
-                key = day,
-                label = labelOf(list.first().first),
-                items = list.map { it.second },
-            )
+            DayGroup(key = day, label = labelOf(day), items = list.map { it.second })
         }
-    return if (undated.isEmpty()) groups else groups + DayGroup(key = -1L, label = null, items = undated)
+    // 沉底组也必须带日期头：没有头的话，这批文章会一直挂在最后一个日期头下面，
+    // 滚多久吸顶的日期都不变，看着就像粘性头坏了。
+    return if (undated.isEmpty()) groups else groups + DayGroup(UNDATED_DAY_KEY, "未知日期", undated)
 }
 
-/** 生产标签：Android 相对时间文案。 */
-private fun relativeDayLabel(ts: Long): String =
-    DateUtils.getRelativeTimeSpanString(ts).toString()
+private val WEEKDAYS = arrayOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+
+/**
+ * 粘性日期头文案：按**日历日**给，不用相对时长。
+ *
+ * 这里踩过坑：原先拿组内第一条的时间戳喂 `DateUtils.getRelativeTimeSpanString`，
+ * 那是「距今多久」而不是「哪一天」——duration 不足 24h 一律显示「N 小时前」，
+ * 于是昨天 23:00 的组和今天凌晨的组会顶着同一句话；排序一乱（推荐 tab 按分数排、
+ * 日期不是单调的）撞车更多。日期头要回答的是「这一天是哪天」，只能按日历算。
+ *
+ * 纯 java.time，无 Android 依赖，JVM 可测。
+ * 注意：跨零点后已渲染的标签不会自己变，要下一次重组（翻页/刷新/切 tab）才更新。
+ */
+fun calendarDayLabel(day: Long, today: Long = LocalDate.now().toEpochDay()): String {
+    when (today - day) {
+        0L -> return "今天"
+        1L -> return "昨天"
+        2L -> return "前天"
+    }
+    val date = LocalDate.ofEpochDay(day)
+    // 一周内带周几，读起来最快；超出一周只有日期。diff 为负（源的时间戳超前，
+    // 时区或源站时钟问题）不给「明天」这种假答案，一律落到绝对日期。
+    return if (today - day in 3..6) {
+        "${date.monthValue}月${date.dayOfMonth}日 ${WEEKDAYS[date.dayOfWeek.value - 1]}"
+    } else if (date.year == LocalDate.ofEpochDay(today).year) {
+        "${date.monthValue}月${date.dayOfMonth}日"
+    } else {
+        "${date.year}年${date.monthValue}月${date.dayOfMonth}日"
+    }
+}

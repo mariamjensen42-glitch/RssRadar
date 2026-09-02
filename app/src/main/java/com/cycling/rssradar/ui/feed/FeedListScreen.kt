@@ -473,7 +473,7 @@ fun ArticleCardList(
         remember(dayGroups) {
             buildList {
                 dayGroups.forEach { group ->
-                    if (group.label != null) add(null)
+                    add(null) // 日期头占一个槽位
                     group.items.forEach { add(it.article.id) }
                 }
             }
@@ -511,12 +511,10 @@ fun ArticleCardList(
             // 粘性日期头（issue #56）：按自然日分组，吸附在顶部。
             // 只做视觉分组，不改变排序与分页；列表本身已按 publishedAt DESC 排序。
             dayGroups.forEach { group ->
-                group.label?.let { label ->
-                    // stickyHeader 是 LazyListScope 接口成员（foundation 1.10+，真值表已核），
-                    // DSL 内直接调用，不可 import
-                    stickyHeader(key = "date-${group.key}") {
-                        StickyDateHeader(label)
-                    }
+                // stickyHeader 是 LazyListScope 接口成员（foundation 1.10+，真值表已核），
+                // DSL 内直接调用，不可 import
+                stickyHeader(key = "date-${group.key}") {
+                    StickyDateHeader(group.label)
                 }
                 items(group.items, key = { it.article.id }) { item ->
                     ArticleCard(
