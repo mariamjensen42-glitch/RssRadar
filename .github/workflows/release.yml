@@ -87,18 +87,28 @@ jobs:
         run: |
           APK=app/build/outputs/apk/release/app-release.apk
           SIZE=$(stat -c%s "$APK")
+          MAPPING=app/build/outputs/mapping/release
+          MISSING="$MAPPING/missing_rules.txt"
+
+          echo "APK 体积：$(( SIZE / 1024 )) KiB（$SIZE bytes）"
+          echo "mapping 目录内容："
+          ls -1 "$MAPPING" 2>/dev/null || echo '(mapping 目录为空)'
+          if [ -s "$MISSING" ]; then
+            echo "### missing_rules.txt（R8 提示可能缺失的规则）"
+            cat "$MISSING"
+          else
+            echo 'missing_rules.txt 不存在或为空 —— 未发现缺失的保留规则。'
+          fi
+
           {
             echo "### Release 构建诊断"
             echo ''
             echo "- APK 体积：**$(( SIZE / 1024 )) KiB**（$SIZE bytes）"
             echo ''
             echo '```'
-            ls -1 app/build/outputs/mapping/release/ 2>/dev/null || echo '(mapping 目录为空)'
+            ls -1 "$MAPPING" 2>/dev/null || echo '(mapping 目录为空)'
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          MISSING=app/build/outputs/mapping/release/missing_rules.txt
-          if [ -s "$MISSING" ]; then
-            {
+            if [ -s "$MISSING" ]; then
               echo ''
               echo "### missing_rules.txt"
               echo ''
@@ -107,11 +117,11 @@ jobs:
               echo '```'
               cat "$MISSING"
               echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo '' >> "$GITHUB_STEP_SUMMARY"
-            echo 'missing_rules.txt 不存在或为空 —— 未发现缺失的保留规则。' >> "$GITHUB_STEP_SUMMARY"
-          fi
+            else
+              echo ''
+              echo 'missing_rules.txt 不存在或为空 —— 未发现缺失的保留规则。'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # R8 断裂绝大多数表现为「启动即炸」（反射加载的类被裁掉）。
       # 单测跑的是未混淆字节码，抓不到这类问题——只有真装 release APK 冷启动才能发现。
@@ -123,8 +133,8 @@ jobs:
           target: default
           profile: pixel_6
           disable-animations: true
+          # 注意：script 由 /usr/bin/sh（dash）执行，不是 bash —— 不能用 set -o pipefail 等 bash 专有语法
           script: |
-            set -o pipefail
             PKG=com.cycling.rssradar
 
             adb logcat -c
