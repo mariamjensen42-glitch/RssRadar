@@ -3,8 +3,10 @@ name: Release
 on:
   push:
     tags: ['v*']
-  # 手动 dry-run：不必等打 tag 就能验证 release 构建（R8）与冒烟。
-  # 走分支触发时会跳过 tag 校验与 Draft Release 两步，只跑构建 + 签名校验 + 冒烟。
+  # 手动 dry-run：不必等打 tag 就能验证 release 构建（R8）。走分支触发时跳过
+  # tag 校验与 Draft Release 两步，只跑构建 + 签名校验。
+  # 注意：workflow_dispatch 只能用默认分支上的 workflow 文件触发；在 dev 与 main
+  # 同步 .github 之前，验证 release 只能靠打 tag。
   workflow_dispatch:
 
 permissions:
@@ -64,12 +66,17 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/rssradar-release.jks"
           echo "RSSRADAR_KEYSTORE_PATH=$RUNNER_TEMP/rssradar-release.jks" >> "$GITHUB_ENV"
 
+      # 仓库 gradle.properties 的 -Xmx2048m 对「Kotlin 全量编译 + KSP + R8」太小，
+      # GC 抖动明显。命令行 -D 的优先级高于 gradle.properties，这里放大到 6g，
+      # 不改动仓库配置。runner 有 16GB 内存，留足余量给 R8。
       - name: Build release APK (R8)
         env:
           RSSRADAR_STORE_PASSWORD: ${{ secrets.RSSRADAR_STORE_PASSWORD }}
           RSSRADAR_KEY_ALIAS: ${{ secrets.RSSRADAR_KEY_ALIAS }}
           RSSRADAR_KEY_PASSWORD: ${{ secrets.RSSRADAR_KEY_PASSWORD }}
-        run: ./gradlew :app:assembleRelease --stacktrace
+        run: |
+          ./gradlew :app:assembleRelease --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
 
       - name: Verify APK signature
         run: |
@@ -122,62 +129,13 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # R8 断裂绝大多数表现为「启动即炸」（反射加载的类被裁掉）。
-      # 单测跑的是未混淆字节码，抓不到这类问题——只有真装 release APK 冷启动才能发现。
-      # 参数全部为「缩短冷启动」服务：4 核 + 4G RAM、关开机动画、不写快照；
-      # 取 api-level 31（= minSdk）镜像最小，顺带覆盖最低系统版本。
-      - name: Smoke test on emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 31
-          arch: x86_64
-          target: default
-          cores: 4
-          ram-size: 4096M
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
-          # 注意：script 由 /usr/bin/sh（dash）执行，不是 bash —— 不能用 set -o pipefail 等 bash 专有语法
-          script: |
-            PKG=com.cycling.rssradar
-
-            adb logcat -c
-            adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell am start -n "$PKG/.MainActivity"
-            # R8 断裂绝大多数是「启动即崩」，不需要久等；12s 足够跑完 Application.onCreate + 首帧
-            sleep 12
-
-            adb logcat -d > "$GITHUB_WORKSPACE/smoke-logcat.txt"
-
-            if [ -z "$(adb shell pidof "$PKG" 2>/dev/null | tr -d '\r')" ]; then
-              echo "::error::进程已退出 —— release APK 冷启动失败（疑似 R8 断裂）"
-              adb logcat -d | tail -100
-              exit 1
-            fi
-            echo "进程存活 pid=$(adb shell pidof "$PKG" | tr -d '\r')"
-
-            FOCUS=$(adb shell dumpsys window 2>/dev/null | grep -m1 -E "mCurrentFocus|mFocusedApp" || true)
-            echo "焦点窗口：$FOCUS"
-            case "$FOCUS" in
-              *"$PKG"*) echo "首屏已进入前台" ;;
-              *) echo "::error::首屏未进入前台：$FOCUS"; adb logcat -d | tail -100; exit 1 ;;
-            esac
-
-            # 只认 FATAL EXCEPTION：模拟器里其他进程的普通报错不该让发版流水线红
-            if adb logcat -d -v brief | grep -q "FATAL EXCEPTION"; then
-              echo "::error::logcat 检测到崩溃堆栈"
-              adb logcat -d | tail -200
-              exit 1
-            fi
-
-            echo "冒烟通过：冷启动存活，首屏在前台，无未捕获异常"
-
-      - name: Upload smoke logcat
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: smoke-logcat
-          path: smoke-logcat.txt
-          if-no-files-found: ignore
+      # 这里原本有模拟器冷启动冒烟，已移除：在 GitHub 免费 runner 上启动模拟器要 9~11 分钟
+      # 且成功率极低（两轮均 Timeout waiting for emulator to boot），占掉流水线一半时间却
+      # 从未成功跑完一次。R8 的运行时验证改为人工：首次开启 R8 / 改动 keep 规则后，装一次
+      # Draft APK 走「订阅 → 刷新 → 阅读 → AI 摘要」即可（keep 规则稳定后风险极低）。
+      # 需要自动化时，可用 reactivecircus/android-emulator-runner 加回本步骤，
+      # 参数用最初那套已验证能启动的组合（api-level 34 / target default / profile pixel_6，
+      # 不要加 cores、ram-size 与自定义 emulator-options——实测全是负优化）。
 
       - name: Draft release notes
         if: startsWith(github.ref, 'refs/tags/')
@@ -189,7 +147,7 @@ jobs:
             echo '自动发布（GitHub Actions）。'
             echo ''
             echo '- 版本号：`${{ github.ref_name }}`'
-            echo '- APK 已通过签名构建、签名校验与模拟器冷启动冒烟'
+            echo '- APK 已通过签名构建（含 R8 代码优化与资源裁剪）与签名校验'
             echo '- SHA-256：`${{ steps.checksum.outputs.sha256 }}`'
             echo ''
             echo "### 变更（自 ${PREV:-首个提交} 起）"
