@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RssRadar — 以 RSSHub 为核心的 Android RSS 阅读器</title>
+<meta name="description" content="RssRadar 是一款以 RSSHub 为核心数据源的 Android RSS 阅读器，内置 1979 个命名空间、3800 条路由目录，支持按需抓取全文、AI 摘要与翻译。">
+<meta name="theme-color" content="#060b18">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="RssRadar — Android RSS 阅读器">
+<meta property="og:description" content="以 RSSHub 为核心的 Android RSS 阅读器。订阅 → 解析 → 信息流 → 详情阅读。">
+<meta property="og:type" content="website">
+<meta property="og:image" content="assets/icon.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" sizes="960x960" href="assets/icon.png">
+<link rel="apple-touch-icon" href="assets/icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="#top" aria-label="RssRadar">
+    <img class="brand-mark" src="assets/icon.png" alt="" width="32" height="32">
+    <span class="brand-name">RssRadar</span>
+  </a>
+  <nav class="nav" aria-label="主导航">
+    <a href="#features">特性</a>
+    <a href="#catalog">路由目录</a>
+    <a href="#tech">技术栈</a>
+    <a href="#start">开始</a>
+    <a href="#faq">常见问题</a>
+  </nav>
+  <a class="cta cta-ghost" href="https://github.com/mariamjensen42-glitch/RssRadar" rel="noopener" target="_blank">
+    GitHub →
+  </a>
+</header>
+
+<main id="top">
+
+<!-- =================== HERO =================== -->
+<section class="hero">
+  <div class="hero-copy">
+    <span class="eyebrow">Android · RSSHub · 离线优先</span>
+    <h1>把信息流<br>握在自己手里</h1>
+    <p class="lede">
+      RssRadar 是一款以 <a href="https://docs.rsshub.app/" rel="noopener" target="_blank">RSSHub</a> 为核心数据源的
+      Android RSS 阅读器。订阅源经解析后入库，本机存储、AI 摘要、阅读排版，全都端侧完成。
+    </p>
+    <div class="hero-cta">
+      <a class="cta cta-primary" href="https://github.com/mariamjensen42-glitch/RssRadar" rel="noopener" target="_blank">查看源码 →</a>
+      <a class="cta cta-secondary" href="#start">从源码构建</a>
+    </div>
+    <ul class="hero-meta">
+      <li><b>v1.0</b><span>首个公开 tag</span></li>
+      <li><b>Android 12+</b><span>minSdk 31 · targetSdk 37</span></li>
+      <li><b>MIT</b><span>许可证</span></li>
+    </ul>
+  </div>
+
+  <div class="hero-art" aria-hidden="true">
+    <svg class="radar" viewBox="0 0 320 320" role="img" aria-label="RssRadar 雷达示意">
+      <defs>
+        <radialGradient id="rg" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#0c1830"/>
+          <stop offset="100%" stop-color="#060b18"/>
+        </radialGradient>
+        <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#5BE4F0" stop-opacity="0.0"/>
+          <stop offset="100%" stop-color="#5BE4F0" stop-opacity="0.55"/>
+        </linearGradient>
+      </defs>
+      <circle cx="160" cy="160" r="150" fill="url(#rg)" stroke="#1c2942"/>
+      <circle cx="160" cy="160" r="110" fill="none" stroke="#1c2942"/>
+      <circle cx="160" cy="160" r="70"  fill="none" stroke="#1c2942"/>
+      <circle cx="160" cy="160" r="30"  fill="none" stroke="#1c2942"/>
+      <line x1="10" y1="160" x2="310" y2="160" stroke="#1c2942"/>
+      <line x1="160" y1="10" x2="160" y2="310" stroke="#1c2942"/>
+      <g class="sweep">
+        <path d="M160 160 L 310 160 A 150 150 0 0 0 256 39 Z" fill="url(#sweep)"/>
+      </g>
+      <g class="ping">
+        <circle cx="225" cy="105" r="4" fill="#5BE4F0"/>
+        <circle cx="225" cy="105" r="10" fill="none" stroke="#5BE4F0" stroke-opacity="0.5"/>
+      </g>
+      <g class="ping2">
+        <circle cx="105" cy="220" r="3" fill="#22D3EE"/>
+        <circle cx="105" cy="220" r="8" fill="none" stroke="#22D3EE" stroke-opacity="0.5"/>
+      </g>
+      <circle cx="160" cy="160" r="6" fill="#5BE4F0"/>
+    </svg>
+  </div>
+</section>
+
+<!-- =================== NUMBERS =================== -->
+<section class="strip">
+  <div class="stat"><b>1,979</b><span>命名空间</span></div>
+  <div class="stat"><b>3,800</b><span>RSSHub 路由</span></div>
+  <div class="stat"><b>25</b><span>分类</span></div>
+  <div class="stat"><b>9</b><span>内置镜像</span></div>
+  <div class="stat"><b>8</b><span>并发刷新</span></div>
+  <div class="stat"><b>30</b><span>每页条数</span></div>
+</section>
+
+<!-- =================== FEATURES =================== -->
+<section id="features" class="section">
+  <header class="section-head">
+    <h2>核心特性</h2>
+    <p>订阅 → 解析 → 入库 → 信息流 → 详情阅读，一个完整的最小闭环。</p>
+  </header>
+
+  <div class="grid">
+    <article class="card">
+      <h3>订阅最小闭环</h3>
+      <p>添加订阅源 → 解析 → 入库 → 信息流浏览。常规 RSS / Atom 与 RSSHub 路由同等支持。</p>
+    </article>
+    <article class="card">
+      <h3>RSSHub 路由目录</h3>
+      <p>添加订阅抽屉内置全量路由目录，关键词搜索、分类浏览、热度排序；点选路由填参数即可订阅。</p>
+    </article>
+    <article class="card">
+      <h3>摘要与正文分离</h3>
+      <p>feed 自带全文优先，缺失时在打开文章时按需抓取原网页正文（带文件缓存，失败静默回退摘要）。</p>
+    </article>
+    <article class="card">
+      <h3>AI 摘要 · 翻译</h3>
+      <p>详情页常驻摘要卡片，一键生成全文概括；外文文章一键整体译为简体中文（替换式显示，随时切回原文）。</p>
+    </article>
+    <article class="card">
+      <h3>阅读排版</h3>
+      <p>详情页内调整字号、行距、左右边距、字体族，即改即见、全局记忆。原生渲染器为主，必要时回退 WebView。</p>
+    </article>
+    <article class="card">
+      <h3>分页 + 并行刷新</h3>
+      <p>所有列表分页加载（每页 30 条），全量刷新多路并行（并发上限 8），适配上千订阅源、数万篇文章。</p>
+    </article>
+    <article class="card">
+      <h3>深色模式</h3>
+      <p>浅色 / 深色 / 跟随系统三档，阅读页同步适配。</p>
+    </article>
+    <article class="card">
+      <h3>OPML 导入导出</h3>
+      <p>标准 OPML 订阅清单，文件夹结构还原为分组；导入「盲导」不联网逐个校验。</p>
+    </article>
+    <article class="card">
+      <h3>站点图标</h3>
+      <p>自动抓取源站点图标，仅首次获取、写入后不覆盖，加载失败回落字母占位。</p>
+    </article>
+  </div>
+</section>
+
+<!-- =================== CATALOG =================== -->
+<section id="catalog" class="section section-alt">
+  <header class="section-head">
+    <h2>RSSHub 路由目录</h2>
+    <p>应用随包内置精简快照（基于 <a href="https://docs.rsshub.app/routes.json" rel="noopener" target="_blank">官方路由元数据</a>），保证首次安装离线可用；联网可更新。</p>
+  </header>
+
+  <div class="catalog">
+    <div class="code" aria-label="路由订阅示例">
+<pre><code><span class="c"># 知乎热榜（无需参数）</span>
+https://&lt;instance&gt;/zhihu/hotlist
+
+<span class="c"># B 站用户投稿</span>
+https://&lt;instance&gt;/bilibili/user/video/:uid
+
+<span class="c"># 微博热搜</span>
+https://&lt;instance&gt;/weibo/search/hot
+</code></pre>
+    </div>
+    <div class="catalog-side">
+      <h3>9 个内置 RSSHub 实例</h3>
+      <p>实测可用，按当次探活耗时取最快者，不是写死名次。设置页可切换 / 添加自定义实例。</p>
+      <ul class="inst-list">
+        <li>rsshub.app</li>
+        <li>rsshub.rssforever.com</li>
+        <li>hub.slarker.me</li>
+        <li>rss.injahow.cn</li>
+        <li>rsshub.liumingye.cn</li>
+        <li>rsshub.ktachibana.party</li>
+        <li>rsshub.isrss.com</li>
+        <li>rsshub.woodland.cafe</li>
+        <li>rsshub.umzzz.com</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- =================== TECH =================== -->
+<section id="tech" class="section">
+  <header class="section-head">
+    <h2>技术栈</h2>
+    <p>Android 原生、Compose + Material 3，Kotlin 协程全栈。</p>
+  </header>
+
+  <div class="table-wrap">
+    <table class="tech">
+      <thead><tr><th>领域</th><th>选型</th></tr></thead>
+      <tbody>
+        <tr><td>语言</td><td>Kotlin 2.2.10</td></tr>
+        <tr><td>UI</td><td>Jetpack Compose（BOM 2026.02.01）+ Material 3 1.4.0</td></tr>
+        <tr><td>架构</td><td>MVI + 类型安全导航（Navigation Compose 2.10.0）+ Hilt 2.60.1</td></tr>
+        <tr><td>本地持久化</td><td>Room 2.8.4</td></tr>
+        <tr><td>网络</td><td>OkHttp 4.12.0、Coil 3.3.0（图片）</td></tr>
+        <tr><td>解析</td><td>Rome 2.1.0（RSS/Atom）、Jsoup 1.18.3、readability4j 1.0.8</td></tr>
+        <tr><td>后台</td><td>WorkManager 2.10.1（自动同步）</td></tr>
+        <tr><td>图标</td><td>lucide compose-icons 2.2.1（线性描边风格）</td></tr>
+        <tr><td>序列化</td><td>kotlinx-serialization-json 1.7.3</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- =================== START =================== -->
+<section id="start" class="section section-alt">
+  <header class="section-head">
+    <h2>快速开始</h2>
+    <p>当前尚未发布签名 APK；推荐从源码构建调试包。所有数据仅存本机，无需注册。</p>
+  </header>
+
+  <div class="grid grid-2">
+    <article class="card">
+      <h3>1. 克隆与构建</h3>
+<pre><code>git clone https://github.com/mariamjensen42-glitch/RssRadar.git
+cd RssRadar
+./gradlew assembleDebug</code></pre>
+    </article>
+    <article class="card">
+      <h3>2. 安装到设备</h3>
+<p>构建产物位于 <code>app/build/outputs/apk/debug/app-debug.apk</code>。Android 12+ 设备允许安装未知来源后直接安装。</p>
+    </article>
+    <article class="card">
+      <h3>3. 添加第一个订阅</h3>
+<p>底部抽屉点 <b>FAB → 添加订阅</b>，进入内置路由目录；搜索「知乎热榜」或按分类浏览，点选路由 → 订阅。</p>
+    </article>
+    <article class="card">
+      <h3>4. 可选：启用 AI 摘要 / 翻译</h3>
+<p>「我的」页填入你自己的 <b>DeepSeek API Key</b>（仅存本机，不上传）。详情页点摘要卡片生成 AI 摘要，外文文章点翻译按钮一键转中文。</p>
+    </article>
+  </div>
+</section>
+
+<!-- =================== FAQ =================== -->
+<section id="faq" class="section">
+  <header class="section-head">
+    <h2>常见问题</h2>
+  </header>
+
+  <details class="qa">
+    <summary>为什么是 RSSHub 而不是直接订阅原始 RSS？</summary>
+    <p>很多站点只提供网页、不提供 RSS；RSSHub 把这类站点统一成 feed。RssRadar 把 RSSHub 路由目录内置进 App，填参数即订阅。当然常规 RSS / Atom 链接同样支持。</p>
+  </details>
+  <details class="qa">
+    <summary>数据放在哪里？</summary>
+    <p>全部本机（Room 数据库 + 文件缓存）。无账号、无后端、无遥测。</p>
+  </details>
+  <details class="qa">
+    <summary>AI 摘要 / 翻译的数据会外发吗？</summary>
+    <p>只在用户主动点生成/翻译时，把当时阅读的文章正文发到 DeepSeek 用于推理；API Key 仅存本机 SharedPreferences，不上传任何服务器。</p>
+  </details>
+  <details class="qa">
+    <summary>RSSHub 实例为什么有时快有时慢？</summary>
+    <p>公共实例漂移严重（实测不到两小时排序全变），App 在每次刷新前按当次探活耗时取最快者，并允许用户在设置页切换 / 添加自定义实例。</p>
+  </details>
+  <details class="qa">
+    <summary>能不能从其他阅读器迁移订阅？</summary>
+    <p>支持标准 OPML 导入导出：「我的 → OPML 导入」。文件夹结构会还原为分组，文章由导入后的刷新补齐。</p>
+  </details>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <img src="assets/icon.png" alt="" width="28" height="28">
+      <span>RssRadar</span>
+    </div>
+    <nav class="footer-nav" aria-label="次要导航">
+      <a href="https://github.com/mariamjensen42-glitch/RssRadar" rel="noopener" target="_blank">源码</a>
+      <a href="https://github.com/mariamjensen42-glitch/RssRadar/releases" rel="noopener" target="_blank">Releases</a>
+      <a href="https://github.com/mariamjensen42-glitch/RssRadar/issues" rel="noopener" target="_blank">Issues</a>
+      <a href="https://github.com/mariamjensen42-glitch/RssRadar/blob/main/LICENSE" rel="noopener" target="_blank">MIT</a>
+      <a href="https://docs.rsshub.app/" rel="noopener" target="_blank">RSSHub</a>
+    </nav>
+    <p class="footer-note">© 2026 RssRadar · MIT License（见仓库 LICENSE）</p>
+  </div>
+</footer>
+
+<script src="script.js" defer></script>
+</body>
+</html>
