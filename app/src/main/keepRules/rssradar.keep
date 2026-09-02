@@ -1,0 +1,40 @@
+# R8 保留规则（AGP 9.3+ 新 DSL）
+#
+# 位置约定：本文件位于 src/main/keepRules/ 且后缀 .keep，AGP 自动收集，
+# 无需在 build.gradle.kts 里声明 proguardFiles（新 DSL 下 proguardFiles 也不再使用）。
+# 平台默认规则（等价 proguard-android-optimize.txt）由 AGP 自动包含，这里不再重复。
+#
+# 策略：保守起步。反射加载是 R8 裁剪唯一的盲区，只有真正走反射的地方才需要手写规则；
+# Room / Hilt / WorkManager / Coil / OkHttp / Navigation / Compose 都自带 consumer rules，不预 keep。
+# 后续按 release 构建产出的 outputs/mapping/release/missing_rules.txt 再逐条收窄。
+
+# ---------------------------------------------------------------------------
+# 1. ROME：PluginManager 按 jar 内 properties 里的类名做 Class.forName 反射加载
+#    （feed 模块解析器 com.rometools.modules.**、日期解析器 com.rometools.rome.feed.impl.**）。
+#    RssParser 依赖 content / mediarss 模块，这些模块类没有任何静态引用，
+#    不 keep 会整片消失，解析直接静默失效（不是崩溃，是拿不到正文和媒体内容）。
+#    ROME 包体本身很小，整包 keep 的体积代价可忽略。
+# ---------------------------------------------------------------------------
+-keep class com.rometools.** { *; }
+-keep interface com.rometools.** { *; }
+
+# ---------------------------------------------------------------------------
+# 2. kotlinx.serialization：生成的 $$serializer 类与 Companion.serializer()
+#    由运行时按名字查找。覆盖三类使用点：
+#      - DeepSeekClient：AI 摘要/翻译的 JSON 请求与响应
+#      - RouteCatalogFile / RouteCatalogSlimmer：解析 assets/rsshub-routes.json
+#      - ui/navigation/Routes.kt：类型安全路由参数（ArticleDetailRoute 等）
+# ---------------------------------------------------------------------------
+-keep,includedescriptorclasses class com.cycling.rssradar.**$$serializer { *; }
+-keepclassmembers class com.cycling.rssradar.** {
+    *** Companion;
+}
+-keepclassmembers class com.cycling.rssradar.**$Companion {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+
+# ---------------------------------------------------------------------------
+# 3. 类型安全路由：Routes.kt 全部是 @Serializable 的 route 对象/data class，
+#    Navigation 在恢复 back stack 时需要其 serializer。整包 keep 成本极低。
+# ---------------------------------------------------------------------------
+-keep,includedescriptorclasses class com.cycling.rssradar.ui.navigation.** { *; }

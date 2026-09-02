@@ -3,6 +3,9 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # 手动 dry-run：不必等打 tag 就能验证 release 构建（R8）与冒烟。
+  # 走分支触发时会跳过 tag 校验与 Draft Release 两步，只跑构建 + 签名校验 + 冒烟。
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -22,6 +25,7 @@ jobs:
           fetch-depth: 0
 
       - name: Verify tag matches versionName
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           VERSION_NAME=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           TAG="${GITHUB_REF_NAME#v}"
@@ -41,17 +45,29 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x ./gradlew
 
-      - name: Run unit tests
+      - name: Run unit tests (debug variant)
         run: ./gradlew :app:testDebugUnitTest --stacktrace
 
+      # release 变体单测：抓编译级断裂。注意它跑的是未混淆的字节码，
+      # 抓不到 R8 运行时断裂——那部分靠下面的模拟器冒烟。
+      - name: Run unit tests (release variant)
+        run: ./gradlew :app:testReleaseUnitTest --stacktrace
+
+      # 密钥缺失时发 warning 并跳过（走 debug 签名），保证 dry-run 能验证 R8。
+      # 真正发版前必须在仓库 Settings → Secrets 配齐下列 4 个变量。
       - name: Decode release keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.RSSRADAR_KEYSTORE_BASE64 }}
-        run: echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/rssradar-release.jks"
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::RSSRADAR_KEYSTORE_BASE64 未配置 —— 本次回退 debug 签名，产物仅用于验证，不可发布"
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/rssradar-release.jks"
+          echo "RSSRADAR_KEYSTORE_PATH=$RUNNER_TEMP/rssradar-release.jks" >> "$GITHUB_ENV"
 
-      - name: Build signed optimized release APK
+      - name: Build release APK (R8)
         env:
-          RSSRADAR_KEYSTORE_PATH: ${{ runner.temp }}/rssradar-release.jks
           RSSRADAR_STORE_PASSWORD: ${{ secrets.RSSRADAR_STORE_PASSWORD }}
           RSSRADAR_KEY_ALIAS: ${{ secrets.RSSRADAR_KEY_ALIAS }}
           RSSRADAR_KEY_PASSWORD: ${{ secrets.RSSRADAR_KEY_PASSWORD }}
@@ -68,7 +84,91 @@ jobs:
           sha256sum app-release.apk > SHA-256.txt
           echo "sha256=$(awk '{print $1}' SHA-256.txt)" >> "$GITHUB_OUTPUT"
 
+      - name: Report APK size and R8 diagnostics
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          SIZE=$(stat -c%s "$APK")
+          {
+            echo "### Release 构建诊断"
+            echo ''
+            echo "- APK 体积：**$(( SIZE / 1024 )) KiB**（$SIZE bytes）"
+            echo ''
+            echo '```'
+            ls -1 app/build/outputs/mapping/release/ 2>/dev/null || echo '(mapping 目录为空)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          MISSING=app/build/outputs/mapping/release/missing_rules.txt
+          if [ -s "$MISSING" ]; then
+            {
+              echo ''
+              echo "### missing_rules.txt"
+              echo ''
+              echo 'R8 提示可能缺失的保留规则，逐条评估后补进 `app/src/main/keepRules/`。'
+              echo ''
+              echo '```'
+              cat "$MISSING"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '' >> "$GITHUB_STEP_SUMMARY"
+            echo 'missing_rules.txt 不存在或为空 —— 未发现缺失的保留规则。' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # R8 断裂绝大多数表现为「启动即炸」（反射加载的类被裁掉）。
+      # 单测跑的是未混淆字节码，抓不到这类问题——只有真装 release APK 冷启动才能发现。
+      - name: Smoke test on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: default
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            set -o pipefail
+            PKG=com.cycling.rssradar
+
+            adb logcat -c
+            adb install -r app/build/outputs/apk/release/app-release.apk
+            adb shell input keyevent 82
+            adb shell am start -n "$PKG/.MainActivity"
+            sleep 30
+
+            adb logcat -d > "$GITHUB_WORKSPACE/smoke-logcat.txt"
+
+            if [ -z "$(adb shell pidof "$PKG" 2>/dev/null | tr -d '\r')" ]; then
+              echo "::error::进程已退出 —— release APK 冷启动失败（疑似 R8 断裂）"
+              adb logcat -d | tail -100
+              exit 1
+            fi
+            echo "进程存活 pid=$(adb shell pidof "$PKG" | tr -d '\r')"
+
+            FOCUS=$(adb shell dumpsys window 2>/dev/null | grep -m1 -E "mCurrentFocus|mFocusedApp" || true)
+            echo "焦点窗口：$FOCUS"
+            case "$FOCUS" in
+              *"$PKG"*) echo "首屏已进入前台" ;;
+              *) echo "::error::首屏未进入前台：$FOCUS"; adb logcat -d | tail -100; exit 1 ;;
+            esac
+
+            # 只认 FATAL EXCEPTION：模拟器里其他进程的普通报错不该让发版流水线红
+            if adb logcat -d -v brief | grep -q "FATAL EXCEPTION"; then
+              echo "::error::logcat 检测到崩溃堆栈"
+              adb logcat -d | tail -200
+              exit 1
+            fi
+
+            echo "冒烟通过：冷启动存活 30s，首屏在前台，无未捕获异常"
+
+      - name: Upload smoke logcat
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-logcat
+          path: smoke-logcat.txt
+          if-no-files-found: ignore
+
       - name: Draft release notes
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
           {
@@ -90,6 +190,7 @@ jobs:
           } > /tmp/notes.txt
 
       - name: Create Draft GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "${{ github.ref_name }}" app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/SHA-256.txt --title "RssRadar ${{ github.ref_name }}" --notes-file /tmp/notes.txt --draft
