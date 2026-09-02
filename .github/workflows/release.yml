@@ -45,13 +45,12 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x ./gradlew
 
-      - name: Run unit tests (debug variant)
+      # 只有 debug 变体有单测任务：AGP 的 android.testBuildType 默认 debug，
+      # 同一时刻只会为一个 build type 生成 test<Variant>UnitTest（改它就会丢掉 debug 的）。
+      # release 侧的编译级断裂由 assembleRelease 自己暴露（R8 规则语法错、缺类都会让构建失败），
+      # 运行时断裂靠下面的模拟器冒烟——单测跑的是未混淆字节码，本来就抓不到 R8 问题。
+      - name: Run unit tests
         run: ./gradlew :app:testDebugUnitTest --stacktrace
-
-      # release 变体单测：抓编译级断裂。注意它跑的是未混淆的字节码，
-      # 抓不到 R8 运行时断裂——那部分靠下面的模拟器冒烟。
-      - name: Run unit tests (release variant)
-        run: ./gradlew :app:testReleaseUnitTest --stacktrace
 
       # 密钥缺失时发 warning 并跳过（走 debug 签名），保证 dry-run 能验证 R8。
       # 真正发版前必须在仓库 Settings → Secrets 配齐下列 4 个变量。
