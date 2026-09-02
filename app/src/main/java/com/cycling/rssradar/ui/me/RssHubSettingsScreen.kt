@@ -1081,7 +1081,7 @@ fun RssHubSettingsScreen(
 
         Spacer(Modifier.height(24.dp))
         Text(
-            text = "内置镜像（按优先级）",
+            text = "内置镜像（点选填入；自动探测取响应最快者）",
             color = TextTertiary,
             style = MaterialTheme.typography.labelMedium,
         )
