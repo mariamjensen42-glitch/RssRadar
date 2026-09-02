@@ -81,6 +81,7 @@ import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.CheckCheck
 import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.SlidersHorizontal
 import com.cycling.rssradar.ui.theme.Surface2
