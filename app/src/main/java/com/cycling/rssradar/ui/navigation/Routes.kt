@@ -36,3 +36,6 @@ import kotlinx.serialization.Serializable
 
 /** 兴趣画像（ADR-0013）：推荐流的画像只读展示，回答"为什么推荐这些"。 */
 @Serializable data object InterestProfileRoute
+
+/** 崩溃日志（issue #61）：最近 5 次崩溃的清单与全文导出。 */
+@Serializable data object CrashLogRoute

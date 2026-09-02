@@ -437,6 +437,8 @@ fun RssHubSettingsScreen(
     onOpenFetchDiagnostics: () -> Unit = {},
     /** 打开兴趣画像页（ADR-0013）。 */
     onOpenInterestProfile: () -> Unit = {},
+    /** 打开崩溃日志页（issue #61）。 */
+    onOpenCrashLog: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     var showKeepSheet by remember { mutableStateOf(false) }
@@ -1066,6 +1068,46 @@ fun RssHubSettingsScreen(
             ) {
                 Text(
                     text = "全文抓取诊断",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    imageVector = Lucide.ChevronRight,
+                    contentDescription = "进入",
+                    tint = TextTertiary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+
+        // ---- 崩溃日志（issue #61）----
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = "诊断",
+            color = TextSecondary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "应用崩溃时自动记录异常与设备信息，最多保留 5 份，可导出。",
+            color = TextTertiary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+        )
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = Surface1,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onOpenCrashLog),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "崩溃日志",
                     color = TextPrimary,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f),

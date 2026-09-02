@@ -35,6 +35,8 @@ import com.cycling.rssradar.ui.feed.FeedArticlesScreen
 import com.cycling.rssradar.ui.feed.FeedArticlesViewModel
 import com.cycling.rssradar.ui.feed.FeedListScreen
 import com.cycling.rssradar.ui.feed.FeedListViewModel
+import com.cycling.rssradar.ui.me.CrashLogScreen
+import com.cycling.rssradar.ui.me.CrashLogViewModel
 import com.cycling.rssradar.ui.me.FetchDiagnosticsScreen
 import com.cycling.rssradar.ui.me.FetchDiagnosticsViewModel
 import com.cycling.rssradar.ui.me.InterestProfileScreen
@@ -47,6 +49,7 @@ import com.cycling.rssradar.ui.subscriptions.SubscriptionsViewModel
 import com.cycling.rssradar.ui.components.FloatingBottomBar
 import com.cycling.rssradar.ui.components.openUrl
 import com.cycling.rssradar.ui.navigation.ArticleDetailRoute
+import com.cycling.rssradar.ui.navigation.CrashLogRoute
 import com.cycling.rssradar.ui.navigation.FeedArticlesRoute
 import com.cycling.rssradar.ui.navigation.FeedActionRoute
 import com.cycling.rssradar.ui.navigation.FeedRoute
@@ -131,6 +134,7 @@ private fun RssRadarAppContent() {
                     viewModel = vm,
                     onOpenFetchDiagnostics = { navController.navigate(FetchDiagnosticsRoute) },
                     onOpenInterestProfile = { navController.navigate(InterestProfileRoute) },
+                    onOpenCrashLog = { navController.navigate(CrashLogRoute) },
                 )
             }
             // 兴趣画像（ADR-0013）：推荐流的可解释性出口
@@ -140,6 +144,13 @@ private fun RssRadarAppContent() {
             composable<FetchDiagnosticsRoute> {
                 FetchDiagnosticsScreen(
                     viewModel = hiltViewModel<FetchDiagnosticsViewModel>(),
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            // 崩溃日志（issue #61）
+            composable<CrashLogRoute> {
+                CrashLogScreen(
+                    viewModel = hiltViewModel<CrashLogViewModel>(),
                     onBack = { navController.popBackStack() },
                 )
             }
