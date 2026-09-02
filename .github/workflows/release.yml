@@ -45,12 +45,11 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x ./gradlew
 
-      # 只有 debug 变体有单测任务：AGP 的 android.testBuildType 默认 debug，
-      # 同一时刻只会为一个 build type 生成 test<Variant>UnitTest（改它就会丢掉 debug 的）。
-      # release 侧的编译级断裂由 assembleRelease 自己暴露（R8 规则语法错、缺类都会让构建失败），
-      # 运行时断裂靠下面的模拟器冒烟——单测跑的是未混淆字节码，本来就抓不到 R8 问题。
-      - name: Run unit tests
-        run: ./gradlew :app:testDebugUnitTest --stacktrace
+      # 这里刻意不跑单测（约 5 分钟）：
+      # 1. ci.yml 每次 push dev 都跑过，能打 tag 的代码必然已过单测；
+      # 2. 单测跑的是未混淆 debug 字节码，抓不到 R8 问题；
+      # 3. release 侧的编译级断裂由 assembleRelease 自己暴露（R8 规则语法错、缺类都会让构建失败），
+      #    运行时断裂靠下面的模拟器冒烟。
 
       # 密钥缺失时发 warning 并跳过（走 debug 签名），保证 dry-run 能验证 R8。
       # 真正发版前必须在仓库 Settings → Secrets 配齐下列 4 个变量。
@@ -125,23 +124,27 @@ jobs:
 
       # R8 断裂绝大多数表现为「启动即炸」（反射加载的类被裁掉）。
       # 单测跑的是未混淆字节码，抓不到这类问题——只有真装 release APK 冷启动才能发现。
+      # 参数全部为「缩短冷启动」服务：4 核 + 4G RAM、关开机动画、不写快照；
+      # 取 api-level 31（= minSdk）镜像最小，顺带覆盖最低系统版本。
       - name: Smoke test on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 31
           arch: x86_64
           target: default
-          profile: pixel_6
+          cores: 4
+          ram-size: 4096M
           disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
           # 注意：script 由 /usr/bin/sh（dash）执行，不是 bash —— 不能用 set -o pipefail 等 bash 专有语法
           script: |
             PKG=com.cycling.rssradar
 
             adb logcat -c
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell input keyevent 82
             adb shell am start -n "$PKG/.MainActivity"
-            sleep 30
+            # R8 断裂绝大多数是「启动即崩」，不需要久等；12s 足够跑完 Application.onCreate + 首帧
+            sleep 12
 
             adb logcat -d > "$GITHUB_WORKSPACE/smoke-logcat.txt"
 
@@ -166,7 +169,7 @@ jobs:
               exit 1
             fi
 
-            echo "冒烟通过：冷启动存活 30s，首屏在前台，无未捕获异常"
+            echo "冒烟通过：冷启动存活，首屏在前台，无未捕获异常"
 
       - name: Upload smoke logcat
         if: always()
@@ -186,7 +189,7 @@ jobs:
             echo '自动发布（GitHub Actions）。'
             echo ''
             echo '- 版本号：`${{ github.ref_name }}`'
-            echo '- APK 已通过单元测试、签名构建与签名校验'
+            echo '- APK 已通过签名构建、签名校验与模拟器冷启动冒烟'
             echo '- SHA-256：`${{ steps.checksum.outputs.sha256 }}`'
             echo ''
             echo "### 变更（自 ${PREV:-首个提交} 起）"
