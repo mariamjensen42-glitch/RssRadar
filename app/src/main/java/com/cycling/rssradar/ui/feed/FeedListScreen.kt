@@ -27,6 +27,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -89,6 +91,8 @@ fun FeedListScreen(
     viewModel: FeedListViewModel,
     onOpenSearch: () -> Unit = {},
     onOpenArticle: (ArticleWithFeed) -> Unit = {},
+    /** 空态「添加订阅源」直达入口（新用户第一分钟不该被卡在找入口上）。 */
+    onAddFeed: () -> Unit = {},
 ) {
     // MVI 候选 C（ADR-0003）：单一 UiState 快照驱动渲染
     val uiState by viewModel.uiState.collectAsState()
@@ -176,7 +180,11 @@ fun FeedListScreen(
                 if (uiState.isRanking) {
                     RecommendationLoading(modifier = Modifier.fillMaxSize())
                 } else if (currentList.isEmpty()) {
-                    EmptyState(selectedTab = uiState.selectedTab, modifier = Modifier.fillMaxSize())
+                    EmptyState(
+                        selectedTab = uiState.selectedTab,
+                        onAddFeed = onAddFeed,
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 } else {
                     ArticleCardList(
                         articles = currentList,
@@ -742,7 +750,11 @@ private fun LoadMoreHint() {
 }
 
 @Composable
-private fun EmptyState(selectedTab: FeedTab, modifier: Modifier = Modifier) {
+private fun EmptyState(
+    selectedTab: FeedTab,
+    onAddFeed: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     val (title, hint) = when (selectedTab) {
         FeedTab.All -> "还没有订阅" to "去订阅页添加你的第一个 RSS / Atom 源"
         FeedTab.Unread -> "没有未读文章" to "所有文章都看完了，休息一下"
@@ -771,7 +783,22 @@ private fun EmptyState(selectedTab: FeedTab, modifier: Modifier = Modifier) {
             hint,
             color = TextSecondary,
             style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
         )
+        // 「全部」为空 = 一篇文章都没有，必然是还没订阅。这里给直达入口：
+        // 让用户自己去找添加订阅的按钮，是新用户流失最快的一步。
+        if (selectedTab == FeedTab.All) {
+            Spacer(Modifier.height(24.dp))
+            FilledTonalButton(onClick = onAddFeed) {
+                Icon(
+                    Lucide.Plus,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("添加订阅源")
+            }
+        }
     }
 }
 
