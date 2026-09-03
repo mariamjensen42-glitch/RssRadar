@@ -438,10 +438,12 @@ class AddSubscriptionViewModel @Inject constructor(
                 url = feed.url,
                 isValidating = false,
                 discovered = emptyList(),
-                validation = if (probe is FeedProbeResult.Valid) {
-                    ValidationInfo.Valid(probe.articleCount)
+                // 走同一套分类：候选地址失败的原因也各不相同（慢 / DNS / 证书 / 404），
+                // 一句「暂时无法访问」把用户能做的事全抹掉了
+                validation = if (probe == null) {
+                    ValidationInfo.Network("请求未返回结果，稍后再试")
                 } else {
-                    ValidationInfo.Invalid("这个源暂时无法访问")
+                    validationOf(probe, fromRoute = false)
                 },
             )
         }
