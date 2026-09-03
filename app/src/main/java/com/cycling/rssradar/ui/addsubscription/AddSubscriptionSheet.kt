@@ -717,7 +717,13 @@ private fun PreviewResult(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "正在校验…",
+                    // 路由拼出来的地址要等 RSSHub 现抓上游站点，十几秒是常态。
+                    // 不说清就是干转圈，用户会以为卡死了（UI 铁律：静默 = 坏了）。
+                    text = if (state.isUrlFromRoute) {
+                        "正在校验…（RSSHub 首次抓这条路由要现抓源站，可能要二三十秒）"
+                    } else {
+                        "正在校验…"
+                    },
                     color = TextTertiary,
                     style = MaterialTheme.typography.bodySmall,
                 )
