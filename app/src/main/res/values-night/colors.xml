@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- 启动屏底色（深色）：与 ui.theme.DarkBgRoot 一致，首帧交接不闪。见 #69。 -->
+    <color name="splash_background">#FF000000</color>
+</resources>
