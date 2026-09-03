@@ -145,10 +145,13 @@ class AddSubscriptionViewModel @Inject constructor(
         /** 手填链接的防抖；点「生成并预览」是明确意图，直接发请求。 */
         private const val VALIDATE_DEBOUNCE_MS = 400L
         /**
-         * 单次探测的兜底超时。HTTP 层是 10s 连接 / 15s 读取，这里留一点余量，
-         * 卡住时也能在有限时间内给用户一句交代，而不是无限转圈。
+         * 整个探测（含重试）的兜底超时。HTTP 层是 10s 连接 / 20s 读取，读超时会自动
+         * 重试一次，最坏 60s。这里设 50s 是刻意的：给第二次尝试留 20s——重试的意义
+         * 是命中实例缓存（缓存命中通常 1s 内返回），若第二次还要再耗满 20s，说明不是
+         * 缓存冷的问题，早点给结论更实在。被这里掐断时 probe 为 null，报「请求超时」，
+         * 同样是真话。
          */
-        private const val PROBE_TIMEOUT_MS = 20_000L
+        private const val PROBE_TIMEOUT_MS = 50_000L
     }
 
     override fun onIntent(intent: AddSubscriptionIntent) {
@@ -373,15 +376,37 @@ class AddSubscriptionViewModel @Inject constructor(
     private suspend fun isReachable(host: String): Boolean =
         runCatching { instanceStore.isReachable(host) }.getOrDefault(false)
 
+    /**
+     * 探测结果 → 用户能照着做点什么的一句话。
+     *
+     * 每一条都必须指向**不同的处置动作**。曾经所有 IOException 共用一个
+     * NetworkError，于是「实例抓上游太慢」被说成「连不上这个地址」——
+     * 用户网络好好的，只能去换实例，而换实例解决不了慢。
+     */
     private fun validationOf(probe: FeedProbeResult?, fromRoute: Boolean): ValidationInfo = when (probe) {
-        // 超时：probe 被 withTimeoutOrNull 掐断。超时是实例问题，不是链接问题。
-        null -> ValidationInfo.Network("请求超时，实例响应太慢，建议换个实例")
-        // 调通了也算一种结果：这里兜住它，免得掉进 else 被说成「不是有效源」
+        // 被 PROBE_TIMEOUT_MS 兜底掐断（含重试也没赶上）：还是慢，不是连不上
+        null -> ValidationInfo.Network("等了 50 秒仍未返回，这个实例响应太慢，换个实例试试")
         is FeedProbeResult.Valid -> ValidationInfo.Valid(probe.articleCount)
         FeedProbeResult.InvalidUrl -> ValidationInfo.Invalid("链接格式不正确")
         is FeedProbeResult.HttpError -> httpErrorInfo(probe.code, fromRoute)
-        FeedProbeResult.NetworkError -> ValidationInfo.Network("连不上这个地址，检查网络或换个实例")
-        else -> if (fromRoute) {
+        is FeedProbeResult.Timeout -> if (probe.connecting) {
+            ValidationInfo.Network("连接超时：地址没响应，检查网络或换个实例")
+        } else {
+            // 已自动重试过一次仍超时，把这点说出来，否则用户会以为只试了一次
+            ValidationInfo.Network(
+                "实例响应太慢（已重试一次仍超时）：RSSHub 首次抓这条路由要现抓源站，" +
+                    "抓过一次后实例会缓存，稍后再试通常就成了",
+            )
+        }
+        FeedProbeResult.DnsError -> ValidationInfo.Network(
+            "域名解析失败：这个域名不存在，或当前网络的 DNS 解析不了它",
+        )
+        FeedProbeResult.CertificateError -> ValidationInfo.Network(
+            "证书校验失败：自建实例常用自签/过期证书，Android 不信任" +
+                "（浏览器能点「继续访问」绕过，App 不行）——换成受信任的证书",
+        )
+        FeedProbeResult.NetworkError -> ValidationInfo.Network("连接被对方拒绝或中断，检查网络或换个实例")
+        FeedProbeResult.InvalidFeed -> if (fromRoute) {
             ValidationInfo.Invalid("实例没能返回有效内容：参数可能不对，或该路由已失效")
         } else {
             ValidationInfo.Invalid("不是有效的 RSS/Atom 源，也没找到可用的订阅源")
