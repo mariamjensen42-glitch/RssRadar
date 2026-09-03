@@ -21,6 +21,7 @@ import com.cycling.rssradar.data.parser.FeedProbeResult
 import com.cycling.rssradar.data.parser.RssParser
 import com.cycling.rssradar.data.rss.FeedDiscovery
 import com.cycling.rssradar.data.rss.HttpFetcher
+import com.cycling.rssradar.data.rss.retryOnSlowResponse
 import com.cycling.rssradar.data.store.KeepArchived
 import com.cycling.rssradar.data.store.MarkAsReadCondition
 
@@ -205,50 +206,24 @@ class FeedRepository(
      * 仅抓取+解析，用于"添加订阅"页的实时预览。不写入数据库。
      * 返回 [FeedProbeResult] 供 ViewModel 决定 UI 状态。
      *
-     * **卡在等响应时自动重试一次**（[FeedProbeResult.isRetryableTimeout]）：RSSHub 公共
-     * 实例抓一条缓存未命中的路由要现抓上游站点，抓完就进实例缓存，第二次基本秒回——
-     * `docs/rsshub-instances.md` 实测同一条路由「第 1 次读超时 → 第 2 次 1.0s 正常」。
-     * 只重试这一种：握手超时 / DNS 失败 / 证书错误重试多少次都是同一个结果，只会白等。
+     * 重试在 [fetchParsed] / [retryOnSlowResponse] 里，这里不再叠一层——
+     * 曾经两层各重试一次，实际会发 4 次请求。
      */
     suspend fun probeFeed(rawUrl: String): FeedProbeResult = withContext(ioDispatcher) {
         val url = normalizeUrl(rawUrl)
             ?: return@withContext FeedProbeResult.InvalidUrl
-        var result = probeOnce(url)
-        var attempts = 1
-        while (result.isRetryableTimeout && attempts < PROBE_MAX_ATTEMPTS) {
-            attempts++
-            result = probeOnce(url)
-        }
-        result
-    }
-
-    /** 单次探测。异常分类在 [FeedProbeResult.from]，这里只管调一次。 */
-    private suspend fun probeOnce(url: String): FeedProbeResult =
         runCatching { fetchParsed(url) }.fold(
             onSuccess = { FeedProbeResult.Valid(it.articles.size) },
             onFailure = FeedProbeResult::from,
         )
+    }
 
     /**
-     * 抓取+解析，读超时自动重试一次——订阅链路（预览 / 落库）共用，
+     * 抓取+解析，等响应超时自动重试一次——订阅链路（预览 / 落库）共用，
      * 免得用户在预览时看着好好的，点「订阅」那一下反而撞上冷路由失败。
      */
-    private suspend fun fetchParsed(url: String): RssParser.ParsedFeed {
-        var attempt = 1
-        while (true) {
-            try {
-                return engine.fetchAndParse(url)
-            } catch (e: Exception) {
-                if (!FeedProbeResult.from(e).isRetryableTimeout || attempt >= PROBE_MAX_ATTEMPTS) throw e
-                attempt++
-            }
-        }
-    }
-
-    companion object {
-        /** 预览探测的最大尝试次数（只有读超时会走到第二次，见 [probeFeed]）。 */
-        private const val PROBE_MAX_ATTEMPTS = 2
-    }
+    private suspend fun fetchParsed(url: String): RssParser.ParsedFeed =
+        retryOnSlowResponse { engine.fetchAndParse(url) }
 
     suspend fun markRead(id: Long) = articleDao.markRead(id)
 
