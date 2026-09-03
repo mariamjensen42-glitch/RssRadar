@@ -163,4 +163,14 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/SHA-256.txt --title "RssRadar ${{ github.ref_name }}" --notes-file /tmp/notes.txt --draft
+        # --target 必须显式传：checkout 一个 tag 后 HEAD 是 detached 的，gh 推断不出
+        # 分支名，会退化为「挂在默认分支上的无 tag release」——release 页面显示成
+        # untagged-xxxx，releases/tags/<tag> 查不到，发布后分享链接也不稳。
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            app/build/outputs/apk/release/app-release.apk \
+            app/build/outputs/apk/release/SHA-256.txt \
+            --target "${{ github.ref_name }}" \
+            --title "RssRadar ${{ github.ref_name }}" \
+            --notes-file /tmp/notes.txt \
+            --draft
