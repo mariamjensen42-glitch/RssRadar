@@ -137,26 +137,53 @@ jobs:
       # 参数用最初那套已验证能启动的组合（api-level 34 / target default / profile pixel_6，
       # 不要加 cores、ram-size 与自定义 emulator-options——实测全是负优化）。
 
+      # 发布说明取自 CHANGELOG.md 里对应版本的那一段——那是写给人看的中文说明。
+      # 直接用 git log 会让用户看到 merge commit、CI 改动、docs 提交混在一起的流水账。
+      # 取不到（版本号写错 / 忘了写 CHANGELOG）才退化成 commit 列表，宁可丑也不能没有内容。
       - name: Draft release notes
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+
+          # 抽出 `## v<版本号>...` 那一段的正文。awk 里 `next` 顺手把标题行本身丢掉——
+          # 标题由下面统一写成 `## RssRadar v1.0.1`，不用 CHANGELOG 里带日期的那个。
+          #
+          # 光判断前缀不够：`## v1.0` 是 `## v1.0.1` 的前缀，取 v1.0 时会错取到 v1.0.1 的段。
+          # 所以版本号后面必须紧跟一个非数字非点的字符（全角括号或行尾）才算命中。
+          awk -v ver="$VERSION" '
+            /^## / {
+              p = 0
+              if (index($0, "## v" ver) == 1) {
+                sep = substr($0, length("## v" ver) + 1, 1)
+                p = (sep !~ /[0-9.]/)
+              }
+              next
+            }
+            p { print }
+          ' CHANGELOG.md > /tmp/changelog-section.txt
+
           {
-            echo '## RssRadar ${{ github.ref_name }}'
+            echo "## RssRadar ${{ github.ref_name }}"
+            echo ''
+            if [ -s /tmp/changelog-section.txt ]; then
+              cat /tmp/changelog-section.txt
+            else
+              echo "### 变更（自 ${PREV:-首个提交} 起）"
+              echo ''
+              if [ -n "$PREV" ]; then
+                git log --oneline --no-decorate "$PREV..HEAD"
+              else
+                git log --oneline --no-decorate
+              fi
+            fi
+            echo ''
+            echo '---'
             echo ''
             echo '自动发布（GitHub Actions）。'
-            echo ''
-            echo '- 版本号：`${{ github.ref_name }}`'
             echo '- APK 已通过签名构建（含 R8 代码优化与资源裁剪）与签名校验'
             echo '- SHA-256：`${{ steps.checksum.outputs.sha256 }}`'
-            echo ''
-            echo "### 变更（自 ${PREV:-首个提交} 起）"
-            echo ''
-            if [ -n "$PREV" ]; then
-              git log --oneline --no-decorate "$PREV..HEAD"
-            else
-              git log --oneline --no-decorate
-            fi
           } > /tmp/notes.txt
 
       - name: Create Draft GitHub Release
