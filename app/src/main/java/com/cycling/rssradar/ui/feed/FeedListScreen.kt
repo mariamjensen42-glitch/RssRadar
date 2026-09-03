@@ -3,12 +3,14 @@ package com.cycling.rssradar.ui.feed
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -57,6 +59,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -328,25 +332,42 @@ private fun FeedListTabRow(
     tabs: List<FeedTab> = FeedTab.entries,
     onSelect: (FeedTab) -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        tabs.forEach { tab ->
-            val label = when (tab) {
-                FeedTab.All -> "全部"
-                FeedTab.Unread -> "未读 $unreadCount"
-                FeedTab.Starred -> "收藏"
-                FeedTab.Bookmarked -> "稍后读"
-                FeedTab.Recommended -> "推荐"
+    // 5 个 tab 在 360dp 窄屏上约需 380dp，固定 Row 会把末尾 chip 裁掉（看着像少了一个 tab）。
+    // 改成横向滚动，只在还能往右滚时叠一层右侧渐隐，提示后面还有内容。
+    val scrollState = rememberScrollState()
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(scrollState)
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            tabs.forEach { tab ->
+                val label = when (tab) {
+                    FeedTab.All -> "全部"
+                    FeedTab.Unread -> "未读 $unreadCount"
+                    FeedTab.Starred -> "收藏"
+                    FeedTab.Bookmarked -> "稍后读"
+                    FeedTab.Recommended -> "推荐"
+                }
+                FilterChip(
+                    label = label,
+                    selected = tab == selected,
+                    onClick = { onSelect(tab) },
+                )
             }
-            FilterChip(
-                label = label,
-                selected = tab == selected,
-                onClick = { onSelect(tab) },
-            )
+        }
+        if (scrollState.canScrollForward) {
+            Box(modifier = Modifier.matchParentSize()) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .width(28.dp)
+                        .background(Brush.horizontalGradient(listOf(Color.Transparent, BgRoot))),
+                )
+            }
         }
     }
 }
