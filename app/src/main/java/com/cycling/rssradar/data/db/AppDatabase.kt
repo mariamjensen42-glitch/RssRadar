@@ -67,7 +67,14 @@ data class FeedEntity(
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index(value = ["feedId", "link"], unique = true)],
+    indices = [
+        // upsert 去重：同一订阅源下 link 唯一。同时也是 JOIN feeds 与 `WHERE feedId = ?` 的索引。
+        Index(value = ["feedId", "link"], unique = true),
+        // 列表排序（#65）：主列表五个查询统一按「发布日期倒序、无日期沉底」取页。
+        // 没有它时，ORDER BY 里的 `publishedAt IS NULL` 是表达式，SQLite 只能全表扫描 + 外排序，
+        // 数万行下每次翻页都要重排一次全表。有了它，翻页只跳索引项，只回表当前页那几十行。
+        Index(value = ["publishedAt", "fetchedAt"]),
+    ],
 )
 data class ArticleEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -272,13 +279,19 @@ interface ArticleDao {
     // —— 信息流列表：轻量投影 + LIMIT/OFFSET 分页，四个 tab 统一 ——
     // 规模现实：订阅源 1000+、文章数万条。任何"全表 observe 全量物化"的列表流
     // 都会在每次 DB 写失效时重查数万行，内存与主线程都扛不住（OOM 诊断结论）。
+    //
+    // 排序一律 `publishedAt DESC, fetchedAt DESC`，走 index_articles_publishedAt_fetchedAt（#65）。
+    // 别写成 `publishedAt IS NULL, publishedAt DESC, ...`：那个 IS NULL 是表达式，
+    // 会让整条 ORDER BY 退化为全表外排序，索引直接失效。
+    // 语义等价：SQLite 里 NULL 最小，DESC 时 NULL 天然沉底（即「无日期沉底」），
+    // NULL 组内再由 fetchedAt DESC 兜底，与原来分组排序的结果逐行一致。
 
     @Query(
         """
         SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
-        ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
+        ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
         LIMIT :limit OFFSET :offset
         """,
     )
@@ -291,7 +304,7 @@ interface ArticleDao {
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
         WHERE articles.isRead = 0
-        ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
+        ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
         LIMIT :limit OFFSET :offset
         """,
     )
@@ -304,7 +317,7 @@ interface ArticleDao {
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
         WHERE articles.isStarred = 1
-        ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
+        ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
         LIMIT :limit OFFSET :offset
         """,
     )
@@ -317,7 +330,7 @@ interface ArticleDao {
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
         WHERE articles.isBookmarked = 1
-        ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
+        ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
         LIMIT :limit OFFSET :offset
         """,
     )
@@ -331,7 +344,7 @@ interface ArticleDao {
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
         WHERE articles.feedId = :feedId
-        ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
+        ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
         LIMIT :limit OFFSET :offset
         """,
     )
@@ -426,7 +439,7 @@ interface ArticleDao {
         JOIN feeds ON articles.feedId = feeds.id
         WHERE (articles.title LIKE :query OR articles.summary LIKE :query
             OR articles.contentText LIKE :query OR feeds.title LIKE :query)
-        ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
+        ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
         """,
     )
     @Suppress("QUERY_MISMATCH")
@@ -551,7 +564,7 @@ interface ArticleDao {
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
         WHERE articles.fetchedAt >= :since AND articles.isRead = 0 AND feeds.notificationsEnabled = 1
-        ORDER BY articles.publishedAt IS NULL, articles.publishedAt DESC, articles.fetchedAt DESC
+        ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
         LIMIT :limit
         """,
     )
@@ -803,6 +816,23 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
     }
 }
 
+/**
+ * v11 → v12（#65）：给 articles 的列表排序补索引。
+ *
+ * 索引名必须和 Room 从 @Entity 生成的一模一样（index_<表>_<列1>_<列2>），
+ * 否则新装用户（建表时自动建索引）和升级用户（走这条 migration）的 schema 会分叉。
+ *
+ * 只建索引、不改表结构，所以对存量数据零影响，也不需要重写任何行。
+ */
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_articles_publishedAt_fetchedAt` " +
+                "ON `articles` (`publishedAt`, `fetchedAt`)",
+        )
+    }
+}
+
 @Database(
     entities = [
         FeedEntity::class,
@@ -811,7 +841,7 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
         ArchivedArticleTombstoneEntity::class,
         RecommendationFeedbackEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
