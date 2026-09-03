@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+        深色模式下的启动屏（#69）。
+
+        没有这份文件时，深色模式下冷启动会用 values/ 里那个 Light 主题的默认
+        windowBackground（白）→ 先闪一下白屏再切到纯黑，晚上尤其刺眼。
+
+        底色取 DarkBgRoot，与 Compose 首屏背景一致，首帧交接不闪。
+        说明见 values/themes.xml。
+    -->
+    <style name="Theme.RssRadar" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+    </style>
+</resources>

@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.RssRadar" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+        启动屏（#69）：minSdk 31 = Android 12+，系统强制显示启动屏。
+        用平台自带的 windowSplashScreen* 属性即可，不需要 core-splashscreen 依赖。
+
+        底色必须与 Compose 首屏的 colorScheme.background 一致，否则绘制首帧的那一刻
+        仍会闪一下：浅色 #F7F7F9（LightBgRoot）、深色 #000000（DarkBgRoot，见 values-night）。
+    -->
+    <style name="Theme.RssRadar" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+    </style>
 </resources>

@@ -7,4 +7,7 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- 启动屏底色：与 ui.theme.LightBgRoot 一致，首帧交接不闪。深色见 values-night。-->
+    <color name="splash_background">#FFF7F7F9</color>
 </resources>
