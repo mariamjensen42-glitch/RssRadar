@@ -168,20 +168,31 @@ private const val ARTICLE_LIST_COLUMNS =
         "articles.mediaKind"
 
 /**
- * 分组筛选（issue #74）的 WHERE 片段：选中分组时按 feeds.groupName 过滤。
+ * 分组筛选（issue #74，issue #75 升级为可空版）的 WHERE 片段：选中分组时按 feeds.groupName 过滤。
  * 关键语义：**默认组要同时命中空串**——历史/导入数据的 feeds.groupName 可能是 ''，
  * UI 上显示为 [DEFAULT_GROUP]，只写 `groupName = :group` 会漏掉这些行
  * （与内存侧 `groupName.ifBlank { DEFAULT_GROUP }` 兜底是同一语义，见 SubscriptionsViewModel）。
  *
- * 绑定参数：group = 所选分组名；isDefaultGroup = (group == DEFAULT_GROUP)，
+ * 可空短路（issue #75）：分组筛选为「全部」时 :group 传 null，谓词恒真，不加过滤开销——
+ * 分组 × 分区两个维度合成同一条查询（Filtered 变体），DAO 查询总数不随维度组合膨胀。
+ *
+ * 绑定参数：group = 所选分组名或 null；isDefaultGroup = (group == DEFAULT_GROUP)，
  * 由仓库层判定后传入，DAO 不依赖常量字符串比较。
  *
  * 性能：JOIN 仍是逐文章行按 feeds 主键探测、在探测行上追加这个过滤条件，
  * ORDER BY 不变（publishedAt DESC, fetchedAt DESC），照走 index_articles_publishedAt_fetchedAt，
  * 不会退化成全表外排序——排序表达式零新增。
  */
-private const val GROUP_FILTER_PREDICATE =
-    "(feeds.groupName = :group OR (:isDefaultGroup = 1 AND feeds.groupName = ''))"
+private const val GROUP_FILTER_PREDICATE_NULLABLE =
+    "(:group IS NULL OR (feeds.groupName = :group OR (:isDefaultGroup = 1 AND feeds.groupName = '')))"
+
+/**
+ * 内容分区（issue #75）的 WHERE 片段：选中分区时按 feeds.contentType 过滤。
+ * 「全部」分区 = :contentType 传 null，谓词恒真，不加过滤开销（与分组谓词同一思路）。
+ * 绑定参数由仓库层从 UI 枚举换算（ContentTypeFilter.dbValue），DAO 不依赖 UI 类型。
+ */
+private const val CONTENT_TYPE_FILTER_PREDICATE =
+    "(:contentType IS NULL OR feeds.contentType = :contentType)"
 
 /**
  * 推荐画像的输入行（ADR-0013）：所有"用户真实表达过兴趣"的文章。
@@ -226,6 +237,12 @@ data class ArticleFeedLink(
 data class ArticleIdGroup(
     val id: Long,
     val groupName: String,
+)
+
+/** 文章 id 与所属源内容类型的轻量对（推荐流按分区过滤推荐序用，issue #75）。 */
+data class ArticleIdContentType(
+    val id: Long,
+    val contentType: Int,
 )
 
 /**
@@ -319,6 +336,10 @@ interface FeedDao {
     /** 参与自动同步的源 id 清单（issue #58）。 */
     @Query("SELECT id FROM feeds WHERE syncEnabled = 1")
     suspend fun getSyncEnabledFeedIds(): List<Long>
+
+    /** 空分区空态判定（issue #75）：该内容类型的订阅源数量。 */
+    @Query("SELECT COUNT(*) FROM feeds WHERE contentType = :contentType")
+    suspend fun countFeedsByContentType(contentType: Int): Int
 }
 
 @Dao
@@ -387,8 +408,10 @@ interface ArticleDao {
     @Suppress("QUERY_MISMATCH")
     suspend fun loadBookmarkedWithFeedPaged(limit: Int, offset: Int): List<ArticleWithFeed>
 
-    // —— 分组筛选变体（issue #74）：选中分组时 DB 级过滤分页，四个常规 tab 各一条 ——
-    // 筛选语义（默认组同时命中空串）与排序约定统一收口在 GROUP_FILTER_PREDICATE 注释里；
+    // —— 组合筛选变体（issue #74 分组 + issue #75 分区）：两个过滤维度收进同一条查询，
+    // 四个常规 tab 各一条，DAO 查询总数不随维度组合膨胀 ——
+    // 筛选语义（默认组同时命中空串、分区「全部」短路）与排序约定统一收口在
+    // GROUP_FILTER_PREDICATE_NULLABLE / CONTENT_TYPE_FILTER_PREDICATE 注释里；
     // isDefaultGroup 由仓库层按 group == DEFAULT_GROUP 传入，DAO 不做字符串比较。
 
     @Query(
@@ -396,15 +419,16 @@ interface ArticleDao {
         SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
-        WHERE $GROUP_FILTER_PREDICATE
+        WHERE $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE
         ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
         LIMIT :limit OFFSET :offset
         """,
     )
     @Suppress("QUERY_MISMATCH")
-    suspend fun loadAllWithFeedPagedByGroup(
-        group: String,
+    suspend fun loadAllWithFeedPagedFiltered(
+        group: String?,
         isDefaultGroup: Boolean,
+        contentType: Int?,
         limit: Int,
         offset: Int,
     ): List<ArticleWithFeed>
@@ -414,15 +438,16 @@ interface ArticleDao {
         SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
-        WHERE articles.isRead = 0 AND $GROUP_FILTER_PREDICATE
+        WHERE articles.isRead = 0 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE
         ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
         LIMIT :limit OFFSET :offset
         """,
     )
     @Suppress("QUERY_MISMATCH")
-    suspend fun loadUnreadWithFeedPagedByGroup(
-        group: String,
+    suspend fun loadUnreadWithFeedPagedFiltered(
+        group: String?,
         isDefaultGroup: Boolean,
+        contentType: Int?,
         limit: Int,
         offset: Int,
     ): List<ArticleWithFeed>
@@ -432,15 +457,16 @@ interface ArticleDao {
         SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
-        WHERE articles.isStarred = 1 AND $GROUP_FILTER_PREDICATE
+        WHERE articles.isStarred = 1 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE
         ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
         LIMIT :limit OFFSET :offset
         """,
     )
     @Suppress("QUERY_MISMATCH")
-    suspend fun loadStarredWithFeedPagedByGroup(
-        group: String,
+    suspend fun loadStarredWithFeedPagedFiltered(
+        group: String?,
         isDefaultGroup: Boolean,
+        contentType: Int?,
         limit: Int,
         offset: Int,
     ): List<ArticleWithFeed>
@@ -450,15 +476,16 @@ interface ArticleDao {
         SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
-        WHERE articles.isBookmarked = 1 AND $GROUP_FILTER_PREDICATE
+        WHERE articles.isBookmarked = 1 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE
         ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
         LIMIT :limit OFFSET :offset
         """,
     )
     @Suppress("QUERY_MISMATCH")
-    suspend fun loadBookmarkedWithFeedPagedByGroup(
-        group: String,
+    suspend fun loadBookmarkedWithFeedPagedFiltered(
+        group: String?,
         isDefaultGroup: Boolean,
+        contentType: Int?,
         limit: Int,
         offset: Int,
     ): List<ArticleWithFeed>
@@ -476,6 +503,20 @@ interface ArticleDao {
         """,
     )
     suspend fun groupOfArticles(ids: List<Long>): List<ArticleIdGroup>
+
+    /**
+     * 文章 id → 所属源内容类型（issue #75）：推荐流的推荐序在内存里，按分区过滤时
+     * 只需要每个 id 的 contentType，两列轻量查询，不物化文章行（模式同 [groupOfArticles]）。
+     */
+    @Query(
+        """
+        SELECT articles.id AS id, feeds.contentType AS contentType
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.id IN (:ids)
+        """,
+    )
+    suspend fun contentTypeOfArticles(ids: List<Long>): List<ArticleIdContentType>
 
     /** 订阅源文章列表（CONTEXT.md「Feed article list」）：单源全部文章，新→旧，分页。 */
     @Query(

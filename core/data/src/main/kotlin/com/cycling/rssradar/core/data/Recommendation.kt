@@ -70,6 +70,18 @@ class Recommendation(
         }
 
     /**
+     * 按内容分区过滤推荐序（issue #75）：查这批 id 所属源的 contentType，仅保留命中的。
+     * 规则本体在纯函数 [filterRankedIdsByContentType]（脱离 Android 环境可单测），
+     * 模式与 [filterByGroup] 完全镜像。
+     */
+    suspend fun filterByContentType(ids: List<Long>, contentType: Int): List<Long> =
+        withContext(ioDispatcher) {
+            if (ids.isEmpty()) return@withContext emptyList()
+            val typeOf = database.articleDao().contentTypeOfArticles(ids).associate { it.id to it.contentType }
+            filterRankedIdsByContentType(ids, typeOf, contentType)
+        }
+
+    /**
      * 把有序 id 还原成文章列表（顺序以 [ids] 为准）。
      * SQL 的 `IN` 不保证顺序，这里显式按 id 序还原——否则打散白做。
      */
@@ -160,7 +172,7 @@ class Recommendation(
 /**
  * 按分组过滤推荐序（issue #74）的纯规则：默认组要同时命中空串——历史/导入数据的
  * feeds.groupName 可能是 ''，UI 显示为默认组，只按 `== group` 比较会漏掉这些行
- * （与 DB 端 GROUP_FILTER_PREDICATE 谓词、内存侧 ifBlank 兜底是同一语义）。
+ * （与 DB 端 GROUP_FILTER_PREDICATE_NULLABLE 谓词、内存侧 ifBlank 兜底是同一语义）。
  * 映射里查不到的 id（打分后文章可能已被删）直接丢弃。
  * 抽成纯函数以便脱离 Android 环境单测。
  */
@@ -171,3 +183,16 @@ internal fun filterRankedIdsByGroup(
     defaultGroup: String,
 ): List<Long> =
     ids.filter { id -> groupOf[id]?.ifBlank { defaultGroup } == group }
+
+/**
+ * 按内容分区过滤推荐序（issue #75）的纯规则：按源的 feeds.contentType 过滤有序 id 序，
+ * 映射里查不到的 id（打分后文章可能已被删）直接丢弃，保序输出。
+ * 与 [filterRankedIdsByGroup] 同族；声明为 public 是为了让 app 模块的
+ * ContentTypePartitionTest 也能直接单测（internal 跨模块不可见）。
+ */
+fun filterRankedIdsByContentType(
+    ids: List<Long>,
+    typeOf: Map<Long, Int>,
+    contentType: Int,
+): List<Long> =
+    ids.filter { id -> typeOf[id] == contentType }

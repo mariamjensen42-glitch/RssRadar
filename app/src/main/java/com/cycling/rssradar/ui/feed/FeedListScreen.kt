@@ -212,6 +212,11 @@ fun FeedListScreen(
                 tabs = if (recommendationEnabled) FeedTab.entries else FeedTab.entries.filter { it != FeedTab.Recommended },
                 onSelect = { viewModel.onIntent(FeedListIntent.SelectTab(it)) },
             )
+            // 内容分区 chip 行（issue #75，PRD 方案 C）：常驻显示，与状态 tab 行同心智
+            ContentTypeChipRow(
+                selected = uiState.selectedContentType,
+                onSelect = { viewModel.onIntent(FeedListIntent.SelectContentType(it)) },
+            )
             Spacer(Modifier.height(8.dp))
             PullToRefreshBox(
                 isRefreshing = uiState.isRefreshing,
@@ -223,6 +228,8 @@ fun FeedListScreen(
                 } else if (currentList.isEmpty()) {
                     EmptyState(
                         selectedTab = uiState.selectedTab,
+                        selectedContentType = uiState.selectedContentType,
+                        partitionEmpty = uiState.partitionEmpty,
                         onAddFeed = onAddFeed,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -433,6 +440,34 @@ private fun FeedListTabRow(
                         .background(Brush.horizontalGradient(listOf(Color.Transparent, radarColors().bgRoot))),
                 )
             }
+        }
+    }
+}
+
+/**
+ * 内容分区 chip 行（issue #75，PRD 方案 C）：全部/图片/视频/音频，文章即默认态不设「文章」chip。
+ * 常驻显示（含「全部」选中态）：可见、可解释；4 个 chip 窄屏放得下，
+ * 但与 [FeedListTabRow] 同样用横向滚动兜底，保持一致心智。收起态留二期。
+ */
+@Composable
+private fun ContentTypeChipRow(
+    selected: ContentTypeFilter,
+    onSelect: (ContentTypeFilter) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ContentTypeFilter.entries.forEach { type ->
+            // 复用文件内私有 FilterChip，选中态与状态 tab 行天然一致
+            FilterChip(
+                label = type.label,
+                selected = type == selected,
+                onClick = { onSelect(type) },
+            )
         }
     }
 }
@@ -1567,16 +1602,26 @@ private fun LoadMoreHint() {
 @Composable
 private fun EmptyState(
     selectedTab: FeedTab,
+    /** 当前分区（issue #75）：空分区空态文案来源。 */
+    selectedContentType: ContentTypeFilter,
+    /** 空分区空态：选中分区且库里没有任何该类型订阅源（区别于「有源但没文章」）。 */
+    partitionEmpty: Boolean,
     onAddFeed: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val (title, hint) = when (selectedTab) {
-        FeedTab.All -> "还没有订阅" to "去订阅页添加你的第一个 RSS / Atom 源"
-        FeedTab.Unread -> "没有未读文章" to "所有文章都看完了，休息一下"
-        FeedTab.Starred -> "还没有收藏" to "阅读时点击星标，把好文章留下来"
-        FeedTab.Bookmarked -> "暂无稍后读" to "阅读时点击书签，稍后再看"
-        // 推荐流空态（ADR-0013）：候选池 = 未读 + 14 天窗，读完就没了——如实说，不编内容
-        FeedTab.Recommended -> "暂无推荐" to "最近未读都读完了，或还没有订阅源"
+    // 分区空态（issue #75）优先：有源没文章走原 tab 空态，无源才走分区引导——
+    // 如实区分两种空。chip 行仍在上方，用户随时可切回「全部」，不阻塞。
+    val (title, hint) = if (partitionEmpty && selectedContentType != ContentTypeFilter.All) {
+        selectedContentType.emptyCopy()
+    } else {
+        when (selectedTab) {
+            FeedTab.All -> "还没有订阅" to "去订阅页添加你的第一个 RSS / Atom 源"
+            FeedTab.Unread -> "没有未读文章" to "所有文章都看完了，休息一下"
+            FeedTab.Starred -> "还没有收藏" to "阅读时点击星标，把好文章留下来"
+            FeedTab.Bookmarked -> "暂无稍后读" to "阅读时点击书签，稍后再看"
+            // 推荐流空态（ADR-0013）：候选池 = 未读 + 14 天窗，读完就没了——如实说，不编内容
+            FeedTab.Recommended -> "暂无推荐" to "最近未读都读完了，或还没有订阅源"
+        }
     }
     // verticalScroll 让空态页也能响应下拉刷新手势
     Column(

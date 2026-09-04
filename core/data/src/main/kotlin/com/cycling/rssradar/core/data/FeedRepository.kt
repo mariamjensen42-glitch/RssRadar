@@ -59,26 +59,34 @@ class FeedRepository(
     suspend fun loadBookmarkedPage(limit: Int, offset: Int): List<ArticleWithFeed> =
         articleDao.loadBookmarkedWithFeedPaged(limit, offset)
 
-    // —— 分组筛选变体（issue #74）：选中分组时走 DB 级过滤分页 ——
-    // 「全部」（selectedGroup == null）继续走上面的无过滤查询，不加 join 谓词开销。
-    // isDefaultGroup 在这里统一判定：默认组要同时命中 groupName 为空串的历史数据，
-    // 语义（SQL 谓词）见 ArticleDao 的 GROUP_FILTER_PREDICATE 注释。
+    // —— 组合筛选入口（issue #74 分组 + issue #75 分区）：分组（null=全部，含默认组空串语义）
+    // × 内容分区（null=全部）叠加。两个过滤都为空时走上面的无谓词原查询，不为空才进
+    // 组合查询——「全部」不加过滤开销。isDefaultGroup 在这里统一判定
+    // （group == DEFAULT_GROUP），DAO 不做字符串比较，谓词语义见 ArticleDao 注释。
 
-    /** All tab + 分组筛选：一次取一页。 */
-    suspend fun loadArticlesPageByGroup(group: String, limit: Int, offset: Int): List<ArticleWithFeed> =
-        articleDao.loadAllWithFeedPagedByGroup(group, group == DEFAULT_GROUP, limit, offset)
+    /** All tab + 组合筛选：一次取一页。 */
+    suspend fun loadArticlesPageFiltered(group: String?, contentType: Int?, limit: Int, offset: Int): List<ArticleWithFeed> =
+        if (group == null && contentType == null) articleDao.loadAllWithFeedPaged(limit, offset)
+        else articleDao.loadAllWithFeedPagedFiltered(group, group == DEFAULT_GROUP, contentType, limit, offset)
 
-    /** 未读 tab + 分组筛选：一次取一页。 */
-    suspend fun loadUnreadPageByGroup(group: String, limit: Int, offset: Int): List<ArticleWithFeed> =
-        articleDao.loadUnreadWithFeedPagedByGroup(group, group == DEFAULT_GROUP, limit, offset)
+    /** 未读 tab + 组合筛选：一次取一页。 */
+    suspend fun loadUnreadPageFiltered(group: String?, contentType: Int?, limit: Int, offset: Int): List<ArticleWithFeed> =
+        if (group == null && contentType == null) articleDao.loadUnreadWithFeedPaged(limit, offset)
+        else articleDao.loadUnreadWithFeedPagedFiltered(group, group == DEFAULT_GROUP, contentType, limit, offset)
 
-    /** 收藏 tab + 分组筛选：一次取一页。 */
-    suspend fun loadStarredPageByGroup(group: String, limit: Int, offset: Int): List<ArticleWithFeed> =
-        articleDao.loadStarredWithFeedPagedByGroup(group, group == DEFAULT_GROUP, limit, offset)
+    /** 收藏 tab + 组合筛选：一次取一页。 */
+    suspend fun loadStarredPageFiltered(group: String?, contentType: Int?, limit: Int, offset: Int): List<ArticleWithFeed> =
+        if (group == null && contentType == null) articleDao.loadStarredWithFeedPaged(limit, offset)
+        else articleDao.loadStarredWithFeedPagedFiltered(group, group == DEFAULT_GROUP, contentType, limit, offset)
 
-    /** 稍后读 tab + 分组筛选：一次取一页。 */
-    suspend fun loadBookmarkedPageByGroup(group: String, limit: Int, offset: Int): List<ArticleWithFeed> =
-        articleDao.loadBookmarkedWithFeedPagedByGroup(group, group == DEFAULT_GROUP, limit, offset)
+    /** 稍后读 tab + 组合筛选：一次取一页。 */
+    suspend fun loadBookmarkedPageFiltered(group: String?, contentType: Int?, limit: Int, offset: Int): List<ArticleWithFeed> =
+        if (group == null && contentType == null) articleDao.loadBookmarkedWithFeedPaged(limit, offset)
+        else articleDao.loadBookmarkedWithFeedPagedFiltered(group, group == DEFAULT_GROUP, contentType, limit, offset)
+
+    /** 空分区空态判定（issue #75）：是否有任何该内容类型的订阅源。 */
+    suspend fun hasFeedsOfType(contentType: Int): Boolean =
+        feedDao.countFeedsByContentType(contentType) > 0
 
     /** 订阅源文章列表（issue #51）：单源全部文章，一次取一页。 */
     suspend fun loadFeedPage(feedId: Long, limit: Int, offset: Int): List<ArticleWithFeed> =

@@ -38,6 +38,13 @@ data class FeedListUiState(
     val selectedTab: FeedTab = FeedTab.All,
     /** 分组筛选：null = 全部。常规 tab 下沉 DB 查询（issue #74），推荐流内存过滤推荐序。 */
     val selectedGroup: String? = null,
+    /** 内容分区筛选（issue #75）：与 selectedGroup 叠加，均下沉 DB 查询，推荐流内存过滤推荐序。 */
+    val selectedContentType: ContentTypeFilter = ContentTypeFilter.All,
+    /**
+     * 空分区空态（issue #75）：选中分区且库里没有任何该类型订阅源
+     * （区别于「有源但没文章」——后者维持各 tab 原空态文案）。
+     */
+    val partitionEmpty: Boolean = false,
     /**
      * 当前 tab 的分页快照列表。
      * 快照语义：列表内的卡片状态（已读/收藏等）由 PagedSnapshot.mutate 原地更新，
@@ -69,6 +76,8 @@ sealed interface FeedListIntent {
     data object ConsumeMessage : FeedListIntent
     data class SelectTab(val tab: FeedTab) : FeedListIntent
     data class SelectGroup(val group: String?) : FeedListIntent
+    /** 内容分区筛选（issue #75）：与分组筛选叠加。 */
+    data class SelectContentType(val type: ContentTypeFilter) : FeedListIntent
     data class ToggleStarred(val articleId: Long) : FeedListIntent
     data class ToggleBookmarked(val articleId: Long) : FeedListIntent
     /** 已读/未读互切（长按菜单，issue #46）。 */
@@ -147,6 +156,7 @@ class FeedListViewModel @Inject constructor(
             FeedListIntent.ConsumeMessage -> update { it.copy(uiMessage = null) }
             is FeedListIntent.SelectTab -> selectTab(intent.tab)
             is FeedListIntent.SelectGroup -> selectGroup(intent.group)
+            is FeedListIntent.SelectContentType -> selectContentType(intent.type)
             is FeedListIntent.ToggleStarred -> toggleStarred(intent.articleId)
             is FeedListIntent.ToggleBookmarked -> toggleBookmarked(intent.articleId)
             is FeedListIntent.SetRead -> setRead(intent.articleId, intent.read)
@@ -227,6 +237,32 @@ class FeedListViewModel @Inject constructor(
         viewModelScope.launch { loadFirstPage(cancelPendingLoadMore = true) }
     }
 
+    /**
+     * 选内容分区（issue #75）：与 [selectGroup] 同构——筛选已下沉 DB 查询，改分区必须
+     * 重拉第一页，否则列表还是上一个分区的数据。
+     */
+    private fun selectContentType(type: ContentTypeFilter) {
+        if (_uiState.value.selectedContentType == type) return
+        update { it.copy(selectedContentType = type, partitionEmpty = false) }
+        viewModelScope.launch {
+            loadFirstPage(cancelPendingLoadMore = true)
+            recheckPartitionEmpty()
+        }
+    }
+
+    /**
+     * 空分区判定（issue #75）：列表为空 且 选中分区 且 库里没有任何该类型源 →
+     * partitionEmpty = true（引导文案空态）；有源但没文章 → false（维持各 tab 原空态）。
+     * 抽成独立步骤，[refresh] 刷新后也复核一次，避免「订阅了图片源但空态没消」的陈旧提示。
+     */
+    private suspend fun recheckPartitionEmpty() {
+        val state = _uiState.value
+        val type = state.selectedContentType
+        val dbValue = type.dbValue ?: return
+        val empty = state.articles.isEmpty() && !repository.hasFeedsOfType(dbValue)
+        update { it.copy(partitionEmpty = empty) }
+    }
+
     private fun toggleStarred(articleId: Long) {
         val current = starredOf(articleId)
         viewModelScope.launch {
@@ -302,6 +338,8 @@ class FeedListViewModel @Inject constructor(
             update { it.copy(isRefreshing = true) }
             val successCount = repository.refreshAllFeeds()
             loadFirstPage()
+            // 刷新可能改变了分区内容（新订阅的源抓到文章），复核空分区态（issue #75）
+            recheckPartitionEmpty()
             val hasFeeds = repository.hasFeeds()
             update {
                 it.copy(
@@ -347,25 +385,19 @@ class FeedListViewModel @Inject constructor(
         }
 
     /**
-     * 按当前 tab 取一页。选中分组时走 DB 级分组查询（issue #74）——分页、hasMore
-     * 与「全部」共用同一套 LIMIT/OFFSET +「上一页拉满」约定；「全部」不加过滤开销。
+     * 按当前 tab 取一页。选中分组/分区时走 DB 级组合查询（issue #74 + #75）——
+     * 两个过滤维度合成一条 Filtered 调用，分页、hasMore 与「全部」共用同一套
+     * LIMIT/OFFSET +「上一页拉满」约定；「全部」不加过滤开销。
      */
     private suspend fun loadTabPage(limit: Int, offset: Int): List<ArticleWithFeed> {
         val state = _uiState.value
         val group = state.selectedGroup
+        val contentType = state.selectedContentType.dbValue
         return when (state.selectedTab) {
-            FeedTab.All ->
-                if (group == null) repository.loadArticlesPage(limit, offset)
-                else repository.loadArticlesPageByGroup(group, limit, offset)
-            FeedTab.Unread ->
-                if (group == null) repository.loadUnreadPage(limit, offset)
-                else repository.loadUnreadPageByGroup(group, limit, offset)
-            FeedTab.Starred ->
-                if (group == null) repository.loadStarredPage(limit, offset)
-                else repository.loadStarredPageByGroup(group, limit, offset)
-            FeedTab.Bookmarked ->
-                if (group == null) repository.loadBookmarkedPage(limit, offset)
-                else repository.loadBookmarkedPageByGroup(group, limit, offset)
+            FeedTab.All -> repository.loadArticlesPageFiltered(group, contentType, limit, offset)
+            FeedTab.Unread -> repository.loadUnreadPageFiltered(group, contentType, limit, offset)
+            FeedTab.Starred -> repository.loadStarredPageFiltered(group, contentType, limit, offset)
+            FeedTab.Bookmarked -> repository.loadBookmarkedPageFiltered(group, contentType, limit, offset)
             FeedTab.Recommended -> loadRecommendationsPage(limit, offset)
         }
     }
@@ -383,6 +415,12 @@ class FeedListViewModel @Inject constructor(
             val group = _uiState.value.selectedGroup
             if (group != null) {
                 rankedIds = recommendation.filterByGroup(rankedIds, group, DEFAULT_GROUP)
+            }
+            // 分区筛选（issue #75）：同上，在 group 过滤之后追加 id 序过滤。
+            // rankedIds 过滤后 hasMore 的游标判定（rankedIds.size）自然保持正确。
+            val type = _uiState.value.selectedContentType.dbValue
+            if (type != null) {
+                rankedIds = recommendation.filterByContentType(rankedIds, type)
             }
             update { it.copy(isRanking = false) }
         }
