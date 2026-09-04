@@ -214,7 +214,7 @@ class FeedListViewModel @Inject constructor(
     private fun selectTab(tab: FeedTab) {
         if (_uiState.value.selectedTab == tab) return
         update { it.copy(selectedTab = tab) }
-        viewModelScope.launch { loadFirstPage() }
+        viewModelScope.launch { loadFirstPage(cancelPendingLoadMore = true) }
     }
 
     /**
@@ -224,7 +224,7 @@ class FeedListViewModel @Inject constructor(
     private fun selectGroup(group: String?) {
         if (_uiState.value.selectedGroup == group) return
         update { it.copy(selectedGroup = group) }
-        viewModelScope.launch { loadFirstPage() }
+        viewModelScope.launch { loadFirstPage(cancelPendingLoadMore = true) }
     }
 
     private fun toggleStarred(articleId: Long) {
@@ -413,7 +413,13 @@ class FeedListViewModel @Inject constructor(
         }
     }
 
-    private suspend fun loadFirstPage() {
+    /**
+     * 重拉第一页。[cancelPendingLoadMore] 为 true 时先取消在途的 loadMore——
+     * 切 tab / 改分组后查询条件已变，在途分页若继续写入，offset（取自旧列表长度）
+     * 会与新条件错位一页（QA #74 遗留竞态）。
+     */
+    private suspend fun loadFirstPage(cancelPendingLoadMore: Boolean = false) {
+        if (cancelPendingLoadMore) loadMoreJob?.cancel()
         val page = loadTabPage(PAGE_SIZE, 0)
         update {
             it.copy(articles = page, hasMore = hasMoreAfter(0, page.size))
