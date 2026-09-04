@@ -43,6 +43,7 @@ COMPOSE_AARS = [
     "androidx.compose.runtime/runtime-android/1.10.4",
     "androidx.compose.runtime/runtime-saveable-android/1.10.4",
     "androidx.compose.animation/animation-android/1.10.4",
+    "androidx.compose.animation/animation-core-android/1.10.4",
 ]
 
 
