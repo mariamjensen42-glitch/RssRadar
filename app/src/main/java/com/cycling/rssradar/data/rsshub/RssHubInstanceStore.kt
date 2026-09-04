@@ -1,5 +1,6 @@
 package com.cycling.rssradar.data.rsshub
 
+import com.cycling.rssradar.core.domain.rsshub.RssHubRoutes
 import android.content.SharedPreferences
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
