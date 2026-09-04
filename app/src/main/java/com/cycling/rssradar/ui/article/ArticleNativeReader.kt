@@ -66,7 +66,7 @@ import com.cycling.rssradar.core.ui.theme.radarColors
  * 原生 Compose 正文渲染器（ADR-0009 双渲染器）的渲染半边；解析在 [ReadingNodes]。
  *
  * 与 WebView 路的关键差异（原生路必须自己重做，库给不了）：
- * - 深色主题：WebView 靠注入 CSS 主题色；原生路直接读 RssRadarPalette getter 映射 TextStyle。
+ * - 深色主题：WebView 靠注入 CSS 主题色；原生路直接读 radarColors() 映射 TextStyle。
  * - 媒体占位卡：`<a class="media-card" href>` 用 Surface 卡片（▶ + 标签·域名）重画，点击外开。
  * - 图片：Coil AsyncImage（与 FeedIcon 同款 coil3），懒加载，不进 WebView 全高堆——避开 OOM。
  * - 文本天然可选中，顺手解决「阅读页闪烁时文本难选」的原始痛点。

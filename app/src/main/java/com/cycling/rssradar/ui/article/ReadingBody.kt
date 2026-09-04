@@ -583,7 +583,7 @@ private fun TranslationBanner(
 /**
  * 净化后的正文 HTML 用 WebView 渲染：排版参数与主题色注入 CSS（issue #42）。
  * 模板构建在 [ReadingContentHtml]（纯函数，JVM 单测覆盖）；本组合函数只负责
- * 从 RssRadarPalette / LocalReadingPrefs 读实时值。
+ * 从 radarColors() / LocalReadingPrefs 读实时值。
  *
  * [passThroughTouch]：整页模式（高度包内容）为 true——触摸穿透给外层 Compose 滚动，
  * 否则 WebView 会吞掉滑动手势；视口模式（有图文章，内部滚动）为 false——
@@ -605,7 +605,7 @@ private fun ArticleWebView(
     passThroughTouch: Boolean = true,
     onScroll: ((Int) -> Unit)? = null,
 ) {
-    // 颜色读自 RssRadarPalette（getter 代理 mutableStateOf），主题切换自动重组
+    // 颜色读自 radarColors()（CompositionLocal），主题切换自动重组
     val bg = toCssColor(radarColors().bgRoot)
     val fg = toCssColor(radarColors().textPrimary)
     val muted = toCssColor(radarColors().textSecondary)

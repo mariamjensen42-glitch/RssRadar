@@ -46,6 +46,8 @@ import com.cycling.rssradar.core.data.parser.RssParser
 import com.cycling.rssradar.core.data.rss.BestIconFinder
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import com.cycling.rssradar.core.domain.rss.HttpUrlFetcher
+import com.cycling.rssradar.core.domain.rsshub.HttpHealthzProber
+import com.cycling.rssradar.core.domain.rsshub.InstanceProber
 import com.cycling.rssradar.core.data.store.ThemeStore
 import com.cycling.rssradar.sync.AutoSync
 import dagger.Module
@@ -186,8 +188,14 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideRssHubInstanceStore(@ApplicationContext context: Context): RssHubInstanceStore =
-        RssHubInstanceStore(SettingsPrefs.of(context))
+    fun provideInstanceProber(): InstanceProber = HttpHealthzProber()
+
+    @Provides
+    @Singleton
+    fun provideRssHubInstanceStore(
+        @ApplicationContext context: Context,
+        prober: InstanceProber,
+    ): RssHubInstanceStore = RssHubInstanceStore(SettingsPrefs.of(context), prober)
 
     @Provides
     @Singleton

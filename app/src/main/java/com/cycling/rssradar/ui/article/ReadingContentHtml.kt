@@ -7,7 +7,7 @@ import com.cycling.rssradar.core.data.store.ReadingStyleState
  * 阅读页 styled-HTML 构建（issue #42 单一测试缝）。
  *
  * 纯 JVM 函数：排版参数 + 实时主题色 + 净化后的正文 HTML → 完整可渲染文档。
- * 颜色由调用方从 RssRadarPalette 实时读出（#RRGGBB），本函数不做任何颜色决策；
+ * 颜色由调用方从 radarColors() 实时读出（#RRGGBB），本函数不做任何颜色决策；
  * 排版参数只在 CSS 中体现：font-size / line-height / padding / font-family。
  *
  * [imageUrls] 是本文的图片地址集合（[ReadingImages.extract] 的产物）：非空时每张图会被

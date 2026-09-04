@@ -9,10 +9,11 @@
 |---|---|
 | 定位 | 仅 RssRadar；但主题/组件仍参数化下沉，core:ui **禁止依赖 core:data** |
 | palette 形态 | 重构为 CompositionLocal（RadarColors + LocalRadarColors），弃全局可变单例 |
-| 确认对话框 | 新建 ConfirmDialog 组件；5 处手写 AlertDialog 本期不换调用点 |
-| 图片封装 | RadarImage 封装 + 本期 4 处调用点全部接入 |
-| utils | 最小起步：只迁 OpenUrl，后续按需收 |
+| 确认对话框 | 新建 ConfirmDialog 组件；5 处手写 AlertDialog 中已接 GroupActionSheet 1 处，其余 4 处留给后续逐屏替换 |
+| 图片封装 | RadarImage 封装；仅 FeedListScreen 走 RadarImage。**复杂场景豁免**（直接用 coil）：ArticleNativeReader（自定义解码尺寸）、ReaderImagePage（要 painter 加载态）、FeedIcon（字母块打底，RadarImage 的 surface1 底会盖掉字母）。coil import 允许存在于 core:ui 与上述 3 处豁免点 |
+| utils | OpenUrl 依赖 core:data 的 LinkStore/LinkOpenMode/LinkShareState，迁 core:ui 会破坏铁律 → **留在 app**；core/ui/util 待有真正纯工具再建 |
 | 骨架屏 | 本期不做 |
+| 边界修订（2026-09-04 补记） | OptionPickerSheet / BottomTabBar / EmptyState 实际迁入了 core:ui（均已充分参数化、无业务依赖），追加 EmptyState 组件；依赖清单相应多了 saveable 与 lucide 两条 api（组件在用） |
 
 ## 1. 模块骨架
 
@@ -24,6 +25,7 @@
 - dependencies：
   - `api(platform(libs.androidx.compose.bom))` + `api` ui / ui-graphics / foundation / material3 / ui-tooling-preview
   - `api(libs.coil.compose)`、`api(libs.coil.network.okhttp)`（RadarImage 在库内，网络实现随之）
+  - `api(libs.compose.icons.lucide)`、`api(libs.androidx.compose.runtime.saveable)`（BottomTabBar/OptionPickerSheet/EmptyState 在用）
   - 无 project 依赖、无 hilt、无 room。**铁律：core:ui 的源码 import 里不得出现 com.cycling.rssradar.core.data / .di / .sync**。
 - `.gitignore` 已有 `**/build/`，无需处理。
 - CI（ci.yml）暂不加新 task：本期 core:ui 无单测；若最终带了纯 JVM 测试再加 `:core:ui:testDebugUnitTest`。
@@ -74,7 +76,7 @@ fun radarColors(): RadarColors = LocalRadarColors.current
 
 - **AppSnackbar.kt** → 原样迁，色引用改 radarColors()。API 不变。
 - **FeedIcon.kt** → 参数去业务化：改为接收 `(url: String?, fallbackName: String, …尺寸/形状参数)`，不接收 Feed/RouteCatalog 类型。app 调用点传 url 与名称。
-- **OpenUrl.kt** → `core/ui/util/OpenUrl.kt`（Context 扩展，纯工具）。
+- **OpenUrl.kt** → 保留在 app（耦合 core:data 的 LinkStore，见决策记录）；core/ui/util 待有真正纯工具再建。
 
 新建：
 
@@ -107,13 +109,14 @@ fun RadarImage(
   行为：crossfade(true)；url 空/加载中 → Surface1 底色占位；失败 → Surface1 底 + lucide 风线性兜底图标（描边风格，禁 Filled）。ImageRequest 遵守内存+磁盘缓存默认。
 - **骨架屏：不做**。
 
-### 图片调用点（本期全接）
+### 图片调用点（2026-09-04 修订）
 
-4 处：`article/ArticleNativeReader.kt`、`article/ReaderImagePage.kt`、`components/FeedIcon.kt`（内部）、`feed/FeedListScreen.kt`。 coil 的直接 import 只允许存在于 core:ui。
+FeedListScreen 走 RadarImage；3 处复杂场景豁免直用 coil：`article/ArticleNativeReader.kt`（自定义解码尺寸防 OOM）、`article/ReaderImagePage.kt`（painter 加载态驱动转圈）、`components/FeedIcon.kt`（库内；字母块打底，不吃 surface1 底色）。
 
-## 4. 交付边界（不做）
+## 4. 交付边界（2026-09-04 修订）
 
-- 不动 OptionPickerSheet / ArticleContextMenu / BottomTabBar（业务组件留 app）。
+- ~~不动 OptionPickerSheet / ArticleContextMenu / BottomTabBar~~ → 修订：OptionPickerSheet / BottomTabBar 已迁入 core:ui（参数化充分，见决策记录）；ArticleContextMenu 仍留 app。
+- 新增 EmptyState 组件（spec 外追加，已记决策）。
 - 不做骨架屏、不做 Modifier/String 大盘点（后续现搬现收进 core/ui/util）。
 - 不引入新第三方库（lucide 图标包沿用 compose-icons）。
 

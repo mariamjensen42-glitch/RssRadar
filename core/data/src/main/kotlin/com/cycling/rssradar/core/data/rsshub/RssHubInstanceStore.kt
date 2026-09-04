@@ -1,6 +1,5 @@
 package com.cycling.rssradar.core.data.rsshub
 
-import com.cycling.rssradar.core.domain.rsshub.HttpHealthzProber
 import com.cycling.rssradar.core.domain.rsshub.InstanceProber
 import com.cycling.rssradar.core.domain.rsshub.RssHubRoutes
 import android.content.SharedPreferences
@@ -23,7 +22,7 @@ import kotlinx.coroutines.coroutineScope
  */
 class RssHubInstanceStore(
     private val prefs: SharedPreferences,
-    private val prober: InstanceProber = HttpHealthzProber(),
+    private val prober: InstanceProber,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
