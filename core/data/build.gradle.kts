@@ -24,13 +24,13 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-}
 
-// rome 2.1.0 的 OSGi 内嵌 jar 与 app 同样的 "2 files found with path" 问题，
-// 在本模块打包时排除（app 模块的 excludes 不传递到依赖模块）。
-packaging {
-    resources {
-        excludes += setOf("rome-utils-2.1.0.jar", "rome-2.1.0.jar")
+    // rome 2.1.0 的 OSGi 内嵌 jar 与 app 同样的 "2 files found with path" 问题，
+    // 在本模块打包时排除（app 模块的 excludes 不传递到依赖模块）。
+    packaging {
+        resources {
+            excludes += setOf("rome-utils-2.1.0.jar", "rome-2.1.0.jar")
+        }
     }
 }
 
