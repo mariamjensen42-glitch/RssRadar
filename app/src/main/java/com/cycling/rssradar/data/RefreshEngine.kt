@@ -5,7 +5,7 @@ import com.cycling.rssradar.data.db.ArticleEntity
 import com.cycling.rssradar.data.db.FeedDao
 import com.cycling.rssradar.data.parser.RssParser
 import com.cycling.rssradar.data.rss.BestIconFinder
-import com.cycling.rssradar.data.rss.HttpFetcher
+import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
