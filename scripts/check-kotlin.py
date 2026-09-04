@@ -74,6 +74,8 @@ DEPS = [
     ("androidx.compose.ui", "ui-text-android", ""),
     ("androidx.compose.ui", "ui-unit-android", ""),
     ("androidx.compose.ui", "ui-tooling-preview-android", ""),
+    ("androidx.compose.animation", "animation-android", ""),
+    ("androidx.compose.animation", "animation-core-android", ""),
     ("androidx.compose.foundation", "foundation-android", ""),
     ("androidx.compose.foundation", "foundation-layout-android", ""),
     ("androidx.compose.material3", "material3-android", ""),
@@ -232,9 +234,18 @@ def main() -> int:
     if args.files:
         files = [str(ROOT / f) for f in args.files]
     else:
-        files = sources(ROOT / "app/src/main/java")
+        # 模块拆分后 app + core 四个子模块一起编；漏 core 源码会 2000+ 假 unresolved
+        src_roots = [
+            ROOT / "app/src/main/java",
+            ROOT / "core/model/src/main",
+            ROOT / "core/domain/src/main",
+            ROOT / "core/data/src/main",
+            ROOT / "core/ui/src/main",
+        ]
+        files = [f for root in src_roots for f in sources(root)]
         if not args.main_only:
             files += sources(ROOT / "app/src/test/java")
+            files += sources(ROOT / "core/data/src/test")
 
     out = WORK / "out"
     out.mkdir(parents=True, exist_ok=True)

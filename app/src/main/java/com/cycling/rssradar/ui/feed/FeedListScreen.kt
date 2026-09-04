@@ -1,6 +1,7 @@
 package com.cycling.rssradar.ui.feed
 
 import android.text.format.DateUtils
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.clickable
@@ -81,7 +82,10 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.cycling.rssradar.core.ui.components.RadarImage
+import com.cycling.rssradar.core.ui.components.pressScale
+import com.cycling.rssradar.core.ui.theme.MotionTokens
 import com.cycling.rssradar.core.data.db.ArticleEntity
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
 import com.cycling.rssradar.core.data.store.ListDescMode
@@ -555,6 +559,37 @@ fun ArticleCardList(
                     StickyDateHeader(group.label)
                 }
                 items(group.items, key = { it.article.id }) { item ->
+                    // 删除淡出（docs/motion.md #4）：数万条列表只做 fadeOut，
+                    // placement / fadeIn 关闭——低端机上 placement 是帧率杀手
+                    Box(
+                        modifier = Modifier.animateItem(
+                            fadeInSpec = null,
+                            placementSpec = null,
+                            fadeOutSpec = tween(MotionTokens.DurationShort, easing = MotionTokens.EasingStandard),
+                        ),
+                    ) {
+                        SwipeableArticleCard(
+                            item = item,
+                            display = display,
+                            onClick = { onArticleClick(item) },
+                            onToggleRead = { onToggleRead(item.article.id, !item.article.isRead) },
+                            onToggleStarred = { onToggleStarred(item.article.id) },
+                            onToggleBookmarked = { onToggleBookmarked(item.article.id) },
+                            onDelete = { onDelete(item.article.id) },
+                            onReduceSuch = onReduceSuch?.let { reduce -> { reduce(item.article.id) } },
+                        )
+                    }
+                }
+            }
+        } else {
+            items(articles, key = { it.article.id }) { item ->
+                Box(
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = null,
+                        placementSpec = null,
+                        fadeOutSpec = tween(MotionTokens.DurationShort, easing = MotionTokens.EasingStandard),
+                    ),
+                ) {
                     SwipeableArticleCard(
                         item = item,
                         display = display,
@@ -563,21 +598,8 @@ fun ArticleCardList(
                         onToggleStarred = { onToggleStarred(item.article.id) },
                         onToggleBookmarked = { onToggleBookmarked(item.article.id) },
                         onDelete = { onDelete(item.article.id) },
-                        onReduceSuch = onReduceSuch?.let { reduce -> { reduce(item.article.id) } },
                     )
                 }
-            }
-        } else {
-            items(articles, key = { it.article.id }) { item ->
-                SwipeableArticleCard(
-                    item = item,
-                    display = display,
-                    onClick = { onArticleClick(item) },
-                    onToggleRead = { onToggleRead(item.article.id, !item.article.isRead) },
-                    onToggleStarred = { onToggleStarred(item.article.id) },
-                    onToggleBookmarked = { onToggleBookmarked(item.article.id) },
-                    onDelete = { onDelete(item.article.id) },
-                )
             }
         }
     }
@@ -734,12 +756,15 @@ fun ArticleCard(
     val dimmed = display.dimRead && item.article.isRead
     val titleColor = if (dimmed) radarColors().textTertiary else radarColors().textPrimary
     val descColor = if (dimmed) radarColors().textTertiary else radarColors().textSecondary
+    // 按压缩放（docs/motion.md #2）：source 与 combinedClickable 共用同一实例
+    val interactionSource = remember { MutableInteractionSource() }
     Box {
         Surface(
             shape = RoundedCornerShape(14.dp),
             color = radarColors().surface1,
             modifier = Modifier
                 .fillMaxWidth()
+                .pressScale(interactionSource)
                 .onGloballyPositioned {
                     cardTopInWindowPx = it.localToWindow(Offset.Zero).y
                     cardHeightPx = it.size.height
@@ -752,6 +777,7 @@ fun ArticleCard(
                     }
                 }
                 .combinedClickable(
+                    interactionSource = interactionSource,
                     onClick = onClick,
                     onLongClick = {
                         menuOffset = articleMenuOffset(
@@ -965,13 +991,16 @@ internal fun ImageGalleryGrid(
 
 @Composable
 private fun ImageGalleryCard(item: ArticleWithFeed, onClick: () -> Unit) {
+    // 按压缩放（docs/motion.md #2）
+    val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
+            .pressScale(interactionSource)
             .clip(RoundedCornerShape(14.dp))
             .background(radarColors().surface2)
-            .clickable(onClick = onClick),
+            .clickable(interactionSource = interactionSource, onClick = onClick),
     ) {
         RadarImage(
             url = item.article.coverUrl?.takeIf { it.isNotBlank() },

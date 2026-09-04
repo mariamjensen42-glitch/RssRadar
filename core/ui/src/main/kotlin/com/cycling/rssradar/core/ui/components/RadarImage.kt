@@ -19,7 +19,9 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import androidx.compose.ui.platform.LocalContext
+import com.cycling.rssradar.core.ui.theme.MotionTokens
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.theme.rememberReducedMotion
 
 /**
  * 统一图片组件：包 coil AsyncImage，提供全应用一致的加载行为——
@@ -41,6 +43,7 @@ fun RadarImage(
 ) {
     var failed by remember(url) { mutableStateOf(false) }
     val context = LocalContext.current
+    val reducedMotion = rememberReducedMotion()
     Box(
         modifier = modifier.background(radarColors().surface1),
         contentAlignment = Alignment.Center,
@@ -55,11 +58,14 @@ fun RadarImage(
                 )
             }
         } else {
+            // crossfade 200ms（docs/motion.md #3）；reduce-motion 直接关掉渐显
+            val model = remember(url, failed) {
+                val builder = ImageRequest.Builder(context).data(url)
+                if (reducedMotion) builder.crossfade(false) else builder.crossfade(MotionTokens.DurationShort)
+                builder.build()
+            }
             AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(url)
-                    .crossfade(true)
-                    .build(),
+                model = model,
                 contentDescription = contentDescription,
                 contentScale = contentScale,
                 onState = { failed = it is coil3.compose.AsyncImagePainter.State.Error },

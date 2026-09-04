@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
 import com.cycling.rssradar.ui.components.ArticleContextMenu
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
+import com.cycling.rssradar.core.ui.components.pressScale
 import com.cycling.rssradar.ui.components.ArticleMenuActions
 import com.cycling.rssradar.ui.components.articleMenuOffset
 import com.cycling.rssradar.core.ui.components.FeedIcon
@@ -313,12 +315,15 @@ private fun SearchResultRow(
     var pressPos by remember { mutableStateOf(Offset.Zero) }
     val density = LocalDensity.current
     val windowHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
+    // 按压缩放（docs/motion.md #2）：source 与 combinedClickable 共用同一实例
+    val interactionSource = remember { MutableInteractionSource() }
     Box {
         Surface(
             shape = RoundedCornerShape(12.dp),
             color = radarColors().surface1,
             modifier = Modifier
                 .fillMaxWidth()
+                .pressScale(interactionSource)
                 .onGloballyPositioned {
                     cardTopInWindowPx = it.localToWindow(Offset.Zero).y
                     cardHeightPx = it.size.height
@@ -330,6 +335,7 @@ private fun SearchResultRow(
                     }
                 }
                 .combinedClickable(
+                    interactionSource = interactionSource,
                     onClick = onClick,
                     onLongClick = {
                         menuOffset = articleMenuOffset(

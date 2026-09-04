@@ -44,6 +44,9 @@ import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
+import coil3.request.crossfade
+import com.cycling.rssradar.core.ui.theme.MotionTokens
+import com.cycling.rssradar.core.ui.theme.rememberReducedMotion
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.X
 
@@ -163,13 +166,16 @@ private fun ZoomableImage(
     // clampDecodeSize 的像素预算封顶（放大超过约 2× 后清晰度渐降，可接受）。
     val context = LocalContext.current
     val config = LocalConfiguration.current
+    val reducedMotion = rememberReducedMotion()
     val decodeWidthPx = with(LocalDensity.current) { (config.screenWidthDp * 2).dp.roundToPx() }
     val decodeHeightPx = with(LocalDensity.current) { (config.screenHeightDp * 2).dp.roundToPx() }
-    val model = remember(url, decodeWidthPx, decodeHeightPx) {
-        ImageRequest.Builder(context)
+    val model = remember(url, decodeWidthPx, decodeHeightPx, reducedMotion) {
+        val builder = ImageRequest.Builder(context)
             .data(url)
             .size(clampDecodeSize(decodeWidthPx, decodeHeightPx))
-            .build()
+        // crossfade 200ms（docs/motion.md #3）；reduce-motion 关掉渐显
+        if (reducedMotion) builder.crossfade(false) else builder.crossfade(MotionTokens.DurationShort)
+        builder.build()
     }
     Box(
         modifier = modifier

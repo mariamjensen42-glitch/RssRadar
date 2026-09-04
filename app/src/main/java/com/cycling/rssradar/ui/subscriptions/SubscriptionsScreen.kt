@@ -3,6 +3,7 @@ package com.cycling.rssradar.ui.subscriptions
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,6 +69,7 @@ import com.composables.icons.lucide.Square
 import com.composables.icons.lucide.SquareCheckBig
 import com.composables.icons.lucide.X
 import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.ui.components.pressScale
 import com.cycling.rssradar.core.ui.theme.radarColors
 
 
@@ -191,7 +193,13 @@ fun SubscriptionsScreen(
                 if (group.group in expandedIds) {
                     group.feeds.forEach { feedItem ->
                         item(key = "feed-${feedItem.feed.id}", contentType = "feed") {
-                            Box(Modifier.padding(start = 12.dp)) {
+                            // animateItem 全量（docs/motion.md #4）：订阅列表量级小，
+                            // 增删 + 位移都开（spring 默认）
+                            Box(
+                                modifier = Modifier
+                                    .padding(start = 12.dp)
+                                    .animateItem(),
+                            ) {
                                 FeedRow(
                                     item = feedItem,
                                     selectionMode = selectionMode,
@@ -396,13 +404,16 @@ private fun FeedRow(
     selectionMode: Boolean = false,
     selected: Boolean = false,
 ) {
+    // 按压缩放（docs/motion.md #2）：source 与 clickable 共用同一实例
+    val interactionSource = remember { MutableInteractionSource() }
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = radarColors().surface1,
         modifier = Modifier
             .fillMaxWidth()
+            .pressScale(interactionSource)
             // 整行点击进「订阅源文章列表」（issue #51）；管理入口仍是行尾"⋯"
-            .clickable(onClick = onClick),
+            .clickable(interactionSource = interactionSource, onClick = onClick),
     ) {
         Row(
             modifier = Modifier

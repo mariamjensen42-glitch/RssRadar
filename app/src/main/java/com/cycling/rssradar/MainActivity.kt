@@ -5,6 +5,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntOffset
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
@@ -68,7 +76,9 @@ import com.cycling.rssradar.ui.navigation.SettingsSyncRoute
 import com.cycling.rssradar.ui.navigation.SubscriptionsRoute
 import com.cycling.rssradar.ui.theme.CompositionLocalRoot
 import dagger.hilt.android.AndroidEntryPoint
+import com.cycling.rssradar.core.ui.theme.MotionTokens
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.theme.rememberReducedMotion
 
 /**
  * 纯壳 Activity：edge-to-edge + 组合根。启动副作用在 [RssRadarApp]，
@@ -110,7 +120,28 @@ private fun RssRadarAppContent() {
     }
 
     Box(modifier = Modifier.fillMaxSize().background(radarColors().bgRoot)) {
-        NavHost(navController = navController, startDestination = FeedRoute) {
+        // 页面转场（docs/motion.md #1，issue #72）：前进「新页右滑入 1/12 + fade」，
+        // 返回取镜像；280ms emphasized。层级方向感来自横轴位移。
+        // reduce-motion：None = 瞬时切换，无位移无淡入。
+        val reducedMotion = rememberReducedMotion()
+        val slideSpec = tween<IntOffset>(MotionTokens.DurationMedium, easing = MotionTokens.EasingEmphasized)
+        val fadeSpec = tween<Float>(MotionTokens.DurationMedium, easing = MotionTokens.EasingEmphasized)
+        val enter: EnterTransition = if (reducedMotion) EnterTransition.None
+        else slideInHorizontally(slideSpec) { it / 12 } + fadeIn(fadeSpec)
+        val exit: ExitTransition = if (reducedMotion) ExitTransition.None
+        else slideOutHorizontally(slideSpec) { -it / 12 } + fadeOut(fadeSpec)
+        val popEnter: EnterTransition = if (reducedMotion) EnterTransition.None
+        else slideInHorizontally(slideSpec) { -it / 12 } + fadeIn(fadeSpec)
+        val popExit: ExitTransition = if (reducedMotion) ExitTransition.None
+        else slideOutHorizontally(slideSpec) { it / 12 } + fadeOut(fadeSpec)
+        NavHost(
+            navController = navController,
+            startDestination = FeedRoute,
+            enterTransition = { enter },
+            exitTransition = { exit },
+            popEnterTransition = { popEnter },
+            popExitTransition = { popExit },
+        ) {
             composable<FeedRoute> {
                 val vm = hiltViewModel<FeedListViewModel>()
                 FeedListScreen(
