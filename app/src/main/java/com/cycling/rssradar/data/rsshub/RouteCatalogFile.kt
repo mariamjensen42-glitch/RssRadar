@@ -1,6 +1,13 @@
 package com.cycling.rssradar.data.rsshub
 
 import kotlinx.serialization.Serializable
+import com.cycling.rssradar.core.domain.rsshub.RoutePath
+import com.cycling.rssradar.core.model.rsshub.CatalogSource
+import com.cycling.rssradar.core.model.rsshub.ParamOption
+import com.cycling.rssradar.core.model.rsshub.RouteExample
+import com.cycling.rssradar.core.model.rsshub.RouteParam
+import com.cycling.rssradar.core.model.rsshub.RouteCatalog
+import com.cycling.rssradar.core.model.rsshub.RssHubRoute
 
 /**
  * 路由目录的存储格式（slim schema）。
