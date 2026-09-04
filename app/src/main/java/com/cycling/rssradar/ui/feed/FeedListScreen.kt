@@ -182,8 +182,9 @@ fun FeedListScreen(
         }
     }
 
-    // 四个 tab 统一分页快照，分组筛选仍是对已加载页的内存过滤
-    val currentList = viewModel.filterByGroup(uiState.articles)
+    // 分组筛选已下沉 DB 查询（issue #74）：ViewModel 返回的页本身就是按分组过滤后的
+    // 分页结果，不再对已加载页做内存过滤（旧做法会让首屏大量留白、hasMore 语义错乱）
+    val currentList = uiState.articles
 
     Scaffold(
         containerColor = radarColors().bgRoot,

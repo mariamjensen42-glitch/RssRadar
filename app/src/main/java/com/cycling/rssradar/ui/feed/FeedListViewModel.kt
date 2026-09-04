@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.AddFeedResult
 import com.cycling.rssradar.core.data.db.ArticleEntity
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.core.data.FeedRepository
 import com.cycling.rssradar.core.data.SubscriptionFlow
 import com.cycling.rssradar.core.data.Recommendation
@@ -35,7 +36,7 @@ enum class FeedTab { All, Unread, Starred, Bookmarked, Recommended }
  */
 data class FeedListUiState(
     val selectedTab: FeedTab = FeedTab.All,
-    /** 分组筛选：null = 全部。仅 All tab 生效。 */
+    /** 分组筛选：null = 全部。常规 tab 下沉 DB 查询（issue #74），推荐流内存过滤推荐序。 */
     val selectedGroup: String? = null,
     /**
      * 当前 tab 的分页快照列表。
@@ -145,7 +146,7 @@ class FeedListViewModel @Inject constructor(
         when (intent) {
             FeedListIntent.ConsumeMessage -> update { it.copy(uiMessage = null) }
             is FeedListIntent.SelectTab -> selectTab(intent.tab)
-            is FeedListIntent.SelectGroup -> update { it.copy(selectedGroup = intent.group) }
+            is FeedListIntent.SelectGroup -> selectGroup(intent.group)
             is FeedListIntent.ToggleStarred -> toggleStarred(intent.articleId)
             is FeedListIntent.ToggleBookmarked -> toggleBookmarked(intent.articleId)
             is FeedListIntent.SetRead -> setRead(intent.articleId, intent.read)
@@ -216,10 +217,14 @@ class FeedListViewModel @Inject constructor(
         viewModelScope.launch { loadFirstPage() }
     }
 
-    /** 按当前分组筛选后的列表（null = 全部，直接透传）。保持 fun：纯投影，非事件。 */
-    fun filterByGroup(articles: List<ArticleWithFeed>): List<ArticleWithFeed> {
-        val group = _uiState.value.selectedGroup ?: return articles
-        return articles.filter { it.feedGroup == group }
+    /**
+     * 选分组（issue #74）：筛选已下沉 DB 查询，改组必须重拉第一页——否则列表
+     * 还是上一个分组的数据（旧实现只改状态不重查，选中分组后首屏是错的）。
+     */
+    private fun selectGroup(group: String?) {
+        if (_uiState.value.selectedGroup == group) return
+        update { it.copy(selectedGroup = group) }
+        viewModelScope.launch { loadFirstPage() }
     }
 
     private fun toggleStarred(articleId: Long) {
@@ -341,15 +346,29 @@ class FeedListViewModel @Inject constructor(
             loaded == PAGE_SIZE
         }
 
-    /** 按当前 tab 取一页。 */
-    private suspend fun loadTabPage(limit: Int, offset: Int): List<ArticleWithFeed> =
-        when (_uiState.value.selectedTab) {
-            FeedTab.All -> repository.loadArticlesPage(limit, offset)
-            FeedTab.Unread -> repository.loadUnreadPage(limit, offset)
-            FeedTab.Starred -> repository.loadStarredPage(limit, offset)
-            FeedTab.Bookmarked -> repository.loadBookmarkedPage(limit, offset)
+    /**
+     * 按当前 tab 取一页。选中分组时走 DB 级分组查询（issue #74）——分页、hasMore
+     * 与「全部」共用同一套 LIMIT/OFFSET +「上一页拉满」约定；「全部」不加过滤开销。
+     */
+    private suspend fun loadTabPage(limit: Int, offset: Int): List<ArticleWithFeed> {
+        val state = _uiState.value
+        val group = state.selectedGroup
+        return when (state.selectedTab) {
+            FeedTab.All ->
+                if (group == null) repository.loadArticlesPage(limit, offset)
+                else repository.loadArticlesPageByGroup(group, limit, offset)
+            FeedTab.Unread ->
+                if (group == null) repository.loadUnreadPage(limit, offset)
+                else repository.loadUnreadPageByGroup(group, limit, offset)
+            FeedTab.Starred ->
+                if (group == null) repository.loadStarredPage(limit, offset)
+                else repository.loadStarredPageByGroup(group, limit, offset)
+            FeedTab.Bookmarked ->
+                if (group == null) repository.loadBookmarkedPage(limit, offset)
+                else repository.loadBookmarkedPageByGroup(group, limit, offset)
             FeedTab.Recommended -> loadRecommendationsPage(limit, offset)
         }
+    }
 
     /**
      * 推荐流分页（ADR-0013）：首屏现算一次排序，之后按游标切片、批量还原文章。
@@ -359,6 +378,12 @@ class FeedListViewModel @Inject constructor(
         if (offset == 0) {
             update { it.copy(isRanking = true) }
             rankedIds = recommendation.rank()
+            // 分组筛选（issue #74）：推荐序在内存里，直接过滤 id 序（默认组含空串语义）。
+            // rankedIds 过滤后 hasMore 的游标判定（rankedIds.size）自然保持正确。
+            val group = _uiState.value.selectedGroup
+            if (group != null) {
+                rankedIds = recommendation.filterByGroup(rankedIds, group, DEFAULT_GROUP)
+            }
             update { it.copy(isRanking = false) }
         }
         val slice = rankedIds.drop(offset).take(limit)

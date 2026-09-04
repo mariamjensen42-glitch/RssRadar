@@ -58,6 +58,18 @@ class Recommendation(
     }
 
     /**
+     * 按分组过滤推荐序（issue #74）：查这批 id 的所属分组，仅保留命中的。
+     * 默认组同时命中空串（历史数据 groupName = ''），与 DB 端分组筛选谓词语义一致，
+     * 规则本体在纯函数 [filterRankedIdsByGroup]（脱离 Android 环境可单测）。
+     */
+    suspend fun filterByGroup(ids: List<Long>, group: String, defaultGroup: String): List<Long> =
+        withContext(ioDispatcher) {
+            if (ids.isEmpty()) return@withContext emptyList()
+            val groupOf = database.articleDao().groupOfArticles(ids).associate { it.id to it.groupName }
+            filterRankedIdsByGroup(ids, groupOf, group, defaultGroup)
+        }
+
+    /**
      * 把有序 id 还原成文章列表（顺序以 [ids] 为准）。
      * SQL 的 `IN` 不保证顺序，这里显式按 id 序还原——否则打散白做。
      */
@@ -144,3 +156,18 @@ class Recommendation(
         )
     }
 }
+
+/**
+ * 按分组过滤推荐序（issue #74）的纯规则：默认组要同时命中空串——历史/导入数据的
+ * feeds.groupName 可能是 ''，UI 显示为默认组，只按 `== group` 比较会漏掉这些行
+ * （与 DB 端 GROUP_FILTER_PREDICATE 谓词、内存侧 ifBlank 兜底是同一语义）。
+ * 映射里查不到的 id（打分后文章可能已被删）直接丢弃。
+ * 抽成纯函数以便脱离 Android 环境单测。
+ */
+internal fun filterRankedIdsByGroup(
+    ids: List<Long>,
+    groupOf: Map<Long, String>,
+    group: String,
+    defaultGroup: String,
+): List<Long> =
+    ids.filter { id -> groupOf[id]?.ifBlank { defaultGroup } == group }

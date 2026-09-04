@@ -168,6 +168,22 @@ private const val ARTICLE_LIST_COLUMNS =
         "articles.mediaKind"
 
 /**
+ * 分组筛选（issue #74）的 WHERE 片段：选中分组时按 feeds.groupName 过滤。
+ * 关键语义：**默认组要同时命中空串**——历史/导入数据的 feeds.groupName 可能是 ''，
+ * UI 上显示为 [DEFAULT_GROUP]，只写 `groupName = :group` 会漏掉这些行
+ * （与内存侧 `groupName.ifBlank { DEFAULT_GROUP }` 兜底是同一语义，见 SubscriptionsViewModel）。
+ *
+ * 绑定参数：group = 所选分组名；isDefaultGroup = (group == DEFAULT_GROUP)，
+ * 由仓库层判定后传入，DAO 不依赖常量字符串比较。
+ *
+ * 性能：JOIN 仍是逐文章行按 feeds 主键探测、在探测行上追加这个过滤条件，
+ * ORDER BY 不变（publishedAt DESC, fetchedAt DESC），照走 index_articles_publishedAt_fetchedAt，
+ * 不会退化成全表外排序——排序表达式零新增。
+ */
+private const val GROUP_FILTER_PREDICATE =
+    "(feeds.groupName = :group OR (:isDefaultGroup = 1 AND feeds.groupName = ''))"
+
+/**
  * 推荐画像的输入行（ADR-0013）：所有"用户真实表达过兴趣"的文章。
  * 打开过（lastOpenedAt 非空）、收藏、稍后读都算——三选一即可入样本，
  * 没有这些信号的文章不参与画像（画像只由真实行为驱动，不预置兴趣类别）。
@@ -204,6 +220,12 @@ data class ArticleIdLink(
 data class ArticleFeedLink(
     val feedId: Long,
     val link: String,
+)
+
+/** 文章 id 与所属分组名的轻量对（推荐流按分组过滤推荐序用，issue #74）。 */
+data class ArticleIdGroup(
+    val id: Long,
+    val groupName: String,
 )
 
 /**
@@ -364,6 +386,96 @@ interface ArticleDao {
     )
     @Suppress("QUERY_MISMATCH")
     suspend fun loadBookmarkedWithFeedPaged(limit: Int, offset: Int): List<ArticleWithFeed>
+
+    // —— 分组筛选变体（issue #74）：选中分组时 DB 级过滤分页，四个常规 tab 各一条 ——
+    // 筛选语义（默认组同时命中空串）与排序约定统一收口在 GROUP_FILTER_PREDICATE 注释里；
+    // isDefaultGroup 由仓库层按 group == DEFAULT_GROUP 传入，DAO 不做字符串比较。
+
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE $GROUP_FILTER_PREDICATE
+        ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun loadAllWithFeedPagedByGroup(
+        group: String,
+        isDefaultGroup: Boolean,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed>
+
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.isRead = 0 AND $GROUP_FILTER_PREDICATE
+        ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun loadUnreadWithFeedPagedByGroup(
+        group: String,
+        isDefaultGroup: Boolean,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed>
+
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.isStarred = 1 AND $GROUP_FILTER_PREDICATE
+        ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun loadStarredWithFeedPagedByGroup(
+        group: String,
+        isDefaultGroup: Boolean,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed>
+
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.isBookmarked = 1 AND $GROUP_FILTER_PREDICATE
+        ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun loadBookmarkedWithFeedPagedByGroup(
+        group: String,
+        isDefaultGroup: Boolean,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed>
+
+    /**
+     * 文章 id → 所属分组名（issue #74）：推荐流的推荐序在内存里，按分组过滤时
+     * 只需要每个 id 的 groupName，两列轻量查询，不物化文章行。
+     */
+    @Query(
+        """
+        SELECT articles.id AS id, feeds.groupName AS groupName
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.id IN (:ids)
+        """,
+    )
+    suspend fun groupOfArticles(ids: List<Long>): List<ArticleIdGroup>
 
     /** 订阅源文章列表（CONTEXT.md「Feed article list」）：单源全部文章，新→旧，分页。 */
     @Query(
