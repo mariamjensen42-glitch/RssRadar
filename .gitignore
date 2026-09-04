@@ -23,3 +23,4 @@ prototype/__pycache__/
 
 # 模块构建产物
 **/build/
+prototype/.compose-symbols.txt
