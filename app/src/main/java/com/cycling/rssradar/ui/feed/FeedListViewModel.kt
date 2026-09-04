@@ -9,7 +9,7 @@ import com.cycling.rssradar.data.FeedRepository
 import com.cycling.rssradar.data.Recommendation
 import com.cycling.rssradar.data.ai.AiRepository
 import com.cycling.rssradar.data.store.GroupStore
-import com.cycling.rssradar.data.store.MarkAsReadCondition
+import com.cycling.rssradar.core.model.MarkAsReadCondition
 import com.cycling.rssradar.data.store.RecommendationStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
