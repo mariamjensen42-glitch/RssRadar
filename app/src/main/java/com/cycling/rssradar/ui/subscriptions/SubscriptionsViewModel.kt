@@ -11,9 +11,9 @@ import com.cycling.rssradar.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.data.db.FeedEntity
 import com.cycling.rssradar.data.ClearArticlesResult
 import com.cycling.rssradar.data.FeedRepository
-import com.cycling.rssradar.data.db.GROUP_DESIGN
-import com.cycling.rssradar.data.db.GROUP_DEV
-import com.cycling.rssradar.data.db.GROUP_TECH
+import com.cycling.rssradar.core.model.GROUP_DESIGN
+import com.cycling.rssradar.core.model.GROUP_DEV
+import com.cycling.rssradar.core.model.GROUP_TECH
 import com.cycling.rssradar.data.store.GroupStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel

@@ -71,7 +71,7 @@ import coil3.compose.AsyncImage
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.store.ListDescMode
 import com.cycling.rssradar.data.store.ListDisplayState
-import com.cycling.rssradar.data.store.MarkAsReadCondition
+import com.cycling.rssradar.core.model.MarkAsReadCondition
 import com.cycling.rssradar.ui.theme.LocalListDisplay
 import com.cycling.rssradar.ui.components.ArticleContextMenu
 import com.cycling.rssradar.ui.components.AppSnackbarHost

@@ -1,5 +1,6 @@
 package com.cycling.rssradar.data.rsshub
 
+import com.cycling.rssradar.core.domain.rsshub.RoutePath
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json

@@ -8,7 +8,7 @@ import com.cycling.rssradar.data.db.ArticleIdLink
 import com.cycling.rssradar.data.db.FeedDao
 import com.cycling.rssradar.data.db.FeedEntity
 import com.cycling.rssradar.data.parser.RssParser
-import com.cycling.rssradar.data.rss.HttpFetcher
+import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

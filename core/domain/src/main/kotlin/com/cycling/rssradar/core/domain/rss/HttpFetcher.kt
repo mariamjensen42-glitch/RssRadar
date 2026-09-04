@@ -1,0 +1,91 @@
+package com.cycling.rssradar.core.domain.rss
+
+import java.io.IOException
+import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
+import java.net.URL
+
+/**
+ * HTTP 抓取缝：刷新/订阅链路取 feed XML 的唯一入口。
+ * 测试塞 fake adapter（本地流或固定响应），刷新链路即可离线复现；
+ * 生产装配 [HttpUrlFetcher]。
+ */
+fun interface HttpFetcher {
+
+    /** 返回响应体流；非 2xx 抛 [HttpStatusException]（带状态码），网络失败抛 [IOException]。 */
+    @Throws(IOException::class)
+    fun fetch(url: String): InputStream
+}
+
+/**
+ * 非 2xx 响应。继承 [IOException] 是为了不改动既有调用方（刷新链路一律按失败处理，
+ * 本来就该 catch IOException）；需要区分状态码的地方（加订阅预览）再单独 catch。
+ */
+class HttpStatusException(val code: Int) : IOException("HTTP $code")
+
+/**
+ * 超时，并带出卡在哪个阶段。
+ *
+ * HttpURLConnection 对「连接超时」和「读取超时」抛的是**同一个** `SocketTimeoutException`，
+ * 只在 message 文本里区分，靠字符串判断太脆。这里把 `connect()` 与 `responseCode` 拆成
+ * 两段、用标志位记录进度，把阶段用类型带出去。
+ *
+ * 值得这么麻烦是因为两者的处置完全相反：卡在握手是真连不上（换实例/查网络），
+ * 卡在等响应是对端慢（RSSHub 冷路由要现抓上游站点，等一等就出来了）。
+ * 混成一句「连不上这个地址」会让用户去换实例——而换实例解决不了慢。
+ */
+class HttpTimeoutException(val phase: Phase) : IOException("timeout at $phase") {
+
+    enum class Phase { CONNECT, READ }
+
+    /** true = 卡在 TCP/TLS 握手（真连不上）；false = 卡在等响应（对端慢）。 */
+    val isConnectPhase: Boolean get() = phase == Phase.CONNECT
+}
+
+/** 默认 adapter：HttpURLConnection + 超时 + UA，行为与原 FeedRepository.fetch 一致。 */
+class HttpUrlFetcher(
+    private val connectTimeoutMs: Int = DEFAULT_CONNECT_TIMEOUT_MS,
+    private val readTimeoutMs: Int = DEFAULT_READ_TIMEOUT_MS,
+    private val userAgent: String = USER_AGENT,
+) : HttpFetcher {
+
+    override fun fetch(url: String): InputStream {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        connection.connectTimeout = connectTimeoutMs
+        connection.readTimeout = readTimeoutMs
+        connection.instanceFollowRedirects = true
+        connection.setRequestProperty("User-Agent", userAgent)
+        var connected = false
+        val code = try {
+            // 分两段：先握手（connectTimeout 生效），再等响应头（readTimeout 生效）。
+            // 合在一起就只能拿到一个分不清阶段的 SocketTimeoutException。
+            connection.connect()
+            connected = true
+            connection.responseCode
+        } catch (e: SocketTimeoutException) {
+            connection.disconnect()
+            throw HttpTimeoutException(
+                if (connected) HttpTimeoutException.Phase.READ else HttpTimeoutException.Phase.CONNECT,
+            )
+        }
+        if (code !in 200..299) {
+            connection.disconnect()
+            throw HttpStatusException(code)
+        }
+        return connection.inputStream
+    }
+
+    companion object {
+        const val DEFAULT_CONNECT_TIMEOUT_MS = 10_000
+
+        /**
+         * 20s 而不是 15s：RSSHub 公共实例抓一条**缓存未命中**的路由要现抓上游站点，
+         * 15s 实测经常被掐断（`docs/rsshub-instances.md`：同一条路由「读超时 → 1.0s 正常」）。
+         * 掐断的后果不是慢，是订阅直接失败——所以宁可多等 5s。
+         */
+        const val DEFAULT_READ_TIMEOUT_MS = 20_000
+
+        const val USER_AGENT = "Mozilla/5.0 (Android) RssRadar/1.0"
+    }
+}

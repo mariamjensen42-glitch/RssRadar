@@ -1,7 +1,9 @@
 package com.cycling.rssradar.data.rsshub
 
 import android.content.Context
-import com.cycling.rssradar.data.rss.HttpFetcher
+import com.cycling.rssradar.core.domain.rss.HttpFetcher
+import com.cycling.rssradar.core.model.rsshub.CatalogSource
+import com.cycling.rssradar.core.model.rsshub.RouteCatalog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow

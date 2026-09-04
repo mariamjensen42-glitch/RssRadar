@@ -42,8 +42,8 @@ import com.cycling.rssradar.data.db.MIGRATION_11_12
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.parser.RssParser
 import com.cycling.rssradar.data.rss.BestIconFinder
-import com.cycling.rssradar.data.rss.HttpFetcher
-import com.cycling.rssradar.data.rss.HttpUrlFetcher
+import com.cycling.rssradar.core.domain.rss.HttpFetcher
+import com.cycling.rssradar.core.domain.rss.HttpUrlFetcher
 import com.cycling.rssradar.data.store.ThemeStore
 import com.cycling.rssradar.sync.AutoSync
 import dagger.Module

@@ -44,7 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.data.rsshub.CatalogSource
+import com.cycling.rssradar.core.model.rsshub.CatalogSource
 import com.cycling.rssradar.data.rsshub.RouteCatalogStore
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.store.AiStore

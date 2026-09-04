@@ -1,5 +1,9 @@
 package com.cycling.rssradar.data
 
+import com.cycling.rssradar.core.domain.recommendation.EngagementSample
+import com.cycling.rssradar.core.domain.recommendation.InterestProfile
+import com.cycling.rssradar.core.domain.recommendation.RecommendationCandidate
+import com.cycling.rssradar.core.domain.recommendation.RecommendationScoring
 import com.cycling.rssradar.data.db.AppDatabase
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.db.EngagementRow

@@ -56,11 +56,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.data.rsshub.CatalogSource
-import com.cycling.rssradar.data.rsshub.RouteCategory
-import com.cycling.rssradar.data.rsshub.RouteExample
-import com.cycling.rssradar.data.rsshub.RouteParam
-import com.cycling.rssradar.data.rsshub.RssHubRoute
+import com.cycling.rssradar.core.model.rsshub.CatalogSource
+import com.cycling.rssradar.core.model.rsshub.RouteCategory
+import com.cycling.rssradar.core.model.rsshub.RouteExample
+import com.cycling.rssradar.core.model.rsshub.RouteParam
+import com.cycling.rssradar.core.model.rsshub.RssHubRoute
 import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.theme.Accent

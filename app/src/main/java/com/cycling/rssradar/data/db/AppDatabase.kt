@@ -19,9 +19,6 @@ import kotlinx.coroutines.flow.Flow
 
 /** 默认分组名。 */
 const val DEFAULT_GROUP = "默认"
-const val GROUP_TECH = "科技"
-const val GROUP_DEV = "开发"
-const val GROUP_DESIGN = "设计"
 
 @Entity(
     tableName = "feeds",

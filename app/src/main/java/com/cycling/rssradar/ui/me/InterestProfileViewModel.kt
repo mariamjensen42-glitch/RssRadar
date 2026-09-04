@@ -3,7 +3,7 @@ package com.cycling.rssradar.ui.me
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.data.FeedRepository
-import com.cycling.rssradar.data.ProfileTerm
+import com.cycling.rssradar.core.domain.recommendation.ProfileTerm
 import com.cycling.rssradar.data.Recommendation
 import com.cycling.rssradar.data.db.FeedEntity
 import dagger.hilt.android.lifecycle.HiltViewModel

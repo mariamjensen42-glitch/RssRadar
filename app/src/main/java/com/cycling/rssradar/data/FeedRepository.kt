@@ -17,13 +17,13 @@ import com.cycling.rssradar.data.db.FeedEntity
 import com.cycling.rssradar.data.opml.OpmlEntry
 import com.cycling.rssradar.data.opml.OpmlParser
 import com.cycling.rssradar.data.opml.OpmlWriter
-import com.cycling.rssradar.data.parser.FeedProbeResult
+import com.cycling.rssradar.core.domain.rss.FeedProbeResult
 import com.cycling.rssradar.data.parser.RssParser
 import com.cycling.rssradar.data.rss.FeedDiscovery
-import com.cycling.rssradar.data.rss.HttpFetcher
-import com.cycling.rssradar.data.rss.retryOnSlowResponse
+import com.cycling.rssradar.core.domain.rss.HttpFetcher
+import com.cycling.rssradar.core.domain.rss.retryOnSlowResponse
 import com.cycling.rssradar.data.store.KeepArchived
-import com.cycling.rssradar.data.store.MarkAsReadCondition
+import com.cycling.rssradar.core.model.MarkAsReadCondition
 
 /** 订阅结果，供 UI 层区分提示文案。 */
 sealed interface AddFeedResult {
