@@ -46,7 +46,7 @@ import com.cycling.rssradar.ui.search.SearchScreen
 import com.cycling.rssradar.ui.search.SearchViewModel
 import com.cycling.rssradar.ui.subscriptions.SubscriptionsScreen
 import com.cycling.rssradar.ui.subscriptions.SubscriptionsViewModel
-import com.cycling.rssradar.ui.components.FloatingBottomBar
+import com.cycling.rssradar.core.ui.components.FloatingBottomBar
 import com.cycling.rssradar.ui.components.openUrl
 import com.cycling.rssradar.ui.navigation.ArticleDetailRoute
 import com.cycling.rssradar.ui.navigation.CrashLogRoute

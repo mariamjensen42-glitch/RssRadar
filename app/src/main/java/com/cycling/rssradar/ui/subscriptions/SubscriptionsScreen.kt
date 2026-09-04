@@ -48,8 +48,8 @@ import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.components.FeedIcon
-import com.cycling.rssradar.ui.components.FloatingTabBarFabOffset
-import com.cycling.rssradar.ui.components.tabBarBottomClearance
+import com.cycling.rssradar.core.ui.components.FloatingTabBarFabOffset
+import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.composables.icons.lucide.ArrowDownUp
 import com.composables.icons.lucide.BookMarked
 import com.composables.icons.lucide.CheckCheck

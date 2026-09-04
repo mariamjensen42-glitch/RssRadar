@@ -1,4 +1,4 @@
-package com.cycling.rssradar.ui.components
+package com.cycling.rssradar.core.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background

@@ -52,7 +52,7 @@ import com.cycling.rssradar.core.data.store.SyncStore
 import com.cycling.rssradar.core.data.store.ThemeMode
 import com.cycling.rssradar.core.data.store.ThemeStore
 import com.cycling.rssradar.sync.SyncScheduler
-import com.cycling.rssradar.ui.components.tabBarBottomClearance
+import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.composables.icons.lucide.Bot
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide

@@ -60,7 +60,7 @@ import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.ArticleMenuActions
 import com.cycling.rssradar.ui.components.articleMenuOffset
 import com.cycling.rssradar.core.ui.components.FeedIcon
-import com.cycling.rssradar.ui.components.tabBarBottomClearance
+import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.X

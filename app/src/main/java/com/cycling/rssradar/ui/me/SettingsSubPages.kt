@@ -51,7 +51,7 @@ import com.cycling.rssradar.core.data.store.LinkOpenMode
 import com.cycling.rssradar.core.data.store.ShareContentFormat
 import com.cycling.rssradar.core.data.store.SyncInterval
 import com.cycling.rssradar.core.data.store.ThemeMode
-import com.cycling.rssradar.ui.components.OptionPickerSheet
+import com.cycling.rssradar.core.ui.components.OptionPickerSheet
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide
