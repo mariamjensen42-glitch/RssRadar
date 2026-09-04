@@ -7,6 +7,31 @@ import java.net.SocketTimeoutException
 import java.net.URL
 
 /**
+ * 全应用统一的 UA 常量：feed 抓取、图标抓取、实例探活共用一条缝的同一份配置。
+ * 此前三处各写一份字面量，改 UA / 加代理要改三个文件——locality 事故。
+ */
+const val RSSRADAR_USER_AGENT = "Mozilla/5.0 (Android) RssRadar/1.0"
+
+/**
+ * URL 规范化（订阅链路与图标抓取共用）：补 https 前缀、解析合法性校验。
+ * 两处各写一份同样的私有函数，一处修 bug 另一处必然漏——沉到缝的这一侧。
+ */
+fun normalizeHttpUrl(raw: String): String? {
+    val trimmed = raw.trim()
+    if (trimmed.isEmpty()) return null
+    val withScheme = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        trimmed
+    } else {
+        "https://$trimmed"
+    }
+    return try {
+        URL(withScheme).toString().takeIf { it.startsWith("http") }
+    } catch (_: Exception) {
+        null
+    }
+}
+
+/**
  * HTTP 抓取缝：刷新/订阅链路取 feed XML 的唯一入口。
  * 测试塞 fake adapter（本地流或固定响应），刷新链路即可离线复现；
  * 生产装配 [HttpUrlFetcher]。
@@ -47,7 +72,7 @@ class HttpTimeoutException(val phase: Phase) : IOException("timeout at $phase") 
 class HttpUrlFetcher(
     private val connectTimeoutMs: Int = DEFAULT_CONNECT_TIMEOUT_MS,
     private val readTimeoutMs: Int = DEFAULT_READ_TIMEOUT_MS,
-    private val userAgent: String = USER_AGENT,
+    private val userAgent: String = RSSRADAR_USER_AGENT,
 ) : HttpFetcher {
 
     override fun fetch(url: String): InputStream {
@@ -86,6 +111,7 @@ class HttpUrlFetcher(
          */
         const val DEFAULT_READ_TIMEOUT_MS = 20_000
 
-        const val USER_AGENT = "Mozilla/5.0 (Android) RssRadar/1.0"
+        /** 兼容旧引用；真身是顶层 [RSSRADAR_USER_AGENT]。 */
+        const val USER_AGENT = RSSRADAR_USER_AGENT
     }
 }

@@ -57,6 +57,45 @@ class PagedSnapshotTest {
     }
 }
 
+/** 滚动自动标记已读（#11）的槽位规则：槽位表与列表结构（含日期头占位）严格同构。 */
+class ScrollSlotsTest {
+
+    private fun article(id: Long, read: Boolean = false) = ArticleWithFeed(
+        article = ArticleEntity(id = id, feedId = 1, link = "l$id", title = "t$id", summary = null, publishedAt = null, fetchedAt = 0, isRead = read),
+        feedTitle = "f", feedGroup = "g", feedIconUrl = null,
+    )
+
+    @Test
+    fun `不开粘性头时槽位就是文章 id 列表`() {
+        val slots = scrollSlots(listOf(article(1), article(2)), stickyDateHeader = false)
+        assertEquals(listOf(1L, 2L), slots)
+    }
+
+    @Test
+    fun `开粘性头时每组先占一个 null 槽位——错位即标错文章`() {
+        val groups = listOf(
+            DayGroup(1, "D1", listOf(article(1), article(2))),
+            DayGroup(2, "D2", listOf(article(3))),
+        )
+        val slots = scrollSlots(emptyList(), stickyDateHeader = true, groups = groups)
+        assertEquals(listOf<Long?>(null, 1L, 2L, null, 3L), slots)
+    }
+
+    @Test
+    fun `passedUnreadIds 只取首屏之前且仍未读的 id`() {
+        val slots = listOf<Long?>(null, 1L, 2L, null, 3L)
+        val unread = setOf(2L, 3L, 4L)
+        val passed = passedUnreadIds(slots, firstVisibleIndex = 3, unreadIds = unread)
+        assertEquals(listOf(2L), passed)
+    }
+
+    @Test
+    fun `firstVisibleIndex 越界按槽位表长度截断`() {
+        val passed = passedUnreadIds(listOf(1L, 2L), firstVisibleIndex = 99, unreadIds = setOf(1L, 2L))
+        assertEquals(listOf(1L, 2L), passed)
+    }
+}
+
 /** 粘性日期头分组规则（issue #56）：无日期沉底、自然日分组、标签经缝注入。 */
 class DayGroupsTest {
 

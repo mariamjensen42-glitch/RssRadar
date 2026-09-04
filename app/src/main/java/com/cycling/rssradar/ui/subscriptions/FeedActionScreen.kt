@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.data.db.DEFAULT_GROUP
+import com.cycling.rssradar.data.db.FeedEntity
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.Danger
 import com.cycling.rssradar.ui.theme.OnAccent
@@ -154,6 +155,38 @@ fun FeedActionScreen(
                         viewModel.onIntent(SubscriptionsIntent.SetNotificationsEnabled(f.id, v))
                     },
                 )
+                Spacer(Modifier.height(12.dp))
+                // 内容类型（ADR-0014）：决定列表浏览形态（图片画廊/视频音频卡），订阅时已按信号预判
+                Text(
+                    text = "内容类型",
+                    color = TextTertiary,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        FeedEntity.CONTENT_TYPE_ARTICLE to "文章",
+                        FeedEntity.CONTENT_TYPE_IMAGE to "图片",
+                        FeedEntity.CONTENT_TYPE_VIDEO to "视频",
+                        FeedEntity.CONTENT_TYPE_AUDIO to "音频",
+                    ).forEach { (type, label) ->
+                        val selected = f.contentType == type
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = if (selected) Accent else Surface2,
+                            modifier = Modifier.clickable {
+                                viewModel.onIntent(SubscriptionsIntent.SetContentType(f.id, type))
+                            },
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (selected) OnAccent else TextPrimary,
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            )
+                        }
+                    }
+                }
                 Spacer(Modifier.height(16.dp))
                 Surface(
                     shape = RoundedCornerShape(12.dp),

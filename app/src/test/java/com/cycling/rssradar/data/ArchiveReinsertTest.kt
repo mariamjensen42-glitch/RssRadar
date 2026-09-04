@@ -111,6 +111,12 @@ class ArchiveReinsertTest {
                 doomed.size
             }
             // 复刻 ArticleDao.deleteByFeed 的 SQL 语义
+            // 复刻 ArticleDao.countProtectedByFeed 的 SQL 语义：与 deleteByFeed 的
+            // 豁免 WHERE 一一对应——kept/deleted 口径一致性由这里锁死。
+            "countProtectedByFeed" -> {
+                val fId = args[0] as Long
+                mem.articles.values.count { it.feedId == fId && (it.isStarred || it.isBookmarked) }
+            }
             "deleteByFeed" -> {
                 val fId = args[0] as Long
                 val doomed = mem.articles.values.filter {
@@ -216,9 +222,12 @@ class ArchiveReinsertTest {
         seed(mem, newLink, now - 2 * 3_600_000L)
         seed(mem, starredLink, now - 5 * day, starred = true)
 
-        // 1) 清空（issue #8）：收藏豁免
-        val deleted = ArticleCleaner(articleDao(mem)).clearFeed(feedId, now)
-        assertTrue("清空应删掉 2 篇, 实际=$deleted", deleted == 2)
+        // 1) 清空（issue #8）：收藏豁免。kept 与 deleted 的豁免口径同在本类，直接断言一致性。
+        val result = ArticleCleaner(articleDao(mem)).clearFeed(feedId, now)
+        assertTrue(
+            "清空应删 2 篇、豁免 1 篇, 实际 deleted=${result.deleted} kept=${result.kept}",
+            result.deleted == 2 && result.kept == 1,
+        )
         assertTrue("收藏豁免", mem.articles.values.any { it.link == starredLink })
 
         // 2) 刷新

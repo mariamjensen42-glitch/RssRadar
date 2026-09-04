@@ -6,6 +6,7 @@ import com.cycling.rssradar.data.AddFeedResult
 import com.cycling.rssradar.data.db.ArticleEntity
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.data.SubscriptionFlow
 import com.cycling.rssradar.data.Recommendation
 import com.cycling.rssradar.data.ai.AiRepository
 import com.cycling.rssradar.data.store.GroupStore
@@ -93,6 +94,7 @@ sealed interface FeedListIntent {
 @HiltViewModel
 class FeedListViewModel @Inject constructor(
     private val repository: FeedRepository,
+    private val subscriptionFlow: SubscriptionFlow,
     groupStore: GroupStore,
     private val aiRepository: AiRepository,
     /** 推荐流（ADR-0013）：候选池 + 打分 + 负反馈。 */
@@ -391,7 +393,7 @@ class FeedListViewModel @Inject constructor(
         if (_uiState.value.isAddingFeed) return
         viewModelScope.launch {
             update { it.copy(isAddingFeed = true) }
-            val message = when (repository.addFeed(rawUrl, groupName)) {
+            val message = when (subscriptionFlow.addFeed(rawUrl, groupName)) {
                 AddFeedResult.Success -> "订阅成功"
                 AddFeedResult.Duplicate -> "该源已订阅"
                 AddFeedResult.InvalidFeed -> "不是有效的 RSS/Atom 源"

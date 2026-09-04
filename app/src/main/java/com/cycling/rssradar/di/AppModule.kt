@@ -12,6 +12,7 @@ import com.cycling.rssradar.data.parser.ContentFetcher
 import com.cycling.rssradar.data.parser.FetchConfig
 import com.cycling.rssradar.data.parser.FetchLogger
 import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.data.SubscriptionFlow
 import com.cycling.rssradar.data.OnDemandFetch
 import com.cycling.rssradar.data.Recommendation
 import com.cycling.rssradar.data.RefreshEngine
@@ -39,6 +40,7 @@ import com.cycling.rssradar.data.db.MIGRATION_8_9
 import com.cycling.rssradar.data.db.MIGRATION_9_10
 import com.cycling.rssradar.data.db.MIGRATION_10_11
 import com.cycling.rssradar.data.db.MIGRATION_11_12
+import com.cycling.rssradar.data.db.MIGRATION_12_13
 import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.data.parser.RssParser
 import com.cycling.rssradar.data.rss.BestIconFinder
@@ -74,7 +76,7 @@ object AppModule {
             .addMigrations(
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                 MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-                MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
+                MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
             )
             .build()
 
@@ -147,8 +149,16 @@ object AppModule {
     fun provideFeedRepository(
         db: AppDatabase,
         engine: RefreshEngine,
+    ): FeedRepository = FeedRepository(db, engine)
+
+    /** 订阅链路（发现/预览/落库/OPML）：AddSubscription、FeedList、Subscriptions 三个 VM 直连。 */
+    @Provides
+    @Singleton
+    fun provideSubscriptionFlow(
+        db: AppDatabase,
+        engine: RefreshEngine,
         http: HttpFetcher,
-    ): FeedRepository = FeedRepository(db, engine, http = http)
+    ): SubscriptionFlow = SubscriptionFlow(db, engine, http = http)
 
     /**
      * 按需抓取（ADR-0001 + ADR-0012）：抓取正文与写抓取日志是一个模块的两半，

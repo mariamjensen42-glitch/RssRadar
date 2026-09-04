@@ -47,10 +47,21 @@ data class FeedEntity(
      * 默认开（与全局通知开关默认关不冲突：全局关时一条都不发）。
      */
     @ColumnInfo(defaultValue = "1") val notificationsEnabled: Boolean = true,
+    /**
+     * 内容类型（ADR-0014）：feed 级主导的分类，决定列表用什么形态浏览。
+     * 0=文章（含社媒源，默认）、1=图片（画廊）、2=视频、3=音频。
+     * 订阅时按信号预判，用户在订阅操作页可改。
+     */
+    @ColumnInfo(defaultValue = "0") val contentType: Int = CONTENT_TYPE_ARTICLE,
 ) {
     companion object {
         const val SOURCE_TYPE_RSS = 0
         const val SOURCE_TYPE_RSSHUB = 1
+
+        const val CONTENT_TYPE_ARTICLE = 0
+        const val CONTENT_TYPE_IMAGE = 1
+        const val CONTENT_TYPE_VIDEO = 2
+        const val CONTENT_TYPE_AUDIO = 3
     }
 }
 
@@ -113,11 +124,20 @@ data class ArticleEntity(
      * 源亲和度的时间衰减也就无从算起。null = 从未打开过。
      */
     val lastOpenedAt: Long? = null,
+    /**
+     * 条目级媒体种类（ADR-0014）：enclosure 是 video/audio 时覆盖 feed 的内容类型——
+     * 图文源里偶尔夹一条播客或视频，feed 级分类解释不了它。null/0=跟随 feed。
+     */
+    @ColumnInfo(defaultValue = "0") val mediaKind: Int = MEDIA_KIND_NONE,
 ) {
     companion object {
         const val CONTENT_SOURCE_NONE = 0
         const val CONTENT_SOURCE_FEED = 1
         const val CONTENT_SOURCE_WEB = 2
+
+        const val MEDIA_KIND_NONE = 0
+        const val MEDIA_KIND_VIDEO = 1
+        const val MEDIA_KIND_AUDIO = 2
     }
 }
 
@@ -144,7 +164,8 @@ private const val ARTICLE_LIST_COLUMNS =
     "articles.id, articles.feedId, articles.link, articles.title, articles.summary, " +
         "articles.publishedAt, articles.fetchedAt, articles.author, articles.contentSource, " +
         "articles.isRead, articles.isStarred, articles.isBookmarked, articles.readingMinutes, " +
-        "articles.coverUrl, articles.aiSummary, articles.contentIncomplete, articles.lastOpenedAt"
+        "articles.coverUrl, articles.aiSummary, articles.contentIncomplete, articles.lastOpenedAt, " +
+        "articles.mediaKind"
 
 /**
  * 推荐画像的输入行（ADR-0013）：所有"用户真实表达过兴趣"的文章。
@@ -254,6 +275,10 @@ interface FeedDao {
     /** 自动同步开关（issue #58）：屏蔽后不参与自动同步，手动刷新照常。 */
     @Query("UPDATE feeds SET syncEnabled = :enabled WHERE id = :feedId")
     suspend fun updateSyncEnabled(feedId: Long, enabled: Boolean)
+
+    /** 内容类型（ADR-0014）：只影响列表浏览形态，不影响数据。 */
+    @Query("UPDATE feeds SET contentType = :contentType WHERE id = :feedId")
+    suspend fun updateContentType(feedId: Long, contentType: Int)
 
     /** Feed 级预设：全文抓取开关（issue #9）。 */
     @Query("UPDATE feeds SET fullContentEnabled = :enabled WHERE id = :feedId")
@@ -483,7 +508,8 @@ interface ArticleDao {
         UPDATE articles SET
             title = :title, summary = :summary, content = :content, contentText = :contentText,
             author = :author, publishedAt = :publishedAt, coverUrl = :coverUrl,
-            readingMinutes = :readingMinutes, contentSource = :contentSource, fetchedAt = :fetchedAt
+            readingMinutes = :readingMinutes, contentSource = :contentSource, fetchedAt = :fetchedAt,
+            mediaKind = :mediaKind
         WHERE id = :id
         """,
     )
@@ -499,6 +525,7 @@ interface ArticleDao {
         readingMinutes: Int?,
         contentSource: Int,
         fetchedAt: Long,
+        mediaKind: Int,
     )
 
     /**
@@ -830,6 +857,41 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
     }
 }
 
+/**
+ * v12 → v13（ADR-0014 内容分类）：feeds.contentType + articles.mediaKind。
+ * 都是带默认值的 int 新列，存量行用默认值（文章类/跟随 feed），无需重写。
+ *
+ * contentType 对存量 feed 做一次 SQL 回填：类型预判原本只在订阅时跑，老源
+ * 会永远停留在「文章」，图片源永远变不成画廊。回填只认高置信域名/路由信号
+ * （与 FeedContentTypeGuesser 同一套关键词），猜不出保持文章类；用户之后仍可在
+ * 订阅操作页改。
+ */
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE feeds ADD COLUMN contentType INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE articles ADD COLUMN mediaKind INTEGER NOT NULL DEFAULT 0")
+        // 图片
+        db.execSQL(
+            "UPDATE feeds SET contentType = 1 WHERE contentType = 0 AND (" +
+                "url LIKE '%pixiv.net%' OR url LIKE '%rsshub%/pixiv%' OR " +
+                "url LIKE '%instagram.com%')",
+        )
+        // 视频
+        db.execSQL(
+            "UPDATE feeds SET contentType = 2 WHERE contentType = 0 AND (" +
+                "url LIKE '%bilibili.com%' OR url LIKE '%rsshub%/bilibili%' OR " +
+                "url LIKE '%youtube.com%' OR url LIKE '%/youtube/%' OR " +
+                "url LIKE '%douyin.com%')",
+        )
+        // 音频
+        db.execSQL(
+            "UPDATE feeds SET contentType = 3 WHERE contentType = 0 AND (" +
+                "url LIKE '%xiaoyuzhoufm.com%' OR " +
+                "url LIKE '%podcast%')",
+        )
+    }
+}
+
 @Database(
     entities = [
         FeedEntity::class,
@@ -838,7 +900,7 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
         ArchivedArticleTombstoneEntity::class,
         RecommendationFeedbackEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

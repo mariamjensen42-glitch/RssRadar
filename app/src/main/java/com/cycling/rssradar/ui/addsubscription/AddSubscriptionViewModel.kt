@@ -9,7 +9,7 @@ import com.cycling.rssradar.data.AddFeedResult
 import com.cycling.rssradar.data.DiscoveredFeed
 import com.cycling.rssradar.data.db.FeedEntity
 import com.cycling.rssradar.core.domain.rss.FeedProbeResult
-import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.data.SubscriptionFlow
 import com.cycling.rssradar.core.model.GROUP_DESIGN
 import com.cycling.rssradar.core.model.GROUP_DEV
 import com.cycling.rssradar.core.model.GROUP_TECH
@@ -118,7 +118,7 @@ sealed interface AddSubscriptionIntent {
 
 @HiltViewModel
 class AddSubscriptionViewModel @Inject constructor(
-    private val repository: FeedRepository,
+    private val subscriptionFlow: SubscriptionFlow,
     private val instanceStore: RssHubInstanceStore,
     private val catalogStore: RouteCatalogStore,
 ) : ViewModel(), MviViewModel<AddSubscriptionIntent> {
@@ -344,7 +344,7 @@ class AddSubscriptionViewModel @Inject constructor(
                 return@launch
             }
             val probe = runCatching {
-                withTimeoutOrNull(PROBE_TIMEOUT_MS) { repository.probeFeed(raw) }
+                withTimeoutOrNull(PROBE_TIMEOUT_MS) { subscriptionFlow.probeFeed(raw) }
             }.getOrNull()
             if (probe is FeedProbeResult.Valid) {
                 _state.value = _state.value.copy(
@@ -357,7 +357,7 @@ class AddSubscriptionViewModel @Inject constructor(
             // 手填不是 feed 地址 → 试着从站点里发现（#5）。贴个首页也能订阅，这是订阅体验的下限。
             if (!fromRoute) {
                 _state.value = _state.value.copy(isValidating = false, isDiscovering = true)
-                val found = runCatching { repository.discoverFeeds(raw) }.getOrDefault(emptyList())
+                val found = runCatching { subscriptionFlow.discoverFeeds(raw) }.getOrDefault(emptyList())
                 _state.value = _state.value.copy(
                     isDiscovering = false,
                     discovered = found,
@@ -433,7 +433,7 @@ class AddSubscriptionViewModel @Inject constructor(
         validationJob?.cancel()
         validationJob = viewModelScope.launch {
             _state.value = _state.value.copy(isValidating = true)
-            val probe = runCatching { repository.probeFeed(feed.url) }.getOrNull()
+            val probe = runCatching { subscriptionFlow.probeFeed(feed.url) }.getOrNull()
             _state.value = _state.value.copy(
                 url = feed.url,
                 isValidating = false,
@@ -512,7 +512,7 @@ class AddSubscriptionViewModel @Inject constructor(
             } else {
                 FeedEntity.SOURCE_TYPE_RSS
             }
-            val result = repository.addFeed(state.url.trim(), state.selectedGroup, sourceType)
+            val result = subscriptionFlow.addFeed(state.url.trim(), state.selectedGroup, sourceType)
             _state.value = _state.value.copy(isAdding = false)
             uiMessage = when (result) {
                 AddFeedResult.Success -> "订阅成功"

@@ -5,6 +5,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,13 +45,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.ui.components.ArticleContextMenu
 import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.ArticleMenuActions
+import com.cycling.rssradar.ui.components.articleMenuOffset
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.ui.theme.Accent
@@ -304,15 +313,42 @@ private fun SearchResultRow(
     onDelete: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    // 菜单偏移：贴着长按手指出现（与信息流 ArticleCard 一致，逻辑在 articleMenuOffset）
+    var menuOffset by remember { mutableStateOf(DpOffset.Zero) }
+    var cardTopInWindowPx by remember { mutableStateOf(0f) }
+    var cardHeightPx by remember { mutableStateOf(0) }
+    var pressPos by remember { mutableStateOf(Offset.Zero) }
+    val density = LocalDensity.current
+    val windowHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
     Box {
         Surface(
             shape = RoundedCornerShape(12.dp),
             color = Surface1,
             modifier = Modifier
                 .fillMaxWidth()
+                .onGloballyPositioned {
+                    cardTopInWindowPx = it.localToWindow(Offset.Zero).y
+                    cardHeightPx = it.size.height
+                }
+                // 旁观手势：只记录按下坐标，不消费事件，长按仍由 combinedClickable 触发
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        pressPos = awaitFirstDown(requireUnconsumed = false).position
+                    }
+                }
                 .combinedClickable(
                     onClick = onClick,
-                    onLongClick = { menuExpanded = true },
+                    onLongClick = {
+                        menuOffset = articleMenuOffset(
+                            pressPos = pressPos,
+                            cardTopInWindowPx = cardTopInWindowPx,
+                            cardHeightPx = cardHeightPx,
+                            menuItemCount = 7,
+                            windowHeightPx = windowHeightPx,
+                            density = density,
+                        )
+                        menuExpanded = true
+                    },
                 ),
         ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -357,9 +393,10 @@ private fun SearchResultRow(
         }
         }
 
-        // 长按上下文菜单（issue #46），与信息流一致
+        // 长按上下文菜单（issue #46），与信息流一致，出现在长按手指处
         ArticleContextMenu(
             expanded = menuExpanded,
+            offset = menuOffset,
             actions = ArticleMenuActions(
                 isRead = article.article.isRead,
                 isStarred = article.article.isStarred,

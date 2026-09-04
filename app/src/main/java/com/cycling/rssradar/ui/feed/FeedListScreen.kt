@@ -2,6 +2,7 @@ package com.cycling.rssradar.ui.feed
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +20,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -61,13 +66,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import coil3.compose.AsyncImage
+import com.cycling.rssradar.data.db.ArticleEntity
 import com.cycling.rssradar.data.db.ArticleWithFeed
 import com.cycling.rssradar.data.store.ListDescMode
 import com.cycling.rssradar.data.store.ListDisplayState
@@ -76,10 +91,12 @@ import com.cycling.rssradar.ui.theme.LocalListDisplay
 import com.cycling.rssradar.ui.components.ArticleContextMenu
 import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.ArticleMenuActions
+import com.cycling.rssradar.ui.components.articleMenuOffset
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.components.OptionPickerSheet
 import com.cycling.rssradar.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.ui.theme.Accent
+import com.cycling.rssradar.ui.theme.OnAccent
 import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.Surface1
 import com.cycling.rssradar.ui.theme.TextPrimary
@@ -89,6 +106,8 @@ import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.CheckCheck
 import com.composables.icons.lucide.Image
+import com.composables.icons.lucide.Music
+import com.composables.icons.lucide.Play
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Search
@@ -502,20 +521,12 @@ fun ArticleCardList(
     } else {
         emptyList()
     }
-    // 滚动自动标记已读（#11）：把"列表槽位 → 文章 id"铺平（粘性日期头也占一个槽位，
-    // 用 null 占位），滚过视口顶部的槽位即视为已读。槽位表与列表结构严格同构，
-    // 否则粘性头开启时索引会错位。
+    // 滚动自动标记已读（#11）：槽位表构建与「滚过视口顶 = 已读」判定是纯函数
+    // （scrollSlots/passedUnreadIds，见 PagedSnapshot.kt），此处只做接线。
     val slotIds: List<Long?> = if (display.stickyDateHeader) {
-        remember(dayGroups) {
-            buildList {
-                dayGroups.forEach { group ->
-                    add(null) // 日期头占一个槽位
-                    group.items.forEach { add(it.article.id) }
-                }
-            }
-        }
+        remember(dayGroups) { scrollSlots(articles, stickyDateHeader = true, groups = dayGroups) }
     } else {
-        remember(articles) { articles.map { it.article.id } }
+        remember(articles) { scrollSlots(articles, stickyDateHeader = false) }
     }
     val unreadIds = remember(articles) {
         articles.filter { !it.article.isRead }.map { it.article.id }.toSet()
@@ -525,9 +536,7 @@ fun ArticleCardList(
         snapshotFlow { listState.firstVisibleItemIndex }
             .distinctUntilChanged()
             .collect { firstVisible ->
-                val passed = slotIds.subList(0, firstVisible.coerceAtMost(slotIds.size))
-                    .filterNotNull()
-                    .filter { it in unreadIds }
+                val passed = passedUnreadIds(slotIds, firstVisible, unreadIds)
                 if (passed.isNotEmpty()) markReadPassed(passed)
             }
     }
@@ -582,7 +591,7 @@ fun ArticleCardList(
 }
 
 /** 距列表尾部还剩这么多项时预加载下一页。 */
-private const val LOAD_MORE_THRESHOLD = 5
+internal const val LOAD_MORE_THRESHOLD = 5
 
 /** 粘性日期头：不透明底色（页面底色）保证滚动时干净压住下方卡片。 */
 @Composable
@@ -720,6 +729,14 @@ fun ArticleCard(
     onReduceSuch: (() -> Unit)? = null,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    // 菜单偏移：贴着长按手指出现（手指下方放不下时翻到上方、底边贴手指），
+    // 方向预判逻辑在 articleMenuOffset（绕开 M3 翻转时偏移符号反转的坑）
+    var menuOffset by remember { mutableStateOf(DpOffset.Zero) }
+    var cardTopInWindowPx by remember { mutableStateOf(0f) }
+    var cardHeightPx by remember { mutableStateOf(0) }
+    var pressPos by remember { mutableStateOf(Offset.Zero) }
+    val density = LocalDensity.current
+    val windowHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
     // 已读弱化（issue #56）：开关开启时已读卡片降弱色；未读卡片永不因此改变
     val dimmed = display.dimRead && item.article.isRead
     val titleColor = if (dimmed) TextTertiary else TextPrimary
@@ -730,10 +747,30 @@ fun ArticleCard(
             color = Surface1,
             modifier = Modifier
                 .fillMaxWidth()
+                .onGloballyPositioned {
+                    cardTopInWindowPx = it.localToWindow(Offset.Zero).y
+                    cardHeightPx = it.size.height
+                }
                 .clip(RoundedCornerShape(14.dp))
+                // 旁观手势：只记录按下坐标，不消费事件，长按仍由 combinedClickable 触发
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        pressPos = awaitFirstDown(requireUnconsumed = false).position
+                    }
+                }
                 .combinedClickable(
                     onClick = onClick,
-                    onLongClick = { menuExpanded = true },
+                    onLongClick = {
+                        menuOffset = articleMenuOffset(
+                            pressPos = pressPos,
+                            cardTopInWindowPx = cardTopInWindowPx,
+                            cardHeightPx = cardHeightPx,
+                            menuItemCount = if (onReduceSuch != null) 8 else 7,
+                            windowHeightPx = windowHeightPx,
+                            density = density,
+                        )
+                        menuExpanded = true
+                    },
                 ),
         ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -791,15 +828,20 @@ fun ArticleCard(
                 }
                 if (display.showThumbnail) {
                     Spacer(Modifier.width(10.dp))
-                    CoverThumb(url = item.article.coverUrl?.takeIf { it.isNotBlank() })
+                    CoverThumb(url = item.article.coverUrl?.takeIf { it.isNotBlank() }, mediaKind = item.article.mediaKind)
+                } else if (item.article.mediaKind != ArticleEntity.MEDIA_KIND_NONE) {
+                    // 无缩略图的音视频条目：给个明确的类型标识，别让用户猜点开是什么
+                    Spacer(Modifier.width(10.dp))
+                    MediaKindChip(kind = item.article.mediaKind)
                 }
             }
         }
         }
 
-        // 长按上下文菜单（issue #46），锚定卡片
+        // 长按上下文菜单（issue #46），出现在长按手指处
         ArticleContextMenu(
             expanded = menuExpanded,
+            offset = menuOffset,
             actions = ArticleMenuActions(
                 isRead = item.article.isRead,
                 isStarred = item.article.isStarred,
@@ -820,30 +862,156 @@ fun ArticleCard(
  * 列表封面缩略图：统一 96×72（4:3），ContentScale.Crop 居中裁剪不拉伸；
  * 无封面画 Surface2 + Image 图标占位。固定尺寸让 Coil 免读原图尺寸、按目标大小解码，
  * LazyColumn 滚动开销最小；AsyncImage 无子组合，比 SubcomposeAsyncImage 更轻。
+ * 音视频条目（ADR-0014）在角上加播放/音频角标。
  */
 @Composable
-private fun CoverThumb(url: String?) {
+private fun CoverThumb(url: String?, mediaKind: Int = ArticleEntity.MEDIA_KIND_NONE) {
+    Box {
+        Box(
+            modifier = Modifier
+                .size(width = 96.dp, height = 72.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Surface2),
+        ) {
+            if (url != null) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = "封面缩略图",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Icon(
+                    imageVector = Lucide.Image,
+                    contentDescription = null,
+                    tint = TextTertiary,
+                    modifier = Modifier.align(Alignment.Center).size(18.dp),
+                )
+            }
+        }
+        when (mediaKind) {
+            ArticleEntity.MEDIA_KIND_VIDEO ->
+                MediaBadge(Lucide.Play, "视频", Modifier.align(Alignment.BottomEnd).padding(4.dp))
+            ArticleEntity.MEDIA_KIND_AUDIO ->
+                MediaBadge(Lucide.Music, "音频", Modifier.align(Alignment.BottomEnd).padding(4.dp))
+        }
+    }
+}
+
+/** 缩略图角上的媒体种类角标：小圆片 + 图标。align 作用域由调用方的 Box 提供。 */
+@Composable
+private fun MediaBadge(icon: ImageVector, label: String, modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = Color.Black.copy(alpha = 0.55f),
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = label, tint = OnAccent, modifier = Modifier.size(10.dp))
+        }
+    }
+}
+
+/** 无缩略图时的音视频类型标识：图标 + 文字，贴标题列右侧。 */
+@Composable
+private fun MediaKindChip(kind: Int) {
+    val (icon, label) = when (kind) {
+        ArticleEntity.MEDIA_KIND_VIDEO -> Lucide.Play to "视频"
+        else -> Lucide.Music to "音频"
+    }
+    Surface(shape = RoundedCornerShape(50), color = Surface2) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = Accent, modifier = Modifier.size(12.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(label, color = Accent, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+/**
+ * 图片类订阅源的画廊视图（ADR-0014）：两列方图网格，标题压在图上。
+ * 只改列表形态，交互仍走文章详情（媒体/大图查看不内嵌，遵守媒体占位卡词条）。
+ * 分页沿用 ArticleCardList 的滚近底部触发；无粘性日期头（网格里没有它的一席之地）。
+ */
+@Composable
+internal fun ImageGalleryGrid(
+    articles: List<ArticleWithFeed>,
+    onArticleClick: (ArticleWithFeed) -> Unit,
+    onScrolledToEnd: () -> Unit,
+    bottomPadding: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val listState = rememberLazyGridState()
+    val shouldLoadMore = remember {
+        derivedStateOf {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            lastVisible >= listState.layoutInfo.totalItemsCount - LOAD_MORE_THRESHOLD
+        }
+    }
+    LaunchedEffect(shouldLoadMore.value) {
+        if (shouldLoadMore.value) onScrolledToEnd()
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        state = listState,
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomPadding),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = modifier.fillMaxSize(),
+    ) {
+        items(items = articles, key = { it.article.id }) { item ->
+            ImageGalleryCard(item = item, onClick = { onArticleClick(item) })
+        }
+    }
+}
+
+@Composable
+private fun ImageGalleryCard(item: ArticleWithFeed, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(width = 96.dp, height = 72.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(Surface2),
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(14.dp))
+            .background(Surface2)
+            .clickable(onClick = onClick),
     ) {
-        if (url != null) {
-            AsyncImage(
-                model = url,
-                contentDescription = "封面缩略图",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            Icon(
-                imageVector = Lucide.Image,
-                contentDescription = null,
-                tint = TextTertiary,
+        AsyncImage(
+            model = item.article.coverUrl?.takeIf { it.isNotBlank() },
+            contentDescription = item.article.title,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (!item.article.isRead) {
+            Box(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(20.dp),
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+                    .size(8.dp)
+                    .background(Accent, RoundedCornerShape(50)),
+            )
+        }
+        // 标题压底：黑渐变 scrim 保证白字可读，最多两行
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))),
+                )
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+        ) {
+            Text(
+                text = item.article.title,
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

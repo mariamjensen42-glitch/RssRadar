@@ -1,5 +1,7 @@
 package com.cycling.rssradar.data.rsshub
 
+import com.cycling.rssradar.core.domain.rsshub.HttpHealthzProber
+import com.cycling.rssradar.core.domain.rsshub.InstanceProber
 import com.cycling.rssradar.core.domain.rsshub.RssHubRoutes
 import android.content.SharedPreferences
 import kotlinx.coroutines.CoroutineDispatcher
@@ -7,9 +9,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * RSSHub 实例管理与可达性探测。
@@ -17,8 +16,16 @@ import java.net.URL
  * 背景：实测 rsshub.app 官方主站、docs、官方镜像在部分网络环境下完全不可达
  * （GitHub/常规源正常）——实例写死等于首次使用即坏，见 issue #14。
  * 策略：内置镜像列表 + 并发探测选首个可达 + 用户自定义实例优先。
+ *
+ * 探测本身住在 [InstanceProber] 缝后（生产 adapter [HttpHealthzProber]）：
+ * 本类只剩 prefs 持久化 + 「选最快可达」的纯策略，测试塞 fake prober 即可，
+ * 不必真联网。
  */
-class RssHubInstanceStore(private val prefs: SharedPreferences, private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
+class RssHubInstanceStore(
+    private val prefs: SharedPreferences,
+    private val prober: InstanceProber = HttpHealthzProber(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
 
     /** 用户手动设置的实例。空表示未设置（用探测或默认）。 */
     var customHost: String?
@@ -39,8 +46,8 @@ class RssHubInstanceStore(private val prefs: SharedPreferences, private val ioDi
         return available
     }
 
-    /** 主机是否活着。判定同 [probeLatency]：拿到任何 HTTP 响应都算，包括 404。 */
-    suspend fun isReachable(host: String): Boolean = probeLatency(host) != null
+    /** 主机是否活着。判定口径见 [InstanceProber]：拿到任何 HTTP 响应都算。 */
+    suspend fun isReachable(host: String): Boolean = prober.probe(host) != null
 
     /**
      * 并发探测内置镜像 + 自定义实例，返回**响应最快的**可达者。
@@ -53,39 +60,16 @@ class RssHubInstanceStore(private val prefs: SharedPreferences, private val ioDi
     suspend fun detectFirstAvailable(): String? = coroutineScope {
         val candidates = (customHost?.let { listOf(it) }.orEmpty() + BUILTIN_INSTANCES).distinct()
         candidates.map { host ->
-            async(ioDispatcher) { host to probeLatency(host) }
+            async(ioDispatcher) { host to prober.probe(host) }
         }.awaitAll()
             .filter { it.second != null }
             .minByOrNull { it.second!! }
             ?.first
     }
 
-    /** 可达即探活耗时（ms），不可达返回 null。 */
-    private suspend fun probeLatency(host: String): Long? = withContext(ioDispatcher) {
-        val start = System.currentTimeMillis()
-        try {
-            val connection = URL(host.trimEnd('/') + "/healthz").openConnection() as HttpURLConnection
-            connection.connectTimeout = PROBE_TIMEOUT_MS
-            connection.readTimeout = PROBE_TIMEOUT_MS
-            connection.instanceFollowRedirects = true
-            connection.setRequestProperty("User-Agent", USER_AGENT)
-            val code = connection.responseCode
-            connection.disconnect()
-            // 拿到任何 HTTP 响应都算活着，包括 404。判定放宽的原因：实测
-            // rss.injahow.cn 的 /healthz 是 404，但它的 /zhihu/daily 正常返回
-            // 200 的 feed——要求 2xx 等于把一个能用的实例判死。真正该判死的
-            // 是连不上：超时 / DNS 失败 / 拒连。
-            if (code > 0) System.currentTimeMillis() - start else null
-        } catch (_: Exception) {
-            null
-        }
-    }
-
     companion object {
         private const val KEY_CUSTOM_HOST = "rsshub_custom_host"
         private const val KEY_LAST_AVAILABLE = "rsshub_last_available_host"
-        private const val PROBE_TIMEOUT_MS = 5_000
-        private const val USER_AGENT = "Mozilla/5.0 (Android) RssRadar/1.0"
 
         /**
          * 内置公共实例。

@@ -55,8 +55,16 @@ import com.cycling.rssradar.ui.navigation.FeedActionRoute
 import com.cycling.rssradar.ui.navigation.FeedRoute
 import com.cycling.rssradar.ui.navigation.FetchDiagnosticsRoute
 import com.cycling.rssradar.ui.navigation.InterestProfileRoute
+import com.cycling.rssradar.ui.me.SettingsAiDiagScreen
+import com.cycling.rssradar.ui.me.SettingsGeneralScreen
+import com.cycling.rssradar.ui.me.SettingsRssHubScreen
+import com.cycling.rssradar.ui.me.SettingsSyncScreen
 import com.cycling.rssradar.ui.navigation.MeRoute
 import com.cycling.rssradar.ui.navigation.SearchRoute
+import com.cycling.rssradar.ui.navigation.SettingsAiDiagRoute
+import com.cycling.rssradar.ui.navigation.SettingsGeneralRoute
+import com.cycling.rssradar.ui.navigation.SettingsRssHubRoute
+import com.cycling.rssradar.ui.navigation.SettingsSyncRoute
 import com.cycling.rssradar.ui.navigation.SubscriptionsRoute
 import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.CompositionLocalRoot
@@ -133,8 +141,29 @@ private fun RssRadarAppContent() {
                 val vm = hiltViewModel<RssHubSettingsViewModel>()
                 RssHubSettingsScreen(
                     viewModel = vm,
-                    onOpenFetchDiagnostics = { navController.navigate(FetchDiagnosticsRoute) },
+                    onOpenGeneral = { navController.navigate(SettingsGeneralRoute) },
+                    onOpenSync = { navController.navigate(SettingsSyncRoute) },
+                    onOpenRssHub = { navController.navigate(SettingsRssHubRoute) },
+                    onOpenAiDiag = { navController.navigate(SettingsAiDiagRoute) },
+                )
+            }
+            // 设置二级页（主页只留分组入口）：通用 / 同步与清理 / RSSHub / AI 与诊断
+            composable<SettingsGeneralRoute> {
+                SettingsGeneralScreen(
+                    onBack = { navController.popBackStack() },
                     onOpenInterestProfile = { navController.navigate(InterestProfileRoute) },
+                )
+            }
+            composable<SettingsSyncRoute> {
+                SettingsSyncScreen(onBack = { navController.popBackStack() })
+            }
+            composable<SettingsRssHubRoute> {
+                SettingsRssHubScreen(onBack = { navController.popBackStack() })
+            }
+            composable<SettingsAiDiagRoute> {
+                SettingsAiDiagScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenFetchDiagnostics = { navController.navigate(FetchDiagnosticsRoute) },
                     onOpenCrashLog = { navController.navigate(CrashLogRoute) },
                 )
             }

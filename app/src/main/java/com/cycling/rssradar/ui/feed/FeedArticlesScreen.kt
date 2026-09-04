@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.cycling.rssradar.data.db.FeedEntity
 import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
@@ -100,6 +101,18 @@ fun FeedArticlesScreen(
             ) {
                 Text("此订阅源还没有文章", color = TextSecondary)
             }
+        } else if (viewModel.feed?.contentType == FeedEntity.CONTENT_TYPE_IMAGE) {
+            // 图片类源（ADR-0014）：两列画廊网格，点击仍走详情
+            ImageGalleryGrid(
+                articles = viewModel.articles,
+                onArticleClick = { item ->
+                    viewModel.onIntent(FeedArticlesIntent.MarkRead(item.article.id))
+                    onOpenArticle(item.article.id)
+                },
+                onScrolledToEnd = { viewModel.onIntent(FeedArticlesIntent.LoadMore) },
+                bottomPadding = 16.dp,
+                modifier = Modifier.padding(padding),
+            )
         } else {
             ArticleCardList(
                 articles = viewModel.articles,

@@ -4,6 +4,15 @@ import com.cycling.rssradar.data.db.ArchivedArticleTombstoneEntity
 import com.cycling.rssradar.data.db.ArticleDao
 
 /**
+ * 清空文章结果（issue #8）：deleted = 真删条数，kept = 因收藏/稍后读豁免保留的条数。
+ * 两个数字都来自数据库真实统计，UI 直接展示，不做估算。
+ */
+data class ClearArticlesResult(
+    val deleted: Int,
+    val kept: Int,
+)
+
+/**
  * 文章清理子系统深模块：归档清理与「清空文章」的统一入口。
  *
  * 规则（issue「归档后刷新文章复活」）：真删之前先把将删文章的 (feedId, link) 写进
@@ -49,21 +58,29 @@ class ArticleCleaner(
         return removed
     }
 
-    /** 清空单个订阅源的文章（issue #8 语义）：先写墓碑再删，返回删除条数。 */
-    suspend fun clearFeed(feedId: Long, now: Long): Int = transactionRunner.inTransaction {
-        articleDao.insertTombstones(
-            articleDao.getArticleLinksByFeed(feedId)
-                .map { ArchivedArticleTombstoneEntity(it.feedId, it.link, now) },
-        )
-        articleDao.deleteByFeed(feedId)
-    }
+    /**
+     * 清空单个订阅源的文章（issue #8 语义）：先写墓碑再删，返回删除条数。
+     * kept（豁免统计）也在本类算：此前 kept 在 FeedRepository 数、deleted 在这里删，
+     * 两条 SQL 的豁免口径隔文件人工对账、无单测锁死——现在口径一处定义。
+     */
+    suspend fun clearFeed(feedId: Long, now: Long): ClearArticlesResult =
+        transactionRunner.inTransaction {
+            val kept = articleDao.countProtectedByFeed(feedId)
+            articleDao.insertTombstones(
+                articleDao.getArticleLinksByFeed(feedId)
+                    .map { ArchivedArticleTombstoneEntity(it.feedId, it.link, now) },
+            )
+            ClearArticlesResult(deleted = articleDao.deleteByFeed(feedId), kept = kept)
+        }
 
-    /** 清空一个分组下所有订阅源的文章：先写墓碑再删，返回删除条数。 */
-    suspend fun clearGroup(groupName: String, now: Long): Int = transactionRunner.inTransaction {
-        articleDao.insertTombstones(
-            articleDao.getArticleLinksByGroup(groupName)
-                .map { ArchivedArticleTombstoneEntity(it.feedId, it.link, now) },
-        )
-        articleDao.deleteByGroup(groupName)
-    }
+    /** 清空一个分组下所有订阅源的文章：先写墓碑再删，豁免口径同 [clearFeed]。 */
+    suspend fun clearGroup(groupName: String, now: Long): ClearArticlesResult =
+        transactionRunner.inTransaction {
+            val kept = articleDao.countProtectedByGroup(groupName)
+            articleDao.insertTombstones(
+                articleDao.getArticleLinksByGroup(groupName)
+                    .map { ArchivedArticleTombstoneEntity(it.feedId, it.link, now) },
+            )
+            ClearArticlesResult(deleted = articleDao.deleteByGroup(groupName), kept = kept)
+        }
 }

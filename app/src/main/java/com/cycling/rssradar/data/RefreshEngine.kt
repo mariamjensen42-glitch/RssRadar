@@ -169,6 +169,7 @@ class RefreshEngine(
                         coverUrl = article.coverUrl,
                         readingMinutes = readingMinutes,
                         contentSource = contentSource,
+                        mediaKind = article.mediaKind,
                     )
                 } else {
                     articleDao.updateContentState(
@@ -183,6 +184,7 @@ class RefreshEngine(
                         readingMinutes = readingMinutes,
                         contentSource = contentSource,
                         fetchedAt = now,
+                        mediaKind = article.mediaKind,
                     )
                 }
             }

@@ -11,6 +11,7 @@ import com.cycling.rssradar.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.data.db.FeedEntity
 import com.cycling.rssradar.data.ClearArticlesResult
 import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.data.SubscriptionFlow
 import com.cycling.rssradar.core.model.GROUP_DESIGN
 import com.cycling.rssradar.core.model.GROUP_DEV
 import com.cycling.rssradar.core.model.GROUP_TECH
@@ -63,11 +64,15 @@ sealed interface SubscriptionsIntent {
     data class SetSyncEnabled(val feedId: Long, val enabled: Boolean) : SubscriptionsIntent
     /** Feed 级通知开关（#31）。 */
     data class SetNotificationsEnabled(val feedId: Long, val enabled: Boolean) : SubscriptionsIntent
+
+    /** 内容类型（ADR-0014）：改的是列表浏览形态，不动数据。 */
+    data class SetContentType(val feedId: Long, val contentType: Int) : SubscriptionsIntent
 }
 
 @HiltViewModel
 class SubscriptionsViewModel @Inject constructor(
     private val repository: FeedRepository,
+    private val subscriptionFlow: SubscriptionFlow,
     private val groupStore: GroupStore,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel(), MviViewModel<SubscriptionsIntent> {
@@ -128,6 +133,7 @@ class SubscriptionsViewModel @Inject constructor(
             is SubscriptionsIntent.ExportOpml -> exportOpml(intent.uri)
             is SubscriptionsIntent.SetSyncEnabled -> setSyncEnabled(intent.feedId, intent.enabled)
             is SubscriptionsIntent.SetNotificationsEnabled -> setNotificationsEnabled(intent.feedId, intent.enabled)
+            is SubscriptionsIntent.SetContentType -> setContentType(intent.feedId, intent.contentType)
         }
     }
 
@@ -300,7 +306,7 @@ class SubscriptionsViewModel @Inject constructor(
                         uiMessage = "无法读取所选文件"
                         return@launch
                     }
-                stream.use { repository.importOpml(it) }
+                stream.use { subscriptionFlow.importOpml(it) }
             } catch (_: IllegalArgumentException) {
                 uiMessage = "不是有效的 OPML 文件"
                 return@launch
@@ -330,13 +336,20 @@ class SubscriptionsViewModel @Inject constructor(
         }
     }
 
+    private fun setContentType(feedId: Long, contentType: Int) {
+        viewModelScope.launch {
+            repository.setContentType(feedId, contentType)
+            uiMessage = "内容类型已更新"
+        }
+    }
+
     /**
      * OPML 导出（#4）：序列化全部订阅源 → 写进用户选的 URI。
      * 写失败（没有写权限/存储被移除）如实报错，不假装成功。
      */
     private fun exportOpml(uri: Uri) {
         viewModelScope.launch {
-            val opml = repository.exportOpml()
+            val opml = subscriptionFlow.exportOpml()
             val written = runCatching {
                 appContext.contentResolver.openOutputStream(uri)?.use { stream ->
                     stream.write(opml.toByteArray(Charsets.UTF_8))

@@ -34,6 +34,38 @@ object PagedSnapshot {
         list.filterNot { keyOf(it) == key }
 }
 
+/**
+ * 滚动自动标记已读（#11）的纯逻辑，从 FeedListScreen 的 LaunchedEffect 里抽出：
+ * 把「列表槽位 → 文章 id」铺平（粘性日期头也占一个槽位，用 null 占位），
+ * 滚过视口顶部的槽位即视为已读。槽位表与列表结构严格同构，
+ * 否则粘性头开启时索引会错位。
+ *
+ * 与 [dayGroups] 配对使用：开启粘性头时 [groups] 必须来自同一个 dayGroups 结果。
+ */
+fun scrollSlots(
+    articles: List<ArticleWithFeed>,
+    stickyDateHeader: Boolean,
+    groups: List<DayGroup> = emptyList(),
+): List<Long?> = if (stickyDateHeader) {
+    buildList {
+        groups.forEach { group ->
+            add(null) // 日期头占一个槽位
+            group.items.forEach { add(it.article.id) }
+        }
+    }
+} else {
+    articles.map { it.article.id }
+}
+
+/** 首屏可见索引 [firstVisibleIndex] 之前的槽位里，仍未读的文章 id（保持列表序）。 */
+fun passedUnreadIds(
+    slots: List<Long?>,
+    firstVisibleIndex: Int,
+    unreadIds: Set<Long>,
+): List<Long> = slots.subList(0, firstVisibleIndex.coerceAtMost(slots.size))
+    .filterNotNull()
+    .filter { it in unreadIds }
+
 /** 粘性日期头分组（issue #56）：一个自然日一组。 */
 data class DayGroup(
     /** 自然日的 epochDay，作 LazyColumn key；无日期组为 [UNDATED_DAY_KEY]。 */

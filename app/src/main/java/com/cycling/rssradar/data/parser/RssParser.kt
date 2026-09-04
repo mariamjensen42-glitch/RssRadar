@@ -35,6 +35,11 @@ class RssParser {
         val publishedAt: Long?,
         /** 封面图：enclosure → media:thumbnail → 正文首个 img。 */
         val coverUrl: String?,
+        /**
+         * 条目级媒体种类（ADR-0014）：enclosure / media 模块是 video/audio 时置对应值，
+         * 供列表卡片变形（跳原站播放）。数值与 ArticleEntity.MEDIA_KIND_* 对齐。
+         */
+        val mediaKind: Int = MEDIA_KIND_NONE,
     )
 
     data class ParsedFeed(
@@ -114,7 +119,28 @@ class RssParser {
             author = author?.trim()?.takeIf { it.isNotEmpty() },
             publishedAt = sanitizePublishedAt(publishedDate?.time ?: updatedDate?.time),
             coverUrl = extractCover(this, coverSource, link),
+            mediaKind = extractMediaKind(this),
         )
+    }
+
+    /**
+     * 条目级媒体种类：enclosure 的 MIME type 前缀（video/→视频，audio/→音频），
+     * 其次 media 模块 content 的 type。都不命中返回 NONE——不猜：RSS 世界里
+     * 没有可靠信号就当普通文章，误判比不判更伤（用户会看到错的卡片形态）。
+     */
+    private fun extractMediaKind(entry: SyndEntry): Int {
+        entry.enclosures.orEmpty().forEach { enclosure ->
+            val type = enclosure.type.orEmpty().lowercase()
+            if (type.startsWith("video")) return MEDIA_KIND_VIDEO
+            if (type.startsWith("audio")) return MEDIA_KIND_AUDIO
+        }
+        val mediaTypes = (entry.getModule(MEDIA_MODULE_URI)
+            as? com.rometools.modules.mediarss.MediaEntryModule)
+            ?.mediaContents.orEmpty()
+            .mapNotNull { it.type }
+        if (mediaTypes.any { it.lowercase().startsWith("video") }) return MEDIA_KIND_VIDEO
+        if (mediaTypes.any { it.lowercase().startsWith("audio") }) return MEDIA_KIND_AUDIO
+        return MEDIA_KIND_NONE
     }
 
     /**
@@ -165,6 +191,11 @@ class RssParser {
         private const val MEDIA_MODULE_URI = "http://search.yahoo.com/mrss/"
         /** 列表摘要长度。ReadYou 用 280，这里给中文多一点余量。 */
         const val SUMMARY_MAX_LENGTH = 300
+
+        /** 条目级媒体种类，与 ArticleEntity.MEDIA_KIND_* 数值对齐（ADR-0014）。 */
+        const val MEDIA_KIND_NONE = 0
+        const val MEDIA_KIND_VIDEO = 1
+        const val MEDIA_KIND_AUDIO = 2
 
         /**
          * 「这段内容够不够格当正文」的字数门槛。

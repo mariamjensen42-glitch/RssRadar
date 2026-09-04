@@ -39,3 +39,17 @@ import kotlinx.serialization.Serializable
 
 /** 崩溃日志（issue #61）：最近 5 次崩溃的清单与全文导出。 */
 @Serializable data object CrashLogRoute
+
+// —— 设置二级页（主页只留分组入口，见 RssHubSettingsScreen） ——
+
+/** 通用：外观、列表显示、推荐、链接与分享。 */
+@Serializable data object SettingsGeneralRoute
+
+/** 同步与清理：自动同步、文章清理、新文章通知。 */
+@Serializable data object SettingsSyncRoute
+
+/** RSSHub：实例、自定义实例、内置镜像、路由目录。 */
+@Serializable data object SettingsRssHubRoute
+
+/** AI 与诊断：DeepSeek Key、全文抓取诊断、崩溃日志。 */
+@Serializable data object SettingsAiDiagRoute
