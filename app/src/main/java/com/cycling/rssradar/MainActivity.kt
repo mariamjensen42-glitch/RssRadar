@@ -76,9 +76,9 @@ import com.cycling.rssradar.ui.navigation.SettingsSyncRoute
 import com.cycling.rssradar.ui.navigation.SubscriptionsRoute
 import com.cycling.rssradar.ui.theme.CompositionLocalRoot
 import dagger.hilt.android.AndroidEntryPoint
+import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.MotionTokens
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.core.ui.theme.rememberReducedMotion
 
 /**
  * 纯壳 Activity：edge-to-edge + 组合根。启动副作用在 [RssRadarApp]，
@@ -123,7 +123,7 @@ private fun RssRadarAppContent() {
         // 页面转场（docs/motion.md #1，issue #72）：前进「新页右滑入 1/12 + fade」，
         // 返回取镜像；280ms emphasized。层级方向感来自横轴位移。
         // reduce-motion：None = 瞬时切换，无位移无淡入。
-        val reducedMotion = rememberReducedMotion()
+        val reducedMotion = LocalReducedMotion.current
         val slideSpec = tween<IntOffset>(MotionTokens.DurationMedium, easing = MotionTokens.EasingEmphasized)
         val fadeSpec = tween<Float>(MotionTokens.DurationMedium, easing = MotionTokens.EasingEmphasized)
         val enter: EnterTransition = if (reducedMotion) EnterTransition.None

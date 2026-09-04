@@ -1,6 +1,7 @@
 package com.cycling.rssradar.ui.feed
 
 import android.text.format.DateUtils
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.aspectRatio
@@ -85,6 +86,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.cycling.rssradar.core.ui.components.RadarImage
 import com.cycling.rssradar.core.ui.components.pressScale
+import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.MotionTokens
 import com.cycling.rssradar.core.data.db.ArticleEntity
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
@@ -502,6 +504,11 @@ fun ArticleCardList(
         it.copy(showFeedName = showFeedName ?: it.showFeedName)
     }
     val listState = rememberLazyListState()
+    // 删除淡出（docs/motion.md #4）：数万条列表只做 fadeOut，placement / fadeIn 关闭
+    // ——低端机上 placement 是帧率杀手。reduce-motion 时 fadeOut 也关（红线）。
+    val reducedMotion = LocalReducedMotion.current
+    val removeFadeSpec: FiniteAnimationSpec<Float>? =
+        if (reducedMotion) null else tween(MotionTokens.DurationShort, easing = MotionTokens.EasingStandard)
     val shouldLoadMore = remember {
         derivedStateOf {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
@@ -559,13 +566,11 @@ fun ArticleCardList(
                     StickyDateHeader(group.label)
                 }
                 items(group.items, key = { it.article.id }) { item ->
-                    // 删除淡出（docs/motion.md #4）：数万条列表只做 fadeOut，
-                    // placement / fadeIn 关闭——低端机上 placement 是帧率杀手
                     Box(
                         modifier = Modifier.animateItem(
                             fadeInSpec = null,
                             placementSpec = null,
-                            fadeOutSpec = tween(MotionTokens.DurationShort, easing = MotionTokens.EasingStandard),
+                            fadeOutSpec = removeFadeSpec,
                         ),
                     ) {
                         SwipeableArticleCard(
@@ -587,7 +592,7 @@ fun ArticleCardList(
                     modifier = Modifier.animateItem(
                         fadeInSpec = null,
                         placementSpec = null,
-                        fadeOutSpec = tween(MotionTokens.DurationShort, easing = MotionTokens.EasingStandard),
+                        fadeOutSpec = removeFadeSpec,
                     ),
                 ) {
                     SwipeableArticleCard(

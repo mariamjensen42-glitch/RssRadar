@@ -8,8 +8,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.MotionTokens
-import com.cycling.rssradar.core.ui.theme.rememberReducedMotion
 
 /**
  * 按压缩放反馈（docs/motion.md #2）：按下缩到 [pressedScale]，抬起回弹，
@@ -26,7 +26,7 @@ fun Modifier.pressScale(
     interactionSource: MutableInteractionSource,
     pressedScale: Float = 0.97f,
 ): Modifier {
-    val reducedMotion = rememberReducedMotion()
+    val reducedMotion = LocalReducedMotion.current
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (pressed && !reducedMotion) pressedScale else 1f,

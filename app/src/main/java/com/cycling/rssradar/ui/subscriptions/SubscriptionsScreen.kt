@@ -2,6 +2,8 @@ package com.cycling.rssradar.ui.subscriptions
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -45,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
@@ -70,6 +73,8 @@ import com.composables.icons.lucide.SquareCheckBig
 import com.composables.icons.lucide.X
 import com.cycling.rssradar.core.data.db.FeedEntity
 import com.cycling.rssradar.core.ui.components.pressScale
+import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
+import com.cycling.rssradar.core.ui.theme.MotionTokens
 import com.cycling.rssradar.core.ui.theme.radarColors
 
 
@@ -97,6 +102,14 @@ fun SubscriptionsScreen(
     /** 分组操作底栏（重命名/清空文章/删除分组，issue #8）。 */
     var groupActionTarget by remember { mutableStateOf<String?>(null) }
     var batchMoveDialog by remember { mutableStateOf(false) }
+
+    // 列表 item 动画（docs/motion.md #4）：订阅列表增删 + 位移全开；
+    // reduce-motion 时全部置 null = 直接增删（红线：所有动画响应降级）
+    val reducedMotion = LocalReducedMotion.current
+    val itemFadeSpec: FiniteAnimationSpec<Float>? =
+        if (reducedMotion) null else tween(MotionTokens.DurationShort, easing = MotionTokens.EasingStandard)
+    val itemPlacementSpec: FiniteAnimationSpec<IntOffset>? =
+        if (reducedMotion) null else tween(MotionTokens.DurationShort, easing = MotionTokens.EasingStandard)
 
     // OPML 导入：SAF 文件选择器（mime 放宽，规避文件管理器标注不一致，见 ADR-0004）
     val opmlLauncher = rememberLauncherForActivityResult(
@@ -150,15 +163,20 @@ fun SubscriptionsScreen(
         floatingActionButton = {
             // 多选态隐藏 FAB：它与「选完再移动」的操作流冲突
             if (!selectionMode) {
+                // 主操作按钮按压缩放（docs/motion.md #2）
+                val fabInteraction = remember { MutableInteractionSource() }
                 ExtendedFloatingActionButton(
                     onClick = onAddSubscription,
+                    interactionSource = fabInteraction,
                     containerColor = radarColors().accent,
                     contentColor = radarColors().onAccent,
                     icon = { Icon(Lucide.Plus, contentDescription = null) },
                     text = { Text("添加") },
                     shape = RoundedCornerShape(20.dp),
                     // 抬升让开底部悬浮 TabBar（与 FeedListScreen 的 FAB 同一规则）
-                    modifier = Modifier.padding(bottom = FloatingTabBarFabOffset),
+                    modifier = Modifier
+                        .padding(bottom = FloatingTabBarFabOffset)
+                        .pressScale(fabInteraction),
                 )
             }
         },
@@ -181,24 +199,26 @@ fun SubscriptionsScreen(
             // 几百行一次性同步组合在主线程上，点击分组卡顿的根因。
             groups.forEach { group ->
                 item(key = "header-${group.group}", contentType = "header") {
-                    GroupHeader(
-                        title = group.group,
-                        feedCount = group.feeds.size,
-                        expanded = group.group in expandedIds,
-                        onToggle = { viewModel.onIntent(SubscriptionsIntent.ToggleGroup(group.group)) },
-                        // 铅笔 → 分组操作底栏（重命名/清空文章/删除分组，issue #8）
-                        onEdit = { groupActionTarget = group.group },
-                    )
+                    Box(modifier = Modifier.animateItem(itemFadeSpec, itemPlacementSpec, itemFadeSpec)) {
+                        GroupHeader(
+                            title = group.group,
+                            feedCount = group.feeds.size,
+                            expanded = group.group in expandedIds,
+                            onToggle = { viewModel.onIntent(SubscriptionsIntent.ToggleGroup(group.group)) },
+                            // 铅笔 → 分组操作底栏（重命名/清空文章/删除分组，issue #8）
+                            onEdit = { groupActionTarget = group.group },
+                        )
+                    }
                 }
                 if (group.group in expandedIds) {
                     group.feeds.forEach { feedItem ->
                         item(key = "feed-${feedItem.feed.id}", contentType = "feed") {
                             // animateItem 全量（docs/motion.md #4）：订阅列表量级小，
-                            // 增删 + 位移都开（spring 默认）
+                            // 增删 + 位移都开；reduce-motion 见上面的 spec 置 null
                             Box(
                                 modifier = Modifier
                                     .padding(start = 12.dp)
-                                    .animateItem(),
+                                    .animateItem(itemFadeSpec, itemPlacementSpec, itemFadeSpec),
                             ) {
                                 FeedRow(
                                     item = feedItem,

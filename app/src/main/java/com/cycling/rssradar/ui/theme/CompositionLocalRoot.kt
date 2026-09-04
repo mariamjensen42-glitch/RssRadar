@@ -13,6 +13,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
 import com.cycling.rssradar.core.ui.theme.RssRadarTheme
+import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
+import com.cycling.rssradar.core.ui.theme.rememberReducedMotion
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.cycling.rssradar.core.data.store.ListDisplayState
@@ -58,10 +60,13 @@ fun CompositionLocalRoot(content: @Composable () -> Unit) {
         ThemeMode.DARK -> true
     }
     ApplySystemBarIcons(darkTheme)
+    // reduce-motion（docs/motion.md）：装配点读一次系统信号，观察器全局只注册一次
+    val reducedMotion = rememberReducedMotion()
     CompositionLocalProvider(
         LocalDarkTheme provides darkTheme,
         LocalReadingPrefs provides readingPrefs,
         LocalListDisplay provides listDisplay,
+        LocalReducedMotion provides reducedMotion,
     ) {
         RssRadarTheme(darkTheme = darkTheme) {
             content()

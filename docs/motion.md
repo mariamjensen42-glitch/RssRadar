@@ -58,5 +58,5 @@
 
 - 不做无限循环动画（loading 指示器除外）。
 - 不做布局跳变动画：容器尺寸变化只在明确需要处用 `animateContentSize()`。
-- 数万字列表（文章列表）禁止 placement 动画。
+- 数万条列表（文章列表）禁止 placement 动画。
 - 任何动画不得阻塞输入（无 `graphicsLayer` 全屏滥用、无转场期间点击穿透禁用）。

@@ -12,7 +12,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 
 /**
  * 全应用动效 token（docs/motion.md，issue #72）。
@@ -38,13 +41,20 @@ object MotionTokens {
 }
 
 /**
+ * reduce-motion 信号（docs/motion.md，issue #72）：全 app 统一读 [LocalReducedMotion]。
+ * 默认 false（正常动画）；由 CompositionLocalRoot 用 [rememberReducedMotion] 读系统
+ * 设置后注入——观察器只在装配点注册一次，调用点直接读 Local。
+ */
+val LocalReducedMotion = staticCompositionLocalOf { false }
+
+/**
  * 系统「移除动画」（无障碍 / 开发者选项把动画时长缩放置 0）时返回 true。
  *
- * 单一事实来源：所有动画调用点通过本函数读信号，降级 = 瞬时状态切换，
- * 不去掉反馈。若未来要加应用内「动画开关」，只改这里。
+ * 仅供装配点（CompositionLocalRoot）使用：读信号 + ContentObserver 监听
+ * `ANIMATOR_DURATION_SCALE`，系统设置改动实时生效，不需要重启应用。
+ * 业务代码一律读 [LocalReducedMotion]，不要直接调本函数。
  *
- * 用 ContentObserver 监听 `ANIMATOR_DURATION_SCALE`，系统设置改动实时生效，
- * 不需要重启应用。
+ * 降级原则：瞬时状态切换，不是去掉反馈。若未来要加应用内「动画开关」，只改这里。
  */
 @Composable
 fun rememberReducedMotion(): Boolean {
@@ -73,3 +83,10 @@ private fun isAnimatorScaleZero(context: Context): Boolean =
         Settings.Global.ANIMATOR_DURATION_SCALE,
         1f,
     ) == 0f
+
+/**
+ * 图片渐显（docs/motion.md #3）：crossfade [MotionTokens.DurationShort]；
+ * reduce-motion 时关闭——所有 Coil ImageRequest 统一走这里，别再手写 crossfade。
+ */
+fun ImageRequest.Builder.crossfadeMotion(reducedMotion: Boolean): ImageRequest.Builder =
+    if (reducedMotion) crossfade(false) else crossfade(MotionTokens.DurationShort)

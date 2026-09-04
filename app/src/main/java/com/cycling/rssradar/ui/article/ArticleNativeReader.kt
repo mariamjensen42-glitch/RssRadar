@@ -54,16 +54,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
-import coil3.request.crossfade
 import coil3.size.Size
 import com.cycling.rssradar.core.data.store.ReadingFontFamily
 import com.cycling.rssradar.core.data.store.ReadingImageState
 import com.cycling.rssradar.core.data.store.ReadingStyleState
 import com.cycling.rssradar.ui.theme.LocalReadingPrefs
 import kotlin.math.sqrt
-import com.cycling.rssradar.core.ui.theme.MotionTokens
+import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
+import com.cycling.rssradar.core.ui.theme.crossfadeMotion
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.core.ui.theme.rememberReducedMotion
 
 /**
  * 原生 Compose 正文渲染器（ADR-0009 双渲染器）的渲染半边；解析在 [ReadingNodes]。
@@ -311,18 +310,18 @@ private fun RenderNode(
             // 显式解码尺寸：宽度按屏、高度同 heightIn 上限，再过像素预算兜底。
             // 长图/大图按原图解码会直接撞 Canvas 上限崩溃（119MB bitmap 实案）。
             val context = LocalContext.current
-            val reducedMotion = rememberReducedMotion()
+            val reducedMotion = LocalReducedMotion.current
             val screenWidthPx = with(LocalDensity.current) {
                 LocalConfiguration.current.screenWidthDp.dp.roundToPx()
             }
             val maxHeightPx = with(LocalDensity.current) { IMAGE_MAX_HEIGHT_DP.dp.roundToPx() }
             val model = remember(node.src, screenWidthPx, maxHeightPx, reducedMotion) {
-                val builder = ImageRequest.Builder(context)
+                ImageRequest.Builder(context)
                     .data(node.src)
                     .size(clampDecodeSize(screenWidthPx, maxHeightPx))
-                // crossfade 200ms（docs/motion.md #3）；reduce-motion 关掉渐显
-                if (reducedMotion) builder.crossfade(false) else builder.crossfade(MotionTokens.DurationShort)
-                builder.build()
+                    // crossfade 200ms（docs/motion.md #3）；reduce-motion 关掉渐显
+                    .crossfadeMotion(reducedMotion)
+                    .build()
             }
             AsyncImage(
                 model = model,
