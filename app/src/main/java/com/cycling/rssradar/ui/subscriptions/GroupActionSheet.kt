@@ -31,7 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.data.db.DEFAULT_GROUP
+import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.Danger
 import com.cycling.rssradar.ui.theme.Surface1

@@ -29,11 +29,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.data.OnDemandFetch
-import com.cycling.rssradar.data.db.ContentFetchLogEntity
-import com.cycling.rssradar.data.db.FetchHostStat
-import com.cycling.rssradar.data.parser.ExtractionIssue
-import com.cycling.rssradar.data.parser.FetchFailure
+import com.cycling.rssradar.core.data.OnDemandFetch
+import com.cycling.rssradar.core.data.db.ContentFetchLogEntity
+import com.cycling.rssradar.core.data.db.FetchHostStat
+import com.cycling.rssradar.core.data.parser.ExtractionIssue
+import com.cycling.rssradar.core.data.parser.FetchFailure
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.Danger

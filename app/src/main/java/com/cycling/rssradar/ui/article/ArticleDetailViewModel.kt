@@ -3,16 +3,16 @@ package com.cycling.rssradar.ui.article
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.data.db.ArticleEntity
-import com.cycling.rssradar.data.db.ArticleWithFeed
-import com.cycling.rssradar.data.FeedRepository
-import com.cycling.rssradar.data.OnDemandFetch
-import com.cycling.rssradar.data.ai.AiRepository
-import com.cycling.rssradar.data.store.AiStore
-import com.cycling.rssradar.data.store.LinkShareState
-import com.cycling.rssradar.data.store.LinkStore
-import com.cycling.rssradar.data.store.ReadingPrefs
-import com.cycling.rssradar.data.store.ReadingPrefsStore
+import com.cycling.rssradar.core.data.db.ArticleEntity
+import com.cycling.rssradar.core.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.FeedRepository
+import com.cycling.rssradar.core.data.OnDemandFetch
+import com.cycling.rssradar.core.data.ai.AiRepository
+import com.cycling.rssradar.core.data.store.AiStore
+import com.cycling.rssradar.core.data.store.LinkShareState
+import com.cycling.rssradar.core.data.store.LinkStore
+import com.cycling.rssradar.core.data.store.ReadingPrefs
+import com.cycling.rssradar.core.data.store.ReadingPrefsStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -56,7 +56,7 @@ data class TranslationSegmentUi(
     val originalHtml: String,
     val translatedHtml: String?,
     /**
-     * 本段原文内的顶层块（双语对照的配对单位）。由 [com.cycling.rssradar.data.ai.TranslationSegments]
+     * 本段原文内的顶层块（双语对照的配对单位）。由 [com.cycling.rssradar.core.data.ai.TranslationSegments]
      * 分段时一次切好带过来——渲染侧不再把原文切第二遍，两级单位由同一个模块说了算。
      */
     val blocks: List<String>,

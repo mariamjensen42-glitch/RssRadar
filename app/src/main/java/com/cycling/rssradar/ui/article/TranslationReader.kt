@@ -15,11 +15,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.data.ai.TranslationBlockPair
-import com.cycling.rssradar.data.ai.TranslationPairInput
-import com.cycling.rssradar.data.ai.TranslationSegments
-import com.cycling.rssradar.data.store.BilingualLayout
-import com.cycling.rssradar.data.store.TranslationViewMode
+import com.cycling.rssradar.core.data.ai.TranslationBlockPair
+import com.cycling.rssradar.core.data.ai.TranslationPairInput
+import com.cycling.rssradar.core.data.ai.TranslationSegments
+import com.cycling.rssradar.core.data.store.BilingualLayout
+import com.cycling.rssradar.core.data.store.TranslationViewMode
 import com.cycling.rssradar.ui.theme.Divider
 import com.cycling.rssradar.ui.theme.LocalReadingPrefs
 

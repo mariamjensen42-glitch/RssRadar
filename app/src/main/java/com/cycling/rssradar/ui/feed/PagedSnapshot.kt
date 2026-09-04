@@ -1,6 +1,6 @@
 package com.cycling.rssradar.ui.feed
 
-import com.cycling.rssradar.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.db.ArticleWithFeed
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId

@@ -45,12 +45,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.cycling.rssradar.core.model.rsshub.CatalogSource
-import com.cycling.rssradar.data.rsshub.RssHubInstanceStore
-import com.cycling.rssradar.data.store.KeepArchived
-import com.cycling.rssradar.data.store.LinkOpenMode
-import com.cycling.rssradar.data.store.ShareContentFormat
-import com.cycling.rssradar.data.store.SyncInterval
-import com.cycling.rssradar.data.store.ThemeMode
+import com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore
+import com.cycling.rssradar.core.data.store.KeepArchived
+import com.cycling.rssradar.core.data.store.LinkOpenMode
+import com.cycling.rssradar.core.data.store.ShareContentFormat
+import com.cycling.rssradar.core.data.store.SyncInterval
+import com.cycling.rssradar.core.data.store.ThemeMode
 import com.cycling.rssradar.ui.components.OptionPickerSheet
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
@@ -324,7 +324,7 @@ fun SettingsGeneralScreen(
                         modifier = Modifier.weight(1f),
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        com.cycling.rssradar.data.store.ListDescMode.entries.forEach { mode ->
+                        com.cycling.rssradar.core.data.store.ListDescMode.entries.forEach { mode ->
                             val selected = display.descMode == mode
                             Surface(
                                 shape = RoundedCornerShape(50),

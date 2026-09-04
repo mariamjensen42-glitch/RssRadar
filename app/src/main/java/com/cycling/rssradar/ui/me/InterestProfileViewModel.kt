@@ -2,10 +2,10 @@ package com.cycling.rssradar.ui.me
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.data.FeedRepository
+import com.cycling.rssradar.core.data.FeedRepository
 import com.cycling.rssradar.core.domain.recommendation.ProfileTerm
-import com.cycling.rssradar.data.Recommendation
-import com.cycling.rssradar.data.db.FeedEntity
+import com.cycling.rssradar.core.data.Recommendation
+import com.cycling.rssradar.core.data.db.FeedEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

@@ -1,6 +1,6 @@
 package com.cycling.rssradar.ui.addsubscription
 
-import com.cycling.rssradar.data.DiscoveredFeed
+import com.cycling.rssradar.core.data.DiscoveredFeed
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

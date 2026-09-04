@@ -45,7 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.data.db.DEFAULT_GROUP
+import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.FeedIcon
 import com.cycling.rssradar.ui.components.FloatingTabBarFabOffset
@@ -76,7 +76,7 @@ import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Square
 import com.composables.icons.lucide.SquareCheckBig
 import com.composables.icons.lucide.X
-import com.cycling.rssradar.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.FeedEntity
 
 
 @Composable

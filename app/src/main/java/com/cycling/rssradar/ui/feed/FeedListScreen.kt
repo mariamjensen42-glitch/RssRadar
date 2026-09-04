@@ -82,10 +82,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import coil3.compose.AsyncImage
-import com.cycling.rssradar.data.db.ArticleEntity
-import com.cycling.rssradar.data.db.ArticleWithFeed
-import com.cycling.rssradar.data.store.ListDescMode
-import com.cycling.rssradar.data.store.ListDisplayState
+import com.cycling.rssradar.core.data.db.ArticleEntity
+import com.cycling.rssradar.core.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.store.ListDescMode
+import com.cycling.rssradar.core.data.store.ListDisplayState
 import com.cycling.rssradar.core.model.MarkAsReadCondition
 import com.cycling.rssradar.ui.theme.LocalListDisplay
 import com.cycling.rssradar.ui.components.ArticleContextMenu

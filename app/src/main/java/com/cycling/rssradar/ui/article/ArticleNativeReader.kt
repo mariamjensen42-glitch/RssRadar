@@ -55,9 +55,9 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.size.Size
-import com.cycling.rssradar.data.store.ReadingFontFamily
-import com.cycling.rssradar.data.store.ReadingImageState
-import com.cycling.rssradar.data.store.ReadingStyleState
+import com.cycling.rssradar.core.data.store.ReadingFontFamily
+import com.cycling.rssradar.core.data.store.ReadingImageState
+import com.cycling.rssradar.core.data.store.ReadingStyleState
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.Divider
 import com.cycling.rssradar.ui.theme.Link

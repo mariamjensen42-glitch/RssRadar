@@ -1,7 +1,7 @@
 package com.cycling.rssradar
 
 import android.app.Application
-import com.cycling.rssradar.data.CrashLog
+import com.cycling.rssradar.core.data.CrashLog
 import com.cycling.rssradar.sync.SyncScheduler
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope

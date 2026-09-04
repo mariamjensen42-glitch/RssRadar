@@ -1,9 +1,9 @@
 package com.cycling.rssradar.sync
 
 import com.cycling.rssradar.FakeSharedPreferences
-import com.cycling.rssradar.data.store.ArchiveStore
-import com.cycling.rssradar.data.store.KeepArchived
-import com.cycling.rssradar.data.store.SyncStore
+import com.cycling.rssradar.core.data.store.ArchiveStore
+import com.cycling.rssradar.core.data.store.KeepArchived
+import com.cycling.rssradar.core.data.store.SyncStore
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

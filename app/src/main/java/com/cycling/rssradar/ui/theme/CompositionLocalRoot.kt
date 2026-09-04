@@ -14,9 +14,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import com.cycling.rssradar.data.store.ListDisplayState
-import com.cycling.rssradar.data.store.ReadingPrefs
-import com.cycling.rssradar.data.store.ThemeMode
+import com.cycling.rssradar.core.data.store.ListDisplayState
+import com.cycling.rssradar.core.data.store.ReadingPrefs
+import com.cycling.rssradar.core.data.store.ThemeMode
 import com.cycling.rssradar.di.AppEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 

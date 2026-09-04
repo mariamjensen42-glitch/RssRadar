@@ -20,3 +20,6 @@ local.properties
 .idea/
 .workbuddy/
 prototype/__pycache__/
+
+# 模块构建产物
+**/build/

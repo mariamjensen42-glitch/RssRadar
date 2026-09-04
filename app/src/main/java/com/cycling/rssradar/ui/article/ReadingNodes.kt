@@ -11,7 +11,7 @@ import org.jsoup.nodes.TextNode
  * 与渲染分离的理由和 [ReadingContentHtml] / [ReadingImages] 一样：解析是可测的纯函数，
  * 不碰 Android、不碰 Compose，单测直接覆盖；渲染那边只剩「树 → Composable」的直译。
  *
- * 输入是 [com.cycling.rssradar.data.parser.RssParser.sanitizeHtml] 的产物（相对路径与
+ * 输入是 [com.cycling.rssradar.core.data.parser.RssParser.sanitizeHtml] 的产物（相对路径与
  * 危险属性已剥掉），但**不依赖**这一点：凡是解析出来的 URL 都要再过 [absoluteUrl]，
  * 协议相对（`//host/x`）补 https，`mailto:`/`javascript:` 之类一律降级成纯文本。
  *

@@ -2,16 +2,16 @@ package com.cycling.rssradar.ui.feed
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.data.AddFeedResult
-import com.cycling.rssradar.data.db.ArticleEntity
-import com.cycling.rssradar.data.db.ArticleWithFeed
-import com.cycling.rssradar.data.FeedRepository
-import com.cycling.rssradar.data.SubscriptionFlow
-import com.cycling.rssradar.data.Recommendation
-import com.cycling.rssradar.data.ai.AiRepository
-import com.cycling.rssradar.data.store.GroupStore
+import com.cycling.rssradar.core.data.AddFeedResult
+import com.cycling.rssradar.core.data.db.ArticleEntity
+import com.cycling.rssradar.core.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.FeedRepository
+import com.cycling.rssradar.core.data.SubscriptionFlow
+import com.cycling.rssradar.core.data.Recommendation
+import com.cycling.rssradar.core.data.ai.AiRepository
+import com.cycling.rssradar.core.data.store.GroupStore
 import com.cycling.rssradar.core.model.MarkAsReadCondition
-import com.cycling.rssradar.data.store.RecommendationStore
+import com.cycling.rssradar.core.data.store.RecommendationStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject

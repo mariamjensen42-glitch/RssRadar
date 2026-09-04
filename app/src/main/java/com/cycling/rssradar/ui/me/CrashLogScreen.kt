@@ -41,8 +41,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.data.CrashLog
-import com.cycling.rssradar.data.CrashRecord
+import com.cycling.rssradar.core.data.CrashLog
+import com.cycling.rssradar.core.data.CrashRecord
 import com.cycling.rssradar.ui.theme.Accent
 import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.Danger

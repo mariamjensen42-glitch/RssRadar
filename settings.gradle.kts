@@ -27,3 +27,4 @@ rootProject.name = "RssRadar"
 include(":app")
 include(":core:model")
 include(":core:domain")
+include(":core:data")

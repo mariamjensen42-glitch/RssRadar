@@ -34,4 +34,4 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Run unit tests
-        run: ./gradlew :app:testDebugUnitTest :core:model:test :core:domain:test --stacktrace
+        run: ./gradlew :app:testDebugUnitTest :core:model:test :core:domain:test :core:data:testDebugUnitTest --stacktrace

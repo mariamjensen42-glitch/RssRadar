@@ -1,6 +1,6 @@
 package com.cycling.rssradar.ui.article
 
-import com.cycling.rssradar.data.store.ReadingRenderer
+import com.cycling.rssradar.core.data.store.ReadingRenderer
 
 /**
  * 正文渲染模式：阅读页正文槽位五条渲染路径的唯一判据。

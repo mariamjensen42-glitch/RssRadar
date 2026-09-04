@@ -2,10 +2,10 @@ package com.cycling.rssradar.ui.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.data.db.ArticleEntity
-import com.cycling.rssradar.data.db.ArticleWithFeed
-import com.cycling.rssradar.data.FeedRepository
-import com.cycling.rssradar.data.ai.AiRepository
+import com.cycling.rssradar.core.data.db.ArticleEntity
+import com.cycling.rssradar.core.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.FeedRepository
+import com.cycling.rssradar.core.data.ai.AiRepository
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject

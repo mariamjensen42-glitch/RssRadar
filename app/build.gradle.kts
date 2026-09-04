@@ -79,6 +79,7 @@ android {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:domain"))
+    implementation(project(":core:data"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)
@@ -99,10 +100,7 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation(libs.compose.icons.lucide)
     ksp(libs.androidx.room.compiler)
-    implementation(libs.rome)
-    implementation(libs.rome.modules)
     implementation(libs.jsoup)
-    implementation(libs.readability4j)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.okhttp)
