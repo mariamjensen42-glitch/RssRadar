@@ -15,6 +15,8 @@ import com.cycling.rssradar.core.data.SubscriptionFlow
 import com.cycling.rssradar.core.model.GROUP_DESIGN
 import com.cycling.rssradar.core.model.GROUP_DEV
 import com.cycling.rssradar.core.model.GROUP_TECH
+import com.cycling.rssradar.core.data.store.FeedSortMode
+import com.cycling.rssradar.core.data.store.FeedSortStore
 import com.cycling.rssradar.core.data.store.GroupStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,11 +38,19 @@ data class FeedWithUnread(val feed: FeedEntity, val unreadCount: Int)
 /** 一个分组下的所有订阅。 */
 data class GroupSectionUi(val group: String, val feeds: List<FeedWithUnread>)
 
+/** 排序所需的三股数据流快照（feeds / 未读数 / 每源最近文章时间）。 */
+private data class FeedInputs(
+    val feeds: List<FeedEntity>,
+    val unread: Map<Long, Int>,
+    val latest: Map<Long, Long>,
+)
+
 /** 订阅页事件（候选 A，ADR-0003）。 */
 sealed interface SubscriptionsIntent {
     data class ToggleGroup(val group: String) : SubscriptionsIntent
     data object MarkAllRead : SubscriptionsIntent
-    data object ToggleSort : SubscriptionsIntent
+    /** 订阅列表排序方式（按名称/最近更新/未读数），选择后持久化并立即生效。 */
+    data class SelectSort(val mode: FeedSortMode) : SubscriptionsIntent
     data object ConsumeMessage : SubscriptionsIntent
     data class CreateGroup(val name: String) : SubscriptionsIntent
     data class RenameGroup(val oldName: String, val newName: String) : SubscriptionsIntent
@@ -74,6 +84,7 @@ class SubscriptionsViewModel @Inject constructor(
     private val repository: FeedRepository,
     private val subscriptionFlow: SubscriptionFlow,
     private val groupStore: GroupStore,
+    private val feedSortStore: FeedSortStore,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel(), MviViewModel<SubscriptionsIntent> {
 
@@ -91,13 +102,20 @@ class SubscriptionsViewModel @Inject constructor(
     private val _groupsList = MutableStateFlow(groupStore.getGroups())
     val groupsList: StateFlow<List<String>> = _groupsList.asStateFlow()
 
-    val groups: StateFlow<List<GroupSectionUi>> = combine(
-        repository.observeFeeds(),
-        repository.observeFeedUnreadCounts(),
-        _groupsList,
-    ) { feeds, unreadMap, registered ->
-        groupFeeds(feeds, unreadMap, registered)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val groups: StateFlow<List<GroupSectionUi>> =
+        combine(
+            repository.observeFeeds(),
+            repository.observeFeedUnreadCounts(),
+            repository.observeFeedLatestTimes(),
+        ) { feeds, unread, latest -> FeedInputs(feeds, unread, latest) }
+            .combine(_groupsList) { inputs, registered -> inputs to registered }
+            .combine(feedSortStore.state) { (inputs, registered), sort ->
+                groupFeeds(inputs.feeds, inputs.unread, inputs.latest, registered, sort)
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 当前订阅列表排序方式（持久化，重启后保持）。 */
+    val sortMode: StateFlow<FeedSortMode> = feedSortStore.state
 
     val totalUnread: StateFlow<Int> = repository.observeUnreadCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
@@ -115,7 +133,7 @@ class SubscriptionsViewModel @Inject constructor(
         when (intent) {
             is SubscriptionsIntent.ToggleGroup -> toggleGroup(intent.group)
             SubscriptionsIntent.MarkAllRead -> markAllRead()
-            SubscriptionsIntent.ToggleSort -> toggleSort()
+            is SubscriptionsIntent.SelectSort -> selectSort(intent.mode)
             SubscriptionsIntent.ConsumeMessage -> uiMessage = null
             is SubscriptionsIntent.CreateGroup -> createGroup(intent.name)
             is SubscriptionsIntent.RenameGroup -> renameGroup(intent.oldName, intent.newName)
@@ -150,8 +168,8 @@ class SubscriptionsViewModel @Inject constructor(
         }
     }
 
-    private fun toggleSort() {
-        uiMessage = "排序方式已切换"
+    private fun selectSort(mode: FeedSortMode) {
+        feedSortStore.set(mode)
     }
 
     // —— 分组 CRUD ——
@@ -367,17 +385,36 @@ class SubscriptionsViewModel @Inject constructor(
     private fun groupFeeds(
         feeds: List<FeedEntity>,
         unreadMap: Map<Long, Int>,
+        latestMap: Map<Long, Long>,
         registered: List<String>,
+        sort: FeedSortMode,
     ): List<GroupSectionUi> {
+        val byName = feeds.groupBy { it.groupName.ifBlank { DEFAULT_GROUP } }
         // 注册表里没有 feed 的分组也要显示（空分组）
-        val byName = feeds
-            .groupBy { it.groupName.ifBlank { DEFAULT_GROUP } }
-            .mapValues { (_, list) ->
-                list.sortedBy { it.title }.map { FeedWithUnread(it, unreadMap[it.id] ?: 0) }
-            }
         val ordered = registered.distinct() + byName.keys.filterNot { it in registered }
-        return ordered.map { group ->
-            GroupSectionUi(group = group, feeds = byName[group].orEmpty())
+        val sections = ordered.map { group ->
+            GroupSectionUi(group = group, feeds = byName[group].orEmpty().map { FeedWithUnread(it, unreadMap[it.id] ?: 0) })
+        }
+        return when (sort) {
+            // 名称序：分组保持注册顺序，组内按标题
+            FeedSortMode.BY_NAME ->
+                sections.map { it.copy(feeds = it.feeds.sortedBy { f -> f.feed.title }) }
+            // 最近更新：有新文章的组和源都排前面；从没抓到文章的沉底
+            FeedSortMode.BY_RECENT ->
+                sections
+                    .sortedByDescending { s -> s.feeds.maxOfOrNull { latestMap[it.feed.id] ?: 0L } ?: 0L }
+                    .map { it.copy(feeds = it.feeds.sortedByDescending { f -> latestMap[f.feed.id] ?: 0L }) }
+            // 未读数：未读多的组和源排前面；同数量按名称稳定排列
+            FeedSortMode.BY_UNREAD ->
+                sections
+                    .sortedByDescending { s -> s.feeds.sumOf { it.unreadCount } }
+                    .map {
+                        it.copy(
+                            feeds = it.feeds.sortedWith(
+                                compareByDescending<FeedWithUnread> { f -> f.unreadCount }.thenBy { f -> f.feed.title },
+                            ),
+                        )
+                    }
         }
     }
 }

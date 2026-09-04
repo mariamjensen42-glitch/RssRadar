@@ -19,6 +19,7 @@ import com.cycling.rssradar.core.data.RefreshEngine
 import com.cycling.rssradar.core.data.TransactionRunner
 import com.cycling.rssradar.core.data.store.AiStore
 import com.cycling.rssradar.core.data.store.ArchiveStore
+import com.cycling.rssradar.core.data.store.FeedSortStore
 import com.cycling.rssradar.core.data.store.GroupStore
 import com.cycling.rssradar.core.data.store.LinkStore
 import com.cycling.rssradar.core.data.store.ListDisplayStore
@@ -216,6 +217,12 @@ object AppModule {
     @Singleton
     fun provideListDisplayStore(@ApplicationContext context: Context): ListDisplayStore =
         ListDisplayStore(SettingsPrefs.of(context))
+
+    /** 订阅列表排序偏好（订阅管理页顶栏切换，持久化）。 */
+    @Provides
+    @Singleton
+    fun provideFeedSortStore(@ApplicationContext context: Context): FeedSortStore =
+        FeedSortStore(SettingsPrefs.of(context))
 
     @Provides
     @Singleton

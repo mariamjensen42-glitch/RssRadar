@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
@@ -28,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.compose.NavHost
 import androidx.navigation.navDeepLink
 import androidx.navigation.toRoute
@@ -120,27 +122,58 @@ private fun RssRadarAppContent() {
     }
 
     Box(modifier = Modifier.fillMaxSize().background(radarColors().bgRoot)) {
-        // 页面转场（docs/motion.md #1，issue #72）：前进「新页右滑入 1/12 + fade」，
-        // 返回取镜像；280ms emphasized。层级方向感来自横轴位移。
-        // reduce-motion：None = 瞬时切换，无位移无淡入。
+        // 页面转场（docs/motion.md #1，issue #72）分两层：
+        // - 层级导航（列表→详情这类）：前进「新页右滑入 1/12 + fade」（280ms emphasized），
+        //   返回镜像；退场用 200ms——退场比进场快，转场才跟手，双向同速必然显拖。
+        // - 顶层 tab 互切（Feed/订阅/搜索/我的）：同级没有方向语义，滑左右是假动作，
+        //   统一 200ms crossfade。
+        // - reduce-motion：None = 瞬时切换。
         val reducedMotion = LocalReducedMotion.current
-        val slideSpec = tween<IntOffset>(MotionTokens.DurationMedium, easing = MotionTokens.EasingEmphasized)
-        val fadeSpec = tween<Float>(MotionTokens.DurationMedium, easing = MotionTokens.EasingEmphasized)
-        val enter: EnterTransition = if (reducedMotion) EnterTransition.None
-        else slideInHorizontally(slideSpec) { it / 12 } + fadeIn(fadeSpec)
-        val exit: ExitTransition = if (reducedMotion) ExitTransition.None
-        else slideOutHorizontally(slideSpec) { -it / 12 } + fadeOut(fadeSpec)
-        val popEnter: EnterTransition = if (reducedMotion) EnterTransition.None
-        else slideInHorizontally(slideSpec) { -it / 12 } + fadeIn(fadeSpec)
-        val popExit: ExitTransition = if (reducedMotion) ExitTransition.None
-        else slideOutHorizontally(slideSpec) { it / 12 } + fadeOut(fadeSpec)
+        val enterSlide = tween<IntOffset>(MotionTokens.DurationMedium, easing = MotionTokens.EasingEmphasized)
+        val enterFade = tween<Float>(MotionTokens.DurationMedium, easing = MotionTokens.EasingEmphasized)
+        val exitSlide = tween<IntOffset>(MotionTokens.DurationShort, easing = MotionTokens.EasingEmphasized)
+        val exitFade = tween<Float>(MotionTokens.DurationShort, easing = MotionTokens.EasingEmphasized)
+        val topLevelRoutes = listOf(
+            FeedRoute::class,
+            SubscriptionsRoute::class,
+            SearchRoute::class,
+            MeRoute::class,
+        )
+        val isTabSwitch: AnimatedContentTransitionScope<NavBackStackEntry>.() -> Boolean = {
+            topLevelRoutes.any { initialState.destination.hasRoute(it) } &&
+                topLevelRoutes.any { targetState.destination.hasRoute(it) }
+        }
         NavHost(
             navController = navController,
             startDestination = FeedRoute,
-            enterTransition = { enter },
-            exitTransition = { exit },
-            popEnterTransition = { popEnter },
-            popExitTransition = { popExit },
+            enterTransition = {
+                when {
+                    reducedMotion -> EnterTransition.None
+                    isTabSwitch() -> fadeIn(enterFade)
+                    else -> slideInHorizontally(enterSlide) { it / 12 } + fadeIn(enterFade)
+                }
+            },
+            exitTransition = {
+                when {
+                    reducedMotion -> ExitTransition.None
+                    isTabSwitch() -> fadeOut(exitFade)
+                    else -> slideOutHorizontally(exitSlide) { -it / 12 } + fadeOut(exitFade)
+                }
+            },
+            popEnterTransition = {
+                when {
+                    reducedMotion -> EnterTransition.None
+                    isTabSwitch() -> fadeIn(enterFade)
+                    else -> slideInHorizontally(enterSlide) { -it / 12 } + fadeIn(enterFade)
+                }
+            },
+            popExitTransition = {
+                when {
+                    reducedMotion -> ExitTransition.None
+                    isTabSwitch() -> fadeOut(exitFade)
+                    else -> slideOutHorizontally(exitSlide) { it / 12 } + fadeOut(exitFade)
+                }
+            },
         ) {
             composable<FeedRoute> {
                 val vm = hiltViewModel<FeedListViewModel>()

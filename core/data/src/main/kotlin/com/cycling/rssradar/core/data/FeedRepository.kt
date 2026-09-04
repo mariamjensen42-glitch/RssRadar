@@ -116,6 +116,10 @@ class FeedRepository(
     fun observeFeedUnreadCounts(): Flow<Map<Long, Int>> =
         articleDao.observeUnreadCountByFeed().map { rows -> rows.associate { it.feedId to it.cnt } }
 
+    /** 每个订阅源最近一篇文章的时间（订阅列表「按最近更新」排序用）。 */
+    fun observeFeedLatestTimes(): Flow<Map<Long, Long>> =
+        articleDao.observeLatestTimeByFeed().map { rows -> rows.associate { it.feedId to it.latest } }
+
     suspend fun markRead(id: Long) = articleDao.markRead(id)
 
     /**

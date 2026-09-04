@@ -50,9 +50,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
+import com.cycling.rssradar.core.data.store.FeedSortMode
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.core.ui.components.FloatingTabBarFabOffset
+import com.cycling.rssradar.core.ui.components.OptionPickerSheet
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.composables.icons.lucide.ArrowDownUp
 import com.composables.icons.lucide.BookMarked
@@ -91,6 +93,7 @@ fun SubscriptionsScreen(
     val expandedIds by viewModel.expandedGroupIds.collectAsState()
     val totalUnread by viewModel.totalUnread.collectAsState()
     val groupOptions by viewModel.groupsList.collectAsState()
+    val sortMode by viewModel.sortMode.collectAsState()
     // 批量移动（issue #7）：多选模式与勾选集合在 ViewModel，弹层显隐是纯 UI 状态留在页面
     val selectionMode by viewModel.selectionMode.collectAsState()
     val selectedIds by viewModel.selectedFeedIds.collectAsState()
@@ -102,6 +105,8 @@ fun SubscriptionsScreen(
     /** 分组操作底栏（重命名/清空文章/删除分组，issue #8）。 */
     var groupActionTarget by remember { mutableStateOf<String?>(null) }
     var batchMoveDialog by remember { mutableStateOf(false) }
+    /** 订阅列表排序选择弹层。 */
+    var showSortSheet by remember { mutableStateOf(false) }
 
     // 列表 item 动画（docs/motion.md #4）：订阅列表增删 + 位移全开；
     // reduce-motion 时全部置 null = 直接增删（红线：所有动画响应降级）
@@ -154,7 +159,7 @@ fun SubscriptionsScreen(
                     onExport = {
                         exportLauncher.launch("rssradar-subscriptions-${todayStamp()}.opml")
                     },
-                    onSort = { viewModel.onIntent(SubscriptionsIntent.ToggleSort) },
+                    onSort = { showSortSheet = true },
                     onBatchMove = { viewModel.onIntent(SubscriptionsIntent.ToggleSelectionMode) },
                     onAdd = onAddSubscription,
                 )
@@ -293,6 +298,25 @@ fun SubscriptionsScreen(
             group = group,
             viewModel = viewModel,
             onDismiss = { groupActionTarget = null },
+        )
+    }
+
+    // 订阅列表排序（按名称/最近更新/未读数）：选择即生效并持久化
+    if (showSortSheet) {
+        OptionPickerSheet(
+            title = "订阅列表排序",
+            options = FeedSortMode.entries.toList(),
+            selected = sortMode,
+            label = { it.label },
+            subtitle = { mode ->
+                when (mode) {
+                    FeedSortMode.BY_NAME -> "订阅源按标题排列"
+                    FeedSortMode.BY_RECENT -> "最近有新文章的源排前面"
+                    FeedSortMode.BY_UNREAD -> "未读文章多的源排前面"
+                }
+            },
+            onSelect = { mode -> viewModel.onIntent(SubscriptionsIntent.SelectSort(mode)) },
+            onDismiss = { showSortSheet = false },
         )
     }
 }

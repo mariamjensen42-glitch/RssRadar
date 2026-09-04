@@ -229,6 +229,12 @@ data class FeedUnreadCount(
     val cnt: Int,
 )
 
+/** 订阅源最近一篇文章的时间戳（订阅列表「按最近更新」排序用）。 */
+data class FeedLatestTime(
+    val feedId: Long,
+    val latest: Long,
+)
+
 @Dao
 interface FeedDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -482,6 +488,19 @@ interface ArticleDao {
         """,
     )
     fun observeUnreadCountByFeed(): Flow<List<FeedUnreadCount>>
+
+    /**
+     * 每个订阅源最近一篇文章的时间（无发布时间用抓取时间兜底，COALESCE 里 NULL 沉底）。
+     * 订阅列表「按最近更新」排序用。列名对齐 [FeedLatestTime]。
+     */
+    @Query(
+        """
+        SELECT feedId AS feedId, MAX(COALESCE(publishedAt, fetchedAt)) AS latest
+        FROM articles
+        GROUP BY feedId
+        """,
+    )
+    fun observeLatestTimeByFeed(): Flow<List<FeedLatestTime>>
 
     @Query("SELECT id FROM articles WHERE feedId = :feedId AND link = :link LIMIT 1")
     suspend fun findIdByLink(feedId: Long, link: String): Long?

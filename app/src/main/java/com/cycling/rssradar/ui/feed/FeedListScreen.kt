@@ -92,6 +92,7 @@ import com.cycling.rssradar.core.data.db.ArticleEntity
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
 import com.cycling.rssradar.core.data.store.ListDescMode
 import com.cycling.rssradar.core.data.store.ListDisplayState
+import com.cycling.rssradar.core.data.store.ListViewMode
 import com.cycling.rssradar.core.model.MarkAsReadCondition
 import com.cycling.rssradar.ui.theme.LocalListDisplay
 import com.cycling.rssradar.ui.components.ArticleContextMenu
@@ -105,10 +106,14 @@ import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.CheckCheck
 import com.composables.icons.lucide.Image
+import com.composables.icons.lucide.LayoutGrid
+import com.composables.icons.lucide.LayoutList
 import com.composables.icons.lucide.Music
+import com.composables.icons.lucide.Newspaper
 import com.composables.icons.lucide.Play
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Rows3
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.SlidersHorizontal
@@ -132,6 +137,10 @@ fun FeedListScreen(
     var showGroupSheet by remember { mutableStateOf(false) }
     /** 批量标记已读条件弹层（#10）。 */
     var showMarkReadSheet by remember { mutableStateOf(false) }
+    /** 列表视图模式选择弹层（列表/卡片/杂志/网格）。 */
+    var showViewModeSheet by remember { mutableStateOf(false) }
+    /** 视图模式是全局显示偏好（ListDisplayStore → CompositionLocal），这里读，VM 写。 */
+    val viewMode = LocalListDisplay.current.viewMode
     val message = uiState.uiMessage
 
     LaunchedEffect(message) {
@@ -184,6 +193,8 @@ fun FeedListScreen(
                 onOpenSearch = onOpenSearch,
                 onOpenFilter = { showGroupSheet = true },
                 onMarkAllRead = { showMarkReadSheet = true },
+                onOpenViewMode = { showViewModeSheet = true },
+                viewMode = viewMode,
                 filterActive = uiState.selectedGroup != null,
             )
         },
@@ -278,6 +289,26 @@ fun FeedListScreen(
         )
     }
 
+    // 列表视图模式（列表/卡片/杂志/网格）：全局偏好，切换后所有文章列表即改即见
+    if (showViewModeSheet) {
+        OptionPickerSheet(
+            title = "视图模式",
+            options = ListViewMode.entries.toList(),
+            selected = viewMode,
+            label = { it.label },
+            subtitle = { mode ->
+                when (mode) {
+                    ListViewMode.LIST -> "单列紧凑，标题 + 摘要"
+                    ListViewMode.CARD -> "卡片排版，右侧缩略图"
+                    ListViewMode.MAGAZINE -> "图文混排，首篇大图突出"
+                    ListViewMode.GRID -> "多列网格，按屏幕宽度自适应"
+                }
+            },
+            onSelect = { mode -> viewModel.onIntent(FeedListIntent.SetViewMode(mode)) },
+            onDismiss = { showViewModeSheet = false },
+        )
+    }
+
     // 批量标记已读（#10）：选条件后一次性写库，数字由 DAO 的真实影响行数汇报
     if (showMarkReadSheet) {
         OptionPickerSheet(
@@ -302,6 +333,8 @@ private fun FeedListTopBar(
     onOpenSearch: () -> Unit,
     onOpenFilter: () -> Unit,
     onMarkAllRead: () -> Unit,
+    onOpenViewMode: () -> Unit,
+    viewMode: ListViewMode,
     filterActive: Boolean,
 ) {
     Row(
@@ -324,6 +357,19 @@ private fun FeedListTopBar(
         // 批量标记已读（#10）：积累几天未读刷不完的信息流，一键按时间范围清空
         IconButton(onClick = onMarkAllRead) {
             Icon(Lucide.CheckCheck, contentDescription = "标记已读", tint = radarColors().textPrimary)
+        }
+        // 视图模式切换：图标随当前模式变，点开弹层选模式
+        IconButton(onClick = onOpenViewMode) {
+            Icon(
+                imageVector = when (viewMode) {
+                    ListViewMode.LIST -> Lucide.Rows3
+                    ListViewMode.CARD -> Lucide.LayoutList
+                    ListViewMode.MAGAZINE -> Lucide.Newspaper
+                    ListViewMode.GRID -> Lucide.LayoutGrid
+                },
+                contentDescription = "视图模式",
+                tint = radarColors().textPrimary,
+            )
         }
         IconButton(onClick = onOpenFilter) {
             Box {
@@ -503,6 +549,28 @@ fun ArticleCardList(
     val display = LocalListDisplay.current.let {
         it.copy(showFeedName = showFeedName ?: it.showFeedName)
     }
+    // 网格模式是独立容器（LazyVerticalGrid），走自己的渲染分支；粘性日期头与
+    // 滚动标已读都是 LazyColumn 槽位逻辑，网格里不适用（与图片画廊同规则）。
+    if (display.viewMode == ListViewMode.GRID) {
+        ArticleAdaptiveGrid(
+            articles = articles,
+            onArticleClick = onArticleClick,
+            onScrolledToEnd = onScrolledToEnd,
+            bottomPadding = bottomPadding,
+            onReduceSuch = onReduceSuch,
+            onToggleRead = onToggleRead,
+            onToggleStarred = onToggleStarred,
+            onToggleBookmarked = onToggleBookmarked,
+            onDelete = onDelete,
+            modifier = modifier,
+        )
+        return
+    }
+    // 列表模式 = 单列紧凑：固定无缩略图（摘要保留），其余显示项沿用用户设置
+    val effective = when (display.viewMode) {
+        ListViewMode.LIST -> display.copy(showThumbnail = false)
+        else -> display
+    }
     val listState = rememberLazyListState()
     // 删除淡出（docs/motion.md #4）：数万条列表只做 fadeOut，placement / fadeIn 关闭
     // ——低端机上 placement 是帧率杀手。reduce-motion 时 fadeOut 也关（红线）。
@@ -556,6 +624,8 @@ fun ArticleCardList(
         ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        // 杂志模式：首篇大图突出（hero 跟随列表首项，翻页后仍是当前加载段的第一篇）
+        val heroId = if (effective.viewMode == ListViewMode.MAGAZINE) articles.firstOrNull()?.article?.id else null
         if (display.stickyDateHeader) {
             // 粘性日期头（issue #56）：按自然日分组，吸附在顶部。
             // 只做视觉分组，不改变排序与分页；列表本身已按 publishedAt DESC 排序。
@@ -573,15 +643,16 @@ fun ArticleCardList(
                             fadeOutSpec = removeFadeSpec,
                         ),
                     ) {
-                        SwipeableArticleCard(
+                        ArticleListItem(
                             item = item,
-                            display = display,
-                            onClick = { onArticleClick(item) },
-                            onToggleRead = { onToggleRead(item.article.id, !item.article.isRead) },
-                            onToggleStarred = { onToggleStarred(item.article.id) },
-                            onToggleBookmarked = { onToggleBookmarked(item.article.id) },
-                            onDelete = { onDelete(item.article.id) },
-                            onReduceSuch = onReduceSuch?.let { reduce -> { reduce(item.article.id) } },
+                            display = effective,
+                            hero = item.article.id == heroId,
+                            onArticleClick = onArticleClick,
+                            onToggleRead = onToggleRead,
+                            onToggleStarred = onToggleStarred,
+                            onToggleBookmarked = onToggleBookmarked,
+                            onDelete = onDelete,
+                            onReduceSuch = onReduceSuch,
                         )
                     }
                 }
@@ -595,16 +666,433 @@ fun ArticleCardList(
                         fadeOutSpec = removeFadeSpec,
                     ),
                 ) {
-                    SwipeableArticleCard(
+                    ArticleListItem(
                         item = item,
-                        display = display,
-                        onClick = { onArticleClick(item) },
-                        onToggleRead = { onToggleRead(item.article.id, !item.article.isRead) },
-                        onToggleStarred = { onToggleStarred(item.article.id) },
-                        onToggleBookmarked = { onToggleBookmarked(item.article.id) },
-                        onDelete = { onDelete(item.article.id) },
+                        display = effective,
+                        hero = item.article.id == heroId,
+                        onArticleClick = onArticleClick,
+                        onToggleRead = onToggleRead,
+                        onToggleStarred = onToggleStarred,
+                        onToggleBookmarked = onToggleBookmarked,
+                        onDelete = onDelete,
+                        onReduceSuch = onReduceSuch,
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * 单篇文章项按视图模式分发：列表/卡片走 [SwipeableArticleCard]（带滑动手势），
+ * 杂志走图文混排卡（首篇 hero 大图）。长按上下文菜单在杂志卡里保持一致。
+ */
+@Composable
+private fun ArticleListItem(
+    item: ArticleWithFeed,
+    display: ListDisplayState,
+    hero: Boolean,
+    onArticleClick: (ArticleWithFeed) -> Unit,
+    onToggleRead: (Long, Boolean) -> Unit,
+    onToggleStarred: (Long) -> Unit,
+    onToggleBookmarked: (Long) -> Unit,
+    onDelete: (Long) -> Unit,
+    onReduceSuch: ((Long) -> Unit)?,
+) {
+    if (display.viewMode != ListViewMode.MAGAZINE) {
+        SwipeableArticleCard(
+            item = item,
+            display = display,
+            onClick = { onArticleClick(item) },
+            onToggleRead = { onToggleRead(item.article.id, !item.article.isRead) },
+            onToggleStarred = { onToggleStarred(item.article.id) },
+            onToggleBookmarked = { onToggleBookmarked(item.article.id) },
+            onDelete = { onDelete(item.article.id) },
+            onReduceSuch = onReduceSuch?.let { reduce -> { reduce(item.article.id) } },
+        )
+        return
+    }
+    ArticleMenuBox(
+        itemCount = if (onReduceSuch != null) 8 else 7,
+        actions = ArticleMenuActions(
+            isRead = item.article.isRead,
+            isStarred = item.article.isStarred,
+            isBookmarked = item.article.isBookmarked,
+            link = item.article.link,
+            onToggleRead = { onToggleRead(item.article.id, !item.article.isRead) },
+            onToggleStarred = { onToggleStarred(item.article.id) },
+            onToggleBookmarked = { onToggleBookmarked(item.article.id) },
+            onDelete = { onDelete(item.article.id) },
+            onReduceSuch = onReduceSuch?.let { reduce -> { reduce(item.article.id) } },
+        ),
+    ) { onLongClick ->
+        if (hero) {
+            MagazineHeroCard(item = item, onClick = { onArticleClick(item) }, onLongClick = onLongClick)
+        } else {
+            MagazineCard(item = item, onClick = { onArticleClick(item) }, onLongClick = onLongClick)
+        }
+    }
+}
+
+/**
+ * 杂志/网格卡的通用长按菜单容器：负责按压缩点定位与菜单弹出，
+ * 内容卡通过 [content] 拿到 onLongClick 挂进自己的 combinedClickable。
+ */
+@Composable
+private fun ArticleMenuBox(
+    itemCount: Int,
+    actions: ArticleMenuActions,
+    content: @Composable (() -> Unit) -> Unit,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    // 菜单偏移：贴着长按手指出现（与 ArticleCard 同一套预判逻辑）
+    var menuOffset by remember { mutableStateOf(DpOffset.Zero) }
+    var pressPos by remember { mutableStateOf(Offset.Zero) }
+    var cardTopInWindowPx by remember { mutableStateOf(0f) }
+    var cardHeightPx by remember { mutableStateOf(0) }
+    val density = LocalDensity.current
+    val windowHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
+    Box {
+        Box(
+            modifier = Modifier
+                .onGloballyPositioned {
+                    cardTopInWindowPx = it.localToWindow(Offset.Zero).y
+                    cardHeightPx = it.size.height
+                }
+                // 旁观手势：只记录按下坐标，不消费事件，长按仍由内容卡的 clickable 触发
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        pressPos = awaitFirstDown(requireUnconsumed = false).position
+                    }
+                },
+        ) {
+            content {
+                menuOffset = articleMenuOffset(
+                    pressPos = pressPos,
+                    cardTopInWindowPx = cardTopInWindowPx,
+                    cardHeightPx = cardHeightPx,
+                    menuItemCount = itemCount,
+                    windowHeightPx = windowHeightPx,
+                    density = density,
+                )
+                menuExpanded = true
+            }
+        }
+        ArticleContextMenu(
+            expanded = menuExpanded,
+            offset = menuOffset,
+            actions = actions,
+            onDismiss = { menuExpanded = false },
+        )
+    }
+}
+
+/** 杂志模式首篇：16:9 大图 + 标题压图（黑渐变 scrim 保证可读）；无封面退化为大字排版。 */
+@Composable
+private fun MagazineHeroCard(
+    item: ArticleWithFeed,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = radarColors().surface1,
+        modifier = Modifier
+            .fillMaxWidth()
+            .pressScale(interactionSource)
+            .clip(RoundedCornerShape(16.dp))
+            .combinedClickable(
+                interactionSource = interactionSource,
+                onClick = onClick,
+                onLongClick = onLongClick,
+            ),
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .background(radarColors().surface2),
+            ) {
+                // RadarImage 对 null/加载失败自带图标占位兜底
+                RadarImage(
+                    url = item.article.coverUrl,
+                    contentDescription = item.article.title,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                if (!item.article.isRead) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(10.dp)
+                            .size(8.dp)
+                            .background(radarColors().accent, RoundedCornerShape(50)),
+                    )
+                }
+                // 标题压底：白字 + scrim，来源行让读者知道重点来自哪个源
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f))),
+                        )
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                ) {
+                    Column {
+                        Text(
+                            text = item.feedTitle,
+                            color = Color.White.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = item.article.title,
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            item.article.summary?.takeIf { it.isNotBlank() }?.let { summary ->
+                Text(
+                    text = summary,
+                    color = radarColors().textSecondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                )
+            }
+        }
+    }
+}
+
+/** 杂志模式常规项：封面横图置顶（有则显示），标题 + 摘要混排其下。 */
+@Composable
+private fun MagazineCard(
+    item: ArticleWithFeed,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = radarColors().surface1,
+        modifier = Modifier
+            .fillMaxWidth()
+            .pressScale(interactionSource)
+            .clip(RoundedCornerShape(14.dp))
+            .combinedClickable(
+                interactionSource = interactionSource,
+                onClick = onClick,
+                onLongClick = onLongClick,
+            ),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            item.article.coverUrl?.takeIf { it.isNotBlank() }?.let { cover ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(radarColors().surface2),
+                ) {
+                    RadarImage(
+                        url = cover,
+                        contentDescription = item.article.title,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    when (item.article.mediaKind) {
+                        ArticleEntity.MEDIA_KIND_VIDEO ->
+                            MediaBadge(Lucide.Play, "视频", Modifier.align(Alignment.BottomEnd).padding(6.dp))
+                        ArticleEntity.MEDIA_KIND_AUDIO ->
+                            MediaBadge(Lucide.Music, "音频", Modifier.align(Alignment.BottomEnd).padding(6.dp))
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                UnreadDot(visible = !item.article.isRead)
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = item.feedTitle,
+                    color = radarColors().textTertiary,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                item.article.publishedAt?.let { ts ->
+                    Text(
+                        text = DateUtils.getRelativeTimeSpanString(ts).toString(),
+                        color = radarColors().textTertiary,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = item.article.title,
+                color = radarColors().textPrimary,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            item.article.summary?.takeIf { it.isNotBlank() }?.let { summary ->
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = summary,
+                    color = radarColors().textSecondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 网格模式：GridCells.Adaptive 按可用宽度自动定列数（手机两列、平板/横屏更多），
+ * 分页沿用滚近底部触发。粘性日期头/滚动标已读均为列表容器逻辑，网格不适用。
+ */
+@Composable
+private fun ArticleAdaptiveGrid(
+    articles: List<ArticleWithFeed>,
+    onArticleClick: (ArticleWithFeed) -> Unit,
+    onScrolledToEnd: () -> Unit,
+    bottomPadding: Dp,
+    onReduceSuch: ((Long) -> Unit)?,
+    onToggleRead: (Long, Boolean) -> Unit,
+    onToggleStarred: (Long) -> Unit,
+    onToggleBookmarked: (Long) -> Unit,
+    onDelete: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val listState = rememberLazyGridState()
+    val shouldLoadMore = remember {
+        derivedStateOf {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            lastVisible >= listState.layoutInfo.totalItemsCount - LOAD_MORE_THRESHOLD
+        }
+    }
+    LaunchedEffect(shouldLoadMore.value) {
+        if (shouldLoadMore.value) onScrolledToEnd()
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 160.dp),
+        state = listState,
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = bottomPadding),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = modifier.fillMaxSize(),
+    ) {
+        items(items = articles, key = { it.article.id }) { item ->
+            ArticleMenuBox(
+                itemCount = if (onReduceSuch != null) 8 else 7,
+                actions = ArticleMenuActions(
+                    isRead = item.article.isRead,
+                    isStarred = item.article.isStarred,
+                    isBookmarked = item.article.isBookmarked,
+                    link = item.article.link,
+                    onToggleRead = { onToggleRead(item.article.id, !item.article.isRead) },
+                    onToggleStarred = { onToggleStarred(item.article.id) },
+                    onToggleBookmarked = { onToggleBookmarked(item.article.id) },
+                    onDelete = { onDelete(item.article.id) },
+                    onReduceSuch = onReduceSuch?.let { reduce -> { reduce(item.article.id) } },
+                ),
+            ) { onLongClick ->
+                GridArticleCard(
+                    item = item,
+                    onClick = { onArticleClick(item) },
+                    onLongClick = onLongClick,
+                )
+            }
+        }
+    }
+}
+
+/** 网格模式单元格：4:3 封面 + 标题 + 来源/日期行。 */
+@Composable
+private fun GridArticleCard(
+    item: ArticleWithFeed,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = radarColors().surface1,
+        modifier = Modifier
+            .fillMaxWidth()
+            .pressScale(interactionSource)
+            .clip(RoundedCornerShape(14.dp))
+            .combinedClickable(
+                interactionSource = interactionSource,
+                onClick = onClick,
+                onLongClick = onLongClick,
+            ),
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(4f / 3f)
+                    .background(radarColors().surface2),
+            ) {
+                RadarImage(
+                    url = item.article.coverUrl,
+                    contentDescription = item.article.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                if (!item.article.isRead) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(8.dp)
+                            .size(8.dp)
+                            .background(radarColors().accent, RoundedCornerShape(50)),
+                    )
+                }
+                when (item.article.mediaKind) {
+                    ArticleEntity.MEDIA_KIND_VIDEO ->
+                        MediaBadge(Lucide.Play, "视频", Modifier.align(Alignment.BottomEnd).padding(6.dp))
+                    ArticleEntity.MEDIA_KIND_AUDIO ->
+                        MediaBadge(Lucide.Music, "音频", Modifier.align(Alignment.BottomEnd).padding(6.dp))
+                }
+            }
+            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                Text(
+                    text = item.article.title,
+                    color = radarColors().textPrimary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = buildString {
+                        append(item.feedTitle)
+                        item.article.publishedAt?.let { ts ->
+                            append(" · ")
+                            append(DateUtils.getRelativeTimeSpanString(ts).toString())
+                        }
+                    },
+                    color = radarColors().textTertiary,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }

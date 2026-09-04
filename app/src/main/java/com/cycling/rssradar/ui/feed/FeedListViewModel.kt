@@ -10,6 +10,8 @@ import com.cycling.rssradar.core.data.SubscriptionFlow
 import com.cycling.rssradar.core.data.Recommendation
 import com.cycling.rssradar.core.data.ai.AiRepository
 import com.cycling.rssradar.core.data.store.GroupStore
+import com.cycling.rssradar.core.data.store.ListDisplayStore
+import com.cycling.rssradar.core.data.store.ListViewMode
 import com.cycling.rssradar.core.model.MarkAsReadCondition
 import com.cycling.rssradar.core.data.store.RecommendationStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
@@ -89,6 +91,8 @@ sealed interface FeedListIntent {
     data class MarkAllRead(val condition: MarkAsReadCondition) : FeedListIntent
     /** 滚动自动标记已读（#11）：卡片滚出视口后由列表上报的 id 批次。 */
     data class MarkReadPassed(val ids: List<Long>) : FeedListIntent
+    /** 文章列表视图模式（列表/卡片/杂志/网格），写入全局显示偏好，即改即见并持久化。 */
+    data class SetViewMode(val mode: ListViewMode) : FeedListIntent
 }
 
 @HiltViewModel
@@ -100,6 +104,7 @@ class FeedListViewModel @Inject constructor(
     /** 推荐流（ADR-0013）：候选池 + 打分 + 负反馈。 */
     private val recommendation: Recommendation,
     recommendationStore: RecommendationStore,
+    private val listDisplayStore: ListDisplayStore,
 ) : ViewModel(), MviViewModel<FeedListIntent> {
 
     private val _uiState = MutableStateFlow(FeedListUiState())
@@ -156,6 +161,7 @@ class FeedListViewModel @Inject constructor(
             is FeedListIntent.AddFeed -> addFeed(intent.rawUrl, intent.groupName)
             is FeedListIntent.MarkAllRead -> markAllRead(intent.condition)
             is FeedListIntent.MarkReadPassed -> markReadPassed(intent.ids)
+            is FeedListIntent.SetViewMode -> listDisplayStore.update { it.copy(viewMode = intent.mode) }
         }
     }
 

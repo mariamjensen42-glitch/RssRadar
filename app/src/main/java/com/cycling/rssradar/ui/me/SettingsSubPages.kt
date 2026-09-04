@@ -48,6 +48,7 @@ import com.cycling.rssradar.core.model.rsshub.CatalogSource
 import com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.core.data.store.KeepArchived
 import com.cycling.rssradar.core.data.store.LinkOpenMode
+import com.cycling.rssradar.core.data.store.ListViewMode
 import com.cycling.rssradar.core.data.store.ShareContentFormat
 import com.cycling.rssradar.core.data.store.SyncInterval
 import com.cycling.rssradar.core.data.store.ThemeMode
@@ -286,6 +287,37 @@ fun SettingsGeneralScreen(
         Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 val display = state.listDisplay
+                // 视图模式（列表/卡片/杂志/网格）：与信息流顶栏同一份全局偏好
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "视图模式",
+                        color = radarColors().textPrimary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ListViewMode.entries.forEach { mode ->
+                            val selected = display.viewMode == mode
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = if (selected) radarColors().accent else radarColors().surface2,
+                                modifier = Modifier.clickable {
+                                    viewModel.updateListDisplay { it.copy(viewMode = mode) }
+                                },
+                            ) {
+                                Text(
+                                    text = mode.label,
+                                    color = if (selected) radarColors().onAccent else radarColors().textPrimary,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                )
+                            }
+                        }
+                    }
+                }
                 SettingSwitchRow(
                     label = "订阅源图标",
                     checked = display.showFeedIcon,
