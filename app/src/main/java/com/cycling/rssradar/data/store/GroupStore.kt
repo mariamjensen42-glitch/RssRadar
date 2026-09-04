@@ -2,9 +2,9 @@ package com.cycling.rssradar.data.store
 
 import android.content.SharedPreferences
 import com.cycling.rssradar.data.db.DEFAULT_GROUP
-import com.cycling.rssradar.data.db.GROUP_TECH
-import com.cycling.rssradar.data.db.GROUP_DEV
-import com.cycling.rssradar.data.db.GROUP_DESIGN
+import com.cycling.rssradar.core.model.GROUP_TECH
+import com.cycling.rssradar.core.model.GROUP_DEV
+import com.cycling.rssradar.core.model.GROUP_DESIGN
 
 
 /**
