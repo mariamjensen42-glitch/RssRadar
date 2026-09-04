@@ -94,6 +94,7 @@ fun ArticleDetailScreen(
     onOpenOriginal: (String) -> Unit = {},
 ) {
     val article by viewModel.article.collectAsState()
+    val initialLoadDone by viewModel.initialLoadDone.collectAsState()
     val isFetchingContent by viewModel.isFetchingContent.collectAsState()
     val aiSummaryState by viewModel.aiSummaryState.collectAsState()
     val translationState by viewModel.translationState.collectAsState()
@@ -181,7 +182,17 @@ fun ArticleDetailScreen(
                     .padding(padding),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("文章不存在", color = radarColors().textSecondary)
+                if (initialLoadDone) {
+                    // 查过了、确实没有，才可以说「文章不存在」
+                    Text("文章不存在", color = radarColors().textSecondary)
+                } else {
+                    // 首查进行中（issue #73）：此前的 null 会闪一帧「文章不存在」
+                    CircularProgressIndicator(
+                        color = radarColors().accent,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
             return@Scaffold
         }

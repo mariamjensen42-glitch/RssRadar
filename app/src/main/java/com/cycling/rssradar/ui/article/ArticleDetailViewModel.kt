@@ -92,6 +92,14 @@ class ArticleDetailViewModel @Inject constructor(
     private val _article = MutableStateFlow<ArticleWithFeed?>(null)
     val article: StateFlow<ArticleWithFeed?> = _article.asStateFlow()
 
+    /**
+     * 首次详情查询是否已完成。初始 null ≠ 不存在——Room 查询是挂起调用，
+     * 返回前 UI 若把 null 当「文章不存在」渲染，就会闪一帧错误提示再被真值覆盖。
+     * 置 true 后不再回落：上一篇/下一篇切换时旧文章保持显示到新文章就位，同理不闪。
+     */
+    private val _initialLoadDone = MutableStateFlow(false)
+    val initialLoadDone: StateFlow<Boolean> = _initialLoadDone.asStateFlow()
+
     /** 正在按需抓取原网页正文。失败是常态（反爬/JS 页），静默降级，UI 不弹错误。 */
     private val _isFetchingContent = MutableStateFlow(false)
     val isFetchingContent: StateFlow<Boolean> = _isFetchingContent.asStateFlow()
@@ -153,6 +161,7 @@ class ArticleDetailViewModel @Inject constructor(
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             _article.value = repository.getArticle(articleId)
+            _initialLoadDone.value = true
             _neighbors.value = loadNeighbors(articleId)
             if (_article.value?.article?.isRead == false) {
                 repository.markRead(articleId)
