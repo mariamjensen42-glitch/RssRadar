@@ -1,5 +1,7 @@
 package com.cycling.rssradar.data.rsshub
 
+import com.cycling.rssradar.core.model.rsshub.CatalogSource
+
 import kotlinx.serialization.decodeFromString
 import org.junit.Assert.assertEquals
 import org.junit.Test
