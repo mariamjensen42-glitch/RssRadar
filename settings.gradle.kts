@@ -25,3 +25,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "RssRadar"
 include(":app")
+include(":core:model")
+include(":core:domain")
