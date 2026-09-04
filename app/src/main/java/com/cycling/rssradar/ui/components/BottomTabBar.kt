@@ -29,16 +29,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.OnAccent
-import com.cycling.rssradar.ui.theme.Surface2
-import com.cycling.rssradar.ui.theme.TextSecondary
-import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.Library
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Rss
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.User
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 
 /** 底部 TabBar 的 4 个主屏条目，与 Nav 路由一一对应（key 用于选中态判定）。 */
@@ -93,7 +89,7 @@ fun FloatingBottomBar(
     ) {
         Surface(
             shape = RoundedCornerShape(28.dp),
-            color = Surface2,
+            color = radarColors().surface2,
             tonalElevation = 0.dp,
             shadowElevation = 8.dp,
             modifier = Modifier.fillMaxWidth(),
@@ -126,15 +122,15 @@ private fun TabItem(
     modifier: Modifier = Modifier,
 ) {
     val background by animateColorAsState(
-        targetValue = if (selected) Accent else Color.Transparent,
+        targetValue = if (selected) radarColors().accent else Color.Transparent,
         label = "tab-bg",
     )
     val foreground by animateColorAsState(
-        targetValue = if (selected) OnAccent else TextTertiary,
+        targetValue = if (selected) radarColors().onAccent else radarColors().textTertiary,
         label = "tab-fg",
     )
     val secondaryFg by animateColorAsState(
-        targetValue = if (selected) OnAccent else TextSecondary,
+        targetValue = if (selected) radarColors().onAccent else radarColors().textSecondary,
         label = "tab-secondary-fg",
     )
     @Suppress("UNUSED_EXPRESSION") secondaryFg // 留作未来副标题

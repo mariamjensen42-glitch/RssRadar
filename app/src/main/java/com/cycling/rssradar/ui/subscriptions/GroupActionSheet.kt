@@ -32,17 +32,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.Danger
-import com.cycling.rssradar.ui.theme.Surface1
-import com.cycling.rssradar.ui.theme.Surface2
-import com.cycling.rssradar.ui.theme.TextPrimary
-import com.cycling.rssradar.ui.theme.TextSecondary
-import com.cycling.rssradar.ui.theme.TextTertiary
+import com.cycling.rssradar.core.ui.theme.Danger
 import com.composables.icons.lucide.Eraser
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Trash2
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 
 /**
@@ -65,12 +60,12 @@ fun GroupActionSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Surface1,
+        containerColor = radarColors().surface1,
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text(
                 text = group,
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -78,13 +73,13 @@ fun GroupActionSheet(
             )
             Spacer(Modifier.height(16.dp))
             ActionRow(
-                icon = { Icon(Lucide.Pencil, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp)) },
+                icon = { Icon(Lucide.Pencil, contentDescription = null, tint = radarColors().textSecondary, modifier = Modifier.size(18.dp)) },
                 title = "重命名分组",
                 onClick = { renameTarget = group },
             )
             Spacer(Modifier.height(8.dp))
             ActionRow(
-                icon = { Icon(Lucide.Eraser, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp)) },
+                icon = { Icon(Lucide.Eraser, contentDescription = null, tint = radarColors().textSecondary, modifier = Modifier.size(18.dp)) },
                 title = "清空分组文章",
                 subtitle = "删除本组所有订阅的文章，收藏与稍后读保留",
                 onClick = { confirmClear = true },
@@ -107,9 +102,9 @@ fun GroupActionSheet(
         var value by remember { mutableStateOf(initial) }
         AlertDialog(
             onDismissRequest = { renameTarget = null },
-            containerColor = Surface1,
-            titleContentColor = TextPrimary,
-            textContentColor = TextSecondary,
+            containerColor = radarColors().surface1,
+            titleContentColor = radarColors().textPrimary,
+            textContentColor = radarColors().textSecondary,
             title = {
                 Text(
                     "重命名分组",
@@ -123,13 +118,13 @@ fun GroupActionSheet(
                     onValueChange = { value = it },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Surface2,
-                        unfocusedContainerColor = Surface2,
-                        focusedBorderColor = Accent,
+                        focusedContainerColor = radarColors().surface2,
+                        unfocusedContainerColor = radarColors().surface2,
+                        focusedBorderColor = radarColors().accent,
                         unfocusedBorderColor = Color.Transparent,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        cursorColor = Accent,
+                        focusedTextColor = radarColors().textPrimary,
+                        unfocusedTextColor = radarColors().textPrimary,
+                        cursorColor = radarColors().accent,
                     ),
                 )
             },
@@ -141,11 +136,11 @@ fun GroupActionSheet(
                         onDismiss()
                     },
                 ) {
-                    Text("保存", color = Accent, fontWeight = FontWeight.SemiBold)
+                    Text("保存", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { renameTarget = null }) { Text("取消", color = TextTertiary) }
+                TextButton(onClick = { renameTarget = null }) { Text("取消", color = radarColors().textTertiary) }
             },
         )
     }
@@ -185,11 +180,11 @@ private fun ActionRow(
     title: String,
     onClick: () -> Unit,
     subtitle: String? = null,
-    titleColor: Color = TextPrimary,
+    titleColor: Color = radarColors().textPrimary,
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = Surface2,
+        color = radarColors().surface2,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
@@ -205,7 +200,7 @@ private fun ActionRow(
                 if (subtitle != null) {
                     Text(
                         subtitle,
-                        color = TextTertiary,
+                        color = radarColors().textTertiary,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -224,9 +219,9 @@ private fun ConfirmDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Surface1,
-        titleContentColor = TextPrimary,
-        textContentColor = TextSecondary,
+        containerColor = radarColors().surface1,
+        titleContentColor = radarColors().textPrimary,
+        textContentColor = radarColors().textSecondary,
         title = { Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
         text = { Text(text, style = MaterialTheme.typography.bodyMedium) },
         confirmButton = {
@@ -235,7 +230,7 @@ private fun ConfirmDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消", color = TextTertiary) }
+            TextButton(onClick = onDismiss) { Text("取消", color = radarColors().textTertiary) }
         },
     )
 }

@@ -16,11 +16,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.Surface1
-import com.cycling.rssradar.ui.theme.TextPrimary
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lucide
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 通用档位选择弹层（原 RssHubSettingsScreen 内的私有组件抽出，供设置页与信息流页共用）。
@@ -39,11 +37,11 @@ fun <T> OptionPickerSheet(
     /** 选项下方的说明（如"1 天前 = 早于该时间的未读文章"），可空。 */
     subtitle: ((T) -> String?)? = null,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Surface1) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = radarColors().surface1) {
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
             Text(
                 text = title,
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
@@ -62,7 +60,7 @@ fun <T> OptionPickerSheet(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = label(option),
-                            color = if (option == selected) Accent else TextPrimary,
+                            color = if (option == selected) radarColors().accent else radarColors().textPrimary,
                             style = MaterialTheme.typography.bodyLarge,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -70,7 +68,7 @@ fun <T> OptionPickerSheet(
                         subtitle?.invoke(option)?.let { note ->
                             Text(
                                 text = note,
-                                color = com.cycling.rssradar.ui.theme.TextTertiary,
+                                color = radarColors().textTertiary,
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
@@ -79,7 +77,7 @@ fun <T> OptionPickerSheet(
                         Icon(
                             imageVector = Lucide.Check,
                             contentDescription = "已选",
-                            tint = Accent,
+                            tint = radarColors().accent,
                             modifier = Modifier.size(18.dp),
                         )
                     }

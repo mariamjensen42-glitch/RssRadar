@@ -24,14 +24,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.cycling.rssradar.core.data.db.FeedEntity
-import com.cycling.rssradar.ui.components.AppSnackbarHost
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.BgRoot
-import com.cycling.rssradar.ui.theme.TextPrimary
-import com.cycling.rssradar.ui.theme.TextSecondary
+import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.RefreshCw
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 订阅源文章列表（CONTEXT.md「Feed article list」，issue #51）：
@@ -56,14 +53,14 @@ fun FeedArticlesScreen(
     }
 
     Scaffold(
-        containerColor = BgRoot,
+        containerColor = radarColors().bgRoot,
         snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         text = viewModel.feed?.title ?: "订阅源",
-                        color = TextPrimary,
+                        color = radarColors().textPrimary,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -71,7 +68,7 @@ fun FeedArticlesScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = TextPrimary)
+                        Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = radarColors().textPrimary)
                     }
                 },
                 actions = {
@@ -79,16 +76,16 @@ fun FeedArticlesScreen(
                     IconButton(onClick = { viewModel.onIntent(FeedArticlesIntent.Refresh) }) {
                         if (viewModel.isRefreshing) {
                             CircularProgressIndicator(
-                                color = TextSecondary,
+                                color = radarColors().textSecondary,
                                 strokeWidth = 2.dp,
                                 modifier = Modifier.size(18.dp),
                             )
                         } else {
-                            Icon(Lucide.RefreshCw, contentDescription = "刷新此源", tint = TextPrimary)
+                            Icon(Lucide.RefreshCw, contentDescription = "刷新此源", tint = radarColors().textPrimary)
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgRoot),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = radarColors().bgRoot),
             )
         },
     ) { padding ->
@@ -99,7 +96,7 @@ fun FeedArticlesScreen(
                     .padding(padding),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("此订阅源还没有文章", color = TextSecondary)
+                Text("此订阅源还没有文章", color = radarColors().textSecondary)
             }
         } else if (viewModel.feed?.contentType == FeedEntity.CONTENT_TYPE_IMAGE) {
             // 图片类源（ADR-0014）：两列画廊网格，点击仍走详情
@@ -147,7 +144,7 @@ fun FeedArticlesScreen(
             ) {
                 if (viewModel.isLoadingMore) {
                     CircularProgressIndicator(
-                        color = Accent,
+                        color = radarColors().accent,
                         strokeWidth = 2.dp,
                         modifier = Modifier.size(18.dp),
                     )

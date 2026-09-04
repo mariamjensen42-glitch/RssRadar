@@ -52,23 +52,15 @@ import com.cycling.rssradar.core.data.store.ReadingFontFamily
 import com.cycling.rssradar.core.data.store.ReadingStyleState
 import com.cycling.rssradar.core.data.store.TranslationDisplayState
 import com.cycling.rssradar.core.data.store.TranslationViewMode
-import com.cycling.rssradar.ui.components.FeedIcon
+import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.ui.components.openUrl
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.BgRoot
-import com.cycling.rssradar.ui.theme.Link
 import com.cycling.rssradar.ui.theme.LocalReadingPrefs
-import com.cycling.rssradar.ui.theme.OnAccent
-import com.cycling.rssradar.ui.theme.Surface1
-import com.cycling.rssradar.ui.theme.Surface2
-import com.cycling.rssradar.ui.theme.TextPrimary
-import com.cycling.rssradar.ui.theme.TextSecondary
-import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.CircleAlert
 import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
 import kotlin.math.roundToInt
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 阅读页正文渲染深模块：头部（源名/标题/AI 摘要卡/译文横幅）+ 正文两种渲染模式的
@@ -312,7 +304,7 @@ private fun ArticleHeader(
         Spacer(Modifier.width(8.dp))
         Text(
             text = article.feedTitle,
-            color = TextPrimary,
+            color = radarColors().textPrimary,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
@@ -320,21 +312,21 @@ private fun ArticleHeader(
             modifier = Modifier.weight(1f, fill = false),
         )
         Spacer(Modifier.width(8.dp))
-        Text("·", color = TextTertiary)
+        Text("·", color = radarColors().textTertiary)
         Spacer(Modifier.width(8.dp))
         Text(
             text = formatDate(article.article.publishedAt),
-            color = TextTertiary,
+            color = radarColors().textTertiary,
             style = MaterialTheme.typography.labelMedium,
         )
         // 阅读时长：只有真实正文字数算出来的才显示。取不到就不显示，不虚构。
         article.article.readingMinutes?.let { minutes ->
             Spacer(Modifier.width(8.dp))
-            Text("·", color = TextTertiary)
+            Text("·", color = radarColors().textTertiary)
             Spacer(Modifier.width(8.dp))
             Text(
                 text = "阅读约 $minutes 分钟",
-                color = TextTertiary,
+                color = radarColors().textTertiary,
                 style = MaterialTheme.typography.labelMedium,
             )
         }
@@ -344,7 +336,7 @@ private fun ArticleHeader(
     Spacer(Modifier.height(10.dp))
     Text(
         text = article.article.title,
-        color = TextPrimary,
+        color = radarColors().textPrimary,
         style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Bold,
         modifier = Modifier
@@ -386,7 +378,7 @@ private fun ArticleHeader(
 private fun IncompleteContentBanner(modifier: Modifier = Modifier) {
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = Surface2,
+        color = radarColors().surface2,
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(
@@ -396,13 +388,13 @@ private fun IncompleteContentBanner(modifier: Modifier = Modifier) {
             Icon(
                 Lucide.CircleAlert,
                 contentDescription = null,
-                tint = TextTertiary,
+                tint = radarColors().textTertiary,
                 modifier = Modifier.size(14.dp),
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = "正文可能不完整（站点限制或动态加载），可查看原文",
-                color = TextTertiary,
+                color = radarColors().textTertiary,
                 style = MaterialTheme.typography.labelMedium,
             )
         }
@@ -422,14 +414,14 @@ private fun NoContentBody(
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(
-                    color = Accent,
+                    color = radarColors().accent,
                     strokeWidth = 2.dp,
                     modifier = Modifier.size(14.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = "正在获取全文…",
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.labelMedium,
                 )
             }
@@ -449,51 +441,51 @@ private fun AiSummaryCard(
 ) {
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = Surface1,
+        color = radarColors().surface1,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Lucide.Sparkles, contentDescription = null, tint = Accent, modifier = Modifier.size(16.dp))
+                Icon(Lucide.Sparkles, contentDescription = null, tint = radarColors().accent, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = "AI 摘要",
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
                 if (state is AiSummaryState.Generating) {
-                    CircularProgressIndicator(color = Accent, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+                    CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
                 }
             }
             when {
                 state is AiSummaryState.Generating -> {
                     Spacer(Modifier.height(8.dp))
-                    Text("正在生成摘要…", color = TextTertiary, style = MaterialTheme.typography.bodySmall)
+                    Text("正在生成摘要…", color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
                 }
                 state is AiSummaryState.Failed -> {
                     Spacer(Modifier.height(8.dp))
-                    Text(state.message, color = TextTertiary, style = MaterialTheme.typography.bodySmall)
+                    Text(state.message, color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(6.dp))
                     TextButton(onClick = onGenerate) {
-                        Text(if (summary == null) "重试" else "重新生成", color = Accent, fontWeight = FontWeight.SemiBold)
+                        Text(if (summary == null) "重试" else "重新生成", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 summary != null -> {
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = summary,
-                        color = TextPrimary,
+                        color = radarColors().textPrimary,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
                 else -> {
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = onGenerate) {
-                        Text("生成摘要", color = Accent, fontWeight = FontWeight.SemiBold)
+                        Text("生成摘要", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -521,7 +513,7 @@ private fun TranslationBanner(
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Lucide.Languages, contentDescription = null, tint = Accent, modifier = Modifier.size(14.dp))
+        Icon(Lucide.Languages, contentDescription = null, tint = radarColors().accent, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(6.dp))
         Text(
             text = if (progressing) {
@@ -529,12 +521,12 @@ private fun TranslationBanner(
             } else {
                 "AI 译文（DeepSeek）"
             },
-            color = TextTertiary,
+            color = radarColors().textTertiary,
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.weight(1f),
         )
         if (progressing) {
-            CircularProgressIndicator(color = Accent, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+            CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
         } else {
             TextButton(
                 onClick = {
@@ -552,7 +544,7 @@ private fun TranslationBanner(
             ) {
                 Text(
                     text = if (display.viewMode == TranslationViewMode.TRANSLATION_ONLY) "双语" else "纯译文",
-                    color = Accent,
+                    color = radarColors().accent,
                     style = MaterialTheme.typography.labelMedium,
                 )
             }
@@ -573,17 +565,17 @@ private fun TranslationBanner(
                 ) {
                     Text(
                         text = if (display.bilingualLayout == BilingualLayout.STACKED) "左右" else "上下",
-                        color = Accent,
+                        color = radarColors().accent,
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
             }
             TextButton(onClick = onRetranslate, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                Text("重新翻译", color = Accent, style = MaterialTheme.typography.labelMedium)
+                Text("重新翻译", color = radarColors().accent, style = MaterialTheme.typography.labelMedium)
             }
         }
         TextButton(onClick = onShowOriginal, contentPadding = PaddingValues(horizontal = 8.dp)) {
-            Text("切回原文", color = TextSecondary, style = MaterialTheme.typography.labelMedium)
+            Text("切回原文", color = radarColors().textSecondary, style = MaterialTheme.typography.labelMedium)
         }
     }
 }
@@ -614,12 +606,12 @@ private fun ArticleWebView(
     onScroll: ((Int) -> Unit)? = null,
 ) {
     // 颜色读自 RssRadarPalette（getter 代理 mutableStateOf），主题切换自动重组
-    val bg = toCssColor(BgRoot)
-    val fg = toCssColor(TextPrimary)
-    val muted = toCssColor(TextSecondary)
-    val codeBg = toCssColor(Surface2)
-    val border = toCssColor(Surface1)
-    val link = toCssColor(Link)
+    val bg = toCssColor(radarColors().bgRoot)
+    val fg = toCssColor(radarColors().textPrimary)
+    val muted = toCssColor(radarColors().textSecondary)
+    val codeBg = toCssColor(radarColors().surface2)
+    val border = toCssColor(radarColors().surface1)
+    val link = toCssColor(radarColors().link)
     val style = LocalReadingPrefs.current.style
     val image = LocalReadingPrefs.current.image
     // 关闭"点击放大"就传空集合：正文不包链接，图片点击在 WebView 里自然无反应。
@@ -706,7 +698,7 @@ private fun BodyParagraph(text: String) {
     val style = LocalReadingPrefs.current.style
     Text(
         text = text,
-        color = TextPrimary,
+        color = radarColors().textPrimary,
         style = MaterialTheme.typography.bodyLarge.copy(
             fontSize = style.fontSize.sp,
             lineHeight = (style.fontSize * style.lineHeight).sp,

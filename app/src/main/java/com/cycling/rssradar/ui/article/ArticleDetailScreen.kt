@@ -61,16 +61,8 @@ import com.cycling.rssradar.core.data.store.coerceFontSize
 import com.cycling.rssradar.core.data.store.coerceImageCornerRadius
 import com.cycling.rssradar.core.data.store.coerceLineHeight
 import com.cycling.rssradar.core.data.store.coercePadding
-import com.cycling.rssradar.ui.components.AppSnackbarHost
+import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.shareArticle
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.BgRoot
-import com.cycling.rssradar.ui.theme.OnAccent
-import com.cycling.rssradar.ui.theme.Surface1
-import com.cycling.rssradar.ui.theme.Surface2
-import com.cycling.rssradar.ui.theme.TextPrimary
-import com.cycling.rssradar.ui.theme.TextSecondary
-import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Bookmark
 import com.composables.icons.lucide.ChevronLeft
@@ -85,6 +77,7 @@ import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.Type
 import kotlin.math.roundToInt
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 
 /**
@@ -135,7 +128,7 @@ fun ArticleDetailScreen(
     }
 
     Scaffold(
-        containerColor = BgRoot,
+        containerColor = radarColors().bgRoot,
         snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
             ArticleDetailTopBar(
@@ -188,7 +181,7 @@ fun ArticleDetailScreen(
                     .padding(padding),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("文章不存在", color = TextSecondary)
+                Text("文章不存在", color = radarColors().textSecondary)
             }
             return@Scaffold
         }
@@ -281,14 +274,14 @@ private fun ArticleDetailTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onBack) {
-            Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = TextPrimary)
+            Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = radarColors().textPrimary)
         }
         // 标题滚出视口后顶栏补位显示（用户反馈）；阅读中隐藏，不占阅读注意力
         Box(modifier = Modifier.weight(1f)) {
             if (showTitle && title != null) {
                 Text(
                     text = title,
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -304,13 +297,13 @@ private fun ArticleDetailTopBar(
             aiSummary == null
         ) {
             if (aiSummaryState is AiSummaryState.Generating) {
-                CircularProgressIndicator(color = Accent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
             } else {
                 IconButton(onClick = onGenerateSummary) {
                     Icon(
                         Lucide.Sparkles,
                         contentDescription = "生成 AI 摘要",
-                        tint = if (aiSummaryState is AiSummaryState.Failed) Accent else TextPrimary,
+                        tint = if (aiSummaryState is AiSummaryState.Failed) radarColors().accent else radarColors().textPrimary,
                     )
                 }
             }
@@ -320,16 +313,16 @@ private fun ArticleDetailTopBar(
             Icon(
                 Lucide.Languages,
                 contentDescription = if (isShowingTranslation) "切回原文" else "AI 翻译",
-                tint = if (isShowingTranslation || isGeneratingTranslation) Accent else TextPrimary,
+                tint = if (isShowingTranslation || isGeneratingTranslation) radarColors().accent else radarColors().textPrimary,
             )
         }
         // 分享（#26）
         IconButton(onClick = onShare) {
-            Icon(Lucide.Share2, contentDescription = "分享", tint = TextPrimary)
+            Icon(Lucide.Share2, contentDescription = "分享", tint = radarColors().textPrimary)
         }
         // 排版设置入口（issue #42）
         IconButton(onClick = onOpenStyle) {
-            Icon(Lucide.Type, contentDescription = "排版设置", tint = TextPrimary)
+            Icon(Lucide.Type, contentDescription = "排版设置", tint = radarColors().textPrimary)
         }
     }
 }
@@ -357,7 +350,7 @@ private fun ReadingStyleSheet(
     val style = prefs.style
     val image = prefs.image
     val renderer = prefs.renderer
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Surface1) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = radarColors().surface1) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -365,7 +358,7 @@ private fun ReadingStyleSheet(
         ) {
             Text(
                 text = "排版设置",
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -375,7 +368,7 @@ private fun ReadingStyleSheet(
             // 原生路对表格/视频/内联样式退化，仅建议被 WebView 滚动闪烁困扰时启用。
             Text(
                 text = "正文渲染器",
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
@@ -384,14 +377,14 @@ private fun ReadingStyleSheet(
                     val selected = r == renderer
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = if (selected) Accent else Surface2,
+                        color = if (selected) radarColors().accent else radarColors().surface2,
                         modifier = Modifier
                             .weight(1f)
                             .clickable { onRenderer(r) },
                     ) {
                         Text(
                             text = r.label,
-                            color = if (selected) OnAccent else TextSecondary,
+                            color = if (selected) radarColors().onAccent else radarColors().textSecondary,
                             style = MaterialTheme.typography.bodyMedium,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(vertical = 8.dp),
@@ -405,22 +398,22 @@ private fun ReadingStyleSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "字号",
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = { onFontSize(coerceFontSize(style.fontSize - 1)) }) {
-                    Icon(Lucide.Minus, contentDescription = "减小字号", tint = TextPrimary, modifier = Modifier.size(18.dp))
+                    Icon(Lucide.Minus, contentDescription = "减小字号", tint = radarColors().textPrimary, modifier = Modifier.size(18.dp))
                 }
                 Text(
                     text = "${style.fontSize}",
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.width(40.dp),
                 )
                 IconButton(onClick = { onFontSize(coerceFontSize(style.fontSize + 1)) }) {
-                    Icon(Lucide.Plus, contentDescription = "增大字号", tint = TextPrimary, modifier = Modifier.size(18.dp))
+                    Icon(Lucide.Plus, contentDescription = "增大字号", tint = radarColors().textPrimary, modifier = Modifier.size(18.dp))
                 }
             }
 
@@ -428,7 +421,7 @@ private fun ReadingStyleSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "行距",
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.width(72.dp),
                 )
@@ -440,7 +433,7 @@ private fun ReadingStyleSheet(
                 )
                 Text(
                     text = "%.1f".format(style.lineHeight),
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.End,
                     modifier = Modifier.width(40.dp),
@@ -451,7 +444,7 @@ private fun ReadingStyleSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "边距",
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.width(72.dp),
                 )
@@ -463,7 +456,7 @@ private fun ReadingStyleSheet(
                 )
                 Text(
                     text = "${style.horizontalPadding}dp",
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.End,
                     modifier = Modifier.width(40.dp),
@@ -477,7 +470,7 @@ private fun ReadingStyleSheet(
                     val selected = family == style.fontFamily
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = if (selected) Accent else Surface2,
+                        color = if (selected) radarColors().accent else radarColors().surface2,
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(50))
@@ -485,7 +478,7 @@ private fun ReadingStyleSheet(
                     ) {
                         Text(
                             text = family.label,
-                            color = if (selected) OnAccent else TextPrimary,
+                            color = if (selected) radarColors().onAccent else radarColors().textPrimary,
                             style = MaterialTheme.typography.labelLarge,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(vertical = 8.dp),
@@ -499,14 +492,14 @@ private fun ReadingStyleSheet(
             // 正文不再把 <img> 包成链接，点图在 WebView 里自然无反应。
             Text(
                 text = "图片",
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "圆角",
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.width(72.dp),
                 )
@@ -519,7 +512,7 @@ private fun ReadingStyleSheet(
                 )
                 Text(
                     text = "${image.cornerRadius}dp",
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.End,
                     modifier = Modifier.width(40.dp),
@@ -531,7 +524,7 @@ private fun ReadingStyleSheet(
             ) {
                 Text(
                     text = "点击放大",
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f),
                 )
@@ -539,8 +532,8 @@ private fun ReadingStyleSheet(
                     checked = image.maximizeOnTap,
                     onCheckedChange = onImageMaximize,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = OnAccent,
-                        checkedTrackColor = Accent,
+                        checkedThumbColor = radarColors().onAccent,
+                        checkedTrackColor = radarColors().accent,
                     ),
                 )
             }
@@ -561,7 +554,7 @@ private fun ArticleActionsBar(
     onOpenOriginal: () -> Unit,
 ) {
     val insets = WindowInsets.navigationBars.asPaddingValues()
-    Surface(color = BgRoot) {
+    Surface(color = radarColors().bgRoot) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -599,8 +592,8 @@ private fun ArticleActionsBar(
                 shape = RoundedCornerShape(14.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Accent,
-                    contentColor = OnAccent,
+                    containerColor = radarColors().accent,
+                    contentColor = radarColors().onAccent,
                 ),
             ) {
                 Icon(
@@ -629,11 +622,11 @@ private fun ActionIcon(
     enabled: Boolean = true,
     size: androidx.compose.ui.unit.Dp = 48.dp,
 ) {
-    val bg = if (checked) Accent else Surface2
+    val bg = if (checked) radarColors().accent else radarColors().surface2
     val fg = when {
-        checked -> OnAccent
-        !enabled -> TextTertiary
-        else -> TextPrimary
+        checked -> radarColors().onAccent
+        !enabled -> radarColors().textTertiary
+        else -> radarColors().textPrimary
     }
     Surface(
         shape = RoundedCornerShape(14.dp),

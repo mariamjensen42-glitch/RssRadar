@@ -43,13 +43,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.CrashLog
 import com.cycling.rssradar.core.data.CrashRecord
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.BgRoot
-import com.cycling.rssradar.ui.theme.Danger
-import com.cycling.rssradar.ui.theme.Surface1
-import com.cycling.rssradar.ui.theme.TextPrimary
-import com.cycling.rssradar.ui.theme.TextSecondary
-import com.cycling.rssradar.ui.theme.TextTertiary
+import com.cycling.rssradar.core.ui.theme.Danger
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.CircleAlert
 import com.composables.icons.lucide.Lucide
@@ -64,6 +58,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 /** 单条崩溃的全文（dialog 内容）。 */
 data class CrashDetail(val name: String, val head: String, val text: String)
@@ -124,7 +119,7 @@ fun CrashLogScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(BgRoot)
+            .background(radarColors().bgRoot)
             .statusBarsPadding(),
     ) {
         Row(
@@ -134,18 +129,18 @@ fun CrashLogScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = TextPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = radarColors().textPrimary)
             }
             Text(
                 text = "崩溃日志",
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
             if (records.isNotEmpty()) {
                 IconButton(onClick = { confirmClear = true }) {
-                    Icon(Lucide.Trash, contentDescription = "清空日志", tint = TextSecondary)
+                    Icon(Lucide.Trash, contentDescription = "清空日志", tint = radarColors().textSecondary)
                 }
             }
         }
@@ -157,11 +152,11 @@ fun CrashLogScreen(
                     .padding(horizontal = 20.dp, vertical = 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("暂无崩溃记录", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                Text("暂无崩溃记录", color = radarColors().textSecondary, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(6.dp))
                 Text(
                     "应用崩溃时会自动记录异常与设备信息，最多保留 5 份",
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -182,7 +177,7 @@ fun CrashLogScreen(
             title = {
                 Text(
                     text = crash.head,
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
@@ -193,7 +188,7 @@ fun CrashLogScreen(
                     SelectionContainer {
                         Text(
                             text = crash.text.ifBlank { "（日志已丢失或读取失败）" },
-                            color = TextSecondary,
+                            color = radarColors().textSecondary,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -201,21 +196,21 @@ fun CrashLogScreen(
             },
             confirmButton = {
                 TextButton(onClick = { context.shareCrashLog(crash.text, crash.head) }) {
-                    Text("导出", color = Accent, fontWeight = FontWeight.SemiBold)
+                    Text("导出", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::close) { Text("关闭", color = TextSecondary) }
+                TextButton(onClick = viewModel::close) { Text("关闭", color = radarColors().textSecondary) }
             },
-            containerColor = Surface1,
+            containerColor = radarColors().surface1,
         )
     }
 
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("清空崩溃日志？", color = TextPrimary) },
-            text = { Text("已记录的 ${records.size} 份崩溃日志会被删除，无法恢复。", color = TextSecondary) },
+            title = { Text("清空崩溃日志？", color = radarColors().textPrimary) },
+            text = { Text("已记录的 ${records.size} 份崩溃日志会被删除，无法恢复。", color = radarColors().textSecondary) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -225,9 +220,9 @@ fun CrashLogScreen(
                 ) { Text("清空", color = Danger, fontWeight = FontWeight.SemiBold) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text("取消", color = TextSecondary) }
+                TextButton(onClick = { confirmClear = false }) { Text("取消", color = radarColors().textSecondary) }
             },
-            containerColor = Surface1,
+            containerColor = radarColors().surface1,
         )
     }
 }
@@ -236,7 +231,7 @@ fun CrashLogScreen(
 private fun CrashRow(record: CrashRecord, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = Surface1,
+        color = radarColors().surface1,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
@@ -253,7 +248,7 @@ private fun CrashRow(record: CrashRecord, onClick: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = record.head,
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
@@ -263,12 +258,12 @@ private fun CrashRow(record: CrashRecord, onClick: () -> Unit) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = formatTime(record.time),
-                        color = TextTertiary,
+                        color = radarColors().textTertiary,
                         style = MaterialTheme.typography.labelSmall,
                     )
                     Text(
                         text = "点击查看全文",
-                        color = TextTertiary,
+                        color = radarColors().textTertiary,
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -276,7 +271,7 @@ private fun CrashRow(record: CrashRecord, onClick: () -> Unit) {
             Icon(
                 Lucide.Share,
                 contentDescription = null,
-                tint = TextTertiary,
+                tint = radarColors().textTertiary,
                 modifier = Modifier.size(16.dp),
             )
         }

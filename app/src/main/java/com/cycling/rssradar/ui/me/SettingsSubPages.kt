@@ -52,17 +52,10 @@ import com.cycling.rssradar.core.data.store.ShareContentFormat
 import com.cycling.rssradar.core.data.store.SyncInterval
 import com.cycling.rssradar.core.data.store.ThemeMode
 import com.cycling.rssradar.ui.components.OptionPickerSheet
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.BgRoot
-import com.cycling.rssradar.ui.theme.OnAccent
-import com.cycling.rssradar.ui.theme.Surface1
-import com.cycling.rssradar.ui.theme.Surface2
-import com.cycling.rssradar.ui.theme.TextPrimary
-import com.cycling.rssradar.ui.theme.TextSecondary
-import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 设置二级页（原「我的」长页拆分）：通用 / 同步与清理 / RSSHub / AI 与诊断。
@@ -82,7 +75,7 @@ private fun SettingsSubPage(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgRoot)
+            .background(radarColors().bgRoot)
             .statusBarsPadding(),
     ) {
         Row(
@@ -92,11 +85,11 @@ private fun SettingsSubPage(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = TextPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = radarColors().textPrimary)
             }
             Text(
                 text = title,
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
@@ -117,14 +110,14 @@ private fun SettingsSubPage(
 private fun SectionHeader(title: String, description: String? = null) {
     Text(
         text = title,
-        color = TextSecondary,
+        color = radarColors().textSecondary,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
     )
     if (description != null) {
         Text(
             text = description,
-            color = TextTertiary,
+            color = radarColors().textTertiary,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
         )
@@ -143,7 +136,7 @@ internal fun SettingSwitchRow(label: String, checked: Boolean, onChange: (Boolea
     ) {
         Text(
             text = label,
-            color = TextPrimary,
+            color = radarColors().textPrimary,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f),
         )
@@ -151,8 +144,8 @@ internal fun SettingSwitchRow(label: String, checked: Boolean, onChange: (Boolea
             checked = checked,
             onCheckedChange = onChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = OnAccent,
-                checkedTrackColor = Accent,
+                checkedThumbColor = radarColors().onAccent,
+                checkedTrackColor = radarColors().accent,
             ),
         )
     }
@@ -174,13 +167,13 @@ private fun OptionRow(
     ) {
         Text(
             text = label,
-            color = TextPrimary,
+            color = radarColors().textPrimary,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f),
         )
         Text(
             text = value,
-            color = Accent,
+            color = radarColors().accent,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
         )
@@ -188,7 +181,7 @@ private fun OptionRow(
         Icon(
             imageVector = Lucide.ChevronRight,
             contentDescription = "选择",
-            tint = TextTertiary,
+            tint = radarColors().textTertiary,
             modifier = Modifier.size(16.dp),
         )
     }
@@ -199,7 +192,7 @@ private fun OptionRow(
 private fun NavigateRow(label: String, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = Surface1,
+        color = radarColors().surface1,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
@@ -210,14 +203,14 @@ private fun NavigateRow(label: String, onClick: () -> Unit) {
         ) {
             Text(
                 text = label,
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
             )
             Icon(
                 imageVector = Lucide.ChevronRight,
                 contentDescription = "进入",
-                tint = TextTertiary,
+                tint = radarColors().textTertiary,
                 modifier = Modifier.size(18.dp),
             )
         }
@@ -249,12 +242,12 @@ fun SettingsGeneralScreen(
 
     SettingsSubPage(title = "通用", onBack = onBack) {
         SectionHeader("外观")
-        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "主题",
-                        color = TextPrimary,
+                        color = radarColors().textPrimary,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f),
                     )
@@ -263,7 +256,7 @@ fun SettingsGeneralScreen(
                             val selected = state.themeMode == mode
                             Surface(
                                 shape = RoundedCornerShape(50),
-                                color = if (selected) Accent else Surface2,
+                                color = if (selected) radarColors().accent else radarColors().surface2,
                                 modifier = Modifier.clickable { viewModel.setThemeMode(mode) },
                             ) {
                                 Text(
@@ -272,7 +265,7 @@ fun SettingsGeneralScreen(
                                         ThemeMode.LIGHT -> "浅色"
                                         ThemeMode.DARK -> "深色"
                                     },
-                                    color = if (selected) OnAccent else TextPrimary,
+                                    color = if (selected) radarColors().onAccent else radarColors().textPrimary,
                                     style = MaterialTheme.typography.labelMedium,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                 )
@@ -290,7 +283,7 @@ fun SettingsGeneralScreen(
             "列表显示",
             "信息流与订阅源文章列表卡片的显示项，全局生效，即改即见。",
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 val display = state.listDisplay
                 SettingSwitchRow(
@@ -319,7 +312,7 @@ fun SettingsGeneralScreen(
                 ) {
                     Text(
                         text = "描述",
-                        color = TextPrimary,
+                        color = radarColors().textPrimary,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f),
                     )
@@ -328,14 +321,14 @@ fun SettingsGeneralScreen(
                             val selected = display.descMode == mode
                             Surface(
                                 shape = RoundedCornerShape(50),
-                                color = if (selected) Accent else Surface2,
+                                color = if (selected) radarColors().accent else radarColors().surface2,
                                 modifier = Modifier.clickable {
                                     viewModel.updateListDisplay { it.copy(descMode = mode) }
                                 },
                             ) {
                                 Text(
                                     text = mode.label,
-                                    color = if (selected) OnAccent else TextPrimary,
+                                    color = if (selected) radarColors().onAccent else radarColors().textPrimary,
                                     style = MaterialTheme.typography.labelMedium,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                 )
@@ -370,7 +363,7 @@ fun SettingsGeneralScreen(
             "推荐",
             "按你的真实阅读行为给未读文章排序，全部计算在本机完成，画像不上传。",
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 SettingSwitchRow(
                     label = "显示「推荐」标签页",
@@ -387,14 +380,14 @@ fun SettingsGeneralScreen(
                     ) {
                         Text(
                             text = "兴趣画像",
-                            color = TextPrimary,
+                            color = radarColors().textPrimary,
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
                         )
                         Icon(
                             imageVector = Lucide.ChevronRight,
                             contentDescription = "进入",
-                            tint = TextTertiary,
+                            tint = radarColors().textTertiary,
                             modifier = Modifier.size(18.dp),
                         )
                     }
@@ -409,7 +402,7 @@ fun SettingsGeneralScreen(
             "链接与分享",
             "外链怎么打开、分享文章时带哪些内容。阅读页顶栏可分享本文。",
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 OptionRow(
                     label = "打开链接",
@@ -423,7 +416,7 @@ fun SettingsGeneralScreen(
                 )
                 Text(
                     text = "Custom Tabs（应用内打开）需引入 androidx.browser 依赖，暂未提供。",
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(vertical = 4.dp),
                 )
@@ -476,7 +469,7 @@ fun SettingsSyncScreen(
             "自动同步",
             "后台周期刷新订阅源，同步完成后按保留天数清理归档。手动刷新不受这些限制。",
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 Row(
                     modifier = Modifier
@@ -487,13 +480,13 @@ fun SettingsSyncScreen(
                 ) {
                     Text(
                         text = "同步间隔",
-                        color = TextPrimary,
+                        color = radarColors().textPrimary,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
                         text = state.sync.interval.label,
-                        color = Accent,
+                        color = radarColors().accent,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -523,7 +516,7 @@ fun SettingsSyncScreen(
             "文章清理",
             "发布时间超过所选期限的文章会被清理（打开应用时和自动同步完成后执行）；收藏与稍后读永不清理。",
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -533,13 +526,13 @@ fun SettingsSyncScreen(
             ) {
                 Text(
                     text = "发布超过",
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
                     text = state.keepArchived.label,
-                    color = Accent,
+                    color = radarColors().accent,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -553,7 +546,7 @@ fun SettingsSyncScreen(
             "新文章通知",
             "自动同步后发现新文章时发一条汇总通知。逐个订阅源可在订阅操作页单独关闭。",
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 SettingSwitchRow(
                     label = "开启通知",
@@ -569,7 +562,7 @@ fun SettingsSyncScreen(
                 state.notifyMessage?.let { message ->
                     Text(
                         text = message,
-                        color = TextTertiary,
+                        color = radarColors().textTertiary,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(vertical = 4.dp),
                     )
@@ -616,18 +609,18 @@ fun SettingsRssHubScreen(
             "RSSHub 实例",
             "路由解析由 RSSHub 实例完成。官方实例在部分网络环境不可达，可自动探测或填入自建实例。",
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "当前实例",
-                        color = TextTertiary,
+                        color = radarColors().textTertiary,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
                         text = state.activeHost,
-                        color = TextPrimary,
+                        color = radarColors().textPrimary,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -639,12 +632,12 @@ fun SettingsRssHubScreen(
                     modifier = Modifier.fillMaxWidth().height(44.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Accent,
-                        contentColor = OnAccent,
+                        containerColor = radarColors().accent,
+                        contentColor = radarColors().onAccent,
                     ),
                 ) {
                     if (state.probing) {
-                        CircularProgressIndicator(color = OnAccent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                        CircularProgressIndicator(color = radarColors().onAccent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("探测中…", style = MaterialTheme.typography.labelLarge)
                     } else {
@@ -653,7 +646,7 @@ fun SettingsRssHubScreen(
                 }
                 state.probeMessage?.let { message ->
                     Spacer(Modifier.height(8.dp))
-                    Text(text = message, color = TextTertiary, style = MaterialTheme.typography.bodySmall)
+                    Text(text = message, color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -661,7 +654,7 @@ fun SettingsRssHubScreen(
         Spacer(Modifier.height(16.dp))
         Text(
             text = "自定义实例（可选）",
-            color = TextSecondary,
+            color = radarColors().textSecondary,
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
         )
@@ -670,41 +663,41 @@ fun SettingsRssHubScreen(
             value = state.customInput,
             onValueChange = viewModel::onCustomInputChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("https://your-rsshub.example.com", color = TextTertiary, style = MaterialTheme.typography.bodyMedium) },
+            placeholder = { Text("https://your-rsshub.example.com", color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Surface2,
-                unfocusedContainerColor = Surface2,
-                focusedBorderColor = Accent,
+                focusedContainerColor = radarColors().surface2,
+                unfocusedContainerColor = radarColors().surface2,
+                focusedBorderColor = radarColors().accent,
                 unfocusedBorderColor = Color.Transparent,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary,
-                cursorColor = Accent,
+                focusedTextColor = radarColors().textPrimary,
+                unfocusedTextColor = radarColors().textPrimary,
+                cursorColor = radarColors().accent,
             ),
         )
         Text(
             text = "自定义实例优先于探测结果；留空并保存则清除。",
-            color = TextTertiary,
+            color = radarColors().textTertiary,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 4.dp),
         )
         Spacer(Modifier.height(10.dp))
         TextButton(onClick = viewModel::saveCustomHost) {
-            Text("保存", color = Accent, fontWeight = FontWeight.SemiBold)
+            Text("保存", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
         }
 
         Spacer(Modifier.height(16.dp))
         Text(
             text = "内置镜像（点选填入；自动探测取响应最快者）",
-            color = TextTertiary,
+            color = radarColors().textTertiary,
             style = MaterialTheme.typography.labelMedium,
         )
         Spacer(Modifier.height(6.dp))
         RssHubInstanceStore.BUILTIN_INSTANCES.forEachIndexed { index, host ->
             Surface(
                 shape = RoundedCornerShape(10.dp),
-                color = Surface1,
+                color = radarColors().surface1,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 3.dp)
@@ -713,12 +706,12 @@ fun SettingsRssHubScreen(
                 Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "${index + 1}. $host",
-                        color = TextSecondary,
+                        color = radarColors().textSecondary,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.weight(1f),
                     )
                     if (host == state.activeHost) {
-                        Text("当前", color = Accent, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                        Text("当前", color = radarColors().accent, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -731,18 +724,18 @@ fun SettingsRssHubScreen(
             "路由目录",
             "内置 RSSHub 全量路由，加订阅时可搜索与分类筛选。官方新增路由后联网更新目录即可同步。",
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "收录路由",
-                        color = TextTertiary,
+                        color = radarColors().textTertiary,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
                         text = if (state.catalogRouteCount > 0) "${state.catalogRouteCount} 条" else "装载中…",
-                        color = TextPrimary,
+                        color = radarColors().textPrimary,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -751,14 +744,14 @@ fun SettingsRssHubScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "数据时间",
-                        color = TextTertiary,
+                        color = radarColors().textTertiary,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
                         text = formatCatalogTimestamp(state.catalogGeneratedAt) +
                             if (state.catalogSource == CatalogSource.UPDATED) "（已更新）" else "（内置）",
-                        color = TextPrimary,
+                        color = radarColors().textPrimary,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -770,12 +763,12 @@ fun SettingsRssHubScreen(
                     modifier = Modifier.fillMaxWidth().height(44.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Accent,
-                        contentColor = OnAccent,
+                        containerColor = radarColors().accent,
+                        contentColor = radarColors().onAccent,
                     ),
                 ) {
                     if (state.catalogRefreshing) {
-                        CircularProgressIndicator(color = OnAccent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                        CircularProgressIndicator(color = radarColors().onAccent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("更新中…", style = MaterialTheme.typography.labelLarge)
                     } else {
@@ -784,7 +777,7 @@ fun SettingsRssHubScreen(
                 }
                 state.catalogMessage?.let { message ->
                     Spacer(Modifier.height(8.dp))
-                    Text(text = message, color = TextTertiary, style = MaterialTheme.typography.bodySmall)
+                    Text(text = message, color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -809,18 +802,18 @@ fun SettingsAiDiagScreen(
             "AI（DeepSeek）",
             "详情页的 AI 摘要与翻译由 DeepSeek 提供，使用你自己的 API Key，费用与额度由你掌控。",
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "状态",
-                        color = TextTertiary,
+                        color = radarColors().textTertiary,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
                         text = if (state.aiKeyConfigured) "已配置" else "未配置",
-                        color = if (state.aiKeyConfigured) Accent else TextTertiary,
+                        color = if (state.aiKeyConfigured) radarColors().accent else radarColors().textTertiary,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -830,26 +823,26 @@ fun SettingsAiDiagScreen(
                     value = state.aiKeyInput,
                     onValueChange = viewModel::onAiKeyChange,
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("sk-…", color = TextTertiary, style = MaterialTheme.typography.bodyMedium) },
+                    placeholder = { Text("sk-…", color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Surface2,
-                        unfocusedContainerColor = Surface2,
-                        focusedBorderColor = Accent,
+                        focusedContainerColor = radarColors().surface2,
+                        unfocusedContainerColor = radarColors().surface2,
+                        focusedBorderColor = radarColors().accent,
                         unfocusedBorderColor = Color.Transparent,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        cursorColor = Accent,
+                        focusedTextColor = radarColors().textPrimary,
+                        unfocusedTextColor = radarColors().textPrimary,
+                        cursorColor = radarColors().accent,
                     ),
                 )
                 state.aiMessage?.let { message ->
                     Spacer(Modifier.height(8.dp))
-                    Text(text = message, color = TextTertiary, style = MaterialTheme.typography.bodySmall)
+                    Text(text = message, color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
                 }
                 Spacer(Modifier.height(10.dp))
                 TextButton(onClick = viewModel::saveAiKey) {
-                    Text("保存 Key", color = Accent, fontWeight = FontWeight.SemiBold)
+                    Text("保存 Key", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

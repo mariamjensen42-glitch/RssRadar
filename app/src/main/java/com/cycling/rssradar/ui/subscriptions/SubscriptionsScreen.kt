@@ -46,19 +46,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
-import com.cycling.rssradar.ui.components.AppSnackbarHost
-import com.cycling.rssradar.ui.components.FeedIcon
+import com.cycling.rssradar.core.ui.components.AppSnackbarHost
+import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.ui.components.FloatingTabBarFabOffset
 import com.cycling.rssradar.ui.components.tabBarBottomClearance
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.BgRoot
-import com.cycling.rssradar.ui.theme.Link
-import com.cycling.rssradar.ui.theme.OnAccent
-import com.cycling.rssradar.ui.theme.Surface1
-import com.cycling.rssradar.ui.theme.Surface2
-import com.cycling.rssradar.ui.theme.TextPrimary
-import com.cycling.rssradar.ui.theme.TextSecondary
-import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.ArrowDownUp
 import com.composables.icons.lucide.BookMarked
 import com.composables.icons.lucide.CheckCheck
@@ -77,6 +68,7 @@ import com.composables.icons.lucide.Square
 import com.composables.icons.lucide.SquareCheckBig
 import com.composables.icons.lucide.X
 import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 
 @Composable
@@ -126,7 +118,7 @@ fun SubscriptionsScreen(
     }
 
     Scaffold(
-        containerColor = BgRoot,
+        containerColor = radarColors().bgRoot,
         snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
             if (selectionMode) {
@@ -158,8 +150,8 @@ fun SubscriptionsScreen(
             if (!selectionMode) {
                 ExtendedFloatingActionButton(
                     onClick = onAddSubscription,
-                    containerColor = Accent,
-                    contentColor = OnAccent,
+                    containerColor = radarColors().accent,
+                    contentColor = radarColors().onAccent,
                     icon = { Icon(Lucide.Plus, contentDescription = null) },
                     text = { Text("添加") },
                     shape = RoundedCornerShape(20.dp),
@@ -294,27 +286,27 @@ private fun SubscriptionsTopBar(
     ) {
         Text(
             text = "订阅管理",
-            color = TextPrimary,
+            color = radarColors().textPrimary,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f),
         )
         IconButton(onClick = onImport) {
-            Icon(Lucide.FileUp, contentDescription = "导入 OPML", tint = TextPrimary)
+            Icon(Lucide.FileUp, contentDescription = "导入 OPML", tint = radarColors().textPrimary)
         }
         // OPML 导出（#4）：导入的逆操作，订阅清单不被本应用绑架
         IconButton(onClick = onExport) {
-            Icon(Lucide.FileDown, contentDescription = "导出 OPML", tint = TextPrimary)
+            Icon(Lucide.FileDown, contentDescription = "导出 OPML", tint = radarColors().textPrimary)
         }
         // 批量移动入口（issue #7）：进入多选态，勾选后一次移动到目标分组
         IconButton(onClick = onBatchMove) {
-            Icon(Lucide.FolderInput, contentDescription = "批量移动", tint = TextPrimary)
+            Icon(Lucide.FolderInput, contentDescription = "批量移动", tint = radarColors().textPrimary)
         }
         IconButton(onClick = onSort) {
-            Icon(Lucide.ArrowDownUp, contentDescription = "排序", tint = TextPrimary)
+            Icon(Lucide.ArrowDownUp, contentDescription = "排序", tint = radarColors().textPrimary)
         }
         IconButton(onClick = onAdd) {
-            Icon(Lucide.Plus, contentDescription = "添加订阅", tint = TextPrimary)
+            Icon(Lucide.Plus, contentDescription = "添加订阅", tint = radarColors().textPrimary)
         }
     }
 }
@@ -336,16 +328,16 @@ private fun SelectionTopBar(
     ) {
         Text(
             text = "已选择 $selectedCount 个订阅",
-            color = TextPrimary,
+            color = radarColors().textPrimary,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f),
         )
         TextButton(onClick = onMove, enabled = canMove) {
-            Text("移动到", color = if (canMove) Accent else TextTertiary, fontWeight = FontWeight.SemiBold)
+            Text("移动到", color = if (canMove) radarColors().accent else radarColors().textTertiary, fontWeight = FontWeight.SemiBold)
         }
         IconButton(onClick = onCancel) {
-            Icon(Lucide.X, contentDescription = "退出多选", tint = TextPrimary)
+            Icon(Lucide.X, contentDescription = "退出多选", tint = radarColors().textPrimary)
         }
     }
 }
@@ -368,20 +360,20 @@ private fun GroupHeader(
         Icon(
             imageVector = if (expanded) Lucide.ChevronDown else Lucide.ChevronRight,
             contentDescription = if (expanded) "折叠" else "展开",
-            tint = TextSecondary,
+            tint = radarColors().textSecondary,
             modifier = Modifier.size(18.dp),
         )
         Spacer(Modifier.width(6.dp))
         Text(
             text = title,
-            color = TextPrimary,
+            color = radarColors().textPrimary,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.width(8.dp))
         Text(
             text = "$feedCount 个订阅",
-            color = TextTertiary,
+            color = radarColors().textTertiary,
             style = MaterialTheme.typography.labelMedium,
         )
         Spacer(Modifier.weight(1f))
@@ -389,7 +381,7 @@ private fun GroupHeader(
             Icon(
                 Lucide.Pencil,
                 contentDescription = "编辑分组",
-                tint = TextSecondary,
+                tint = radarColors().textSecondary,
                 modifier = Modifier.size(18.dp),
             )
         }
@@ -406,7 +398,7 @@ private fun FeedRow(
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = Surface1,
+        color = radarColors().surface1,
         modifier = Modifier
             .fillMaxWidth()
             // 整行点击进「订阅源文章列表」（issue #51）；管理入口仍是行尾"⋯"
@@ -423,7 +415,7 @@ private fun FeedRow(
                 Icon(
                     imageVector = if (selected) Lucide.SquareCheckBig else Lucide.Square,
                     contentDescription = if (selected) "取消选择" else "选择",
-                    tint = if (selected) Accent else TextTertiary,
+                    tint = if (selected) radarColors().accent else radarColors().textTertiary,
                     modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(10.dp))
@@ -433,7 +425,7 @@ private fun FeedRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = item.feed.title,
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -441,7 +433,7 @@ private fun FeedRow(
                 )
                 Text(
                     text = item.feed.url.withoutScheme(),
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -450,10 +442,10 @@ private fun FeedRow(
             // 类型标记：RSSHub 路由和常规 RSS 一眼区分
             if (item.feed.sourceType == FeedEntity.SOURCE_TYPE_RSSHUB) {
                 Spacer(Modifier.width(6.dp))
-                Surface(shape = RoundedCornerShape(50), color = Surface2) {
+                Surface(shape = RoundedCornerShape(50), color = radarColors().surface2) {
                     Text(
                         text = "RSSHub",
-                        color = TextTertiary,
+                        color = radarColors().textTertiary,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     )
@@ -467,7 +459,7 @@ private fun FeedRow(
                     Icon(
                         Lucide.Ellipsis,
                         contentDescription = "更多",
-                        tint = TextSecondary,
+                        tint = radarColors().textSecondary,
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -479,20 +471,20 @@ private fun FeedRow(
 @Composable
 private fun UnreadBadge(count: Int) {
     if (count <= 0) {
-        Surface(shape = RoundedCornerShape(50), color = Surface2) {
+        Surface(shape = RoundedCornerShape(50), color = radarColors().surface2) {
             Text(
                 text = "已读",
-                color = TextTertiary,
+                color = radarColors().textTertiary,
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             )
         }
         return
     }
-    Surface(shape = RoundedCornerShape(50), color = Accent) {
+    Surface(shape = RoundedCornerShape(50), color = radarColors().accent) {
         Text(
             text = count.coerceAtMost(999).toString(),
-            color = OnAccent,
+            color = radarColors().onAccent,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
@@ -504,7 +496,7 @@ private fun UnreadBadge(count: Int) {
 private fun CreateGroupRow(onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = Surface1,
+        color = radarColors().surface1,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
@@ -518,13 +510,13 @@ private fun CreateGroupRow(onClick: () -> Unit) {
             Icon(
                 Lucide.Plus,
                 contentDescription = null,
-                tint = Link,
+                tint = radarColors().link,
                 modifier = Modifier.size(18.dp),
             )
             Spacer(Modifier.width(8.dp))
             Text(
                 text = "新建分组",
-                color = Link,
+                color = radarColors().link,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -544,13 +536,13 @@ private fun MarkAllReadRow(onClick: () -> Unit) {
         Icon(
             Lucide.CheckCheck,
             contentDescription = null,
-            tint = TextSecondary,
+            tint = radarColors().textSecondary,
             modifier = Modifier.size(18.dp),
         )
         Spacer(Modifier.width(6.dp))
         Text(
             text = "全部标记为已读",
-            color = TextSecondary,
+            color = radarColors().textSecondary,
             style = MaterialTheme.typography.bodyMedium,
         )
     }
@@ -570,9 +562,9 @@ private fun BatchMoveToGroupDialog(
     var target by remember { mutableStateOf(groups.firstOrNull().orEmpty()) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Surface1,
-        titleContentColor = TextPrimary,
-        textContentColor = TextSecondary,
+        containerColor = radarColors().surface1,
+        titleContentColor = radarColors().textPrimary,
+        textContentColor = radarColors().textSecondary,
         title = {
             Text(
                 "移动 $selectedCount 个订阅到",
@@ -592,7 +584,7 @@ private fun BatchMoveToGroupDialog(
                     ) {
                         Text(
                             text = group,
-                            color = TextPrimary,
+                            color = radarColors().textPrimary,
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
                         )
@@ -600,7 +592,7 @@ private fun BatchMoveToGroupDialog(
                             Icon(
                                 Lucide.Check,
                                 contentDescription = null,
-                                tint = Accent,
+                                tint = radarColors().accent,
                                 modifier = Modifier.size(18.dp),
                             )
                         }
@@ -610,11 +602,11 @@ private fun BatchMoveToGroupDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(target) }, enabled = target.isNotBlank()) {
-                Text("移动", color = Accent, fontWeight = FontWeight.SemiBold)
+                Text("移动", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消", color = TextTertiary) }
+            TextButton(onClick = onDismiss) { Text("取消", color = radarColors().textTertiary) }
         },
     )
 }
@@ -638,35 +630,35 @@ private fun TextInputDialog(
     var value by remember { mutableStateOf(initialValue) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Surface1,
-        titleContentColor = TextPrimary,
-        textContentColor = TextSecondary,
+        containerColor = radarColors().surface1,
+        titleContentColor = radarColors().textPrimary,
+        textContentColor = radarColors().textSecondary,
         title = { Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
         text = {
             OutlinedTextField(
                 value = value,
                 onValueChange = { value = it },
                 singleLine = true,
-                placeholder = { Text(placeholder, color = TextTertiary, style = MaterialTheme.typography.bodyMedium) },
+                placeholder = { Text(placeholder, color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium) },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Surface2,
-                    unfocusedContainerColor = Surface2,
-                    focusedBorderColor = Accent,
+                    focusedContainerColor = radarColors().surface2,
+                    unfocusedContainerColor = radarColors().surface2,
+                    focusedBorderColor = radarColors().accent,
                     unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary,
-                    cursorColor = Accent,
+                    focusedTextColor = radarColors().textPrimary,
+                    unfocusedTextColor = radarColors().textPrimary,
+                    cursorColor = radarColors().accent,
                 ),
             )
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(value) }) {
-                Text(confirmText, color = Accent, fontWeight = FontWeight.SemiBold)
+                Text(confirmText, color = radarColors().accent, fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消", color = TextTertiary)
+                Text("取消", color = radarColors().textTertiary)
             }
         },
     )

@@ -1,6 +1,7 @@
 package com.cycling.rssradar.ui.addsubscription
 
 import com.cycling.rssradar.core.data.DiscoveredFeed
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -61,19 +62,9 @@ import com.cycling.rssradar.core.model.rsshub.RouteCategory
 import com.cycling.rssradar.core.model.rsshub.RouteExample
 import com.cycling.rssradar.core.model.rsshub.RouteParam
 import com.cycling.rssradar.core.model.rsshub.RssHubRoute
-import com.cycling.rssradar.ui.components.AppSnackbarHost
-import com.cycling.rssradar.ui.components.FeedIcon
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.Divider
-import com.cycling.rssradar.ui.theme.Link
-import com.cycling.rssradar.ui.theme.OnAccent
-import com.cycling.rssradar.ui.theme.Success
-import com.cycling.rssradar.ui.theme.Surface1
-import com.cycling.rssradar.ui.theme.Surface2
-import com.cycling.rssradar.ui.theme.Surface3
-import com.cycling.rssradar.ui.theme.TextPrimary
-import com.cycling.rssradar.ui.theme.TextSecondary
-import com.cycling.rssradar.ui.theme.TextTertiary
+import com.cycling.rssradar.core.ui.components.AppSnackbarHost
+import com.cycling.rssradar.core.ui.components.FeedIcon
+import com.cycling.rssradar.core.ui.theme.Success
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.CircleCheckBig
@@ -121,8 +112,8 @@ private fun AddSheetShell(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Surface1,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = Surface3) },
+        containerColor = radarColors().surface1,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = radarColors().surface3) },
         contentWindowInsets = { WindowInsets.navigationBars },
     ) {
         Box(modifier = Modifier.fillMaxHeight(0.92f)) {
@@ -206,20 +197,20 @@ private fun SheetHeader(title: String, subtitle: String?, onClose: () -> Unit) {
             }
             Text(
                 text = title,
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
             if (subtitle != null) {
                 Text(
                     text = subtitle,
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
         }
         IconButton(onClick = onClose) {
-            Icon(Lucide.X, contentDescription = "关闭", tint = TextSecondary)
+            Icon(Lucide.X, contentDescription = "关闭", tint = radarColors().textSecondary)
         }
     }
 }
@@ -233,14 +224,14 @@ private fun ParamsHeader(route: RssHubRoute, onBack: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onBack) {
-            Icon(Lucide.ArrowLeft, contentDescription = "返回目录", tint = TextPrimary)
+            Icon(Lucide.ArrowLeft, contentDescription = "返回目录", tint = radarColors().textPrimary)
         }
         FeedIcon(title = route.sourceName, size = 32.dp, cornerRadius = 9.dp)
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = route.name,
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -248,7 +239,7 @@ private fun ParamsHeader(route: RssHubRoute, onBack: () -> Unit) {
             )
             Text(
                 text = route.sourceName,
-                color = TextTertiary,
+                color = radarColors().textTertiary,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -285,14 +276,14 @@ private fun ColumnScope.CatalogContent(
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(
-                            color = Accent,
+                            color = radarColors().accent,
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(14.dp),
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = "正在探测订阅源…",
-                            color = TextTertiary,
+                            color = radarColors().textTertiary,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -337,12 +328,12 @@ private fun ColumnScope.CatalogContent(
             ) {
                 Text(
                     text = "或从 RSSHub 路由构建",
-                    color = TextSecondary,
+                    color = radarColors().textSecondary,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.width(8.dp))
-                HorizontalDivider(color = Divider, modifier = Modifier.weight(1f))
+                HorizontalDivider(color = radarColors().divider, modifier = Modifier.weight(1f))
             }
         }
 
@@ -382,11 +373,11 @@ private fun ColumnScope.CatalogContent(
                     contentAlignment = Alignment.Center,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(color = Accent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                        CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = "正在装载路由目录…",
-                            color = TextTertiary,
+                            color = radarColors().textTertiary,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -402,7 +393,7 @@ private fun ColumnScope.CatalogContent(
                 ) {
                     Text(
                         text = "没有匹配的路由",
-                        color = TextTertiary,
+                        color = radarColors().textTertiary,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -436,13 +427,13 @@ private fun CatalogStatusBar(
     ) {
         Text(
             text = catalogStatusText(routeCount, generatedAtMillis, source),
-            color = TextTertiary,
+            color = radarColors().textTertiary,
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.weight(1f),
         )
         Surface(
             shape = RoundedCornerShape(50),
-            color = Surface2,
+            color = radarColors().surface2,
             modifier = Modifier.clickable(enabled = !refreshing, onClick = onRefresh),
         ) {
             Row(
@@ -450,19 +441,19 @@ private fun CatalogStatusBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (refreshing) {
-                    CircularProgressIndicator(color = Accent, strokeWidth = 2.dp, modifier = Modifier.size(12.dp))
+                    CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(12.dp))
                 } else {
                     Icon(
                         imageVector = Lucide.RefreshCw,
                         contentDescription = "更新路由目录",
-                        tint = TextSecondary,
+                        tint = radarColors().textSecondary,
                         modifier = Modifier.size(12.dp),
                     )
                 }
                 Spacer(Modifier.width(5.dp))
                 Text(
                     text = if (refreshing) "更新中" else "更新目录",
-                    color = TextSecondary,
+                    color = radarColors().textSecondary,
                     style = MaterialTheme.typography.labelMedium,
                 )
             }
@@ -499,7 +490,7 @@ private fun RouteRow(route: RssHubRoute, onClick: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = route.name,
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f, fill = false),
@@ -513,7 +504,7 @@ private fun RouteRow(route: RssHubRoute, onClick: () -> Unit) {
             }
             Text(
                 text = route.subtitle,
-                color = TextTertiary,
+                color = radarColors().textTertiary,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -523,7 +514,7 @@ private fun RouteRow(route: RssHubRoute, onClick: () -> Unit) {
         Icon(
             imageVector = Lucide.ChevronRight,
             contentDescription = null,
-            tint = TextTertiary,
+            tint = radarColors().textTertiary,
             modifier = Modifier.size(18.dp),
         )
     }
@@ -601,7 +592,7 @@ private fun ColumnScope.ParamsContent(
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = route.description,
-                        color = TextTertiary,
+                        color = radarColors().textTertiary,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -612,7 +603,7 @@ private fun ColumnScope.ParamsContent(
             item {
                 Text(
                     text = "此路由无需参数，直接生成即可。",
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -640,7 +631,7 @@ private fun ColumnScope.ParamsContent(
                 // 结果由哪个实例解析，写在按钮上方：实例不可达时这是最先要核对的信息
                 Text(
                     text = "由 ${state.host} 解析",
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -655,10 +646,10 @@ private fun ColumnScope.ParamsContent(
                         .height(50.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Surface2,
-                        contentColor = TextPrimary,
-                        disabledContainerColor = Surface2.copy(alpha = 0.5f),
-                        disabledContentColor = TextTertiary,
+                        containerColor = radarColors().surface2,
+                        contentColor = radarColors().textPrimary,
+                        disabledContainerColor = radarColors().surface2.copy(alpha = 0.5f),
+                        disabledContentColor = radarColors().textTertiary,
                     ),
                 ) {
                     Icon(
@@ -679,7 +670,7 @@ private fun ColumnScope.ParamsContent(
                         text = "还需填写：" + state.missingParams.joinToString("、") {
                             it.label.ifBlank { it.key }
                         },
-                        color = TextTertiary,
+                        color = radarColors().textTertiary,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -711,7 +702,7 @@ private fun PreviewResult(
         if (state.isValidating) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(
-                    color = Accent,
+                    color = radarColors().accent,
                     strokeWidth = 2.dp,
                     modifier = Modifier.size(14.dp),
                 )
@@ -724,7 +715,7 @@ private fun PreviewResult(
                     } else {
                         "正在校验…"
                     },
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -762,7 +753,7 @@ private fun ExamplePicker(
     Column {
         Text(
             text = "示例",
-            color = TextSecondary,
+            color = radarColors().textSecondary,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
         )
@@ -772,13 +763,13 @@ private fun ExamplePicker(
                 val example = examples[index]
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = Surface2,
+                    color = radarColors().surface2,
                     modifier = Modifier.clickable { onSelect(example) },
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                         Text(
                             text = example.title.ifBlank { example.path.substringAfterLast('/') },
-                            color = TextPrimary,
+                            color = radarColors().textPrimary,
                             style = MaterialTheme.typography.bodySmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -786,7 +777,7 @@ private fun ExamplePicker(
                         if (example.title.isNotBlank()) {
                             Text(
                                 text = example.path,
-                                color = TextTertiary,
+                                color = radarColors().textTertiary,
                                 style = MaterialTheme.typography.labelSmall,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -809,7 +800,7 @@ private fun ParamField(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = "${param.label} · :${param.key}",
-                color = TextSecondary,
+                color = radarColors().textSecondary,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f, fill = false),
@@ -842,20 +833,20 @@ private fun ParamField(
             placeholder = {
                 Text(
                     text = param.fallback ?: "必填",
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Surface2,
-                unfocusedContainerColor = Surface2,
-                focusedBorderColor = Accent,
+                focusedContainerColor = radarColors().surface2,
+                unfocusedContainerColor = radarColors().surface2,
+                focusedBorderColor = radarColors().accent,
                 unfocusedBorderColor = Color.Transparent,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary,
-                cursorColor = Accent,
+                focusedTextColor = radarColors().textPrimary,
+                unfocusedTextColor = radarColors().textPrimary,
+                cursorColor = radarColors().accent,
             ),
         )
         // 说明与标签重复时不再啰嗦一遍
@@ -863,7 +854,7 @@ private fun ParamField(
             Spacer(Modifier.height(4.dp))
             Text(
                 text = param.description,
-                color = TextTertiary,
+                color = radarColors().textTertiary,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
@@ -876,12 +867,12 @@ private fun ParamField(
 private fun OptionalTag() {
     Box(
         modifier = Modifier
-            .background(Surface3, RoundedCornerShape(4.dp))
+            .background(radarColors().surface3, RoundedCornerShape(4.dp))
             .padding(horizontal = 5.dp, vertical = 2.dp),
     ) {
         Text(
             text = "可选",
-            color = TextTertiary,
+            color = radarColors().textTertiary,
             style = MaterialTheme.typography.labelSmall,
         )
     }
@@ -891,12 +882,12 @@ private fun OptionalTag() {
 private fun CodeBlock(text: String, accent: Boolean = false) {
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = if (accent) Surface2 else Color(0xFF111114),
+        color = if (accent) radarColors().surface2 else Color(0xFF111114),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Text(
             text = text,
-            color = if (accent) Link else TextSecondary,
+            color = if (accent) radarColors().link else radarColors().textSecondary,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
         )
@@ -909,7 +900,7 @@ private fun CodeBlock(text: String, accent: Boolean = false) {
 private fun FieldLabel(text: String) {
     Text(
         text = text,
-        color = TextSecondary,
+        color = radarColors().textSecondary,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
     )
@@ -928,18 +919,18 @@ private fun UrlField(
         placeholder = {
             Text(
                 "https://rsshub.app/zhihu/daily",
-                color = TextTertiary,
+                color = radarColors().textTertiary,
                 style = MaterialTheme.typography.bodyMedium,
             )
         },
         singleLine = true,
         leadingIcon = {
-            Icon(Lucide.Link2, contentDescription = null, tint = TextTertiary)
+            Icon(Lucide.Link2, contentDescription = null, tint = radarColors().textTertiary)
         },
         trailingIcon = {
             if (isLoading) {
                 CircularProgressIndicator(
-                    color = Accent,
+                    color = radarColors().accent,
                     strokeWidth = 2.dp,
                     modifier = Modifier.size(18.dp),
                 )
@@ -947,13 +938,13 @@ private fun UrlField(
         },
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Surface2,
-            unfocusedContainerColor = Surface2,
-            focusedBorderColor = Accent,
+            focusedContainerColor = radarColors().surface2,
+            unfocusedContainerColor = radarColors().surface2,
+            focusedBorderColor = radarColors().accent,
             unfocusedBorderColor = Color.Transparent,
-            focusedTextColor = TextPrimary,
-            unfocusedTextColor = TextPrimary,
-            cursorColor = Accent,
+            focusedTextColor = radarColors().textPrimary,
+            unfocusedTextColor = radarColors().textPrimary,
+            cursorColor = radarColors().accent,
         ),
     )
 }
@@ -969,21 +960,21 @@ private fun SearchField(
         onValueChange = onChange,
         modifier = modifier.fillMaxWidth(),
         placeholder = {
-            Text("搜索 3800 条路由，如 b站 / github / 日报", color = TextTertiary, style = MaterialTheme.typography.bodyMedium)
+            Text("搜索 3800 条路由，如 b站 / github / 日报", color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium)
         },
         singleLine = true,
         leadingIcon = {
-            Icon(Lucide.Search, contentDescription = null, tint = TextTertiary)
+            Icon(Lucide.Search, contentDescription = null, tint = radarColors().textTertiary)
         },
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Surface2,
-            unfocusedContainerColor = Surface2,
-            focusedBorderColor = Accent,
+            focusedContainerColor = radarColors().surface2,
+            unfocusedContainerColor = radarColors().surface2,
+            focusedBorderColor = radarColors().accent,
             unfocusedBorderColor = Color.Transparent,
-            focusedTextColor = TextPrimary,
-            unfocusedTextColor = TextPrimary,
-            cursorColor = Accent,
+            focusedTextColor = radarColors().textPrimary,
+            unfocusedTextColor = radarColors().textPrimary,
+            cursorColor = radarColors().accent,
         ),
     )
 }
@@ -992,12 +983,12 @@ private fun SearchField(
 private fun FilterChipLight(label: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(50),
-        color = if (selected) Accent else Surface2,
+        color = if (selected) radarColors().accent else radarColors().surface2,
         modifier = Modifier.clickable(onClick = onClick),
     ) {
         Text(
             text = label,
-            color = if (selected) OnAccent else TextSecondary,
+            color = if (selected) radarColors().onAccent else radarColors().textSecondary,
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(horizontal = 13.dp, vertical = 6.dp),
         )
@@ -1023,7 +1014,7 @@ private fun ValidationBanner(info: ValidationInfo) {
     val color = when (info) {
         is ValidationInfo.Valid -> Success
         // 发现到候选不是错误，是进展：用强调色而非报错红
-        is ValidationInfo.Discovered -> Accent
+        is ValidationInfo.Discovered -> radarColors().accent
         else -> MaterialTheme.colorScheme.error
     }
     Row(
@@ -1057,7 +1048,7 @@ private fun DiscoveredFeedRow(
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = Surface1,
+        color = radarColors().surface1,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
@@ -1069,21 +1060,21 @@ private fun DiscoveredFeedRow(
             Icon(
                 imageVector = Lucide.Rss,
                 contentDescription = null,
-                tint = Accent,
+                tint = radarColors().accent,
                 modifier = Modifier.size(16.dp),
             )
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = feed.title.ifBlank { feed.url },
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = feed.url,
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1091,7 +1082,7 @@ private fun DiscoveredFeedRow(
             }
             Text(
                 text = "${feed.articleCount} 篇",
-                color = TextSecondary,
+                color = radarColors().textSecondary,
                 style = MaterialTheme.typography.labelSmall,
             )
         }
@@ -1113,15 +1104,15 @@ private fun PrimaryButton(
             .height(52.dp),
         shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = Accent,
-            contentColor = OnAccent,
-            disabledContainerColor = Accent.copy(alpha = 0.4f),
-            disabledContentColor = OnAccent,
+            containerColor = radarColors().accent,
+            contentColor = radarColors().onAccent,
+            disabledContainerColor = radarColors().accent.copy(alpha = 0.4f),
+            disabledContentColor = radarColors().onAccent,
         ),
     ) {
         if (loading) {
             CircularProgressIndicator(
-                color = OnAccent,
+                color = radarColors().onAccent,
                 strokeWidth = 2.dp,
                 modifier = Modifier.size(20.dp),
             )

@@ -22,12 +22,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.ui.theme.Danger
-import com.cycling.rssradar.ui.theme.Surface1
-import com.cycling.rssradar.ui.theme.TextPrimary
-import com.cycling.rssradar.ui.theme.TextSecondary
-import com.cycling.rssradar.ui.theme.TextTertiary
-import com.cycling.rssradar.ui.theme.Divider
+import com.cycling.rssradar.core.ui.theme.Danger
 import com.composables.icons.lucide.Bookmark
 import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.Eye
@@ -38,6 +33,7 @@ import com.composables.icons.lucide.Share2
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.ThumbsDown
 import com.composables.icons.lucide.Trash2
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 /** 菜单项标准高度 48dp；容器上下 padding + 描边约 16dp。 */
 private const val MENU_ITEM_HEIGHT_DP = 48
@@ -116,16 +112,16 @@ fun ArticleContextMenu(
 ) {
     val context = LocalContext.current
     val hasLink = actions.link.isNotBlank()
-    // iOS Dark 风：Surface1 卡片面 + 14dp 圆角 + Divider 细描边，与设计稿卡片语言一致
+    // iOS Dark 风：radarColors().surface1 卡片面 + 14dp 圆角 + radarColors().divider 细描边，与设计稿卡片语言一致
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismiss,
         offset = offset,
         shape = RoundedCornerShape(14.dp),
-        containerColor = Surface1,
+        containerColor = radarColors().surface1,
         tonalElevation = 0.dp,
         shadowElevation = 8.dp,
-        border = BorderStroke(1.dp, Divider),
+        border = BorderStroke(1.dp, radarColors().divider),
     ) {
         DropdownMenuItem(
             text = { Text(if (actions.isRead) "标为未读" else "标为已读") },
@@ -183,15 +179,15 @@ fun ArticleContextMenu(
     }
 }
 
-/** 普通项：文字 TextPrimary、图标 TextSecondary（禁用时文字/图标都用 TextTertiary）。 */
+/** 普通项：文字 radarColors().textPrimary、图标 radarColors().textSecondary（禁用时文字/图标都用 radarColors().textTertiary）。 */
 @Composable
 private fun normalItemColors() = MenuItemColors(
-    textColor = TextPrimary,
-    leadingIconColor = TextSecondary,
-    trailingIconColor = TextSecondary,
-    disabledTextColor = TextTertiary,
-    disabledLeadingIconColor = TextTertiary,
-    disabledTrailingIconColor = TextTertiary,
+    textColor = radarColors().textPrimary,
+    leadingIconColor = radarColors().textSecondary,
+    trailingIconColor = radarColors().textSecondary,
+    disabledTextColor = radarColors().textTertiary,
+    disabledLeadingIconColor = radarColors().textTertiary,
+    disabledTrailingIconColor = radarColors().textTertiary,
 )
 
 /** 破坏性项（删除）：Danger 红，与 App 内危险操作色一致。 */
@@ -200,9 +196,9 @@ private fun dangerItemColors() = MenuItemColors(
     textColor = Danger,
     leadingIconColor = Danger,
     trailingIconColor = Danger,
-    disabledTextColor = TextTertiary,
-    disabledLeadingIconColor = TextTertiary,
-    disabledTrailingIconColor = TextTertiary,
+    disabledTextColor = radarColors().textTertiary,
+    disabledLeadingIconColor = radarColors().textTertiary,
+    disabledTrailingIconColor = radarColors().textTertiary,
 )
 
 @Composable

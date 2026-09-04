@@ -56,22 +56,15 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
 import com.cycling.rssradar.ui.components.ArticleContextMenu
-import com.cycling.rssradar.ui.components.AppSnackbarHost
+import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.ArticleMenuActions
 import com.cycling.rssradar.ui.components.articleMenuOffset
-import com.cycling.rssradar.ui.components.FeedIcon
+import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.ui.components.tabBarBottomClearance
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.BgRoot
-import com.cycling.rssradar.ui.theme.Link
-import com.cycling.rssradar.ui.theme.Surface1
-import com.cycling.rssradar.ui.theme.Surface2
-import com.cycling.rssradar.ui.theme.TextPrimary
-import com.cycling.rssradar.ui.theme.TextSecondary
-import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.X
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 
 @Composable
@@ -98,7 +91,7 @@ fun SearchScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(BgRoot)) {
+    Box(modifier = Modifier.fillMaxSize().background(radarColors().bgRoot)) {
         Column(modifier = Modifier.fillMaxSize()) {
             SearchBar(
                 query = state.query,
@@ -151,37 +144,37 @@ private fun SearchBar(
             placeholder = {
                 Text(
                     "搜索文章、来源或关键词",
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
             singleLine = true,
             shape = RoundedCornerShape(50),
             leadingIcon = {
-                Icon(Lucide.Search, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(18.dp))
+                Icon(Lucide.Search, contentDescription = null, tint = radarColors().textTertiary, modifier = Modifier.size(18.dp))
             },
             trailingIcon = {
                 if (query.isNotEmpty()) {
                     IconButton(onClick = onClear) {
-                        Icon(Lucide.X, contentDescription = "清空", tint = TextTertiary, modifier = Modifier.size(18.dp))
+                        Icon(Lucide.X, contentDescription = "清空", tint = radarColors().textTertiary, modifier = Modifier.size(18.dp))
                     }
                 }
             },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Surface1,
-                unfocusedContainerColor = Surface1,
-                focusedBorderColor = Accent,
-                unfocusedBorderColor = Surface2,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary,
-                cursorColor = Accent,
+                focusedContainerColor = radarColors().surface1,
+                unfocusedContainerColor = radarColors().surface1,
+                focusedBorderColor = radarColors().accent,
+                unfocusedBorderColor = radarColors().surface2,
+                focusedTextColor = radarColors().textPrimary,
+                unfocusedTextColor = radarColors().textPrimary,
+                cursorColor = radarColors().accent,
             ),
         )
         Spacer(Modifier.width(8.dp))
         TextButton(onClick = onSubmit) {
             Text(
                 text = "搜索",
-                color = Link,
+                color = radarColors().link,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -199,14 +192,14 @@ private fun RecentSearches(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = "最近搜索",
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
             if (history.isNotEmpty()) {
                 TextButton(onClick = onClear) {
-                    Text(text = "清空历史", color = TextTertiary, style = MaterialTheme.typography.bodyMedium)
+                    Text(text = "清空历史", color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -214,7 +207,7 @@ private fun RecentSearches(
         if (history.isEmpty()) {
             Text(
                 text = "暂无搜索记录",
-                color = TextTertiary,
+                color = radarColors().textTertiary,
                 style = MaterialTheme.typography.bodyMedium,
             )
         } else {
@@ -236,12 +229,12 @@ private fun RecentSearches(
 private fun HistoryChip(term: String, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(50),
-        color = Surface1,
+        color = radarColors().surface1,
         modifier = Modifier.clickable(onClick = onClick),
     ) {
         Text(
             text = term,
-            color = TextPrimary,
+            color = radarColors().textPrimary,
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
         )
@@ -271,7 +264,7 @@ private fun SearchResults(
         item {
             Text(
                 text = "找到 ${state.results.size} 条与「${state.query}」相关的结果",
-                color = TextTertiary,
+                color = radarColors().textTertiary,
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
@@ -294,7 +287,7 @@ private fun SearchResults(
                         .padding(top = 32.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("暂无结果，试试其他关键词", color = TextTertiary)
+                    Text("暂无结果，试试其他关键词", color = radarColors().textTertiary)
                 }
             }
         }
@@ -323,7 +316,7 @@ private fun SearchResultRow(
     Box {
         Surface(
             shape = RoundedCornerShape(12.dp),
-            color = Surface1,
+            color = radarColors().surface1,
             modifier = Modifier
                 .fillMaxWidth()
                 .onGloballyPositioned {
@@ -354,7 +347,7 @@ private fun SearchResultRow(
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
                 text = article.article.title.highlight(query),
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
@@ -364,7 +357,7 @@ private fun SearchResultRow(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = summary.highlight(query),
-                    color = TextSecondary,
+                    color = radarColors().textSecondary,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -376,17 +369,17 @@ private fun SearchResultRow(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = article.feedTitle,
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.labelMedium,
                 )
                 Spacer(Modifier.width(6.dp))
-                Text("·", color = TextTertiary)
+                Text("·", color = radarColors().textTertiary)
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = article.article.publishedAt?.let {
                         DateUtils.getRelativeTimeSpanString(it).toString()
                     } ?: "",
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.labelMedium,
                 )
             }

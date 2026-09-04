@@ -35,13 +35,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.BgRoot
-import com.cycling.rssradar.ui.theme.Surface1
-import com.cycling.rssradar.ui.theme.Surface2
-import com.cycling.rssradar.ui.theme.TextPrimary
-import com.cycling.rssradar.ui.theme.TextSecondary
-import com.cycling.rssradar.ui.theme.TextTertiary
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 兴趣画像页（ADR-0013）：推荐流"为什么推这些"的答案，只读。
@@ -59,7 +53,7 @@ fun InterestProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgRoot)
+            .background(radarColors().bgRoot)
             .statusBarsPadding(),
     ) {
         Row(
@@ -69,11 +63,11 @@ fun InterestProfileScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = TextPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = radarColors().textPrimary)
             }
             Text(
                 text = "兴趣画像",
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
@@ -88,7 +82,7 @@ fun InterestProfileScreen(
             Text(
                 text = "推荐流按你的真实阅读行为排序：打开过的文章、收藏、稍后读都会计入画像，" +
                     "越近的行为权重越高。画像只存在本机，不上传。",
-                color = TextTertiary,
+                color = radarColors().textTertiary,
                 style = MaterialTheme.typography.bodySmall,
             )
             Spacer(Modifier.height(16.dp))
@@ -96,26 +90,26 @@ fun InterestProfileScreen(
             when {
                 state.loading -> {
                     Box(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Accent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                        CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
                     }
                 }
                 state.isColdStart -> {
-                    Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+                    Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
                         Column(Modifier.padding(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     Lucide.Sparkles,
                                     contentDescription = null,
-                                    tint = Accent,
+                                    tint = radarColors().accent,
                                     modifier = Modifier.size(18.dp),
                                 )
                                 Spacer(Modifier.width(8.dp))
-                                Text("还没有学到偏好", color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
+                                Text("还没有学到偏好", color = radarColors().textPrimary, style = MaterialTheme.typography.bodyMedium)
                             }
                             Spacer(Modifier.height(8.dp))
                             Text(
                                 text = "多读几篇文章后这里会出现兴趣词；在此之前，推荐 tab 按订阅源轮转展示最近未读。",
-                                color = TextTertiary,
+                                color = radarColors().textTertiary,
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
@@ -124,12 +118,12 @@ fun InterestProfileScreen(
                 else -> {
                     Text(
                         text = "兴趣词 ${state.terms.size} 个",
-                        color = TextSecondary,
+                        color = radarColors().textSecondary,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(Modifier.height(8.dp))
-                    Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+                    Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
                         // 词袋按权重降序，权重条即"这个词在你读过的东西里有多突出"
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             state.terms.take(30).forEach { term ->
@@ -137,7 +131,7 @@ fun InterestProfileScreen(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(
                                             text = term.term,
-                                            color = TextPrimary,
+                                            color = radarColors().textPrimary,
                                             style = MaterialTheme.typography.bodyMedium,
                                             modifier = Modifier.weight(1f),
                                             maxLines = 1,
@@ -145,7 +139,7 @@ fun InterestProfileScreen(
                                         )
                                         Text(
                                             text = "${(term.weight * 100).toInt()}",
-                                            color = TextTertiary,
+                                            color = radarColors().textTertiary,
                                             style = MaterialTheme.typography.labelSmall,
                                         )
                                     }
@@ -155,14 +149,14 @@ fun InterestProfileScreen(
                                             .fillMaxWidth()
                                             .height(4.dp)
                                             .clip(RoundedCornerShape(50))
-                                            .background(Surface2),
+                                            .background(radarColors().surface2),
                                     ) {
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth(term.weight.toFloat().coerceIn(0.02f, 1f))
                                                 .height(4.dp)
                                                 .clip(RoundedCornerShape(50))
-                                                .background(Accent),
+                                                .background(radarColors().accent),
                                         )
                                     }
                                 }
@@ -170,7 +164,7 @@ fun InterestProfileScreen(
                             if (state.terms.size > 30) {
                                 Text(
                                     text = "仅展示权重最高的 30 个，完整词袋共 ${state.terms.size} 个",
-                                    color = TextTertiary,
+                                    color = radarColors().textTertiary,
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                             }
@@ -181,19 +175,19 @@ fun InterestProfileScreen(
                         Spacer(Modifier.height(20.dp))
                         Text(
                             text = "订阅源亲和度 ${state.affinities.size} 个",
-                            color = TextSecondary,
+                            color = radarColors().textSecondary,
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Spacer(Modifier.height(8.dp))
-                        Surface(shape = RoundedCornerShape(14.dp), color = Surface1) {
+                        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
                             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 state.affinities.take(15).forEach { row ->
                                     Column {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
                                                 text = row.title.ifBlank { "（已删除的订阅源）" },
-                                                color = TextPrimary,
+                                                color = radarColors().textPrimary,
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 modifier = Modifier.weight(1f),
                                                 maxLines = 1,
@@ -201,7 +195,7 @@ fun InterestProfileScreen(
                                             )
                                             Text(
                                                 text = "${(row.affinity * 100).toInt()}",
-                                                color = TextTertiary,
+                                                color = radarColors().textTertiary,
                                                 style = MaterialTheme.typography.labelSmall,
                                             )
                                         }
@@ -211,21 +205,21 @@ fun InterestProfileScreen(
                                                 .fillMaxWidth()
                                                 .height(4.dp)
                                                 .clip(RoundedCornerShape(50))
-                                                .background(Surface2),
+                                                .background(radarColors().surface2),
                                         ) {
                                             Box(
                                                 modifier = Modifier
                                                     .fillMaxWidth(row.affinity.toFloat().coerceIn(0.02f, 1f))
                                                     .height(4.dp)
                                                     .clip(RoundedCornerShape(50))
-                                                    .background(Accent),
+                                                    .background(radarColors().accent),
                                             )
                                         }
                                     }
                                 }
                                 Text(
                                     text = "亲和度 = 该源文章的历史打开率（越近的打开权重越高），按最高的那个源归一化。",
-                                    color = TextTertiary,
+                                    color = radarColors().textTertiary,
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                             }

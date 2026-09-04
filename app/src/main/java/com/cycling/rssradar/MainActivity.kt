@@ -66,9 +66,9 @@ import com.cycling.rssradar.ui.navigation.SettingsGeneralRoute
 import com.cycling.rssradar.ui.navigation.SettingsRssHubRoute
 import com.cycling.rssradar.ui.navigation.SettingsSyncRoute
 import com.cycling.rssradar.ui.navigation.SubscriptionsRoute
-import com.cycling.rssradar.ui.theme.BgRoot
 import com.cycling.rssradar.ui.theme.CompositionLocalRoot
 import dagger.hilt.android.AndroidEntryPoint
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 纯壳 Activity：edge-to-edge + 组合根。启动副作用在 [RssRadarApp]，
@@ -109,7 +109,7 @@ private fun RssRadarAppContent() {
         else -> null
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(BgRoot)) {
+    Box(modifier = Modifier.fillMaxSize().background(radarColors().bgRoot)) {
         NavHost(navController = navController, startDestination = FeedRoute) {
             composable<FeedRoute> {
                 val vm = hiltViewModel<FeedListViewModel>()

@@ -53,12 +53,6 @@ import com.cycling.rssradar.core.data.store.ThemeMode
 import com.cycling.rssradar.core.data.store.ThemeStore
 import com.cycling.rssradar.sync.SyncScheduler
 import com.cycling.rssradar.ui.components.tabBarBottomClearance
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.OnAccent
-import com.cycling.rssradar.ui.theme.Surface1
-import com.cycling.rssradar.ui.theme.TextPrimary
-import com.cycling.rssradar.ui.theme.TextSecondary
-import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.Bot
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide
@@ -72,6 +66,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 
 data class RssHubSettingsUiState(
@@ -377,7 +372,7 @@ fun RssHubSettingsScreen(
     ) {
         Text(
             text = "我的",
-            color = TextPrimary,
+            color = radarColors().textPrimary,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(vertical = 12.dp),
@@ -424,7 +419,7 @@ private fun SettingsEntryCard(
 ) {
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = Surface1,
+        color = radarColors().surface1,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
@@ -433,18 +428,18 @@ private fun SettingsEntryCard(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = null, tint = radarColors().textSecondary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
             Text(
                 text = title,
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 text = summary,
-                color = TextTertiary,
+                color = radarColors().textTertiary,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
             )
@@ -452,7 +447,7 @@ private fun SettingsEntryCard(
             Icon(
                 imageVector = Lucide.ChevronRight,
                 contentDescription = "进入",
-                tint = TextTertiary,
+                tint = radarColors().textTertiary,
                 modifier = Modifier.size(18.dp),
             )
         }

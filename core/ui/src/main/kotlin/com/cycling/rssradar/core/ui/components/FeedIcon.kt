@@ -1,4 +1,4 @@
-package com.cycling.rssradar.ui.components
+package com.cycling.rssradar.core.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -18,9 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
-import com.cycling.rssradar.ui.theme.Surface3
-import com.cycling.rssradar.ui.theme.TextTertiary
-
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 订阅源 / 站点图标：有 [iconUrl] 时用 Coil 加载真图（底下字母块常驻打底，
@@ -35,7 +33,8 @@ fun FeedIcon(
     size: Dp = 28.dp,
     cornerRadius: Dp = 7.dp,
 ) {
-    val bg = remember(title) { colorForTitle(title) }
+    // 无题名取主题灰；其余按 title 稳定 hash 取 12 色调色板
+    val bg = colorForTitle(title) ?: radarColors().surface3
     val letter = title.trim().firstOrNull()?.toString()?.uppercase() ?: "?"
     Box(
         modifier = modifier
@@ -73,10 +72,10 @@ fun FeedIconPlaceholder(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape(cornerRadius))
-            .background(Surface3),
+            .background(radarColors().surface3),
         contentAlignment = Alignment.Center,
     ) {
-        Text("?", color = TextTertiary, style = MaterialTheme.typography.labelMedium)
+        Text("?", color = radarColors().textTertiary, style = MaterialTheme.typography.labelMedium)
     }
 }
 
@@ -96,8 +95,8 @@ private val TitlePalette = listOf(
     Color(0xFF38BDF8),
 )
 
-private fun colorForTitle(title: String): Color {
-    if (title.isBlank()) return Surface3
+private fun colorForTitle(title: String): Color? {
+    if (title.isBlank()) return null
     val idx = (title.hashCode().toLong() and 0x7FFF_FFFFL) % TitlePalette.size
     return TitlePalette[idx.toInt()]
 }

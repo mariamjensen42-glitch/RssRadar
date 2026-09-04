@@ -34,14 +34,7 @@ import com.cycling.rssradar.core.data.db.ContentFetchLogEntity
 import com.cycling.rssradar.core.data.db.FetchHostStat
 import com.cycling.rssradar.core.data.parser.ExtractionIssue
 import com.cycling.rssradar.core.data.parser.FetchFailure
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.BgRoot
-import com.cycling.rssradar.ui.theme.Danger
-import com.cycling.rssradar.ui.theme.Surface1
-import com.cycling.rssradar.ui.theme.Surface2
-import com.cycling.rssradar.ui.theme.TextPrimary
-import com.cycling.rssradar.ui.theme.TextSecondary
-import com.cycling.rssradar.ui.theme.TextTertiary
+import com.cycling.rssradar.core.ui.theme.Danger
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.CircleAlert
 import com.composables.icons.lucide.Lucide
@@ -55,6 +48,7 @@ import javax.inject.Inject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 @HiltViewModel
 class FetchDiagnosticsViewModel @Inject constructor(
@@ -96,7 +90,7 @@ fun FetchDiagnosticsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(BgRoot)
+            .background(radarColors().bgRoot)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(bottom = 24.dp),
@@ -108,18 +102,18 @@ fun FetchDiagnosticsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = TextPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = radarColors().textPrimary)
             }
             Text(
                 text = "全文抓取诊断",
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
             if (problems.isNotEmpty()) {
                 IconButton(onClick = viewModel::clear) {
-                    Icon(Lucide.Trash, contentDescription = "清空记录", tint = TextSecondary)
+                    Icon(Lucide.Trash, contentDescription = "清空记录", tint = radarColors().textSecondary)
                 }
             }
         }
@@ -131,11 +125,11 @@ fun FetchDiagnosticsScreen(
                     .padding(horizontal = 20.dp, vertical = 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("暂无失败或不完整的抓取记录", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                Text("暂无失败或不完整的抓取记录", color = radarColors().textSecondary, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(6.dp))
                 Text(
                     "打开一篇摘要型文章并触发全文抓取后，这里会出现记录",
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -145,7 +139,7 @@ fun FetchDiagnosticsScreen(
         SectionTitle("按站点")
         Surface(
             shape = RoundedCornerShape(14.dp),
-            color = Surface1,
+            color = radarColors().surface1,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp),
@@ -160,7 +154,7 @@ fun FetchDiagnosticsScreen(
                     ) {
                         Text(
                             text = stat.host.ifBlank { "（未知站点）" },
-                            color = TextPrimary,
+                            color = radarColors().textPrimary,
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -189,7 +183,7 @@ fun FetchDiagnosticsScreen(
 private fun SectionTitle(text: String) {
     Text(
         text = text,
-        color = TextSecondary,
+        color = radarColors().textSecondary,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
@@ -198,10 +192,10 @@ private fun SectionTitle(text: String) {
 
 @Composable
 private fun StatChip(label: String, danger: Boolean) {
-    Surface(shape = RoundedCornerShape(50), color = Surface2) {
+    Surface(shape = RoundedCornerShape(50), color = radarColors().surface2) {
         Text(
             text = label,
-            color = if (danger) Danger else TextSecondary,
+            color = if (danger) Danger else radarColors().textSecondary,
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
         )
@@ -213,7 +207,7 @@ private fun ProblemRow(log: ContentFetchLogEntity) {
     val (title, detail) = describe(log)
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = Surface1,
+        color = radarColors().surface1,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
@@ -230,7 +224,7 @@ private fun ProblemRow(log: ContentFetchLogEntity) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = title,
-                        color = TextPrimary,
+                        color = radarColors().textPrimary,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f, fill = false),
@@ -238,7 +232,7 @@ private fun ProblemRow(log: ContentFetchLogEntity) {
                     Spacer(Modifier.size(6.dp))
                     Text(
                         text = log.host,
-                        color = TextTertiary,
+                        color = radarColors().textTertiary,
                         style = MaterialTheme.typography.labelSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -247,15 +241,15 @@ private fun ProblemRow(log: ContentFetchLogEntity) {
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = log.link,
-                    color = TextSecondary,
+                    color = radarColors().textSecondary,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(detail, color = TextTertiary, style = MaterialTheme.typography.labelSmall)
-                    Text(formatTime(log.createdAt), color = TextTertiary, style = MaterialTheme.typography.labelSmall)
+                    Text(detail, color = radarColors().textTertiary, style = MaterialTheme.typography.labelSmall)
+                    Text(formatTime(log.createdAt), color = radarColors().textTertiary, style = MaterialTheme.typography.labelSmall)
                 }
             }
         }

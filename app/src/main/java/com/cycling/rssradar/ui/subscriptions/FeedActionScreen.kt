@@ -37,18 +37,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.core.data.db.FeedEntity
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.Danger
-import com.cycling.rssradar.ui.theme.OnAccent
-import com.cycling.rssradar.ui.theme.Surface1
-import com.cycling.rssradar.ui.theme.Surface2
-import com.cycling.rssradar.ui.theme.TextPrimary
-import com.cycling.rssradar.ui.theme.TextSecondary
-import com.cycling.rssradar.ui.theme.TextTertiary
+import com.cycling.rssradar.core.ui.theme.Danger
 import com.composables.icons.lucide.Eraser
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Trash2
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 
 /**
@@ -72,12 +66,12 @@ fun FeedActionScreen(
     feed?.let { f ->
         ModalBottomSheet(
             onDismissRequest = onDismiss,
-            containerColor = Surface1,
+            containerColor = radarColors().surface1,
         ) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
                 Text(
                     text = f.title,
-                    color = TextPrimary,
+                    color = radarColors().textPrimary,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -86,7 +80,7 @@ fun FeedActionScreen(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = f.url.removePrefix("https://").removePrefix("http://"),
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -94,7 +88,7 @@ fun FeedActionScreen(
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = "移动到分组",
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.labelMedium,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -105,12 +99,12 @@ fun FeedActionScreen(
                                 val selected = group == f.groupName.ifBlank { DEFAULT_GROUP }
                                 Surface(
                                     shape = RoundedCornerShape(50),
-                                    color = if (selected) Accent else Surface2,
+                                    color = if (selected) radarColors().accent else radarColors().surface2,
                                     modifier = Modifier.clickable { viewModel.onIntent(SubscriptionsIntent.MoveFeed(f.id, group)); onDismiss() },
                                 ) {
                                     Text(
                                         text = group,
-                                        color = if (selected) OnAccent else TextPrimary,
+                                        color = if (selected) radarColors().onAccent else radarColors().textPrimary,
                                         style = MaterialTheme.typography.labelMedium,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                     )
@@ -122,7 +116,7 @@ fun FeedActionScreen(
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = "同步与预设",
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.labelMedium,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -159,7 +153,7 @@ fun FeedActionScreen(
                 // 内容类型（ADR-0014）：决定列表浏览形态（图片画廊/视频音频卡），订阅时已按信号预判
                 Text(
                     text = "内容类型",
-                    color = TextTertiary,
+                    color = radarColors().textTertiary,
                     style = MaterialTheme.typography.labelMedium,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -173,14 +167,14 @@ fun FeedActionScreen(
                         val selected = f.contentType == type
                         Surface(
                             shape = RoundedCornerShape(50),
-                            color = if (selected) Accent else Surface2,
+                            color = if (selected) radarColors().accent else radarColors().surface2,
                             modifier = Modifier.clickable {
                                 viewModel.onIntent(SubscriptionsIntent.SetContentType(f.id, type))
                             },
                         ) {
                             Text(
                                 text = label,
-                                color = if (selected) OnAccent else TextPrimary,
+                                color = if (selected) radarColors().onAccent else radarColors().textPrimary,
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             )
@@ -190,7 +184,7 @@ fun FeedActionScreen(
                 Spacer(Modifier.height(16.dp))
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Surface2,
+                    color = radarColors().surface2,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { renameTarget = f.title },
@@ -199,16 +193,16 @@ fun FeedActionScreen(
                         Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Lucide.Pencil, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+                        Icon(Lucide.Pencil, contentDescription = null, tint = radarColors().textSecondary, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("重命名", color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
+                        Text("重命名", color = radarColors().textPrimary, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
                 // 清空文章（issue #8）：只删文章保留订阅源，与「删除订阅（含其文章）」区分
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Surface2,
+                    color = radarColors().surface2,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { confirmClear = true },
@@ -217,15 +211,15 @@ fun FeedActionScreen(
                         Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Lucide.Eraser, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+                        Icon(Lucide.Eraser, contentDescription = null, tint = radarColors().textSecondary, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("清空文章（保留订阅）", color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
+                        Text("清空文章（保留订阅）", color = radarColors().textPrimary, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Surface2,
+                    color = radarColors().surface2,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { viewModel.onIntent(SubscriptionsIntent.DeleteFeed(f.id, f.title)); onDismiss() },
@@ -234,9 +228,9 @@ fun FeedActionScreen(
                         Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Lucide.Trash2, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(18.dp))
+                        Icon(Lucide.Trash2, contentDescription = null, tint = radarColors().textTertiary, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("删除订阅（含其文章）", color = TextTertiary, style = MaterialTheme.typography.bodyMedium)
+                        Text("删除订阅（含其文章）", color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
@@ -247,9 +241,9 @@ fun FeedActionScreen(
         var value by remember { mutableStateOf(initial) }
         AlertDialog(
             onDismissRequest = { renameTarget = null },
-            containerColor = Surface1,
-            titleContentColor = TextPrimary,
-            textContentColor = TextSecondary,
+            containerColor = radarColors().surface1,
+            titleContentColor = radarColors().textPrimary,
+            textContentColor = radarColors().textSecondary,
             title = { Text("重命名订阅", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
             text = {
                 OutlinedTextField(
@@ -257,24 +251,24 @@ fun FeedActionScreen(
                     onValueChange = { value = it },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Surface2,
-                        unfocusedContainerColor = Surface2,
-                        focusedBorderColor = Accent,
+                        focusedContainerColor = radarColors().surface2,
+                        unfocusedContainerColor = radarColors().surface2,
+                        focusedBorderColor = radarColors().accent,
                         unfocusedBorderColor = Color.Transparent,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        cursorColor = Accent,
+                        focusedTextColor = radarColors().textPrimary,
+                        unfocusedTextColor = radarColors().textPrimary,
+                        cursorColor = radarColors().accent,
                     ),
                 )
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.onIntent(SubscriptionsIntent.RenameFeed(feedId, value)); renameTarget = null; onDismiss() }) {
-                    Text("保存", color = Accent, fontWeight = FontWeight.SemiBold)
+                    Text("保存", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { renameTarget = null }) {
-                    Text("取消", color = TextTertiary)
+                    Text("取消", color = radarColors().textTertiary)
                 }
             },
         )
@@ -285,9 +279,9 @@ fun FeedActionScreen(
         val title = feed?.title.orEmpty()
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            containerColor = Surface1,
-            titleContentColor = TextPrimary,
-            textContentColor = TextSecondary,
+            containerColor = radarColors().surface1,
+            titleContentColor = radarColors().textPrimary,
+            textContentColor = radarColors().textSecondary,
             title = { Text("清空文章", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
             text = {
                 Text(
@@ -307,7 +301,7 @@ fun FeedActionScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text("取消", color = TextTertiary) }
+                TextButton(onClick = { confirmClear = false }) { Text("取消", color = radarColors().textTertiary) }
             },
         )
     }
@@ -326,15 +320,15 @@ private fun SwitchRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
-            Text(subtitle, color = TextTertiary, style = MaterialTheme.typography.bodySmall)
+            Text(title, color = radarColors().textPrimary, style = MaterialTheme.typography.bodyMedium)
+            Text(subtitle, color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
         }
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = OnAccent,
-                checkedTrackColor = Accent,
+                checkedThumbColor = radarColors().onAccent,
+                checkedTrackColor = radarColors().accent,
             ),
         )
     }

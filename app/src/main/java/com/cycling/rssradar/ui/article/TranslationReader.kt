@@ -20,8 +20,8 @@ import com.cycling.rssradar.core.data.ai.TranslationPairInput
 import com.cycling.rssradar.core.data.ai.TranslationSegments
 import com.cycling.rssradar.core.data.store.BilingualLayout
 import com.cycling.rssradar.core.data.store.TranslationViewMode
-import com.cycling.rssradar.ui.theme.Divider
 import com.cycling.rssradar.ui.theme.LocalReadingPrefs
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 译文渲染区（翻译功能 v2）：渐进显示 + 双语对照的唯一实现。
@@ -141,7 +141,7 @@ internal fun TranslationReader(
                                         modifier = Modifier
                                             .width(1.dp)
                                             .fillMaxHeight()
-                                            .background(Divider),
+                                            .background(radarColors().divider),
                                     )
                                     Box(modifier = Modifier.weight(1f)) {
                                         NativeNodesColumn(
@@ -166,7 +166,7 @@ internal fun TranslationReader(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(1.dp)
-                            .background(Divider),
+                            .background(radarColors().divider),
                     )
                     Spacer(Modifier.height(PAIR_GAP_DP.dp))
                 } else {

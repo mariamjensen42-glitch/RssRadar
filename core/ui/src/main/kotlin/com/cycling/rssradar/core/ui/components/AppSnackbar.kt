@@ -1,4 +1,4 @@
-package com.cycling.rssradar.ui.components
+package com.cycling.rssradar.core.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,13 +19,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.Surface3
-import com.cycling.rssradar.ui.theme.TextPrimary
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
- * 全应用统一 Snackbar：跟随 RssRadarPalette（Surface3 底 / TextPrimary 文字 / Accent 动作），
- * 圆角卡片形态，取代 M3 默认的反色胶囊。带动作标签的（如撤销删除）动作用 Accent 强调。
+ * 全应用统一 Snackbar：跟随 RadarColors（radarColors().surface3 底 / radarColors().textPrimary 文字 / radarColors().accent 动作），
+ * 圆角卡片形态，取代 M3 默认的反色胶囊。带动作标签的（如撤销删除）动作用 radarColors().accent 强调。
  * 所有屏幕的 SnackbarHost 统一走这里，保证观感一致。
  */
 @Composable
@@ -46,20 +44,20 @@ private fun AppSnackbar(data: SnackbarData) {
                 .fillMaxWidth()
                 .shadow(8.dp, RoundedCornerShape(14.dp))
                 .clip(RoundedCornerShape(14.dp))
-                .background(Surface3)
+                .background(radarColors().surface3)
                 .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = data.visuals.message,
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
             )
             data.visuals.actionLabel?.let { label ->
                 Text(
                     text = label,
-                    color = Accent,
+                    color = radarColors().accent,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier

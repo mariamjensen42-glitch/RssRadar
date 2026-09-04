@@ -81,7 +81,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import coil3.compose.AsyncImage
+import com.cycling.rssradar.core.ui.components.RadarImage
 import com.cycling.rssradar.core.data.db.ArticleEntity
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
 import com.cycling.rssradar.core.data.store.ListDescMode
@@ -89,19 +89,12 @@ import com.cycling.rssradar.core.data.store.ListDisplayState
 import com.cycling.rssradar.core.model.MarkAsReadCondition
 import com.cycling.rssradar.ui.theme.LocalListDisplay
 import com.cycling.rssradar.ui.components.ArticleContextMenu
-import com.cycling.rssradar.ui.components.AppSnackbarHost
+import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.ArticleMenuActions
 import com.cycling.rssradar.ui.components.articleMenuOffset
-import com.cycling.rssradar.ui.components.FeedIcon
+import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.ui.components.OptionPickerSheet
 import com.cycling.rssradar.ui.components.tabBarBottomClearance
-import com.cycling.rssradar.ui.theme.Accent
-import com.cycling.rssradar.ui.theme.OnAccent
-import com.cycling.rssradar.ui.theme.BgRoot
-import com.cycling.rssradar.ui.theme.Surface1
-import com.cycling.rssradar.ui.theme.TextPrimary
-import com.cycling.rssradar.ui.theme.TextSecondary
-import com.cycling.rssradar.ui.theme.TextTertiary
 import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.CheckCheck
@@ -113,7 +106,7 @@ import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.SlidersHorizontal
-import com.cycling.rssradar.ui.theme.Surface2
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 
 @Composable
@@ -178,7 +171,7 @@ fun FeedListScreen(
     val currentList = viewModel.filterByGroup(uiState.articles)
 
     Scaffold(
-        containerColor = BgRoot,
+        containerColor = radarColors().bgRoot,
         snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
             FeedListTopBar(
@@ -254,7 +247,7 @@ fun FeedListScreen(
                     ) {
                         if (uiState.isLoadingMore) {
                             CircularProgressIndicator(
-                                color = Accent,
+                                color = radarColors().accent,
                                 strokeWidth = 2.dp,
                                 modifier = Modifier.size(18.dp),
                             )
@@ -314,28 +307,28 @@ private fun FeedListTopBar(
     ) {
         Text(
             text = "RssRadar",
-            color = TextPrimary,
+            color = radarColors().textPrimary,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f),
         )
         IconButton(onClick = onOpenSearch) {
-            Icon(Lucide.Search, contentDescription = "搜索", tint = TextPrimary)
+            Icon(Lucide.Search, contentDescription = "搜索", tint = radarColors().textPrimary)
         }
         // 批量标记已读（#10）：积累几天未读刷不完的信息流，一键按时间范围清空
         IconButton(onClick = onMarkAllRead) {
-            Icon(Lucide.CheckCheck, contentDescription = "标记已读", tint = TextPrimary)
+            Icon(Lucide.CheckCheck, contentDescription = "标记已读", tint = radarColors().textPrimary)
         }
         IconButton(onClick = onOpenFilter) {
             Box {
-                Icon(Lucide.SlidersHorizontal, contentDescription = "分组筛选", tint = TextPrimary)
+                Icon(Lucide.SlidersHorizontal, contentDescription = "分组筛选", tint = radarColors().textPrimary)
                 if (filterActive) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .size(7.dp)
                             .clip(RoundedCornerShape(50))
-                            .background(Accent),
+                            .background(radarColors().accent),
                     )
                 }
             }
@@ -384,7 +377,7 @@ private fun FeedListTabRow(
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight()
                         .width(28.dp)
-                        .background(Brush.horizontalGradient(listOf(Color.Transparent, BgRoot))),
+                        .background(Brush.horizontalGradient(listOf(Color.Transparent, radarColors().bgRoot))),
                 )
             }
         }
@@ -393,8 +386,8 @@ private fun FeedListTabRow(
 
 @Composable
 private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    val bg = if (selected) Accent else Surface1
-    val fg = if (selected) MaterialTheme.colorScheme.onPrimary else TextPrimary
+    val bg = if (selected) radarColors().accent else radarColors().surface1
+    val fg = if (selected) MaterialTheme.colorScheme.onPrimary else radarColors().textPrimary
     Surface(
         shape = RoundedCornerShape(50),
         color = bg,
@@ -418,11 +411,11 @@ private fun GroupFilterSheet(
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Surface1) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = radarColors().surface1) {
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
             Text(
                 text = "分组筛选",
-                color = TextPrimary,
+                color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
@@ -458,7 +451,7 @@ private fun GroupOption(label: String, selected: Boolean, onClick: () -> Unit) {
     ) {
         Text(
             text = label,
-            color = if (selected) Accent else TextPrimary,
+            color = if (selected) radarColors().accent else radarColors().textPrimary,
             style = MaterialTheme.typography.bodyLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -468,7 +461,7 @@ private fun GroupOption(label: String, selected: Boolean, onClick: () -> Unit) {
             Icon(
                 imageVector = Lucide.Check,
                 contentDescription = "已选",
-                tint = Accent,
+                tint = radarColors().accent,
                 modifier = Modifier.size(18.dp),
             )
         }
@@ -599,12 +592,12 @@ private fun StickyDateHeader(label: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(BgRoot)
+            .background(radarColors().bgRoot)
             .padding(vertical = 4.dp),
     ) {
         Text(
             text = label,
-            color = TextTertiary,
+            color = radarColors().textTertiary,
             style = MaterialTheme.typography.labelMedium,
         )
     }
@@ -686,14 +679,14 @@ private fun SwipeActionBackground(
             Triple(
                 if (isStarred) "取消收藏" else "收藏",
                 Lucide.Star,
-                Accent,
+                radarColors().accent,
             )
 
         SwipeToDismissBoxValue.EndToStart ->
             Triple(
                 if (isRead) "标未读" else "标已读",
                 Lucide.Check,
-                TextSecondary,
+                radarColors().textSecondary,
             )
 
         SwipeToDismissBoxValue.Settled -> return
@@ -739,12 +732,12 @@ fun ArticleCard(
     val windowHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
     // 已读弱化（issue #56）：开关开启时已读卡片降弱色；未读卡片永不因此改变
     val dimmed = display.dimRead && item.article.isRead
-    val titleColor = if (dimmed) TextTertiary else TextPrimary
-    val descColor = if (dimmed) TextTertiary else TextSecondary
+    val titleColor = if (dimmed) radarColors().textTertiary else radarColors().textPrimary
+    val descColor = if (dimmed) radarColors().textTertiary else radarColors().textSecondary
     Box {
         Surface(
             shape = RoundedCornerShape(14.dp),
-            color = Surface1,
+            color = radarColors().surface1,
             modifier = Modifier
                 .fillMaxWidth()
                 .onGloballyPositioned {
@@ -784,7 +777,7 @@ fun ArticleCard(
                     Spacer(Modifier.width(6.dp))
                     Text(
                         text = item.feedTitle,
-                        color = TextPrimary,
+                        color = radarColors().textPrimary,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
@@ -796,7 +789,7 @@ fun ArticleCard(
                     item.article.publishedAt?.let { ts ->
                         Text(
                             text = DateUtils.getRelativeTimeSpanString(ts).toString(),
-                            color = TextTertiary,
+                            color = radarColors().textTertiary,
                             style = MaterialTheme.typography.labelSmall,
                         )
                     }
@@ -860,7 +853,7 @@ fun ArticleCard(
 
 /**
  * 列表封面缩略图：统一 96×72（4:3），ContentScale.Crop 居中裁剪不拉伸；
- * 无封面画 Surface2 + Image 图标占位。固定尺寸让 Coil 免读原图尺寸、按目标大小解码，
+ * 无封面画 radarColors().surface2 + Image 图标占位。固定尺寸让 Coil 免读原图尺寸、按目标大小解码，
  * LazyColumn 滚动开销最小；AsyncImage 无子组合，比 SubcomposeAsyncImage 更轻。
  * 音视频条目（ADR-0014）在角上加播放/音频角标。
  */
@@ -871,20 +864,19 @@ private fun CoverThumb(url: String?, mediaKind: Int = ArticleEntity.MEDIA_KIND_N
             modifier = Modifier
                 .size(width = 96.dp, height = 72.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(Surface2),
+                .background(radarColors().surface2),
         ) {
             if (url != null) {
-                AsyncImage(
-                    model = url,
+                RadarImage(
+                    url = url,
                     contentDescription = "封面缩略图",
-                    contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
                 Icon(
                     imageVector = Lucide.Image,
                     contentDescription = null,
-                    tint = TextTertiary,
+                    tint = radarColors().textTertiary,
                     modifier = Modifier.align(Alignment.Center).size(18.dp),
                 )
             }
@@ -910,7 +902,7 @@ private fun MediaBadge(icon: ImageVector, label: String, modifier: Modifier = Mo
             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, contentDescription = label, tint = OnAccent, modifier = Modifier.size(10.dp))
+            Icon(icon, contentDescription = label, tint = radarColors().onAccent, modifier = Modifier.size(10.dp))
         }
     }
 }
@@ -922,14 +914,14 @@ private fun MediaKindChip(kind: Int) {
         ArticleEntity.MEDIA_KIND_VIDEO -> Lucide.Play to "视频"
         else -> Lucide.Music to "音频"
     }
-    Surface(shape = RoundedCornerShape(50), color = Surface2) {
+    Surface(shape = RoundedCornerShape(50), color = radarColors().surface2) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, contentDescription = null, tint = Accent, modifier = Modifier.size(12.dp))
+            Icon(icon, contentDescription = null, tint = radarColors().accent, modifier = Modifier.size(12.dp))
             Spacer(Modifier.width(4.dp))
-            Text(label, color = Accent, style = MaterialTheme.typography.labelSmall)
+            Text(label, color = radarColors().accent, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
@@ -978,13 +970,12 @@ private fun ImageGalleryCard(item: ArticleWithFeed, onClick: () -> Unit) {
             .fillMaxWidth()
             .aspectRatio(1f)
             .clip(RoundedCornerShape(14.dp))
-            .background(Surface2)
+            .background(radarColors().surface2)
             .clickable(onClick = onClick),
     ) {
-        AsyncImage(
-            model = item.article.coverUrl?.takeIf { it.isNotBlank() },
+        RadarImage(
+            url = item.article.coverUrl?.takeIf { it.isNotBlank() },
             contentDescription = item.article.title,
-            contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )
         if (!item.article.isRead) {
@@ -993,7 +984,7 @@ private fun ImageGalleryCard(item: ArticleWithFeed, onClick: () -> Unit) {
                     .align(Alignment.TopStart)
                     .padding(8.dp)
                     .size(8.dp)
-                    .background(Accent, RoundedCornerShape(50)),
+                    .background(radarColors().accent, RoundedCornerShape(50)),
             )
         }
         // 标题压底：黑渐变 scrim 保证白字可读，最多两行
@@ -1028,7 +1019,7 @@ private fun UnreadDot(visible: Boolean) {
         modifier = Modifier
             .size(6.dp)
             .clip(RoundedCornerShape(50))
-            .background(Accent),
+            .background(radarColors().accent),
     )
 }
 
@@ -1038,13 +1029,13 @@ private fun LoadMoreHint() {
         Icon(
             imageVector = Lucide.ArrowUp,
             contentDescription = null,
-            tint = TextTertiary,
+            tint = radarColors().textTertiary,
             modifier = Modifier.size(14.dp),
         )
         Spacer(Modifier.width(4.dp))
         Text(
             text = "上滑加载更多",
-            color = TextTertiary,
+            color = radarColors().textTertiary,
             style = MaterialTheme.typography.labelMedium,
         )
     }
@@ -1078,11 +1069,11 @@ private fun EmptyState(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(title, color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+        Text(title, color = radarColors().textPrimary, style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         Text(
             hint,
-            color = TextSecondary,
+            color = radarColors().textSecondary,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
         )
@@ -1111,9 +1102,9 @@ private fun RecommendationLoading(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        CircularProgressIndicator(color = Accent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+        CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
         Spacer(Modifier.height(10.dp))
-        Text("正在按你的阅读偏好排序…", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+        Text("正在按你的阅读偏好排序…", color = radarColors().textSecondary, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -1121,6 +1112,6 @@ private fun RecommendationLoading(modifier: Modifier = Modifier) {
 @Composable
 fun LoadingPlaceholder() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = Accent)
+        CircularProgressIndicator(color = radarColors().accent)
     }
 }

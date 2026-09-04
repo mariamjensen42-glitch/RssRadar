@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
+import com.cycling.rssradar.core.ui.theme.RssRadarTheme
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.cycling.rssradar.core.data.store.ListDisplayState
