@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.ai.AiTaskScheduler
 import com.cycling.rssradar.core.data.ai.AiArtifactRepository
+import com.cycling.rssradar.core.data.ai.AiBatchProcessor
 import com.cycling.rssradar.core.data.ai.AiCategory
 import com.cycling.rssradar.core.data.ai.AiFeature
 import com.cycling.rssradar.core.data.ai.AiQueueSnapshot
@@ -14,11 +15,14 @@ import com.cycling.rssradar.core.data.store.AiBudgetStore
 import com.cycling.rssradar.core.data.store.AiFeatureSettings
 import com.cycling.rssradar.core.data.store.AiFeatureStore
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 
@@ -43,6 +47,8 @@ sealed interface AiFeaturesIntent {
     data class SetConcurrent(val limit: Int) : AiFeaturesIntent
     data class SetMinInterval(val millis: Long) : AiFeaturesIntent
     data object RunNow : AiFeaturesIntent
+    /** 只跑这一个功能（总览页展开后的「立即运行」）。 */
+    data class RunFeature(val feature: AiFeature) : AiFeaturesIntent
     data object RetryFailed : AiFeaturesIntent
     data object ClearPending : AiFeaturesIntent
     data object RefreshQueue : AiFeaturesIntent
@@ -68,6 +74,7 @@ class AiFeaturesViewModel @Inject constructor(
     private val budgetStore: AiBudgetStore,
     private val queue: AiTaskQueue,
     private val artifacts: AiArtifactRepository,
+    private val processor: AiBatchProcessor,
     private val app: Application,
 ) : ViewModel() {
 
@@ -105,6 +112,7 @@ class AiFeaturesViewModel @Inject constructor(
             is AiFeaturesIntent.SetMinInterval -> budgetStore.setMinIntervalMs(intent.millis)
 
             AiFeaturesIntent.RunNow -> runNow()
+            is AiFeaturesIntent.RunFeature -> runFeature(intent.feature)
             AiFeaturesIntent.RetryFailed -> {
                 viewModelScope.launch {
                     val n = queue.retryFailed()
@@ -184,6 +192,54 @@ class AiFeaturesViewModel @Inject constructor(
     private fun refreshQueue() {
         viewModelScope.launch {
             _state.update { it.copy(queue = queue.snapshot()) }
+        }
+    }
+
+    /**
+     * 只跑一个功能：为它排程入队，再把队列消化掉。
+     *
+     * 为什么走排程而不是直接调 runner：批处理功能的上下文组装（跨文章候选、
+     * 统计口径）、产物去重、预算闸全在 [AiBatchProcessor] 里，绕过它等于
+     * 在 UI 层复刻一遍执行语义，必然漂移。
+     *
+     * 消化的是整个队列而不只是这一个功能的任务——排进来的任务和存量待执行任务
+     * 共享并发与预算，单独挑着跑反而要给 drain 加过滤参数，收益配不上复杂度。
+     * 文案按真实报告说话，不承诺「已为该功能生成结果」。
+     *
+     * 全程 IO 线程：排程查库、消化走网络，卡主线程会 ANR。
+     */
+    private fun runFeature(feature: AiFeature) {
+        if (_state.value.running) return
+        if (!featureStore.isEnabled(feature)) {
+            say("先打开「${feature.label}」的开关再运行")
+            return
+        }
+        _state.update { it.copy(running = true) }
+        viewModelScope.launch {
+            val message = try {
+                withContext(Dispatchers.IO) {
+                    val enqueued = processor.scheduleDaily(only = feature)
+                    if (enqueued == 0) {
+                        "没有需要处理的内容（近期没有候选，或已有产物）"
+                    } else {
+                        val report = processor.drain()
+                        when {
+                            report.isEmpty() -> "任务已入队但没有可执行的（今日额度可能已用完）"
+                            else -> buildString {
+                                append("本次执行 ${report.processed} 项：成功 ${report.succeeded}")
+                                if (report.failed > 0) append("，失败 ${report.failed}")
+                                if (report.outOfBudget) append("（今日额度已用完，余下任务明天继续）")
+                            }
+                        }
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                "执行失败，请稍后重试（失败详情见任务队列）"
+            }
+            _state.update { it.copy(running = false, message = message) }
+            refreshQueue()
         }
     }
 

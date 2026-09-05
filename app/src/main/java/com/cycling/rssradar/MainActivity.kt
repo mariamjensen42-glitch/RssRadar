@@ -233,7 +233,7 @@ private fun RssRadarAppContent() {
                 SettingsAiDiagScreen(
                     onBack = { navController.popBackStack() },
                     onOpenAiFeatures = { navController.navigate(AiFeaturesRoute) },
-                    onOpenAiArtifacts = { navController.navigate(AiArtifactsRoute) },
+                    onOpenAiArtifacts = { navController.navigate(AiArtifactsRoute()) },
                     onOpenFetchDiagnostics = { navController.navigate(FetchDiagnosticsRoute) },
                     onOpenCrashLog = { navController.navigate(CrashLogRoute) },
                 )
@@ -253,15 +253,19 @@ private fun RssRadarAppContent() {
                 AiFeaturesScreen(
                     viewModel = hiltViewModel<AiFeaturesViewModel>(),
                     onBack = { navController.popBackStack() },
-                    onOpenArtifacts = { navController.navigate(AiArtifactsRoute) },
+                    onOpenArtifacts = { featureDbValue ->
+                        navController.navigate(AiArtifactsRoute(featureDbValue = featureDbValue))
+                    },
                 )
             }
             // AI 产物中心：全部功能的生成结果，按功能筛选后查看
-            composable<AiArtifactsRoute> {
+            composable<AiArtifactsRoute> { backStackEntry ->
+                val artifactsRoute = backStackEntry.toRoute<AiArtifactsRoute>()
                 AiArtifactsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenArticle = { navController.navigate(ArticleDetailRoute(it)) },
                     onOpenFeed = { navController.navigate(FeedArticlesRoute(it)) },
+                    initialFeatureDbValue = artifactsRoute.featureDbValue,
                 )
             }
             // 崩溃日志（issue #61）

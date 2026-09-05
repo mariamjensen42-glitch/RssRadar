@@ -94,10 +94,22 @@ fun AiArtifactsScreen(
     onOpenArticle: (Long) -> Unit = {},
     /** 订阅源级产物跳该源文章列表。 */
     onOpenFeed: (Long) -> Unit = {},
+    /**
+     * 从总览页「查看结果」进来时预选的功能（dbValue）。
+     * 用 LaunchedEffect 应用而不是在 VM 构造时读路由参数：VM 是 hiltViewModel
+     * 默认创建的，不知道路由；而筛选一次即可，不该把路由耦合进 VM 生命周期。
+     */
+    initialFeatureDbValue: Int? = null,
 ) {
     val state by viewModel.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val timeFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
+
+    LaunchedEffect(initialFeatureDbValue) {
+        if (initialFeatureDbValue != null) {
+            viewModel.onIntent(AiArtifactsIntent.SelectKind(initialFeatureDbValue))
+        }
+    }
 
     LaunchedEffect(state.message) {
         val message = state.message ?: return@LaunchedEffect

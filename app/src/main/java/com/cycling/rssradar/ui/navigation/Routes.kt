@@ -63,4 +63,7 @@ import kotlinx.serialization.Serializable
  * 它是 35 项功能的**通用出口**——只有一部分功能有专属展示位，
  * 其余功能的产物至少要有地方能看见，否则"跑成功了但看不到结果"无从自查。
  */
-@Serializable data object AiArtifactsRoute
+@Serializable data class AiArtifactsRoute(
+    /** 打开时预选的功能（dbValue）；null = 全部。总览页「查看结果」按功能直达。 */
+    val featureDbValue: Int? = null,
+)

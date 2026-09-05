@@ -90,6 +90,19 @@ def has_generic_viewer() -> bool:
     return False
 
 
+def has_generic_trigger() -> bool:
+    """
+    总览页是否提供**通用触发**（RunFeature 意图：按功能排程 + 立即执行）。
+
+    批处理功能有了它就不再"只能等每日任务"；配合产物中心的按功能筛选，
+    「开关 → 触发 → 看结果」这条最小闭环对每项批处理功能都成立。
+    """
+    vm = ROOT / "app/src/main/java/com/cycling/rssradar/ui/me/AiFeaturesViewModel.kt"
+    if not vm.exists():
+        return False
+    return "RunFeature" in read(vm)
+
+
 def sheet_render_branches() -> set[str]:
     """AiResultCard 的 when 里已处理的 payload 类型名。"""
     src = read(SHEET_FILE)
@@ -160,26 +173,31 @@ def main() -> int:
             unrendered.append((f, t))
 
     generic = has_generic_viewer()
+    trigger = has_generic_trigger()
 
     print(f"AiFeature 共 {len(features)} 项")
     print(f"  UI 模块直接引用      : {len(refs & set(features))} 项")
     print(f"  旧 UI（早于枚举）    : {len(legacy)} 项")
     print(f"  无专属出口           : {len(unwired)} 项")
     print(f"  通用产物中心         : {'有' if generic else '无'}")
+    print(f"  通用触发(RunFeature) : {'有' if trigger else '无'}")
     print()
 
     if unwired:
         level = "【仅通用出口】" if generic else "【未接线】"
         if generic:
-            print(level + "下列功能没有专属入口，产物只能在「AI 结果」页看原文：")
+            print(level + "下列功能没有专属入口，产物在「AI 结果」页按功能筛选查看：")
         else:
             print(level + "下列功能有执行器、会落库，但没有任何页面能触发或看到它：")
         for f in unwired:
             print(f"  - {f}")
         print()
         if generic:
-            print("  现状：开关照常生效、跑批照常花钱，产物在产物中心可见，但缺少为它")
-            print("        定制的排版与触发入口。做专属页之前，这不阻塞发布。")
+            print("  现状：每项功能在总览页可展开查看说明；批处理功能可「立即运行」，")
+            print("        结果在「AI 结果」页按功能筛选。缺的只是为它定制的排版与入口。")
+            if not trigger:
+                print("  注意：通用触发（RunFeature）丢失了——批处理功能退回「只能等每日任务」。")
+            print("        做专属页之前，这不阻塞发布。")
         else:
             print("  后果：设置页照常显示开关与「结果展示：…」文案，用户开启后跑批成功，")
             print("        产物进了 ai_artifacts，但全 App 找不到它。等同于白烧额度。")

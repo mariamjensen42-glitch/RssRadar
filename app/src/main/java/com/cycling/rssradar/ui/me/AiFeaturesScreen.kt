@@ -47,6 +47,7 @@ import com.composables.icons.lucide.Sparkles
 import com.cycling.rssradar.core.data.ai.AiCategory
 import com.cycling.rssradar.core.data.ai.AiFeature
 import com.cycling.rssradar.core.data.ai.AiQueueSnapshot
+import com.cycling.rssradar.core.data.ai.AiTrigger
 import com.cycling.rssradar.core.data.store.AiBudgetState
 import com.cycling.rssradar.core.data.store.AiFeatureSettings
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
@@ -69,13 +70,13 @@ fun AiFeaturesScreen(
     viewModel: AiFeaturesViewModel = hiltViewModel(),
     onBack: () -> Unit,
     /**
-     * 打开 AI 产物中心。
+     * 打开 AI 产物中心。参数是预选功能的 dbValue（null = 全部）。
      *
      * 入口刻意放在这一页而不是只放在设置页：用户开启功能后第一反应是回来找结果，
-     * 而 35 项里有一部分没有专属展示位——产物中心是它们唯一的出口，
+     * 而一部分功能没有专属展示位——产物中心（按功能筛选）是它们的出口，
      * 藏深了等于又一次"跑成功了但看不到结果"。
      */
-    onOpenArtifacts: () -> Unit = {},
+    onOpenArtifacts: (Int?) -> Unit = { _ -> },
 ) {
     val state by viewModel.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
@@ -111,7 +112,7 @@ fun AiFeaturesScreen(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onOpenArtifacts) {
+                TextButton(onClick = { onOpenArtifacts(null) }) {
                     Text(
                         text = "查看结果",
                         style = MaterialTheme.typography.bodySmall,
@@ -148,7 +149,10 @@ fun AiFeaturesScreen(
                     FeatureRow(
                         feature = feature,
                         enabled = state.settings.isEnabled(feature),
+                        running = state.running,
                         onToggle = { viewModel.onIntent(AiFeaturesIntent.Toggle(feature)) },
+                        onRun = { viewModel.onIntent(AiFeaturesIntent.RunFeature(feature)) },
+                        onOpenResults = { onOpenArtifacts(feature.dbValue) },
                     )
                 }
             }
@@ -421,7 +425,10 @@ private fun CategoryHeader(
 private fun FeatureRow(
     feature: AiFeature,
     enabled: Boolean,
+    running: Boolean,
     onToggle: (Boolean) -> Unit,
+    onRun: () -> Unit,
+    onOpenResults: () -> Unit,
 ) {
     val colors = radarColors()
     var expanded by remember { mutableStateOf(false) }
@@ -479,6 +486,34 @@ private fun FeatureRow(
                 DetailLine("触发方式", feature.trigger.description)
                 DetailLine("交互入口", feature.entry)
                 DetailLine("结果展示", feature.presentation)
+
+                // 通用操作行：会落产物的功能给「查看结果」（产物中心预选本功能）；
+                // 批处理功能再给「立即运行」——不等每日任务，当场把结果跑出来。
+                // REALTIME（问答、划词解释）不落库，产物中心没有它的东西，按钮不出现。
+                val hasResults = feature.needsLlm && feature.trigger != AiTrigger.REALTIME
+                val canRun = feature.trigger == AiTrigger.BATCH
+                if (hasResults || canRun) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (canRun) {
+                            TextButton(
+                                enabled = !running,
+                                onClick = onRun,
+                            ) {
+                                Text(
+                                    if (running) "执行中…" else "立即运行",
+                                    color = if (running) colors.textTertiary else colors.accent,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                        if (hasResults) {
+                            TextButton(onClick = onOpenResults) {
+                                Text("查看结果", color = colors.textSecondary)
+                            }
+                        }
+                    }
+                }
             }
         }
     }

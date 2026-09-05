@@ -52,21 +52,27 @@ class AiBatchProcessor(
 
     /**
      * 排一次日常批处理：把近期文章上"已开启但还没产物"的功能排进队列。
+     *
+     * @param only 只排这一个功能（AI 功能总览页的「立即运行」按功能触发）。
+     *   null = 全部。传入非批处理功能时排程结果自然为 0——
+     *   planner 只认 [AiFeature.BATCH_FEATURES]，不需要这里再挡一层。
      * @return 本次新入队的任务数。
      */
     suspend fun scheduleDaily(
         windowMs: Long = DEFAULT_WINDOW_MS,
         candidateLimit: Int = DEFAULT_CANDIDATE_LIMIT,
+        only: AiFeature? = null,
     ): Int {
         queue.maintenance(clock())
 
         val enabled = featureStore.state.value.enabled
+        val scoped = if (only == null) enabled else enabled intersect setOf(only)
         val articleFeatures = AiFeature.BATCH_FEATURES
-            .filter { it in enabled && it.scope == AiScope.ARTICLE }
+            .filter { it in scoped && it.scope == AiScope.ARTICLE }
         val feedFeatures = AiFeature.BATCH_FEATURES
-            .filter { it in enabled && it.scope == AiScope.FEED }
+            .filter { it in scoped && it.scope == AiScope.FEED }
         val globalFeatures = AiFeature.BATCH_FEATURES
-            .filter { it in enabled && it.scope == AiScope.GLOBAL }
+            .filter { it in scoped && it.scope == AiScope.GLOBAL }
         if (articleFeatures.isEmpty() && feedFeatures.isEmpty() && globalFeatures.isEmpty()) return 0
 
         val now = clock()
@@ -84,7 +90,7 @@ class AiBatchProcessor(
         val remaining = budget.current().remainingToday
 
         val specs = AiTaskPlanner.planAll(
-            enabled = enabled,
+            enabled = scoped,
             articleIds = candidates,
             feedIds = feedIds,
             existingKeys = artifacts.existingKeys(candidates),
