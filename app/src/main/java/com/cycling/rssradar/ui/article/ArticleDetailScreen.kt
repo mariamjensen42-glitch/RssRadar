@@ -641,6 +641,9 @@ private fun ArticleActionsBar(
                 .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp + insets.calculateBottomPadding()),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // 图标分两组：左 = 文章间导航（上一篇/下一篇），右 = 阅读动作（收藏/稍后读/
+            // AI/查看原文）。组内等间距，组间弹性 spacer 撑开，全部统一 40dp——
+            // 之前间距 6/10/6/6 混排 + 外链独占 48dp，视觉上忽密忽疏。
             // 上一篇 = 发布更早（列表序更靠后），下一篇 = 更新一篇
             ActionIcon(
                 icon = Lucide.ChevronLeft,
@@ -650,7 +653,7 @@ private fun ArticleActionsBar(
                 size = 40.dp,
                 onClick = onPrev,
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(8.dp))
             ActionIcon(
                 icon = Lucide.ChevronRight,
                 checked = false,
@@ -659,11 +662,11 @@ private fun ArticleActionsBar(
                 size = 40.dp,
                 onClick = onNext,
             )
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.weight(1f))
             ActionIcon(icon = Lucide.Star, checked = isStarred, contentDescription = "收藏", size = 40.dp, onClick = onStar)
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(8.dp))
             ActionIcon(icon = Lucide.Bookmark, checked = isBookmarked, contentDescription = "稍后读", size = 40.dp, onClick = onBookmark)
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(8.dp))
             ActionIcon(
                 icon = Lucide.Sparkles,
                 checked = false,
@@ -671,12 +674,12 @@ private fun ArticleActionsBar(
                 size = 40.dp,
                 onClick = onOpenAi,
             )
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.width(8.dp))
             ActionIcon(
                 icon = Lucide.ExternalLink,
                 checked = true,
                 contentDescription = "查看原文",
-                size = 48.dp,
+                size = 40.dp,
                 onClick = onOpenOriginal,
             )
         }
