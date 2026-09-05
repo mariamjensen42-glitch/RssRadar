@@ -57,6 +57,9 @@ import kotlinx.serialization.Serializable
 /** AI 功能总览（AI 智能功能模块）：35 项独立开关、用量看板、任务队列、预算设置。 */
 @Serializable data object AiFeaturesRoute
 
+/** 提示词模板管理（AiFeature.PROMPT_TEMPLATE）：内置模板预览 + 各订阅源摘要提示词覆盖的集中管理。 */
+@Serializable data object PromptTemplatesRoute
+
 /**
  * AI 产物中心（AI 智能功能模块）：按功能摊开 `ai_artifacts` 里的全部产物。
  *

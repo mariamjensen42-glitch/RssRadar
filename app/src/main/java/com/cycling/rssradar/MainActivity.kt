@@ -41,6 +41,7 @@ import com.cycling.rssradar.ui.addsubscription.AddSubscriptionViewModel
 import com.cycling.rssradar.ui.me.AiArtifactsScreen
 import com.cycling.rssradar.ui.me.AiFeaturesScreen
 import com.cycling.rssradar.ui.me.AiFeaturesViewModel
+import com.cycling.rssradar.ui.me.PromptTemplatesScreen
 import com.cycling.rssradar.ui.article.ArticleDetailScreen
 import com.cycling.rssradar.ui.article.ArticleDetailViewModel
 import com.cycling.rssradar.ui.subscriptions.FeedActionScreen
@@ -62,6 +63,7 @@ import com.cycling.rssradar.ui.subscriptions.SubscriptionsViewModel
 import com.cycling.rssradar.core.ui.components.FloatingBottomBar
 import com.cycling.rssradar.ui.components.openUrl
 import com.cycling.rssradar.ui.navigation.AiArtifactsRoute
+import com.cycling.rssradar.ui.navigation.PromptTemplatesRoute
 import com.cycling.rssradar.ui.navigation.AiFeaturesRoute
 import com.cycling.rssradar.ui.navigation.ArticleDetailRoute
 import com.cycling.rssradar.ui.navigation.CrashLogRoute
@@ -234,6 +236,7 @@ private fun RssRadarAppContent() {
                     onBack = { navController.popBackStack() },
                     onOpenAiFeatures = { navController.navigate(AiFeaturesRoute) },
                     onOpenAiArtifacts = { navController.navigate(AiArtifactsRoute()) },
+                    onOpenPromptTemplates = { navController.navigate(PromptTemplatesRoute) },
                     onOpenFetchDiagnostics = { navController.navigate(FetchDiagnosticsRoute) },
                     onOpenCrashLog = { navController.navigate(CrashLogRoute) },
                 )
@@ -266,6 +269,12 @@ private fun RssRadarAppContent() {
                     onOpenArticle = { navController.navigate(ArticleDetailRoute(it)) },
                     onOpenFeed = { navController.navigate(FeedArticlesRoute(it)) },
                     initialFeatureDbValue = artifactsRoute.featureDbValue,
+                )
+            }
+            // 提示词模板管理（AiFeature.PROMPT_TEMPLATE）：内置模板预览 + 单源覆盖集中管理
+            composable<PromptTemplatesRoute> {
+                PromptTemplatesScreen(
+                    onBack = { navController.popBackStack() },
                 )
             }
             // 崩溃日志（issue #61）

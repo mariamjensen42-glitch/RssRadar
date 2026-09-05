@@ -825,6 +825,7 @@ fun SettingsAiDiagScreen(
     onBack: () -> Unit = {},
     onOpenAiFeatures: () -> Unit = {},
     onOpenAiArtifacts: () -> Unit = {},
+    onOpenPromptTemplates: () -> Unit = {},
     onOpenFetchDiagnostics: () -> Unit = {},
     onOpenCrashLog: () -> Unit = {},
 ) {
@@ -890,6 +891,7 @@ fun SettingsAiDiagScreen(
         )
         NavigateRow("功能开关与用量", onClick = onOpenAiFeatures)
         NavigateRow("AI 生成结果", onClick = onOpenAiArtifacts)
+        NavigateRow("提示词模板", onClick = onOpenPromptTemplates)
 
         Spacer(Modifier.height(24.dp))
 
