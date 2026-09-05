@@ -3,6 +3,7 @@ package com.cycling.rssradar.ui.me
 import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,8 +22,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -108,6 +112,9 @@ data class RssHubSettingsUiState(
     val catalogRefreshing: Boolean = false,
     /** 目录更新结果的提示文案。 */
     val catalogMessage: String? = null,
+    /** 「我的」页统计条：订阅源数 / 未读文章数（全部来自 DB 真实计数，禁止编造）。 */
+    val feedCount: Int = 0,
+    val unreadCount: Int = 0,
 )
 
 /**
@@ -117,6 +124,9 @@ data class RssHubSettingsUiState(
 @HiltViewModel
 class RssHubSettingsViewModel @Inject constructor(
     private val store: RssHubInstanceStore,
+    /** 统计条数据源：订阅源计数与未读计数直接读 DAO，不经中间层（只读、无业务规则）。 */
+    private val feedDao: com.cycling.rssradar.core.data.db.FeedDao,
+    private val articleDao: com.cycling.rssradar.core.data.db.ArticleDao,
     private val themeStore: ThemeStore,
     private val aiStore: AiStore,
     private val listDisplayStore: ListDisplayStore,
@@ -143,6 +153,16 @@ class RssHubSettingsViewModel @Inject constructor(
     val state: StateFlow<RssHubSettingsUiState> = _state.asStateFlow()
 
     init {
+        // 统计条（数字必须真实）：两条 DB 计数流合并进 UiState
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(
+                feedDao.observeFeedCount(),
+                articleDao.observeUnreadCount(),
+            ) { feedCount, unreadCount -> feedCount to unreadCount }
+                .collect { (feedCount, unreadCount) ->
+                    _state.value = _state.value.copy(feedCount = feedCount, unreadCount = unreadCount)
+                }
+        }
         // 主题模式跟随 ThemeStore 的 flow，设置页外（系统切换）也同步
         viewModelScope.launch {
             themeStore.mode.collect { mode ->
@@ -378,6 +398,17 @@ fun RssHubSettingsScreen(
             modifier = Modifier.padding(vertical = 12.dp),
         )
 
+        // 统计条：数字全部来自 DB 真实计数（AI 不参与、不估算）
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            StatCard(label = "订阅源", value = state.feedCount.toString(), modifier = Modifier.weight(1f))
+            StatCard(label = "未读文章", value = state.unreadCount.toString(), modifier = Modifier.weight(1f))
+        }
+
         SettingsEntryCard(
             icon = Lucide.Palette,
             title = "通用",
@@ -406,6 +437,45 @@ fun RssHubSettingsScreen(
             onClick = onOpenAiDiag,
         )
         Spacer(Modifier.height(32.dp))
+
+        // 版本 footer：用户反馈 / 应用商店评价时第一件事就是问版本号
+        val ctx = LocalContext.current
+        val versionName = remember {
+            runCatching {
+                ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName
+            }.getOrNull() ?: "?"
+        }
+        Text(
+            text = "RssRadar v$versionName",
+            color = radarColors().textTertiary,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/** 统计卡片：大数字 + 标签，纯展示。 */
+@Composable
+private fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = radarColors().surface1,
+        modifier = modifier,
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Text(
+                text = value,
+                color = radarColors().textPrimary,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = label,
+                color = radarColors().textTertiary,
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
     }
 }
 

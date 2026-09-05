@@ -61,6 +61,28 @@ fun FeedIcon(
     }
 }
 
+/**
+ * 全尺寸字母色块占位：无封面图时铺满调用方给的尺寸（网格大图 / 列表缩略图），
+ * 颜色与 FeedIcon 同一套 title-hash 调色板，让「订阅源」在列表里有一致的视觉身份。
+ * 相比纯灰底 + 图标占位，色块能区分不同来源，不再是"加载失败"的观感。
+ */
+@Composable
+fun FeedLetterTile(title: String, modifier: Modifier = Modifier) {
+    val bg = colorForTitle(title) ?: radarColors().surface3
+    val letter = title.trim().firstOrNull()?.toString()?.uppercase() ?: "?"
+    Box(
+        modifier = modifier.background(bg),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = letter,
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.headlineMedium,
+        )
+    }
+}
+
 /** 默认无图标时的灰色方块。 */
 @Composable
 fun FeedIconPlaceholder(

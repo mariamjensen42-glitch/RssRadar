@@ -287,6 +287,11 @@ object AppModule {
     @Singleton
     fun provideFeedDao(db: AppDatabase): FeedDao = db.feedDao()
 
+    /** 文章 DAO（「我的」页统计条直接读未读计数）。 */
+    @Provides
+    @Singleton
+    fun provideArticleDao(db: AppDatabase): com.cycling.rssradar.core.data.db.ArticleDao = db.articleDao()
+
     /** 35 项功能的独立开关。 */
     @Provides
     @Singleton

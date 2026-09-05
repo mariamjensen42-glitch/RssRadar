@@ -35,10 +35,13 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -100,10 +103,13 @@ import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.ui.components.ArticleMenuActions
 import com.cycling.rssradar.ui.components.articleMenuOffset
 import com.cycling.rssradar.core.ui.components.FeedIcon
+import com.cycling.rssradar.core.ui.components.FeedLetterTile
 import com.cycling.rssradar.core.ui.components.OptionPickerSheet
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.CheckCheck
+import com.composables.icons.lucide.EllipsisVertical
+import com.composables.icons.lucide.FileUp
 import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.LayoutGrid
 import com.composables.icons.lucide.LayoutList
@@ -126,6 +132,8 @@ fun FeedListScreen(
     onOpenArticle: (ArticleWithFeed) -> Unit = {},
     /** 空态「添加订阅源」直达入口（新用户第一分钟不该被卡在找入口上）。 */
     onAddFeed: () -> Unit = {},
+    /** 新用户空态「导入 OPML」入口：跳订阅页（SAF 入口在订阅页顶栏菜单）。 */
+    onOpenSubscriptions: () -> Unit = {},
 ) {
     // MVI 候选 C（ADR-0003）：单一 UiState 快照驱动渲染
     val uiState by viewModel.uiState.collectAsState()
@@ -213,14 +221,24 @@ fun FeedListScreen(
                 onSelect = { viewModel.onIntent(FeedListIntent.SelectTab(it)) },
             )
             // 刷新进度（真机反馈缺口）：708 源全量刷新可达数十分钟，
-            // 一个孤零零的转圈分不清「在跑」还是「卡死」——必须带计数。
+            // 一个孤零零的转圈分不清「在跑」还是「卡死」——细进度条 + 计数，不抢一整行
             if (uiState.isRefreshing && uiState.refreshTotal > 0) {
-                Text(
-                    text = "正在刷新 ${uiState.refreshDone}/${uiState.refreshTotal}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = radarColors().textTertiary,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                ) {
+                    LinearProgressIndicator(
+                        progress = { uiState.refreshDone.toFloat() / uiState.refreshTotal },
+                        trackColor = radarColors().surface2,
+                        modifier = Modifier.weight(1f).height(3.dp).clip(RoundedCornerShape(2.dp)),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = "${uiState.refreshDone}/${uiState.refreshTotal}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = radarColors().accent,
+                    )
+                }
             }
             Spacer(Modifier.height(4.dp))
             PullToRefreshBox(
@@ -236,6 +254,7 @@ fun FeedListScreen(
                         selectedContentType = uiState.selectedContentType,
                         partitionEmpty = uiState.partitionEmpty,
                         onAddFeed = onAddFeed,
+                        onOpenSubscriptions = onOpenSubscriptions,
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
@@ -350,6 +369,9 @@ private fun FeedListTopBar(
     viewMode: ListViewMode,
     filterActive: Boolean,
 ) {
+    // 顶栏只留高频的搜索，其余低频操作（标记已读/视图模式/分组筛选）收进溢出菜单：
+    // 4 个无标签图标并排的可发现性差，新用户不可能逐个试
+    var menuExpanded by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -367,35 +389,52 @@ private fun FeedListTopBar(
         IconButton(onClick = onOpenSearch) {
             Icon(Lucide.Search, contentDescription = "搜索", tint = radarColors().textPrimary)
         }
-        // 批量标记已读（#10）：积累几天未读刷不完的信息流，一键按时间范围清空
-        IconButton(onClick = onMarkAllRead) {
-            Icon(Lucide.CheckCheck, contentDescription = "标记已读", tint = radarColors().textPrimary)
-        }
-        // 视图模式切换：图标随当前模式变，点开弹层选模式
-        IconButton(onClick = onOpenViewMode) {
-            Icon(
-                imageVector = when (viewMode) {
-                    ListViewMode.LIST -> Lucide.Rows3
-                    ListViewMode.CARD -> Lucide.LayoutList
-                    ListViewMode.MAGAZINE -> Lucide.Newspaper
-                    ListViewMode.GRID -> Lucide.LayoutGrid
-                },
-                contentDescription = "视图模式",
-                tint = radarColors().textPrimary,
-            )
-        }
-        IconButton(onClick = onOpenFilter) {
-            Box {
-                Icon(Lucide.SlidersHorizontal, contentDescription = "分组筛选", tint = radarColors().textPrimary)
-                if (filterActive) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .size(7.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(radarColors().accent),
-                    )
-                }
+        Box {
+            IconButton(onClick = { menuExpanded = true }) {
+                Icon(Lucide.EllipsisVertical, contentDescription = "更多操作", tint = radarColors().textPrimary)
+            }
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text("标记已读") },
+                    leadingIcon = { Icon(Lucide.CheckCheck, contentDescription = null) },
+                    onClick = {
+                        menuExpanded = false
+                        onMarkAllRead()
+                    },
+                )
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            buildString {
+                                append("视图模式 · ")
+                                append(
+                                    when (viewMode) {
+                                        ListViewMode.LIST -> "列表"
+                                        ListViewMode.CARD -> "卡片"
+                                        ListViewMode.MAGAZINE -> "杂志"
+                                        ListViewMode.GRID -> "网格"
+                                    },
+                                )
+                            },
+                        )
+                    },
+                    leadingIcon = { Icon(Lucide.LayoutGrid, contentDescription = null) },
+                    onClick = {
+                        menuExpanded = false
+                        onOpenViewMode()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(if (filterActive) "分组筛选 · 已启用" else "分组筛选") },
+                    leadingIcon = { Icon(Lucide.SlidersHorizontal, contentDescription = null) },
+                    onClick = {
+                        menuExpanded = false
+                        onOpenFilter()
+                    },
+                )
             }
         }
     }
@@ -590,6 +629,8 @@ fun ArticleCardList(
     bottomPadding: Dp = tabBarBottomClearance(),
     // 单源页强制隐藏订阅源名称（同源重复是噪音）；null = 跟随全局配置
     showFeedName: Boolean? = null,
+    /** 视图模式覆盖（单源页用）：null = 跟随全局；非 null 时无视全局模式。 */
+    viewModeOverride: ListViewMode? = null,
     /**
      * 滚动自动标记已读（#11）：上报"已滚出视口顶部"的文章 id 批次。
      * 由 [LocalListDisplay] 的开关决定是否启用，关闭时本回调不会被调用。
@@ -598,7 +639,10 @@ fun ArticleCardList(
     modifier: Modifier = Modifier,
 ) {
     val display = LocalListDisplay.current.let {
-        it.copy(showFeedName = showFeedName ?: it.showFeedName)
+        it.copy(
+            showFeedName = showFeedName ?: it.showFeedName,
+            viewMode = viewModeOverride ?: it.viewMode,
+        )
     }
     // 网格模式是独立容器（LazyVerticalGrid），走自己的渲染分支；粘性日期头与
     // 滚动标已读都是 LazyColumn 槽位逻辑，网格里不适用（与图片画廊同规则）。
@@ -1105,6 +1149,13 @@ private fun GridArticleCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
+                // 无封面时用订阅源字母色块铺满，替代纯灰底（灰块观感像加载失败）
+                if (item.article.coverUrl.isNullOrBlank()) {
+                    FeedLetterTile(
+                        title = item.feedTitle,
+                        modifier = Modifier.matchParentSize(),
+                    )
+                }
                 if (!item.article.isRead) {
                     Box(
                         modifier = Modifier
@@ -1395,7 +1446,11 @@ fun ArticleCard(
                         !item.article.coverUrl.isNullOrBlank())
                 ) {
                     Spacer(Modifier.width(10.dp))
-                    CoverThumb(url = item.article.coverUrl?.takeIf { it.isNotBlank() }, mediaKind = item.article.mediaKind)
+                    CoverThumb(
+                        url = item.article.coverUrl?.takeIf { it.isNotBlank() },
+                        mediaKind = item.article.mediaKind,
+                        feedTitle = item.feedTitle,
+                    )
                 } else if (item.article.mediaKind != ArticleEntity.MEDIA_KIND_NONE) {
                     // 无缩略图的音视频条目：给个明确的类型标识，别让用户猜点开是什么
                     Spacer(Modifier.width(10.dp))
@@ -1432,7 +1487,7 @@ fun ArticleCard(
  * 音视频条目（ADR-0014）在角上加播放/音频角标。
  */
 @Composable
-private fun CoverThumb(url: String?, mediaKind: Int = ArticleEntity.MEDIA_KIND_NONE) {
+private fun CoverThumb(url: String?, mediaKind: Int = ArticleEntity.MEDIA_KIND_NONE, feedTitle: String = "") {
     Box {
         Box(
             modifier = Modifier
@@ -1447,12 +1502,8 @@ private fun CoverThumb(url: String?, mediaKind: Int = ArticleEntity.MEDIA_KIND_N
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                Icon(
-                    imageVector = Lucide.Image,
-                    contentDescription = null,
-                    tint = radarColors().textTertiary,
-                    modifier = Modifier.align(Alignment.Center).size(18.dp),
-                )
+                // 有媒体角标但无封面图：字母色块占位，与网格口径一致
+                FeedLetterTile(title = feedTitle, modifier = Modifier.fillMaxSize())
             }
         }
         when (mediaKind) {
@@ -1608,6 +1659,7 @@ private fun EmptyState(
     /** 空分区空态：选中分区且库里没有任何该类型订阅源（区别于「有源但没文章」）。 */
     partitionEmpty: Boolean,
     onAddFeed: () -> Unit = {},
+    onOpenSubscriptions: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // 分区空态（issue #75）优先：有源没文章走原 tab 空态，无源才走分区引导——
@@ -1646,8 +1698,9 @@ private fun EmptyState(
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
         )
-        // 「全部」为空 = 一篇文章都没有，必然是还没订阅。这里给直达入口：
-        // 让用户自己去找添加订阅的按钮，是新用户流失最快的一步。
+        // 「全部」为空 = 一篇文章都没有，必然是还没订阅。给双入口：
+        // 添加订阅源（直达添加抽屉） / 导入 OPML（老用户迁移最常见的第一个动作），
+        // 让用户自己去找入口，是新用户流失最快的一步。
         if (selectedTab == FeedTab.All) {
             Spacer(Modifier.height(24.dp))
             FilledTonalButton(onClick = onAddFeed) {
@@ -1658,6 +1711,16 @@ private fun EmptyState(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text("添加订阅源")
+            }
+            Spacer(Modifier.height(10.dp))
+            FilledTonalButton(onClick = onOpenSubscriptions) {
+                Icon(
+                    Lucide.FileUp,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("导入 OPML 订阅")
             }
         }
     }

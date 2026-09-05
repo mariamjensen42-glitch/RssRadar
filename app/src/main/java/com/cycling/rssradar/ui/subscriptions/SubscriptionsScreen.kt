@@ -5,6 +5,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,10 +21,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -62,6 +66,7 @@ import com.composables.icons.lucide.CheckCheck
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Ellipsis
+import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.FileDown
 import com.composables.icons.lucide.FileUp
 import com.composables.icons.lucide.Lucide
@@ -70,6 +75,7 @@ import com.composables.icons.lucide.CornerUpRight
 import com.composables.icons.lucide.FolderInput
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.Square
 import com.composables.icons.lucide.SquareCheckBig
 import com.composables.icons.lucide.X
@@ -107,6 +113,10 @@ fun SubscriptionsScreen(
     var batchMoveDialog by remember { mutableStateOf(false) }
     /** 订阅列表排序选择弹层。 */
     var showSortSheet by remember { mutableStateOf(false) }
+    /** 「全部标记为已读」二次确认（批量不可逆，不能一键直发）。 */
+    var showMarkAllReadConfirm by remember { mutableStateOf(false) }
+    /** 订阅源搜索：非空时拍平展示命中的订阅行，绕过分组结构直达。 */
+    var searchQuery by remember { mutableStateOf("") }
 
     // 列表 item 动画（docs/motion.md #4）：订阅列表增删 + 位移全开；
     // reduce-motion 时全部置 null = 直接增删（红线：所有动画响应降级）
@@ -162,6 +172,8 @@ fun SubscriptionsScreen(
                     onSort = { showSortSheet = true },
                     onBatchMove = { viewModel.onIntent(SubscriptionsIntent.ToggleSelectionMode) },
                     onAdd = onAddSubscription,
+                    totalUnread = totalUnread,
+                    onMarkAllRead = { showMarkAllReadConfirm = true },
                 )
             }
         },
@@ -199,6 +211,68 @@ fun SubscriptionsScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            // 订阅源搜索（700+ 源时滚动翻找不现实）：命中时拍平为单列结果
+            item(key = "search", contentType = "search") {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    singleLine = true,
+                    placeholder = { Text("搜索订阅源", color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium) },
+                    leadingIcon = { Icon(Lucide.Search, contentDescription = null, tint = radarColors().textTertiary, modifier = Modifier.size(18.dp)) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(32.dp)) {
+                                Icon(Lucide.X, contentDescription = "清空", tint = radarColors().textTertiary, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = radarColors().surface1,
+                        unfocusedContainerColor = radarColors().surface1,
+                        focusedBorderColor = radarColors().accent,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedTextColor = radarColors().textPrimary,
+                        unfocusedTextColor = radarColors().textPrimary,
+                        cursorColor = radarColors().accent,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            if (searchQuery.isNotBlank()) {
+                val hits = groups
+                    .asSequence()
+                    .flatMap { it.feeds.asSequence() }
+                    .filter { it.feed.title.contains(searchQuery.trim(), ignoreCase = true) }
+                    .toList()
+                if (hits.isEmpty()) {
+                    item(key = "no-hit", contentType = "no-hit") {
+                        Text(
+                            text = "没有匹配「${searchQuery.trim()}」的订阅源",
+                            color = radarColors().textTertiary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(vertical = 24.dp),
+                        )
+                    }
+                } else {
+                    items(hits, key = { "hit-${it.feed.id}" }, contentType = { "feed" }) { feedItem ->
+                        FeedRow(
+                            item = feedItem,
+                            selectionMode = selectionMode,
+                            selected = feedItem.feed.id in selectedIds,
+                            onClick = {
+                                if (selectionMode) {
+                                    viewModel.onIntent(SubscriptionsIntent.ToggleFeedSelected(feedItem.feed.id))
+                                } else {
+                                    onOpenFeed(feedItem.feed.id)
+                                }
+                            },
+                            onMore = { onFeedAction(feedItem.feed.id) },
+                        )
+                    }
+                }
+            } else {
             // 分组列表拍平（#48）：分组头与 FeedRow 都是 LazyColumn 的 item，
             // 展开大分组只组合可见行——原 AnimatedVisibility { forEach } 会把
             // 几百行一次性同步组合在主线程上，点击分组卡顿的根因。
@@ -210,7 +284,9 @@ fun SubscriptionsScreen(
                             feedCount = group.feeds.size,
                             expanded = group.group in expandedIds,
                             onToggle = { viewModel.onIntent(SubscriptionsIntent.ToggleGroup(group.group)) },
-                            // 铅笔 → 分组操作底栏（重命名/清空文章/删除分组，issue #8）
+                            // 长按 → 分组操作底栏（重命名/清空文章/删除分组，issue #8）；
+                            // 行尾铅笔已移除——每个分组都挂一支铅笔是噪音，长按是不可发现性
+                            // 与低频的合理交换（操作底栏也会在误触时有明确出口）
                             onEdit = { groupActionTarget = group.group },
                         )
                     }
@@ -247,23 +323,42 @@ fun SubscriptionsScreen(
                 }
             }
 
-            // 多选态下这两行没有意义：新建分组与「全部已读」都打断勾选流程
+            // 多选态下新建分组没有意义
             if (!selectionMode) {
                 item {
                     Spacer(Modifier.height(4.dp))
                     CreateGroupRow(onClick = { createGroupDialog = true })
                 }
-
-                if (totalUnread > 0) {
-                    item {
-                        Spacer(Modifier.height(8.dp))
-                        MarkAllReadRow(onClick = { viewModel.onIntent(SubscriptionsIntent.MarkAllRead) })
-                    }
-                }
+            }
             }
 
             item { Spacer(Modifier.height(96.dp)) } // 避让 FAB
         }
+    }
+
+    // 「全部标记为已读」二次确认：把 N 篇未读一口气写死前，给一次反悔的机会
+    if (showMarkAllReadConfirm) {
+        AlertDialog(
+            onDismissRequest = { showMarkAllReadConfirm = false },
+            containerColor = radarColors().surface1,
+            titleContentColor = radarColors().textPrimary,
+            textContentColor = radarColors().textSecondary,
+            title = { Text("全部标记为已读", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
+            text = { Text("将把全部 $totalUnread 篇未读文章标为已读，此操作不可撤销。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showMarkAllReadConfirm = false
+                    viewModel.onIntent(SubscriptionsIntent.MarkAllRead)
+                }) {
+                    Text("标记已读", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMarkAllReadConfirm = false }) {
+                    Text("取消", color = radarColors().textTertiary)
+                }
+            },
+        )
     }
 
     if (createGroupDialog) {
@@ -328,7 +423,12 @@ private fun SubscriptionsTopBar(
     onSort: () -> Unit,
     onBatchMove: () -> Unit,
     onAdd: () -> Unit,
+    totalUnread: Int,
+    onMarkAllRead: () -> Unit,
 ) {
+    // 顶栏只留高频的「添加」，低频操作（导入/导出/批量移动/排序/全部已读）收进溢出菜单：
+    // 5 个无标签图标并排，新用户不可能猜出哪个是导入哪个是导出
+    var menuExpanded by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -343,22 +443,63 @@ private fun SubscriptionsTopBar(
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f),
         )
-        IconButton(onClick = onImport) {
-            Icon(Lucide.FileUp, contentDescription = "导入 OPML", tint = radarColors().textPrimary)
-        }
-        // OPML 导出（#4）：导入的逆操作，订阅清单不被本应用绑架
-        IconButton(onClick = onExport) {
-            Icon(Lucide.FileDown, contentDescription = "导出 OPML", tint = radarColors().textPrimary)
-        }
-        // 批量移动入口（issue #7）：进入多选态，勾选后一次移动到目标分组
-        IconButton(onClick = onBatchMove) {
-            Icon(Lucide.FolderInput, contentDescription = "批量移动", tint = radarColors().textPrimary)
-        }
-        IconButton(onClick = onSort) {
-            Icon(Lucide.ArrowDownUp, contentDescription = "排序", tint = radarColors().textPrimary)
-        }
         IconButton(onClick = onAdd) {
             Icon(Lucide.Plus, contentDescription = "添加订阅", tint = radarColors().textPrimary)
+        }
+        Box {
+            IconButton(onClick = { menuExpanded = true }) {
+                Icon(Lucide.EllipsisVertical, contentDescription = "更多操作", tint = radarColors().textPrimary)
+            }
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text("导入 OPML") },
+                    leadingIcon = { Icon(Lucide.FileUp, contentDescription = null) },
+                    onClick = {
+                        menuExpanded = false
+                        onImport()
+                    },
+                )
+                // OPML 导出（#4）：导入的逆操作，订阅清单不被本应用绑架
+                DropdownMenuItem(
+                    text = { Text("导出 OPML") },
+                    leadingIcon = { Icon(Lucide.FileDown, contentDescription = null) },
+                    onClick = {
+                        menuExpanded = false
+                        onExport()
+                    },
+                )
+                // 批量移动入口（issue #7）：进入多选态，勾选后一次移动到目标分组
+                DropdownMenuItem(
+                    text = { Text("批量移动") },
+                    leadingIcon = { Icon(Lucide.FolderInput, contentDescription = null) },
+                    onClick = {
+                        menuExpanded = false
+                        onBatchMove()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("排序") },
+                    leadingIcon = { Icon(Lucide.ArrowDownUp, contentDescription = null) },
+                    onClick = {
+                        menuExpanded = false
+                        onSort()
+                    },
+                )
+                // 全部标记已读是批量不可逆操作：收进菜单（不裸露在列表里）+ 二次确认
+                if (totalUnread > 0) {
+                    DropdownMenuItem(
+                        text = { Text("全部标记为已读（$totalUnread）") },
+                        leadingIcon = { Icon(Lucide.CheckCheck, contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            onMarkAllRead()
+                        },
+                    )
+                }
+            }
         }
     }
 }
@@ -405,7 +546,8 @@ private fun GroupHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggle)
+            // 长按分组行 = 编辑（重命名/清空/删除）；行尾铅笔图标已删，减少视觉噪音
+            .combinedClickable(onClick = onToggle, onLongClick = onEdit)
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -429,14 +571,6 @@ private fun GroupHeader(
             style = MaterialTheme.typography.labelMedium,
         )
         Spacer(Modifier.weight(1f))
-        IconButton(onClick = onEdit) {
-            Icon(
-                Lucide.Pencil,
-                contentDescription = "编辑分组",
-                tint = radarColors().textSecondary,
-                modifier = Modifier.size(18.dp),
-            )
-        }
     }
 }
 
@@ -576,30 +710,6 @@ private fun CreateGroupRow(onClick: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
             )
         }
-    }
-}
-
-@Composable
-private fun MarkAllReadRow(onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            Lucide.CheckCheck,
-            contentDescription = null,
-            tint = radarColors().textSecondary,
-            modifier = Modifier.size(18.dp),
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            text = "全部标记为已读",
-            color = radarColors().textSecondary,
-            style = MaterialTheme.typography.bodyMedium,
-        )
     }
 }
 

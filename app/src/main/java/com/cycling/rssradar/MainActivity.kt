@@ -189,6 +189,8 @@ private fun RssRadarAppContent() {
                     onOpenSearch = { navController.navigate(SearchRoute) },
                     onOpenArticle = { navController.navigate(ArticleDetailRoute(it.article.id)) },
                     onAddFeed = { showAddSheet = true },
+                    // 新用户空态第二入口：OPML 导入的 SAF 入口在订阅页顶栏菜单里
+                    onOpenSubscriptions = { navController.navigate(SubscriptionsRoute) },
                 )
             }
             composable<SubscriptionsRoute> {
@@ -206,6 +208,7 @@ private fun RssRadarAppContent() {
                 SearchScreen(
                     viewModel = vm,
                     onOpenArticle = { navController.navigate(ArticleDetailRoute(it.article.id)) },
+                    onOpenSubscriptions = { navController.navigate(SubscriptionsRoute) },
                 )
             }
             composable<MeRoute> {

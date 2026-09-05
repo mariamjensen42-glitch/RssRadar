@@ -63,6 +63,8 @@ import com.cycling.rssradar.ui.components.ArticleMenuActions
 import com.cycling.rssradar.ui.components.articleMenuOffset
 import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
+import com.composables.icons.lucide.ChevronRight
+import com.composables.icons.lucide.FolderOpen
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.X
@@ -73,6 +75,8 @@ import com.cycling.rssradar.core.ui.theme.radarColors
 fun SearchScreen(
     viewModel: SearchViewModel,
     onOpenArticle: (ArticleWithFeed) -> Unit = {},
+    /** 空态托底入口：跳订阅管理页（订阅源多的时候按源浏览比关键词更顺手）。 */
+    onOpenSubscriptions: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val focusRequester = remember { FocusRequester() }
@@ -112,6 +116,10 @@ fun SearchScreen(
                     onPick = { viewModel.onIntent(SearchIntent.QueryChange(it)) },
                     onClear = { viewModel.onIntent(SearchIntent.ClearHistory) },
                 )
+                // 无历史时的托底内容：整页只剩一句"暂无搜索记录"太空洞
+                if (state.history.isEmpty()) {
+                    IdleSuggestions(onOpenSubscriptions = onOpenSubscriptions)
+                }
             } else {
                 SearchResults(
                     state = state,
@@ -223,6 +231,52 @@ private fun RecentSearches(
                     }
                 }
             }
+        }
+    }
+}
+
+/** 无搜索历史时的托底：给「按订阅源浏览」一条出路，页面不再是空洞的一片。 */
+@Composable
+private fun IdleSuggestions(onOpenSubscriptions: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = radarColors().surface1,
+        modifier = Modifier
+            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .fillMaxWidth()
+            .clickable(onClick = onOpenSubscriptions),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Lucide.FolderOpen,
+                contentDescription = null,
+                tint = radarColors().accent,
+                modifier = Modifier.size(22.dp),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = "浏览订阅源",
+                    color = radarColors().textPrimary,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "按分组查看已订阅的站点，再进入单个订阅源阅读",
+                    color = radarColors().textTertiary,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Icon(
+                Lucide.ChevronRight,
+                contentDescription = null,
+                tint = radarColors().textTertiary,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }

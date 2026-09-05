@@ -288,6 +288,10 @@ interface FeedDao {
     @Query("SELECT * FROM feeds ORDER BY groupName ASC, title ASC")
     fun observeAll(): Flow<List<FeedEntity>>
 
+    /** 订阅源总数（「我的」页统计条用）。 */
+    @Query("SELECT COUNT(*) FROM feeds")
+    fun observeFeedCount(): Flow<Int>
+
     @Query("SELECT * FROM feeds")
     suspend fun getAll(): List<FeedEntity>
 

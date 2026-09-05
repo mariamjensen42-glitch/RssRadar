@@ -1,6 +1,7 @@
 package com.cycling.rssradar.ui.article
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,6 +26,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +50,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -68,6 +74,7 @@ import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Bookmark
 import com.composables.icons.lucide.ChevronLeft
 import com.composables.icons.lucide.ChevronRight
+import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Lucide
@@ -367,13 +374,33 @@ private fun ArticleDetailTopBar(
                 tint = if (isShowingTranslation || isGeneratingTranslation) radarColors().accent else radarColors().textPrimary,
             )
         }
-        // 分享（#26）
-        IconButton(onClick = onShare) {
-            Icon(Lucide.Share2, contentDescription = "分享", tint = radarColors().textPrimary)
-        }
-        // 排版设置入口（issue #42）
-        IconButton(onClick = onOpenStyle) {
-            Icon(Lucide.Type, contentDescription = "排版设置", tint = radarColors().textPrimary)
+        // 分享与排版设置是低频操作：收进溢出菜单，顶栏图标从 4-5 个降到 2-3 个
+        Box {
+            var menuExpanded by remember { mutableStateOf(false) }
+            IconButton(onClick = { menuExpanded = true }) {
+                Icon(Lucide.EllipsisVertical, contentDescription = "更多操作", tint = radarColors().textPrimary)
+            }
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text("分享") },
+                    leadingIcon = { Icon(Lucide.Share2, contentDescription = null) },
+                    onClick = {
+                        menuExpanded = false
+                        onShare()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("排版设置") },
+                    leadingIcon = { Icon(Lucide.Type, contentDescription = null) },
+                    onClick = {
+                        menuExpanded = false
+                        onOpenStyle()
+                    },
+                )
+            }
         }
     }
 }
@@ -733,40 +760,57 @@ private fun RelatedArticlesStrip(
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            items.forEach { item ->
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = colors.surface1,
-                    modifier = Modifier
-                        .width(200.dp)
-                        .clickable { onOpen(item.article.id) },
-                ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(
-                            text = item.article.title,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.textPrimary,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = item.feedTitle,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.textTertiary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+        // 右缘渐隐：提示右侧还有卡片可滑，卡片文字截断不再显得"被裁掉"
+        val stripScroll = rememberScrollState()
+        Box(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(stripScroll)
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                items.forEach { item ->
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = colors.surface1,
+                        modifier = Modifier
+                            .width(200.dp)
+                            .clickable { onOpen(item.article.id) },
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(
+                                text = item.article.title,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textPrimary,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = item.feedTitle,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = colors.textTertiary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
+            }
+            if (stripScroll.canScrollForward) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .width(32.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color.Transparent, colors.bgRoot),
+                            ),
+                        ),
+                )
             }
         }
         Spacer(Modifier.height(10.dp))

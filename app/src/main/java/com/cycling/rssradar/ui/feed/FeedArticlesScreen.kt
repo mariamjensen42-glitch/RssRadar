@@ -24,11 +24,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.store.ListViewMode
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.RefreshCw
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.ui.theme.LocalListDisplay
 
 /**
  * 订阅源文章列表（CONTEXT.md「Feed article list」，issue #51）：
@@ -132,6 +134,13 @@ fun FeedArticlesScreen(
                 onScrolledToEnd = { viewModel.onIntent(FeedArticlesIntent.LoadMore) },
                 // 单源页强制隐藏订阅源名称（issue #56）：同源卡片重复源名是纯噪音
                 showFeedName = false,
+                // 单源文章量少（个位数常见），全局网格模式在这里只有大片留白——
+                // 仅当全局选了网格时降级为单列列表，其余模式尊重用户偏好
+                viewModeOverride = if (LocalListDisplay.current.viewMode == ListViewMode.GRID) {
+                    ListViewMode.LIST
+                } else {
+                    null
+                },
                 // 本页无悬浮 TabBar，普通间距即可
                 bottomPadding = 16.dp,
                 modifier = Modifier.padding(padding),

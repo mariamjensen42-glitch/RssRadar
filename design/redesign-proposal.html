@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RssRadar UI/UX 重设计提案</title>
+<style>
+  :root{
+    --bg:#0d0d12; --panel:#16161d; --card:#1d1d26; --card2:#23232e;
+    --line:#2e2e3a; --txt:#e8e8ef; --sub:#9a9aac; --faint:#5c5c70;
+    --accent:#7c6cf0; --accent-soft:rgba(124,108,240,.16); --ok:#4caf7d; --warn:#e0a458; --bad:#e06c6c;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:"Segoe UI","Microsoft YaHei",sans-serif;line-height:1.6;padding:48px 24px}
+  .wrap{max-width:1280px;margin:0 auto}
+  h1{font-size:28px;margin-bottom:8px}
+  .meta{color:var(--sub);font-size:14px;margin-bottom:40px}
+  h2{font-size:20px;margin:56px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{font-size:15px;margin:20px 0 8px;color:var(--txt)}
+  p{color:var(--sub);font-size:14px;margin-bottom:10px}
+
+  /* 审查表 */
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:12px 0 8px}
+  th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+  th{background:var(--panel);color:var(--txt);font-weight:600;white-space:nowrap}
+  td{color:var(--sub)}
+  td b{color:var(--txt);font-weight:600}
+  .tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;white-space:nowrap}
+  .t-p0{background:rgba(224,108,108,.18);color:var(--bad)}
+  .t-p1{background:rgba(224,164,88,.18);color:var(--warn)}
+  .t-p2{background:rgba(76,175,125,.18);color:var(--ok)}
+
+  /* 手机 mockup */
+  .phones{display:flex;flex-wrap:wrap;gap:36px;justify-content:flex-start}
+  .shot{width:300px;flex:none}
+  .shot .cap{font-size:13px;color:var(--sub);margin-bottom:10px;text-align:center}
+  .cap b{color:var(--txt)}
+  .phone{width:300px;height:640px;border-radius:28px;border:1px solid var(--line);background:#0a0a0f;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+  .statusbar{display:flex;justify-content:space-between;padding:8px 18px 2px;font-size:10px;color:var(--faint)}
+  .note{position:absolute;background:var(--accent);color:#fff;font-size:11px;font-weight:600;border-radius:12px;padding:2px 9px;z-index:5;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+  .note::after{content:"";position:absolute;width:8px;height:8px;background:var(--accent);transform:rotate(45deg);bottom:-3px;left:14px}
+
+  /* 通用控件 */
+  .chip{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:16px;font-size:12px;color:var(--sub);border:1px solid var(--line);white-space:nowrap}
+  .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .ic{width:18px;height:18px;stroke:var(--sub);stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .ic.acc{stroke:var(--accent)}
+  .navbar{margin:8px 12px 12px;background:#1b1b24;border-radius:22px;display:flex;padding:8px 6px}
+  .navitem{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;color:var(--faint);padding:7px 0;border-radius:16px}
+  .navitem.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+
+  /* 首页 mockup */
+  .m-head{padding:12px 16px 6px;display:flex;justify-content:space-between;align-items:center}
+  .m-title{font-size:20px;font-weight:700}
+  .m-chips{display:flex;gap:8px;padding:6px 16px 10px;overflow:hidden}
+  .m-progress{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--accent);padding:0 16px 6px}
+  .bar{flex:1;height:3px;background:var(--card2);border-radius:2px;overflow:hidden}
+  .bar i{display:block;height:100%;width:62%;background:var(--accent);border-radius:2px}
+  .grid{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:4px 16px;overflow:hidden}
+  .acard{background:var(--card);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .acard .thumb{height:86px;background:linear-gradient(135deg,#2a2a3e,#1d1d2e);display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:20px}
+  .acard .thumb img{width:100%;height:100%;object-fit:cover}
+  .acard .body{padding:9px 10px}
+  .acard .tt{font-size:12px;font-weight:600;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .acard .src{font-size:10.5px;color:var(--faint);margin-top:5px;display:flex;align-items:center;gap:4px}
+  .favicon{width:12px;height:12px;border-radius:3px;background:var(--accent-soft);display:inline-flex;align-items:center;justify-content:center;font-size:8px;color:var(--accent);flex:none}
+  .acard.read .tt{color:var(--faint);font-weight:500}
+  .badge-new{background:var(--accent);color:#fff;font-size:9px;border-radius:8px;padding:0 5px;margin-left:auto}
+
+  /* 详情 mockup */
+  .d-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .d-meta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);padding:8px 20px 4px}
+  .d-fav{width:20px;height:20px;border-radius:5px;background:linear-gradient(135deg,#e0704a,#c9a13e)}
+  .d-title{font-size:18px;font-weight:700;padding:6px 20px;line-height:1.4}
+  .ai-card{margin:10px 16px;background:var(--accent-soft);border:1px solid rgba(124,108,240,.3);border-radius:14px;padding:12px 14px}
+  .ai-card .h{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px}
+  .ai-card p{font-size:12px;color:var(--txt);margin:0;line-height:1.6}
+  .ai-card .more{color:var(--accent);font-size:12px;margin-top:6px;display:inline-block}
+  .d-body{padding:4px 20px;font-size:13px;color:#c9c9d8;line-height:1.8}
+  .d-actions{margin:8px 12px 12px;background:#1b1b24;border-radius:20px;display:flex;align-items:center;padding:8px 10px;gap:6px}
+  .d-actions .ab{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--card2)}
+  .d-actions .primary{flex:1;background:var(--accent);border-radius:18px;color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;height:38px}
+
+  /* 订阅管理 mockup */
+  .f-head{padding:14px 16px 10px;display:flex;justify-content:space-between;align-items:center}
+  .f-head .t{font-size:20px;font-weight:700}
+  .f-search{margin:0 16px 12px;background:var(--card);border-radius:12px;display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:12.5px;color:var(--faint)}
+  .group{padding:0 16px}
+  .grow{display:flex;align-items:center;gap:12px;padding:13px 4px;border-bottom:1px solid #1c1c25}
+  .caret{font-size:10px;color:var(--faint)}
+  .grow .nm{font-size:14px;font-weight:600}
+  .grow .ct{font-size:11px;color:var(--faint)}
+  .grow .rt{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .unread{background:var(--accent);color:#fff;font-size:10px;border-radius:9px;padding:1px 7px;font-weight:600}
+  .fab{position:absolute;right:18px;bottom:96px;background:var(--accent);color:#fff;border-radius:18px;padding:11px 20px;font-size:13px;font-weight:600;display:flex;gap:6px;align-items:center;box-shadow:0 6px 20px rgba(124,108,240,.4)}
+
+  /* 空状态 mockup */
+  .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 34px;text-align:center}
+  .empty .big{width:72px;height:72px;border-radius:22px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+  .empty h4{font-size:16px;margin-bottom:6px}
+  .empty p{font-size:12.5px;margin-bottom:20px}
+  .btn{display:block;width:100%;text-align:center;padding:11px 0;border-radius:14px;font-size:13.5px;font-weight:600;margin-bottom:10px}
+  .btn.pri{background:var(--accent);color:#fff}
+  .btn.sec{border:1px solid var(--line);color:var(--sub)}
+  .steps{display:flex;gap:6px;margin-top:6px}
+  .steps i{width:5px;height:5px;border-radius:50%;background:var(--line)}
+  .steps i.on{background:var(--accent);width:16px;border-radius:3px}
+
+  /* 任务清单 */
+  .plan{counter-reset:step}
+  .plan li{list-style:none;position:relative;padding:10px 0 10px 44px;border-bottom:1px solid #1c1c25;color:var(--sub);font-size:14px}
+  .plan li b{color:var(--txt)}
+  .plan li::before{counter-increment:step;content:counter(step);position:absolute;left:0;top:12px;width:26px;height:26px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>RssRadar UI/UX 重设计提案</h1>
+<div class="meta">基于真机截图（design/screens/01-10）评审 · 目标：达到可公开分发的完成度 · 2026-09-05</div>
+
+<h2>一、现状审查（按截图逐页）</h2>
+<table>
+  <tr><th>页面</th><th>问题</th><th>严重度</th></tr>
+  <tr><td><b>01 首页</b></td><td>① 双层顶部（标题行 + 筛选 chips）占掉 ~140px；② 无图文章显示纯灰色空块，像加载失败而不是"没有图"；③ 卡片高度随图有无跳动，瀑布凌乱；④ 刷新进度"正在刷新 10/709"是裸文本，与 chips 挤在一起；⑤ 底部导航药丸悬浮遮住最后一张卡片，内容没留 bottom padding。</td><td><span class="tag t-p0">P0</span></td></tr>
+  <tr><td><b>02/02b 文章详情</b></td><td>① 顶栏 4-5 个线性图标无文字、无可发现性（翻译/分享/字体/AI）；② 底部操作条悬浮遮挡正文最后几行，无 scrim；③ "相关阅读"横向卡片文字被硬截断；④ 正文与 AI 摘要卡之间缺少呼吸空间。</td><td><span class="tag t-p0">P0</span></td></tr>
+  <tr><td><b>03 订阅管理</b></td><td>① 顶栏 5 个图标（导入/导出/跳转/排序/添加）全是无标签线性图标，新用户不可能猜中；② 每行一个编辑铅笔 = 噪音；③ "全部标记为已读"放在列表下方裸露位置，极易误触；④ 空分组（0 个订阅）与 708 个订阅的分组视觉权重相同。</td><td><span class="tag t-p0">P0</span></td></tr>
+  <tr><td><b>04 搜索</b></td><td>页面 80% 空白，没有"按订阅源浏览 / 热门关键词"等内容托底，首感空洞。</td><td><span class="tag t-p1">P1</span></td></tr>
+  <tr><td><b>05 我的</b></td><td>信息量太少，没有版本号、订阅统计、导入 OPML 入口（新用户第一个动作应该在这）。</td><td><span class="tag t-p1">P1</span></td></tr>
+  <tr><td><b>10 分组详情</b></td><td>仅 2 篇文章时仍用双列大图网格，空旷；应按数量自适应列表/网格。</td><td><span class="tag t-p1">P1</span></td></tr>
+  <tr><td><b>新用户流程</b></td><td>无 onboarding：首次启动若 0 订阅，首页就是灰卡片海。这是"给其他用户使用"的最大缺口。</td><td><span class="tag t-p0">P0</span></td></tr>
+  <tr><td><b>设置页 06-09</b></td><td>整体最好：分组清晰、解释文案到位。小问题：分段选择器（列表/卡片/杂志/网格）与主题选择器两套样式；开关尺寸偏大。</td><td><span class="tag t-p2">P2</span></td></tr>
+</table>
+
+<h2>二、重设计方向（四张关键稿）</h2>
+<p>原则：不换设计语言（保持现在的紫色强调 + 深色卡片风，这套底子是对的），只修信息架构和空态。图标继续走 lucide 线性描边，与现有偏好一致。</p>
+
+<div class="phones">
+
+  <!-- 1 首页 -->
+  <div class="shot">
+    <div class="cap"><b>① 首页</b>：合并顶栏、进度条化、占位图语义化</div>
+    <div class="phone">
+      <div class="statusbar"><span>21:26</span><span>▲●▲</span></div>
+      <div class="m-head">
+        <span class="m-title">RssRadar</span>
+        <span style="display:flex;gap:14px">
+          <svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <svg class="ic" viewBox="0 0 24 24"><path d="M3 12h6l2-7 4 14 2-7h4"/></svg>
+        </span>
+      </div>
+      <div class="m-chips">
+        <span class="chip on">全部</span><span class="chip">未读 12</span><span class="chip">收藏</span><span class="chip">稍后读</span><span class="chip">推荐</span>
+      </div>
+      <div class="m-progress"><div class="bar"><i></i></div><span>刷新中 62%</span></div>
+      <div class="grid">
+        <div class="acard"><div class="thumb">📰</div><div class="body"><div class="tt">PH今日热榜 | 2026-09-05</div><div class="src"><span class="favicon">D</span>Decohack · 2小时前</div></div></div>
+        <div class="acard"><div class="thumb" style="background:linear-gradient(135deg,#3a2f5e,#241f3d);color:#b9aef5;font-size:26px;font-weight:700">喵</div><div class="body"><div class="tt">说说：#2026-09-04 22:26<span class="badge-new">NEW</span></div><div class="src"><span class="favicon">喵</span>喵喵小站 · 22小时前</div></div></div>
+        <div class="acard read"><div class="thumb" style="background:linear-gradient(135deg,#2e3a4e,#1f2a3a);color:#9fc3e8;font-size:22px">2001</div><div class="body"><div class="tt">2001，电脑进了家门</div><div class="src"><span class="favicon">愆</span>愆伏 · 8小时前</div></div></div>
+        <div class="acard"><div class="thumb">📖</div><div class="body"><div class="tt">发誓要挣一百万丨一周语文（2636）</div><div class="src"><span class="favicon">孤</span>孤岛客 · 8小时前</div></div></div>
+      </div>
+      <div class="navbar">
+        <div class="navitem on"><svg class="ic acc" viewBox="0 0 24 24"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>文章</div>
+        <div class="navitem"><svg class="ic" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>订阅</div>
+        <div class="navitem"><svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>搜索</div>
+        <div class="navitem"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>我的</div>
+      </div>
+      <div class="note" style="top:64px;right:8px">图标砍到 2 个<br>其余收进「更多」</div>
+      <div class="note" style="top:150px;left:8px">刷新 → 细进度条<br>不再抢一行</div>
+      <div class="note" style="top:490px;left:8px">无图 → 首字色块占位<br>不再是灰空块</div>
+    </div>
+  </div>
+
+  <!-- 2 文章详情 -->
+  <div class="shot">
+    <div class="cap"><b>② 文章详情</b>：顶栏降密度、操作条落底不遮字</div>
+    <div class="phone">
+      <div class="statusbar"><span>21:26</span><span>▲●▲</span></div>
+      <div class="d-bar">
+        <svg class="ic" viewBox="0 0 24 24" style="width:22px;height:22px"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        <span style="display:flex;gap:16px">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+          <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        </span>
+      </div>
+      <div class="d-meta"><span class="d-fav"></span>Decohack · 2小时前 · 约 19 分钟</div>
+      <div class="d-title">PH今日热榜 | 2026-09-05</div>
+      <div class="ai-card">
+        <div class="h"><svg class="ic acc" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI 摘要</div>
+        <p>今日 Product Hunt 精选榜单以 AI 模型与开发者工具为主，OpenAI 发布旗舰模型 GPT-6 Astra…</p>
+        <span class="more">展开全文 ↓</span>
+      </div>
+      <div class="d-body">1. GPT-6 Astra<br>标语：OpenAI 最强大的全流程工作模型。介绍：GPT-6 Astra 是 OpenAI 最新推出的强大模型，专门用于复杂推理、软件工程、计算工具使用和科学研究与专业工作…</div>
+      <div style="flex:1"></div>
+      <div class="d-actions">
+        <div class="ab"><svg class="ic" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg></div>
+        <div class="ab"><svg class="ic" viewBox="0 0 24 24"><path d="M5 12H19"/><path d="M12 5l7 7-7 7"/></svg></div>
+        <div class="ab"><svg class="ic acc" viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg></div>
+        <div class="ab"><svg class="ic" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/></svg></div>
+        <div class="primary"><svg class="ic" viewBox="0 0 24 24" style="stroke:#fff"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>查看原文</div>
+      </div>
+      <div class="note" style="top:60px;right:8px">低频功能（翻译/字体/AI）<br>收进 ⋯ 菜单</div>
+      <div class="note" style="top:560px;left:8px">操作条成为实体底栏<br>正文 padding-bottom 避让</div>
+    </div>
+  </div>
+
+  <!-- 3 订阅管理 -->
+  <div class="shot">
+    <div class="cap"><b>③ 订阅管理</b>：图标全部带语义、去掉行内铅笔、危险操作隔离</div>
+    <div class="phone">
+      <div class="statusbar"><span>21:26</span><span>▲●▲</span></div>
+      <div class="f-head">
+        <span class="t">订阅</span>
+        <span style="display:flex;gap:14px">
+          <svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+        </span>
+      </div>
+      <div class="f-search"><svg class="ic" viewBox="0 0 24 24" style="width:15px;height:15px"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>搜索 712 个订阅源</div>
+      <div class="group">
+        <div class="grow"><span class="caret">▼</span><span class="nm">Blog</span><span class="ct">708 个订阅</span><span class="rt"><span class="unread">96</span></span></div>
+        <div class="grow"><span class="caret">▶</span><span class="nm">科技</span><span class="ct">1 个订阅</span></div>
+        <div class="grow"><span class="caret">▶</span><span class="nm">设计</span><span class="ct">1 个订阅</span></div>
+        <div class="grow"><span class="caret">▶</span><span class="nm">默认</span><span class="ct">2 个订阅</span></div>
+        <div class="grow" style="border:none"><svg class="ic acc" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M12 5v14M5 12h14"/></svg><span class="nm" style="color:var(--accent)">新建分组</span></div>
+      </div>
+      <div style="flex:1"></div>
+      <div class="fab"><svg class="ic" viewBox="0 0 24 24" style="stroke:#fff;width:16px;height:16px"><path d="M12 5v14M5 12h14"/></svg>添加订阅</div>
+      <div class="navbar">
+        <div class="navitem"><svg class="ic" viewBox="0 0 24 24"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>文章</div>
+        <div class="navitem on"><svg class="ic acc" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>订阅</div>
+        <div class="navitem"><svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>搜索</div>
+        <div class="navitem"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>我的</div>
+      </div>
+      <div class="note" style="top:60px;right:8px">5 图标 → 2：<br>导入/导出/排序收进 ⋯</div>
+      <div class="note" style="top:300px;left:8px">铅笔移除<br>长按行 / 详情页编辑</div>
+      <div class="note" style="top:530px;right:8px">「全部标记已读」<br>移入 ⋯ 加二次确认</div>
+    </div>
+  </div>
+
+  <!-- 4 新用户首启 -->
+  <div class="shot">
+    <div class="cap"><b>④ 新用户首启（新增）</b>：三步 onboarding，OPML 一路直达</div>
+    <div class="phone">
+      <div class="statusbar"><span>21:26</span><span>▲●▲</span></div>
+      <div class="empty">
+        <div class="big"><svg class="ic acc" viewBox="0 0 24 24" style="width:34px;height:34px"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg></div>
+        <h4>欢迎来到 RssRadar</h4>
+        <p>导入你现有的订阅（支持 OPML），或者从 RSSHub 发现榜挑几个开始。</p>
+        <div class="btn pri">导入 OPML 订阅文件</div>
+        <div class="btn sec">从推荐榜挑选订阅</div>
+        <div class="btn sec">手动添加 RSS 链接</div>
+        <div class="steps"><i class="on"></i><i></i><i></i></div>
+      </div>
+      <div class="note" style="top:150px;left:8px">0 订阅时首页<br>直接呈现此页</div>
+      <div class="note" style="top:520px;left:8px">完成任一步<br>才进入正式首页</div>
+    </div>
+  </div>
+
+</div>
+
+<h2>三、落地任务清单（按优先级 + 依赖顺序）</h2>
+<ol class="plan">
+  <li><b>P0 · 首页空态与占位图</b>：无缩略图卡片改为「订阅源首字 / lucide 图标 + 渐变色」占位（按 feedId hash 选色），删除纯灰块；卡片高度统一。（Issue 候选：home-placeholder）</li>
+  <li><b>P0 · 首页顶栏合并</b>：标题行保留 搜索 + 标记已读 两个图标，「视图模式/分组筛选」移入右上 ⋯ 或筛选 chips 行尾；刷新进度改为标题下细进度条（LinearProgressIndicator 样式）。</li>
+  <li><b>P0 · 新用户 onboarding</b>：检测订阅数为 0 时进入欢迎页（导入 OPML / 推荐榜 / 手动添加 三入口）；「我的」页同步补 OPML 导入入口。完成后才写 onboarding 完成标记。</li>
+  <li><b>P0 · 订阅管理信息架构</b>：顶栏收敛为 搜索 + ⋯（导入/导出/全部已读/排序，全部已读加确认对话框）；移除行内铅笔（编辑移到分组详情或长按菜单）；行尾改未读数徽章。</li>
+  <li><b>P1 · 详情页操作栏</b>：底部操作条改为实体底栏（非悬浮），正文 Column 加 bottom padding；顶栏只留 返回 + ⋯（翻译/字体/分享/AI 进菜单）。</li>
+  <li><b>P1 · 详情页相关阅读</b>：横向卡片文字两行截断加省略号 + 渐隐遮罩，替代当前硬截。</li>
+  <li><b>P1 · 搜索页托底</b>：无输入时展示「最近搜索 + 订阅源字母索引 / 推荐关键词」，消除空洞感。</li>
+  <li><b>P1 · 分组详情自适应</b>：条目 ≤ 4 时用单列列表布局，> 4 保持网格。</li>
+  <li><b>P2 · 设置页一致性</b>：统一分段选择器组件（主题 / 视图模式 / 描述开关共用一套）；开关尺寸对齐 M3 默认。</li>
+  <li><b>P2 · 「我的」页充实</b>：顶部加统计条（订阅数 / 未读 / 今日已读，全部来自 DB 真实数字），底部加版本号 + OPML 导入导出。</li>
+</ol>
+
+<h2>四、不改的部分（明确保留）</h2>
+<p>深色主题底色与紫色强调、AI 摘要卡样式（这是产品亮点）、设置页的解释文案写法（「disabled 按钮必须配解释文案」铁律已做得很好）、lucide 线性图标体系、底部药丸导航形态（只修内容遮挡问题）。</p>
+
+</div>
+</body>
+</html>

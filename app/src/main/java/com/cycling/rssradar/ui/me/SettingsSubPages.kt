@@ -235,6 +235,34 @@ private fun needsNotificationPermission(): Boolean =
 
 // —— 1. 通用：外观 / 列表显示 / 推荐 / 链接与分享 ——
 
+/** 通用分段选择器：胶囊 chip 一排，选中态 accent 填充。设置页三处共用，保证样式一致。 */
+@Composable
+private fun <T> SegmentedChips(
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = modifier) {
+        options.forEach { option ->
+            val isSelected = option == selected
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = if (isSelected) radarColors().accent else radarColors().surface2,
+                modifier = Modifier.clickable { onSelect(option) },
+            ) {
+                Text(
+                    text = label(option),
+                    color = if (isSelected) radarColors().onAccent else radarColors().textPrimary,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun SettingsGeneralScreen(
     viewModel: RssHubSettingsViewModel = hiltViewModel(),
@@ -257,25 +285,18 @@ fun SettingsGeneralScreen(
                         modifier = Modifier.weight(1f),
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ThemeMode.entries.forEach { mode ->
-                            val selected = state.themeMode == mode
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = if (selected) radarColors().accent else radarColors().surface2,
-                                modifier = Modifier.clickable { viewModel.setThemeMode(mode) },
-                            ) {
-                                Text(
-                                    text = when (mode) {
-                                        ThemeMode.SYSTEM -> "跟随系统"
-                                        ThemeMode.LIGHT -> "浅色"
-                                        ThemeMode.DARK -> "深色"
-                                    },
-                                    color = if (selected) radarColors().onAccent else radarColors().textPrimary,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                )
-                            }
-                        }
+                        SegmentedChips(
+                            options = ThemeMode.entries.toList(),
+                            selected = state.themeMode,
+                            label = {
+                                when (it) {
+                                    ThemeMode.SYSTEM -> "跟随系统"
+                                    ThemeMode.LIGHT -> "浅色"
+                                    ThemeMode.DARK -> "深色"
+                                }
+                            },
+                            onSelect = { viewModel.setThemeMode(it) },
+                        )
                     }
                 }
             }
@@ -303,23 +324,12 @@ fun SettingsGeneralScreen(
                         modifier = Modifier.weight(1f),
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ListViewMode.entries.forEach { mode ->
-                            val selected = display.viewMode == mode
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = if (selected) radarColors().accent else radarColors().surface2,
-                                modifier = Modifier.clickable {
-                                    viewModel.updateListDisplay { it.copy(viewMode = mode) }
-                                },
-                            ) {
-                                Text(
-                                    text = mode.label,
-                                    color = if (selected) radarColors().onAccent else radarColors().textPrimary,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                )
-                            }
-                        }
+                        SegmentedChips(
+                            options = ListViewMode.entries.toList(),
+                            selected = display.viewMode,
+                            label = { it.label },
+                            onSelect = { mode -> viewModel.updateListDisplay { it.copy(viewMode = mode) } },
+                        )
                     }
                 }
                 SettingSwitchRow(
@@ -353,23 +363,12 @@ fun SettingsGeneralScreen(
                         modifier = Modifier.weight(1f),
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        com.cycling.rssradar.core.data.store.ListDescMode.entries.forEach { mode ->
-                            val selected = display.descMode == mode
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = if (selected) radarColors().accent else radarColors().surface2,
-                                modifier = Modifier.clickable {
-                                    viewModel.updateListDisplay { it.copy(descMode = mode) }
-                                },
-                            ) {
-                                Text(
-                                    text = mode.label,
-                                    color = if (selected) radarColors().onAccent else radarColors().textPrimary,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                )
-                            }
-                        }
+                        SegmentedChips(
+                            options = com.cycling.rssradar.core.data.store.ListDescMode.entries.toList(),
+                            selected = display.descMode,
+                            label = { it.label },
+                            onSelect = { mode -> viewModel.updateListDisplay { it.copy(descMode = mode) } },
+                        )
                     }
                 }
                 SettingSwitchRow(
