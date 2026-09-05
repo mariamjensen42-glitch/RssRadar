@@ -5,6 +5,8 @@ import com.cycling.rssradar.core.data.db.ArticleEntity
 import com.cycling.rssradar.core.data.db.FeedDao
 import com.cycling.rssradar.core.data.parser.RssParser
 import com.cycling.rssradar.core.data.rss.BestIconFinder
+import com.cycling.rssradar.core.domain.rss.ConditionalFetchResult
+import com.cycling.rssradar.core.domain.rss.ConditionalHttpFetcher
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +47,11 @@ class RefreshEngine(
     private val iconFinder: BestIconFinder? = null,
     /** fire-and-forget 图标抓取的外部作用域，为 null 时同样不抓。 */
     private val externalScope: CoroutineScope? = null,
+    /**
+     * 条件请求能力（ETag / Last-Modified 协商）。null 时回落到无条件抓取（旧路径）。
+     * 非 null 时每源刷新先带凭证发 If-None-Match / If-Modified-Since，304 直接跳过。
+     */
+    private val conditionalHttp: ConditionalHttpFetcher? = null,
 ) {
 
     companion object {
@@ -133,20 +140,46 @@ class RefreshEngine(
     /**
      * 增量刷新：重新抓取并按 link 更新文章的内容状态。
      * 绝不覆盖用户状态（已读/收藏/稍后读），见 CONTEXT.md「用户状态」。
+     *
+     * 源级捷径：有条件请求能力时先做协商（304 = 源没变，直接算成功返回，
+     * 零下载零解析零写库）；凭证在每次 200 后更新，服务器没回就清空。
      */
     private suspend fun refreshFeed(feedId: Long): Boolean = withContext(ioDispatcher) {
         val feed = feedDao.getById(feedId) ?: return@withContext false
-        val parsed = try {
-            fetchAndParse(feed.url)
-        } catch (_: IllegalArgumentException) {
-            return@withContext false
-        } catch (_: IOException) {
-            return@withContext false
+        val conditional = conditionalHttp
+        if (conditional != null) {
+            val result = try {
+                conditional.fetchConditional(feed.url, feed.etag, feed.lastModified)
+            } catch (_: IOException) {
+                return@withContext false
+            }
+            when (result) {
+                is ConditionalFetchResult.NotModified -> return@withContext true // 304：内容未变
+                is ConditionalFetchResult.Modified -> {
+                    val parsed = try {
+                        result.body.use { parser.parse(it) }
+                    } catch (_: IllegalArgumentException) {
+                        return@withContext false
+                    }
+                    upsertArticles(feedId, parsed.articles, System.currentTimeMillis())
+                    if (feed.iconUrl == null) backfillIcon(feedId, parsed.siteUrl)
+                    feedDao.updateValidators(feedId, result.etag, result.lastModified)
+                    true
+                }
+            }
+        } else {
+            val parsed = try {
+                fetchAndParse(feed.url)
+            } catch (_: IllegalArgumentException) {
+                return@withContext false
+            } catch (_: IOException) {
+                return@withContext false
+            }
+            upsertArticles(feedId, parsed.articles, System.currentTimeMillis())
+            // 图标 backfill：老源 / 盲导源 / 早期订阅的源补齐（仅 null 时抓）
+            if (feed.iconUrl == null) backfillIcon(feedId, parsed.siteUrl)
+            true
         }
-        upsertArticles(feedId, parsed.articles, System.currentTimeMillis())
-        // 图标 backfill：老源 / 盲导源 / 早期订阅的源补齐（仅 null 时抓）
-        if (feed.iconUrl == null) backfillIcon(feedId, parsed.siteUrl)
-        true
     }
 
     /** 同一 link：只更新内容状态字段，用户状态原样保留。整源一次事务（#48）。 */

@@ -53,6 +53,13 @@ data class FeedEntity(
      * 订阅时按信号预判，用户在订阅操作页可改。
      */
     @ColumnInfo(defaultValue = "0") val contentType: Int = CONTENT_TYPE_ARTICLE,
+    /**
+     * HTTP 协商缓存凭证（增量刷新）：上次成功响应的 ETag，下次刷新作 If-None-Match。
+     * 304 = 源未更新，跳过下载解析写库。null = 尚无凭证（首次刷新走普通请求）。
+     */
+    val etag: String? = null,
+    /** 同 [etag]：上次成功响应的 Last-Modified，下次刷新作 If-Modified-Since。 */
+    val lastModified: String? = null,
 ) {
     companion object {
         const val SOURCE_TYPE_RSS = 0
@@ -344,6 +351,13 @@ interface FeedDao {
     /** 空分区空态判定（issue #75）：该内容类型的订阅源数量。 */
     @Query("SELECT COUNT(*) FROM feeds WHERE contentType = :contentType")
     suspend fun countFeedsByContentType(contentType: Int): Int
+
+    /**
+     * 刷新后记录 HTTP 协商凭证（ETag / Last-Modified）。服务器没回就传 null 清空，
+     * 避免拿陈旧凭证反复请求导致 304 误判「源没变」。
+     */
+    @Query("UPDATE feeds SET etag = :etag, lastModified = :lastModified WHERE id = :feedId")
+    suspend fun updateValidators(feedId: Long, etag: String?, lastModified: String?)
 }
 
 @Dao
@@ -1086,6 +1100,18 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
     }
 }
 
+/**
+ * v14 → v15：增量刷新的 HTTP 协商凭证（feeds.etag / feeds.lastModified）。
+ * 都是不带默认值的可空 TEXT 新列，存量行取 null（下次刷新走普通请求拿到凭证），
+ * 无需重写任何行。
+ */
+val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE feeds ADD COLUMN etag TEXT")
+        db.execSQL("ALTER TABLE feeds ADD COLUMN lastModified TEXT")
+    }
+}
+
 @Database(
     entities = [
         FeedEntity::class,
@@ -1098,7 +1124,7 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
         FeedAiProfileEntity::class,
         AiTaskEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

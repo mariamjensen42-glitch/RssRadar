@@ -52,10 +52,12 @@ import com.cycling.rssradar.core.data.db.MIGRATION_12_13
 import com.cycling.rssradar.core.data.db.FeedAiProfileDao
 import com.cycling.rssradar.core.data.db.FeedDao
 import com.cycling.rssradar.core.data.db.MIGRATION_13_14
+import com.cycling.rssradar.core.data.db.MIGRATION_14_15
 import com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.core.data.parser.RssParser
 import com.cycling.rssradar.core.data.rss.BestIconFinder
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
+import com.cycling.rssradar.core.domain.rss.ConditionalHttpFetcher
 import com.cycling.rssradar.core.domain.rss.HttpUrlFetcher
 import com.cycling.rssradar.core.domain.rsshub.HttpHealthzProber
 import com.cycling.rssradar.core.domain.rsshub.InstanceProber
@@ -90,7 +92,7 @@ object AppModule {
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                 MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
                 MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
-                MIGRATION_13_14,
+                MIGRATION_13_14, MIGRATION_14_15,
             )
             .build()
 
@@ -123,6 +125,11 @@ object AppModule {
     @Singleton
     fun provideHttpFetcher(): HttpFetcher = HttpUrlFetcher()
 
+    /** 条件请求（ETag 协商）与普通抓取共用同一个 adapter 实例（超时/UA 配置一致）。 */
+    @Provides
+    @Singleton
+    fun provideConditionalHttpFetcher(): ConditionalHttpFetcher = HttpUrlFetcher()
+
     /** 真 Room 事务；JVM 测试用 DirectTransactionRunner 直跑。 */
     @Provides
     @Singleton
@@ -138,6 +145,7 @@ object AppModule {
         transactionRunner: TransactionRunner,
         iconFinder: BestIconFinder,
         externalScope: CoroutineScope,
+        conditionalHttp: ConditionalHttpFetcher,
     ): RefreshEngine = RefreshEngine(
         feedDao = db.feedDao(),
         articleDao = db.articleDao(),
@@ -146,6 +154,7 @@ object AppModule {
         transactionRunner = transactionRunner,
         iconFinder = iconFinder,
         externalScope = externalScope,
+        conditionalHttp = conditionalHttp,
     )
 
     /** 应用级外部作用域：fire-and-forget 任务（站点图标抓取等）不随任何 ViewModel/刷新协程死亡。 */
