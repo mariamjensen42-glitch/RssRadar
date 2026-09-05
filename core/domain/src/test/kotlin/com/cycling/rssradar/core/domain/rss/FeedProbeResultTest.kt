@@ -110,7 +110,18 @@ class FeedProbeResultTest {
         val serving = Thread {
             runCatching {
                 server.accept().use { socket ->
-                    socket.getInputStream().readBytes() // 吃掉请求行/头
+                    // 读到请求头结束（\r\n\r\n）为止。不能用 readBytes()：客户端不会关
+                    // 输出流，readBytes 会阻塞到客户端读超时——CI 上 100% 必挂的假 flaky。
+                    val input = socket.getInputStream()
+                    val buf = ByteArray(4096)
+                    var seen = 0
+                    var head = ""
+                    while (head.indexOf("\r\n\r\n") < 0 && seen < buf.size) {
+                        val n = input.read(buf, seen, buf.size - seen)
+                        if (n < 0) break
+                        seen += n
+                        head = String(buf, 0, seen)
+                    }
                     socket.getOutputStream().write(
                         ("HTTP/1.1 404 Not Found\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n").toByteArray() + body,
                     )
