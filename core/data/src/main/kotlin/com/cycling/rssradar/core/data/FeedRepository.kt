@@ -116,6 +116,16 @@ class FeedRepository(
     /** 定向刷新一批订阅源（盲导后补文章用），返回成功的源数。失败静默跳过。 */
     suspend fun refreshFeeds(feedIds: List<Long>): Int = engine.refreshFeeds(feedIds)
 
+    /**
+     * 失效源复探（#82）：只刷新有失败记录的源。成功 → 计数清零恢复；
+     * 再失败 → 计数继续累加。每日 FeedHealthWorker 与手动复探都走这里。
+     */
+    suspend fun refreshUnhealthyFeeds(): Int {
+        val ids = feedDao.getFeedIdsWithFailures()
+        if (ids.isEmpty()) return 0
+        return engine.refreshFeeds(ids)
+    }
+
     /** 更新单源的自动同步开关（issue #58）。 */
     suspend fun setSyncEnabled(feedId: Long, enabled: Boolean) =
         feedDao.updateSyncEnabled(feedId, enabled)

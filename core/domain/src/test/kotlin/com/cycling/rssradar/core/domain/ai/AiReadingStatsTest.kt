@@ -15,6 +15,34 @@ import org.junit.Test
 class AiReadingStatsTest {
 
     private val hour = 3_600_000L
+    private val day = 24 * hour
+
+    @Test
+    fun `连续天数从今天往回数`() {
+        val today = 100L
+        val keys = setOf(100L, 99L, 98L, 95L)
+        // 98→99→100 连续 3 天；95 断档不计
+        assertEquals(3, AiReadingStats.streakDays(keys, today))
+    }
+
+    @Test
+    fun `今天还没打开不断连击`() {
+        val today = 100L
+        val keys = setOf(99L, 98L, 97L)
+        assertEquals(3, AiReadingStats.streakDays(keys, today))
+    }
+
+    @Test
+    fun `昨天也没打开则连击归零`() {
+        val today = 100L
+        val keys = setOf(98L, 97L)
+        assertEquals(0, AiReadingStats.streakDays(keys, today))
+    }
+
+    @Test
+    fun `空样本连击为零`() {
+        assertEquals(0, AiReadingStats.streakDays(emptySet(), 100L))
+    }
 
     @Test
     fun `活跃时段只取高于全天平均的小时`() {

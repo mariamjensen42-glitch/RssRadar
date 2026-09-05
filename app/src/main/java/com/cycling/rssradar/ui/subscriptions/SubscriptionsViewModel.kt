@@ -18,6 +18,8 @@ import com.cycling.rssradar.core.model.GROUP_TECH
 import com.cycling.rssradar.core.data.store.FeedSortMode
 import com.cycling.rssradar.core.data.store.FeedSortStore
 import com.cycling.rssradar.core.data.store.GroupStore
+import com.cycling.rssradar.core.domain.rss.FeedFailureCategory
+import com.cycling.rssradar.core.domain.rss.FeedHealth
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -32,8 +34,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 
-/** 订阅 + 未读数，UI 直接消费。 */
-data class FeedWithUnread(val feed: FeedEntity, val unreadCount: Int)
+/** 订阅 + 未读数，UI 直接消费。[failure] 非空 = 该源当前处于失效状态（#82）。 */
+data class FeedWithUnread(
+    val feed: FeedEntity,
+    val unreadCount: Int,
+    val failure: FeedFailureCategory? = null,
+)
 
 /** 一个分组下的所有订阅。 */
 data class GroupSectionUi(val group: String, val feeds: List<FeedWithUnread>)
@@ -88,6 +94,9 @@ sealed interface SubscriptionsIntent {
 
     /** 订阅源级「刷新后自动生成摘要」开关。null 语义由仓储层解释为"跟随全局"。 */
     data class SetFeedAutoSummary(val feedId: Long, val enabled: Boolean) : SubscriptionsIntent
+
+    /** 只看失效源（#82）：订阅列表在「全部」与「仅失效」之间切换。 */
+    data object ToggleUnhealthyFilter : SubscriptionsIntent
 }
 
 @HiltViewModel
@@ -103,6 +112,15 @@ class SubscriptionsViewModel @Inject constructor(
 
     private val _expandedIds = MutableStateFlow(setOf(GROUP_TECH, GROUP_DEV, GROUP_DESIGN))
     val expandedGroupIds: StateFlow<Set<String>> = _expandedIds.asStateFlow()
+
+    /** 只看失效源（#82）。 */
+    private val _unhealthyOnly = MutableStateFlow(false)
+    val unhealthyOnly: StateFlow<Boolean> = _unhealthyOnly.asStateFlow()
+
+    /** 当前失效源数量（筛选入口的角标数字，来自 DB 字段推导，不估算）。 */
+    val unhealthyCount: StateFlow<Int> = repository.observeFeeds()
+        .map { feeds -> feeds.count { FeedHealth.isUnhealthy(it.consecutiveFailures, it.failureReason) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     /** 批量移动的多选模式（issue #7）：开启后列表行变勾选行，整行点击 = 勾选而非进文章列表。 */
     private val _selectionMode = MutableStateFlow(false)
@@ -138,6 +156,23 @@ class SubscriptionsViewModel @Inject constructor(
         repository.observeFeeds()
             .map { list -> list.find { it.id == feedId } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * 失效源拍平列表（#82「只看失效源」）：绕过分组结构直达，
+     * 与搜索命中同一展示形态。failure 分类已推导好，UI 不再判阈值。
+     */
+    val unhealthyFeeds: StateFlow<List<FeedWithUnread>> =
+        combine(repository.observeFeeds(), repository.observeFeedUnreadCounts()) { feeds, unread ->
+            feeds.asSequence()
+                .map { feed -> withFailure(feed, unread[feed.id] ?: 0) }
+                .filter { it.failure != null }
+                .sortedBy { it.feed.title }
+                .toList()
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 失效分类的推导只在此一处（VM 内）：DB 字段 → FeedHealth → UI。 */
+    private fun withFailure(feed: FeedEntity, unread: Int): FeedWithUnread =
+        FeedWithUnread(feed, unread, FeedHealth.categoryOf(feed.consecutiveFailures, feed.failureReason))
 
     /**
      * 按 id 取订阅源的 AI 配置（摘要提示词与自动化开关）。
@@ -176,6 +211,7 @@ class SubscriptionsViewModel @Inject constructor(
             is SubscriptionsIntent.SetContentType -> setContentType(intent.feedId, intent.contentType)
             is SubscriptionsIntent.SetFeedSummaryPrompt -> setFeedSummaryPrompt(intent.feedId, intent.prompt)
             is SubscriptionsIntent.SetFeedAutoSummary -> setFeedAutoSummary(intent.feedId, intent.enabled)
+            SubscriptionsIntent.ToggleUnhealthyFilter -> _unhealthyOnly.value = !_unhealthyOnly.value
         }
     }
 
@@ -468,7 +504,10 @@ class SubscriptionsViewModel @Inject constructor(
         // 注册表里没有 feed 的分组也要显示（空分组）
         val ordered = registered.distinct() + byName.keys.filterNot { it in registered }
         val sections = ordered.map { group ->
-            GroupSectionUi(group = group, feeds = byName[group].orEmpty().map { FeedWithUnread(it, unreadMap[it.id] ?: 0) })
+            GroupSectionUi(
+                group = group,
+                feeds = byName[group].orEmpty().map { withFailure(it, unreadMap[it.id] ?: 0) },
+            )
         }
         return when (sort) {
             // 名称序：分组保持注册顺序，组内按标题

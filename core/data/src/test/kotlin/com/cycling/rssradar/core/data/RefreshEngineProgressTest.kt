@@ -33,6 +33,8 @@ class RefreshEngineProgressTest {
                 FeedEntity(id = id, url = "https://example.com/$id.xml", title = "F$id", createdAt = 0)
             }
             "getById" -> FeedEntity(id = 1L, url = "https://example.com/1.xml", title = "F", createdAt = 0)
+            // #82 失效检测埋点：本测试只关心进度回调，健康/失败记账放行即可
+            "recordRefreshSuccess", "recordRefreshFailure" -> Unit
             else -> throw UnsupportedOperationException(name)
         }
     }
@@ -83,6 +85,8 @@ class RefreshEngineProgressTest {
                     FeedEntity(id = id, url = "https://example.com/$id.xml", title = "F$id", createdAt = 0)
                 }
                 "getById" -> FeedEntity(id = 1L, url = "https://127.0.0.1:1/broken.xml", title = "F", createdAt = 0)
+                // #82：失败源的失败记账，本测试只关心进度回调
+                "recordRefreshSuccess", "recordRefreshFailure" -> Unit
                 else -> throw UnsupportedOperationException(name)
             }
         } as FeedDao

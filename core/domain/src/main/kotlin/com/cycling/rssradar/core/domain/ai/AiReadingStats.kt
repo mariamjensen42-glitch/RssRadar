@@ -65,4 +65,22 @@ object AiReadingStats {
         }
         return ((hhi - 1.0 / n) / (1.0 - 1.0 / n)).coerceIn(0.0, 1.0)
     }
+
+    /**
+     * 连续阅读天数（统计仪表盘，#81/#83）：[dayKeys] 是打开过文章的本地历日
+     * （epoch day）集合，[todayDay] 是今天的 epoch day。
+     *
+     * 今天还没打开不算断——从今天或昨天起往回数，日子连续才累加。
+     * 「今天没读」时从昨天起数，否则早上打开 App 看统计永远是 0，夜里 0 点
+     * 跨天瞬间连击清零，两个都是反直觉的。
+     */
+    fun streakDays(dayKeys: Set<Long>, todayDay: Long): Int {
+        var cursor = if (todayDay in dayKeys) todayDay else todayDay - 1
+        var streak = 0
+        while (cursor in dayKeys) {
+            streak++
+            cursor--
+        }
+        return streak
+    }
 }

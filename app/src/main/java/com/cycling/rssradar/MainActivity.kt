@@ -55,6 +55,8 @@ import com.cycling.rssradar.ui.me.FetchDiagnosticsViewModel
 import com.cycling.rssradar.ui.me.InterestProfileScreen
 import com.cycling.rssradar.ui.me.RssHubSettingsScreen
 import com.cycling.rssradar.ui.me.RssHubSettingsViewModel
+import com.cycling.rssradar.ui.me.ReadingStatsScreen
+import com.cycling.rssradar.ui.me.ReadingStatsViewModel
 import com.cycling.rssradar.ui.search.SearchScreen
 import com.cycling.rssradar.ui.search.SearchViewModel
 import com.cycling.rssradar.ui.subscriptions.SubscriptionsScreen
@@ -75,6 +77,7 @@ import com.cycling.rssradar.ui.me.SettingsGeneralScreen
 import com.cycling.rssradar.ui.me.SettingsRssHubScreen
 import com.cycling.rssradar.ui.me.SettingsSyncScreen
 import com.cycling.rssradar.ui.navigation.MeRoute
+import com.cycling.rssradar.ui.navigation.ReadingStatsRoute
 import com.cycling.rssradar.ui.navigation.SearchRoute
 import com.cycling.rssradar.ui.navigation.SettingsAiDiagRoute
 import com.cycling.rssradar.ui.navigation.SettingsGeneralRoute
@@ -216,7 +219,12 @@ private fun RssRadarAppContent() {
                     onOpenSync = { navController.navigate(SettingsSyncRoute) },
                     onOpenRssHub = { navController.navigate(SettingsRssHubRoute) },
                     onOpenAiDiag = { navController.navigate(SettingsAiDiagRoute) },
+                    onOpenReadingStats = { navController.navigate(ReadingStatsRoute) },
                 )
+            }
+            // 阅读统计仪表盘（issue #83）：近 7 天阅读行为的真实数字
+            composable<ReadingStatsRoute> {
+                ReadingStatsScreen(onBack = { navController.popBackStack() })
             }
             // 设置二级页（主页只留分组入口）：通用 / 同步与清理 / RSSHub / AI 与诊断
             composable<SettingsGeneralRoute> {

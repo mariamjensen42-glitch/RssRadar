@@ -3,10 +3,13 @@ package com.cycling.rssradar.core.data
 import com.cycling.rssradar.core.data.db.ArticleDao
 import com.cycling.rssradar.core.data.db.ArticleEntity
 import com.cycling.rssradar.core.data.db.FeedDao
+import com.cycling.rssradar.core.data.db.FeedEntity
 import com.cycling.rssradar.core.data.parser.RssParser
 import com.cycling.rssradar.core.data.rss.BestIconFinder
 import com.cycling.rssradar.core.domain.rss.ConditionalFetchResult
 import com.cycling.rssradar.core.domain.rss.ConditionalHttpFetcher
+import com.cycling.rssradar.core.domain.rss.FeedFailureCategory
+import com.cycling.rssradar.core.domain.rss.FeedProbeResult
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -18,7 +21,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import java.io.IOException
 
 /**
  * 刷新子系统深模块（深化自原 FeedRepository）：订阅源刷新的全部规则都沉在这里，
@@ -147,42 +149,55 @@ class RefreshEngine(
      *
      * 源级捷径：有条件请求能力时先做协商（304 = 源没变，直接算成功返回，
      * 零下载零解析零写库）；凭证在每次 200 后更新，服务器没回就清空。
+     *
+     * 失效检测埋点（#82）：失败按 [FeedProbeResult.from] 归类后写 feeds 失败计数
+     * （分类只有一处——订阅预览和刷新共用同一份 from() 映射）；任何一次成功清零。
+     * 判定阈值在 core/domain FeedHealth，这里只负责记数。
      */
     private suspend fun refreshFeed(feedId: Long): Boolean = withContext(ioDispatcher) {
         val feed = feedDao.getById(feedId) ?: return@withContext false
+        val ok = try {
+            doRefreshFeed(feed)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // 协程取消不是源失败：不能把「刷新被取消」记成一次连续失败（假数据）
+            throw e
+        } catch (e: Exception) {
+            feedDao.recordRefreshFailure(feedId, FeedFailureCategory.from(FeedProbeResult.from(e)).stored)
+            false
+        }
+        // 写放大守门（1000+ 源全量刷新）：只有「确实有失败要清」或「从未记过成功」
+        // 才写一次——健康源的常规刷新（200/304）对 feeds 表零额外写入。
+        // 判定用刷新前快照：并发重复清零无副作用，漏清一次由下一轮刷新补上。
+        if (ok && (feed.consecutiveFailures > 0 || feed.lastSuccessAt == null)) {
+            feedDao.recordRefreshSuccess(feedId, System.currentTimeMillis())
+        }
+        ok
+    }
+
+    /**
+     * 单次「抓取 → 写库」本体：异常一律上抛给 [refreshFeed] 统一归类，
+     * 这里不再 catch 成 boolean——那样失败原因（DNS/超时/4xx…）就丢了。
+     */
+    private suspend fun doRefreshFeed(feed: FeedEntity): Boolean {
         val conditional = conditionalHttp
         if (conditional != null) {
-            val result = try {
-                conditional.fetchConditional(feed.url, feed.etag, feed.lastModified)
-            } catch (_: IOException) {
-                return@withContext false
-            }
+            val result = conditional.fetchConditional(feed.url, feed.etag, feed.lastModified)
             when (result) {
-                is ConditionalFetchResult.NotModified -> return@withContext true // 304：内容未变
+                is ConditionalFetchResult.NotModified -> return true // 304：内容未变
                 is ConditionalFetchResult.Modified -> {
-                    val parsed = try {
-                        result.body.use { parser.parse(it) }
-                    } catch (_: IllegalArgumentException) {
-                        return@withContext false
-                    }
-                    upsertArticles(feedId, parsed.articles, System.currentTimeMillis())
-                    if (feed.iconUrl == null) backfillIcon(feedId, parsed.siteUrl)
-                    feedDao.updateValidators(feedId, result.etag, result.lastModified)
-                    true
+                    val parsed = result.body.use { parser.parse(it) }
+                    upsertArticles(feed.id, parsed.articles, System.currentTimeMillis())
+                    if (feed.iconUrl == null) backfillIcon(feed.id, parsed.siteUrl)
+                    feedDao.updateValidators(feed.id, result.etag, result.lastModified)
+                    return true
                 }
             }
         } else {
-            val parsed = try {
-                fetchAndParse(feed.url)
-            } catch (_: IllegalArgumentException) {
-                return@withContext false
-            } catch (_: IOException) {
-                return@withContext false
-            }
-            upsertArticles(feedId, parsed.articles, System.currentTimeMillis())
+            val parsed = fetchAndParse(feed.url)
+            upsertArticles(feed.id, parsed.articles, System.currentTimeMillis())
             // 图标 backfill：老源 / 盲导源 / 早期订阅的源补齐（仅 null 时抓）
-            if (feed.iconUrl == null) backfillIcon(feedId, parsed.siteUrl)
-            true
+            if (feed.iconUrl == null) backfillIcon(feed.id, parsed.siteUrl)
+            return true
         }
     }
 

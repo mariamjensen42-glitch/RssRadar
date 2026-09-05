@@ -57,6 +57,7 @@ import com.cycling.rssradar.core.data.store.ThemeMode
 import com.cycling.rssradar.core.data.store.ThemeStore
 import com.cycling.rssradar.sync.SyncScheduler
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
+import com.composables.icons.lucide.Activity
 import com.composables.icons.lucide.Bot
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide
@@ -375,6 +376,7 @@ fun RssHubSettingsScreen(
     onOpenSync: () -> Unit = {},
     onOpenRssHub: () -> Unit = {},
     onOpenAiDiag: () -> Unit = {},
+    onOpenReadingStats: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -408,6 +410,15 @@ fun RssHubSettingsScreen(
             StatCard(label = "订阅源", value = state.feedCount.toString(), modifier = Modifier.weight(1f))
             StatCard(label = "未读文章", value = state.unreadCount.toString(), modifier = Modifier.weight(1f))
         }
+
+        // 阅读统计入口（#83）：与统计条相邻，数字页不动设置页布局
+        SettingsEntryCard(
+            icon = Lucide.Activity,
+            title = "阅读统计",
+            summary = "近 7 天",
+            onClick = onOpenReadingStats,
+        )
+        Spacer(Modifier.height(10.dp))
 
         SettingsEntryCard(
             icon = Lucide.Palette,

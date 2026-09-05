@@ -37,6 +37,9 @@ import kotlinx.serialization.Serializable
 /** 崩溃日志（issue #61）：最近 5 次崩溃的清单与全文导出。 */
 @Serializable data object CrashLogRoute
 
+/** 阅读统计仪表盘（issue #83）：近 7 天阅读行为的真实数字。 */
+@Serializable data object ReadingStatsRoute
+
 // —— 设置二级页（主页只留分组入口，见 RssHubSettingsScreen） ——
 
 /** 通用：外观、列表显示、推荐、链接与分享。 */

@@ -29,6 +29,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -100,6 +101,10 @@ fun SubscriptionsScreen(
     val totalUnread by viewModel.totalUnread.collectAsState()
     val groupOptions by viewModel.groupsList.collectAsState()
     val sortMode by viewModel.sortMode.collectAsState()
+    // 失效源筛选（#82）
+    val unhealthyOnly by viewModel.unhealthyOnly.collectAsState()
+    val unhealthyCount by viewModel.unhealthyCount.collectAsState()
+    val unhealthyFeeds by viewModel.unhealthyFeeds.collectAsState()
     // 批量移动（issue #7）：多选模式与勾选集合在 ViewModel，弹层显隐是纯 UI 状态留在页面
     val selectionMode by viewModel.selectionMode.collectAsState()
     val selectedIds by viewModel.selectedFeedIds.collectAsState()
@@ -245,6 +250,22 @@ fun SubscriptionsScreen(
                 )
             }
 
+            // 失效源筛选（#82）：只在有伤员或已开启时出现，平时不占地方
+            if (unhealthyCount > 0 || unhealthyOnly) {
+                item(key = "unhealthy-filter", contentType = "filter") {
+                    FilterChip(
+                        selected = unhealthyOnly,
+                        onClick = { viewModel.onIntent(SubscriptionsIntent.ToggleUnhealthyFilter) },
+                        label = {
+                            Text(
+                                text = if (unhealthyOnly) "失效源 $unhealthyCount（点击取消筛选）" else "失效源 ($unhealthyCount)",
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        },
+                    )
+                }
+            }
+
             if (searchQuery.isNotBlank()) {
                 val hits = groups
                     .asSequence()
@@ -275,6 +296,40 @@ fun SubscriptionsScreen(
                             },
                             onMore = { feedActionTarget = feedItem.feed.id },
                         )
+                    }
+                }
+            } else if (unhealthyOnly) {
+                // 只看失效源（#82）：拍平展示，与搜索命中同一形态
+                if (unhealthyFeeds.isEmpty()) {
+                    item(key = "no-unhealthy", contentType = "no-hit") {
+                        Text(
+                            text = "没有失效的订阅源",
+                            color = radarColors().textTertiary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(vertical = 24.dp),
+                        )
+                    }
+                } else {
+                    items(unhealthyFeeds, key = { "unhealthy-${it.feed.id}" }, contentType = { "feed" }) { feedItem ->
+                        FeedRow(
+                            item = feedItem,
+                            selectionMode = selectionMode,
+                            selected = feedItem.feed.id in selectedIds,
+                            onClick = {
+                                if (selectionMode) {
+                                    viewModel.onIntent(SubscriptionsIntent.ToggleFeedSelected(feedItem.feed.id))
+                                } else {
+                                    onOpenFeed(feedItem.feed.id)
+                                }
+                            },
+                            onMore = { feedActionTarget = feedItem.feed.id },
+                        )
+                    }
+                }
+                if (!selectionMode) {
+                    item {
+                        Spacer(Modifier.height(4.dp))
+                        CreateGroupRow(onClick = { createGroupDialog = true })
                     }
                 }
             } else {
@@ -678,6 +733,18 @@ private fun FeedRow(
                     Text(
                         text = "RSSHub",
                         color = radarColors().textTertiary,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+            }
+            // 失效标记（#82）：原因 + 连续失败次数，红色角标一眼定位伤员
+            item.failure?.let { failure ->
+                Spacer(Modifier.width(6.dp))
+                Surface(shape = RoundedCornerShape(50), color = Danger.copy(alpha = 0.14f)) {
+                    Text(
+                        text = "${failure.label} · 连续 ${item.feed.consecutiveFailures} 次",
+                        color = Danger,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     )

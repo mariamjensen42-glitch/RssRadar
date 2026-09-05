@@ -60,6 +60,15 @@ data class FeedEntity(
     val etag: String? = null,
     /** 同 [etag]：上次成功响应的 Last-Modified，下次刷新作 If-Modified-Since。 */
     val lastModified: String? = null,
+    /**
+     * 连续刷新失败计数（#82 失效源检测）。任何一次成功清零（feedDao.recordRefreshSuccess）。
+     * 判失效 = 计数达到失败分类的阈值（core/domain FeedHealth，#80 双阈值）。
+     */
+    @ColumnInfo(defaultValue = "0") val consecutiveFailures: Int = 0,
+    /** 最后一次失败的分类名（core/domain FeedFailureCategory.stored），成功清零时一并置 null。 */
+    val failureReason: String? = null,
+    /** 最近一次「从失败中恢复」的成功刷新时间；从未失败过为 null（健康源零额外写）。 */
+    val lastSuccessAt: Long? = null,
 ) {
     companion object {
         const val SOURCE_TYPE_RSS = 0
@@ -281,6 +290,19 @@ data class FeedLatestTime(
     val latest: Long,
 )
 
+/** 近 7 天阅读窗口统计（#83 统计仪表盘）：打开篇数 + 估算阅读分钟合计。 */
+data class ReadingWindowStat(
+    val cnt: Int,
+    /** SUM 忽略 readingMinutes 为 null 的行；无样本时为 null，UI 按 0 展示。 */
+    val minutes: Long?,
+)
+
+/** Top 打开源（#83）：近 7 天打开篇数最多的订阅源。 */
+data class FeedOpenStat(
+    val feedTitle: String,
+    val cnt: Int,
+)
+
 @Dao
 interface FeedDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -362,6 +384,28 @@ interface FeedDao {
      */
     @Query("UPDATE feeds SET etag = :etag, lastModified = :lastModified WHERE id = :feedId")
     suspend fun updateValidators(feedId: Long, etag: String?, lastModified: String?)
+
+    // —— 失效源检测（#82）：判定规则在 core/domain FeedHealth，这里只做计数 ——
+    // 写放大权衡（1000+ 源每次全量刷新都过这里）：成功路径只在「确实有失败要清」
+    // 或「从未记过成功」时才写，健康源的常规刷新（200/304）零额外写。
+
+    /** 刷新成功（含 304）：清零失败计数并记录恢复时间。健康源谓词不命中，不产生写入。 */
+    @Query(
+        "UPDATE feeds SET consecutiveFailures = 0, failureReason = NULL, lastSuccessAt = :now " +
+            "WHERE id = :feedId AND (consecutiveFailures > 0 OR lastSuccessAt IS NULL)",
+    )
+    suspend fun recordRefreshSuccess(feedId: Long, now: Long)
+
+    /** 刷新失败：计数 +1 并覆盖失败分类。分类由 RefreshEngine 用 FeedProbeResult.from 归出。 */
+    @Query(
+        "UPDATE feeds SET consecutiveFailures = consecutiveFailures + 1, failureReason = :reason " +
+            "WHERE id = :feedId",
+    )
+    suspend fun recordRefreshFailure(feedId: Long, reason: String?)
+
+    /** 有失败记录的源 id（每日探测 Worker 只盯伤员，#80）。 */
+    @Query("SELECT id FROM feeds WHERE consecutiveFailures > 0")
+    suspend fun getFeedIdsWithFailures(): List<Long>
 }
 
 @Dao
@@ -904,6 +948,53 @@ interface ArticleDao {
         """,
     )
     suspend fun countProtectedByGroup(groupName: String): Int
+
+    // —— 阅读统计仪表盘（#83）：口径 = lastOpenedAt（真实打开），见 #81 定稿 ——
+
+    /** 窗口内打开篇数 + 估算阅读分钟合计（SUM 忽略未估算行）。 */
+    @Query(
+        "SELECT COUNT(*) AS cnt, SUM(readingMinutes) AS minutes " +
+            "FROM articles WHERE lastOpenedAt >= :since",
+    )
+    suspend fun readingWindowStat(since: Long): ReadingWindowStat
+
+    /** 全部打开时间戳（活跃时段 + streak 的原料）。单列查询，量级 = 打开过的文章数。 */
+    @Query("SELECT lastOpenedAt FROM articles WHERE lastOpenedAt IS NOT NULL")
+    suspend fun allOpenedTimestamps(): List<Long>
+
+    /** 窗口内每个订阅源的打开次数（源集中度的原料；top 打开源也由此排序）。 */
+    @Query(
+        """
+        SELECT feedId AS feedId, COUNT(*) AS cnt
+        FROM articles
+        WHERE lastOpenedAt >= :since
+        GROUP BY feedId
+        ORDER BY cnt DESC
+        """,
+    )
+    suspend fun openedCountsByFeedSince(since: Long): List<FeedUnreadCount>
+
+    /** 窗口内打开最多的前 [limit] 个订阅源（标题来自 JOIN feeds）。 */
+    @Query(
+        """
+        SELECT feeds.title AS feedTitle, COUNT(*) AS cnt
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.lastOpenedAt >= :since
+        GROUP BY articles.feedId
+        ORDER BY cnt DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun topOpenedFeeds(since: Long, limit: Int): List<FeedOpenStat>
+
+    /** 收藏存量（统计卡）。 */
+    @Query("SELECT COUNT(*) FROM articles WHERE isStarred = 1")
+    suspend fun starredCount(): Int
+
+    /** 稍后读存量（统计卡）。 */
+    @Query("SELECT COUNT(*) FROM articles WHERE isBookmarked = 1")
+    suspend fun bookmarkedCount(): Int
 }
 
 /**
@@ -1116,6 +1207,19 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
     }
 }
 
+/**
+ * v15 → v16（#82 失效源检测）：feeds 加 3 列——连续失败计数 / 失败分类 / 恢复时间。
+ * consecutiveFailures 带默认值 0（与实体 @ColumnInfo(defaultValue="0") 一致，
+ * Room 的 schema 校验认这个）；两个可空列无默认值，存量行取 null（= 健康/从未失败）。
+ */
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE feeds ADD COLUMN consecutiveFailures INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE feeds ADD COLUMN failureReason TEXT")
+        db.execSQL("ALTER TABLE feeds ADD COLUMN lastSuccessAt INTEGER")
+    }
+}
+
 @Database(
     entities = [
         FeedEntity::class,
@@ -1128,7 +1232,7 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
         FeedAiProfileEntity::class,
         AiTaskEntity::class,
     ],
-    version = 15,
+    version = 16,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

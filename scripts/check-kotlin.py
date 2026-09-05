@@ -248,6 +248,9 @@ def main() -> int:
         if not args.main_only:
             files += sources(ROOT / "app/src/test/java")
             files += sources(ROOT / "core/data/src/test")
+            # domain 纯函数测试（FeedHealthTest / AiReadingStatsTest…）：纯 JVM 可断言，
+            # 不收进来这些「数字必须真实」的守门测试就只在 CI 里跑
+            files += sources(ROOT / "core/domain/src/test")
 
     out = WORK / "out"
     out.mkdir(parents=True, exist_ok=True)
