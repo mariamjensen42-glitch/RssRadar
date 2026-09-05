@@ -102,7 +102,6 @@ import com.cycling.rssradar.ui.components.articleMenuOffset
 import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.core.ui.components.OptionPickerSheet
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
-import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.CheckCheck
 import com.composables.icons.lucide.Image
@@ -282,8 +281,6 @@ fun FeedListScreen(
                                 strokeWidth = 2.dp,
                                 modifier = Modifier.size(18.dp),
                             )
-                        } else if (uiState.hasMore) {
-                            LoadMoreHint()
                         }
                     }
                 }
@@ -1392,7 +1389,11 @@ fun ArticleCard(
                         }
                     }
                 }
-                if (display.showThumbnail) {
+                // 无图无媒体不给灰占位：占位块无信息量，连续无图卡片整屏灰块纯视觉噪音
+                if (display.showThumbnail &&
+                    (item.article.mediaKind != ArticleEntity.MEDIA_KIND_NONE ||
+                        !item.article.coverUrl.isNullOrBlank())
+                ) {
                     Spacer(Modifier.width(10.dp))
                     CoverThumb(url = item.article.coverUrl?.takeIf { it.isNotBlank() }, mediaKind = item.article.mediaKind)
                 } else if (item.article.mediaKind != ArticleEntity.MEDIA_KIND_NONE) {
@@ -1597,24 +1598,6 @@ private fun UnreadDot(visible: Boolean) {
             .clip(RoundedCornerShape(50))
             .background(radarColors().accent),
     )
-}
-
-@Composable
-private fun LoadMoreHint() {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = Lucide.ArrowUp,
-            contentDescription = null,
-            tint = radarColors().textTertiary,
-            modifier = Modifier.size(14.dp),
-        )
-        Spacer(Modifier.width(4.dp))
-        Text(
-            text = "上滑加载更多",
-            color = radarColors().textTertiary,
-            style = MaterialTheme.typography.labelMedium,
-        )
-    }
 }
 
 @Composable

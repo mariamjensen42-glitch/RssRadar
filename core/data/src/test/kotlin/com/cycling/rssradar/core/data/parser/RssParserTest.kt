@@ -516,4 +516,41 @@ class RssParserTest {
         assertFalse(RssParser.isFullText(article.contentHtml, article.contentText))
         assertTrue(article.summary.orEmpty().contains("短摘要"))
     }
+
+    @Test
+    fun `strip markdown residue from list preview`() {
+        val raw = "## AI资讯日报 2026/9/5\n> `AI资讯` 「每日早读」 [全文链接](https://x.com/a) ![封面](https://x.com/i.png)\n**加粗** *斜体* 正文"
+        val cleaned = RssParser.stripMarkdown(raw)
+        // 语法符号一个不留；锚文本与正文保留
+        assertFalse(cleaned.contains("##"))
+        assertFalse(cleaned.contains("`"))
+        assertFalse(cleaned.contains("](http"))
+        assertFalse(cleaned.contains("**"))
+        assertFalse(cleaned.contains("!["))
+        assertTrue(cleaned.contains("AI资讯日报 2026/9/5"))
+        assertTrue(cleaned.contains("全文链接"))
+        assertTrue(cleaned.contains("加粗 斜体 正文"))
+        // 连续空白收敛为单空格
+        assertFalse(Regex("\\s{2,}").containsMatchIn(cleaned))
+    }
+
+    @Test
+    fun `markdown stripped in parsed summary`() {
+        val xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0"><channel>
+                <title>MD Feed</title>
+                <item>
+                    <title>markdown 源</title>
+                    <link>https://example.com/md</link>
+                    <description>## 标题行\n**正文** 内容</description>
+                </item>
+            </channel></rss>
+        """.trimIndent()
+
+        val article = parser.parse(ByteArrayInputStream(xml.toByteArray())).articles.single()
+        val summary = article.summary.orEmpty()
+        assertFalse("摘要不得残留 markdown 标记: $summary", summary.contains("##") || summary.contains("**"))
+        assertTrue(summary.contains("标题行"))
+    }
 }

@@ -112,13 +112,30 @@ fun AiFeaturesScreen(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = { onOpenArtifacts(null) }) {
-                    Text(
-                        text = "查看结果",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = radarColors().accent,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                // 产物中心入口：文字链接太弱（65+ 条产物的家），换填充 chip 提权重
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = radarColors().accent,
+                    onClick = { onOpenArtifacts(null) },
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    ) {
+                        Icon(
+                            imageVector = Lucide.Sparkles,
+                            contentDescription = null,
+                            tint = radarColors().onAccent,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = "查看结果",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = radarColors().onAccent,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
             }
         },

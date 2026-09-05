@@ -112,7 +112,7 @@ class RssParser {
         return ParsedArticle(
             link = link,
             title = title.ifEmpty { link },
-            summary = summarySource?.let(::toPlainText)?.take(SUMMARY_MAX_LENGTH)
+            summary = summarySource?.let(::toPlainText)?.let(::stripMarkdown)?.take(SUMMARY_MAX_LENGTH)
                 ?.takeIf { it.isNotBlank() },
             contentHtml = contentHtml,
             contentText = contentText,
@@ -274,6 +274,34 @@ class RssParser {
                 .replace(Regex("\\s+"), " ")
                 .trim()
                 .takeIf { it.isNotEmpty() }
+
+        /**
+         * 剥掉 Markdown 语法残留，供列表摘要预览使用。
+         * 部分源（如用 markdown 写日报的博客）description/content 是 markdown 纯文本，
+         * toPlainText 的 Jsoup 只当普通文本放行，`##`、反引号会原样出现在卡片上。
+         * 只做展示级清洗：链接保留锚文本、其余语法标记删除，不碰正文语义。
+         */
+        internal fun stripMarkdown(text: String): String =
+            text
+                // 图片：整体删除（URL 没有阅读价值）
+                .replace(Regex("!\\[\\S*?]\\([^)]*\\)"), "")
+                // 链接：保留锚文本
+                .replace(Regex("\\[([^]]*)]\\([^)]*\\)"), "$1")
+                // 代码块/行内代码围栏：剥标记留内容
+                .replace(Regex("```[a-zA-Z]*\\n?|```"), "")
+                .replace(Regex("`+"), "")
+                // 标题、引用前缀：toPlainText 已把文本压成单行，不能用行首锚点，
+                // 用「行首或空白后」的位置断言（Kotlin Regex 不支持 lookbehind 定长外的写法，手写捕获）
+                .replace(Regex("(^|\\s)#{1,6}\\s+"), "$1")
+                .replace(Regex("(^|\\s)>\\s?"), "$1")
+                // 加粗/斜体标记
+                .replace(Regex("(\\*\\*|__)(.*?)\\1"), "$2")
+                .replace(Regex("(\\*|_)(.*?)\\1"), "$2")
+                // 分隔线（-/_/* 连续三个及以上独立成词）
+                .replace(Regex("(^|\\s)([-*_]\\s*){3,}(\\s|$)"), " ")
+                .replace(Regex("\\s+"), " ")
+                .trim()
+
 
         private fun cleanAttributes(el: Element) {
             val keep = mutableMapOf<String, String>()

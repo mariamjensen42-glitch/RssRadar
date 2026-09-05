@@ -42,6 +42,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.cycling.rssradar.core.model.rsshub.CatalogSource
@@ -55,6 +57,8 @@ import com.cycling.rssradar.core.data.store.ThemeMode
 import com.cycling.rssradar.core.ui.components.OptionPickerSheet
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.ChevronRight
+import com.composables.icons.lucide.Eye
+import com.composables.icons.lucide.EyeOff
 import com.composables.icons.lucide.Lucide
 import com.cycling.rssradar.core.ui.theme.radarColors
 
@@ -854,12 +858,24 @@ fun SettingsAiDiagScreen(
                     )
                 }
                 Spacer(Modifier.height(12.dp))
+                // Key 默认打码：这页一截图就泄密（真机截图实测）。点眼睛临时可见。
+                var showAiKey by remember { mutableStateOf(false) }
                 OutlinedTextField(
                     value = state.aiKeyInput,
                     onValueChange = viewModel::onAiKeyChange,
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("sk-…", color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium) },
                     singleLine = true,
+                    visualTransformation = if (showAiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showAiKey = !showAiKey }) {
+                            Icon(
+                                imageVector = if (showAiKey) Lucide.EyeOff else Lucide.Eye,
+                                contentDescription = if (showAiKey) "隐藏 Key" else "显示 Key",
+                                tint = radarColors().textTertiary,
+                            )
+                        }
+                    },
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = radarColors().surface2,
