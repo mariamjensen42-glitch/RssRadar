@@ -671,32 +671,14 @@ private fun ArticleActionsBar(
                 size = 40.dp,
                 onClick = onOpenAi,
             )
-            Spacer(Modifier.width(10.dp))
-            Button(
+            Spacer(Modifier.weight(1f))
+            ActionIcon(
+                icon = Lucide.ExternalLink,
+                checked = true,
+                contentDescription = "查看原文",
+                size = 48.dp,
                 onClick = onOpenOriginal,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp),
-                shape = RoundedCornerShape(14.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = radarColors().accent,
-                    contentColor = radarColors().onAccent,
-                ),
-            ) {
-                Icon(
-                    Lucide.ExternalLink,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = "查看原文",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                )
-            }
+            )
         }
     }
 }
