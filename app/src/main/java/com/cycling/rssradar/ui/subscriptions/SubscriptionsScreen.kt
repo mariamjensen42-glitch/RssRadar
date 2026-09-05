@@ -81,6 +81,7 @@ import com.composables.icons.lucide.SquareCheckBig
 import com.composables.icons.lucide.X
 import com.cycling.rssradar.core.data.db.FeedEntity
 import com.cycling.rssradar.core.ui.components.pressScale
+import com.cycling.rssradar.core.ui.theme.Danger
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.MotionTokens
 import com.cycling.rssradar.core.ui.theme.radarColors
@@ -111,6 +112,8 @@ fun SubscriptionsScreen(
     /** 分组操作底栏（重命名/清空文章/删除分组，issue #8）。 */
     var groupActionTarget by remember { mutableStateOf<String?>(null) }
     var batchMoveDialog by remember { mutableStateOf(false) }
+    /** 批量删除二次确认：级联删文章不可逆，不能一键直发。 */
+    var showBatchDeleteConfirm by remember { mutableStateOf(false) }
     /** 订阅列表排序选择弹层。 */
     var showSortSheet by remember { mutableStateOf(false) }
     /** 「全部标记为已读」二次确认（批量不可逆，不能一键直发）。 */
@@ -157,6 +160,7 @@ fun SubscriptionsScreen(
                     selectedCount = selectedIds.size,
                     canMove = selectedIds.isNotEmpty(),
                     onMove = { batchMoveDialog = true },
+                    onDelete = { showBatchDeleteConfirm = true },
                     onCancel = { viewModel.onIntent(SubscriptionsIntent.ToggleSelectionMode) },
                 )
             } else {
@@ -387,6 +391,31 @@ fun SubscriptionsScreen(
         )
     }
 
+    // 批量删除二次确认：级联删文章不可逆，明确告知影响范围后再动手
+    if (showBatchDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showBatchDeleteConfirm = false },
+            containerColor = radarColors().surface1,
+            titleContentColor = radarColors().textPrimary,
+            textContentColor = radarColors().textSecondary,
+            title = { Text("删除订阅源", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
+            text = { Text("将删除 ${selectedIds.size} 个订阅源及其全部文章，此操作不可撤销。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showBatchDeleteConfirm = false
+                    viewModel.onIntent(SubscriptionsIntent.DeleteSelectedFeeds)
+                }) {
+                    Text("删除", color = Danger, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBatchDeleteConfirm = false }) {
+                    Text("取消", color = radarColors().textTertiary)
+                }
+            },
+        )
+    }
+
     // 分组操作底栏：重命名 / 清空分组文章 / 删除分组（issue #8）
     groupActionTarget?.let { group ->
         GroupActionSheet(
@@ -504,12 +533,13 @@ private fun SubscriptionsTopBar(
     }
 }
 
-/** 多选态顶栏：已选计数 + 执行移动 + 退出。 */
+/** 多选态顶栏：已选计数 + 执行移动/删除 + 退出。 */
 @Composable
 private fun SelectionTopBar(
     selectedCount: Int,
     canMove: Boolean,
     onMove: () -> Unit,
+    onDelete: () -> Unit,
     onCancel: () -> Unit,
 ) {
     Row(
@@ -528,6 +558,9 @@ private fun SelectionTopBar(
         )
         TextButton(onClick = onMove, enabled = canMove) {
             Text("移动到", color = if (canMove) radarColors().accent else radarColors().textTertiary, fontWeight = FontWeight.SemiBold)
+        }
+        TextButton(onClick = onDelete, enabled = canMove) {
+            Text("删除", color = if (canMove) Danger else radarColors().textTertiary, fontWeight = FontWeight.SemiBold)
         }
         IconButton(onClick = onCancel) {
             Icon(Lucide.X, contentDescription = "退出多选", tint = radarColors().textPrimary)

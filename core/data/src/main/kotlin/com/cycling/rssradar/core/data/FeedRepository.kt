@@ -235,6 +235,12 @@ class FeedRepository(
     /** 删除订阅源（其文章级联删除）。 */
     suspend fun deleteFeed(feedId: Long) = feedDao.deleteFeed(feedId)
 
+    /** 批量删除订阅源（多选模式）：文章级联删除，一条 SQL 完成。 */
+    suspend fun deleteFeeds(feedIds: List<Long>) {
+        if (feedIds.isEmpty()) return
+        feedDao.deleteFeeds(feedIds)
+    }
+
     /** 分组重命名：注册表 + feeds.groupName 批量更新。 */
     suspend fun renameGroup(oldName: String, newName: String) {
         feedDao.renameGroup(oldName, newName)

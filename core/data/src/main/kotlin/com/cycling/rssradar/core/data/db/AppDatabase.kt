@@ -328,6 +328,10 @@ interface FeedDao {
     @Query("DELETE FROM feeds WHERE id = :feedId")
     suspend fun deleteFeed(feedId: Long)
 
+    /** 批量删除订阅源（多选模式）：一条 DELETE ... WHERE id IN，articles 仍走 CASCADE。 */
+    @Query("DELETE FROM feeds WHERE id IN (:feedIds)")
+    suspend fun deleteFeeds(feedIds: List<Long>)
+
     /** 自动同步开关（issue #58）：屏蔽后不参与自动同步，手动刷新照常。 */
     @Query("UPDATE feeds SET syncEnabled = :enabled WHERE id = :feedId")
     suspend fun updateSyncEnabled(feedId: Long, enabled: Boolean)

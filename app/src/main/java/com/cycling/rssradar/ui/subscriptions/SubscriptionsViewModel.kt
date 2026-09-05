@@ -60,6 +60,8 @@ sealed interface SubscriptionsIntent {
     data object ToggleSelectionMode : SubscriptionsIntent
     data class ToggleFeedSelected(val feedId: Long) : SubscriptionsIntent
     data class MoveSelectedFeeds(val targetGroup: String) : SubscriptionsIntent
+    /** 批量删除（多选模式）：删除全部勾选的订阅源，文章级联删除。 */
+    data object DeleteSelectedFeeds : SubscriptionsIntent
     /** 清空文章（issue #8）：只删文章，源与分组都保留；收藏/稍后读豁免。 */
     data class ClearFeedArticles(val feedId: Long, val feedTitle: String) : SubscriptionsIntent
     data class ClearGroupArticles(val group: String) : SubscriptionsIntent
@@ -161,6 +163,7 @@ class SubscriptionsViewModel @Inject constructor(
             SubscriptionsIntent.ToggleSelectionMode -> toggleSelectionMode()
             is SubscriptionsIntent.ToggleFeedSelected -> toggleFeedSelected(intent.feedId)
             is SubscriptionsIntent.MoveSelectedFeeds -> moveSelectedFeeds(intent.targetGroup)
+            SubscriptionsIntent.DeleteSelectedFeeds -> deleteSelectedFeeds()
             is SubscriptionsIntent.ClearFeedArticles -> clearFeedArticles(intent.feedId, intent.feedTitle)
             is SubscriptionsIntent.ClearGroupArticles -> clearGroupArticles(intent.group)
             is SubscriptionsIntent.SetFullContentEnabled -> setFullContentEnabled(intent.feedId, intent.enabled)
@@ -303,6 +306,18 @@ class SubscriptionsViewModel @Inject constructor(
         viewModelScope.launch {
             repository.moveFeedsToGroup(ids, group)
             uiMessage = "已移动 ${ids.size} 个订阅到「$group」"
+        }
+    }
+
+    /** 执行批量删除：勾选集合即删除清单，退出多选并如实报数。 */
+    private fun deleteSelectedFeeds() {
+        val ids = _selectedFeedIds.value.toList()
+        _selectionMode.value = false
+        _selectedFeedIds.value = emptySet()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            repository.deleteFeeds(ids)
+            uiMessage = "已删除 ${ids.size} 个订阅源（含其文章）"
         }
     }
 
