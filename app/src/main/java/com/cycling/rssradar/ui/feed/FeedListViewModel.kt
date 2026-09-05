@@ -143,6 +143,14 @@ class FeedListViewModel @Inject constructor(
     init {
         // 首屏拉第一页；空库/异常静默，用户可下拉重试
         viewModelScope.launch { loadFirstPage() }
+        // 分页快照不订阅 DB 变化，这里只兜「从无到有」：空态页加订阅源返回后，
+        // 列表还停在空态（未读数已变、快照没重拉），必须靠这条补偿自动重载第一页。
+        // 列表非空时绝不触发——增量变化仍由下拉刷新/翻页负责，避免整页闪烁。
+        viewModelScope.launch {
+            repository.observeFeedCount().collect { total ->
+                if (total > 0 && _uiState.value.articles.isEmpty()) loadFirstPage()
+            }
+        }
         // 推荐流在设置里被关掉时，若正停在「推荐」tab 则退回「全部」——
         // 否则用户会看到一个没有对应 chip 的列表（tab 与内容对不上）。
         viewModelScope.launch {
