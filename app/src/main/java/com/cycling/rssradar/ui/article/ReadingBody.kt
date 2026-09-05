@@ -722,6 +722,9 @@ private fun ArticleWebView(
                     invalidate()
                 }
 
+                // 平台把 View.onLayout 标了 deprecated，但这里是刻意的 Chromium 残影
+                // 兜底（见上注释），行为必须保留，压掉警告即可
+                @Suppress("DEPRECATION")
                 override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
                     super.onLayout(changed, l, t, r, b)
                     if (changed && scrollY == 0) forceFrame()

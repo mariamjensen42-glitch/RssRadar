@@ -43,12 +43,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.ClipEntry
+import android.content.ClipData
+import kotlinx.coroutines.launch
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Copy
 import com.composables.icons.lucide.Lucide
@@ -415,7 +418,8 @@ private fun AiArtifactDetailSheet(
     onDismiss: () -> Unit,
 ) {
     val colors = radarColors()
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val clipboardScope = rememberCoroutineScope()
     var showRaw by remember(detail) { mutableStateOf(false) }
     val item = detail.item
 
@@ -502,7 +506,7 @@ private fun AiArtifactDetailSheet(
                         )
                     }
                 }
-                TextButton(onClick = { clipboard.setText(AnnotatedString(detail.raw)) }) {
+                TextButton(onClick = { clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("artifact", detail.raw))) } }) {
                     Icon(
                         imageVector = Lucide.Copy,
                         contentDescription = null,

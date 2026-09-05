@@ -136,7 +136,7 @@ class RssHubSettingsViewModel @Inject constructor(
     private val recommendationStore: RecommendationStore,
     private val linkStore: LinkStore,
     private val catalogStore: RouteCatalogStore,
-    @ApplicationContext private val appContext: Context,
+    @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(

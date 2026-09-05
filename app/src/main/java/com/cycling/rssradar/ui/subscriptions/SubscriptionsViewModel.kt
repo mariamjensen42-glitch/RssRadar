@@ -96,7 +96,7 @@ class SubscriptionsViewModel @Inject constructor(
     private val subscriptionFlow: SubscriptionFlow,
     private val groupStore: GroupStore,
     private val feedSortStore: FeedSortStore,
-    @ApplicationContext private val appContext: Context,
+    @param:ApplicationContext private val appContext: Context,
     /** AI 智能功能模块：订阅源级 AI 配置（摘要提示词覆盖与自动化开关）。 */
     private val feedAiProfileDao: com.cycling.rssradar.core.data.db.FeedAiProfileDao,
 ) : ViewModel(), MviViewModel<SubscriptionsIntent> {

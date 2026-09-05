@@ -95,6 +95,8 @@ DEPS = [
     ("androidx.work", "work-runtime-ktx", ""),
     ("androidx.work", "work-runtime", ""),
     ("androidx.hilt", "hilt-navigation-compose", ""),
+    # 1.4.0 起 hiltViewModel 迁到 androidx.hilt.lifecycle.viewmodel.compose（传递依赖）
+    ("androidx.hilt", "hilt-lifecycle-viewmodel-compose", ""),
     ("com.google.dagger", "dagger", "2.60"),
     ("com.google.dagger", "hilt-android", ""),
     ("com.google.dagger", "hilt-core", ""),

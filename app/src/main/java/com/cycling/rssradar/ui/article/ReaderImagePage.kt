@@ -152,7 +152,8 @@ private fun ZoomableImage(
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
-    val state = rememberTransformableState { zoomChange, panChange, _ ->
+    // 新签名 4 参（centroid 在前）：缩放围绕手势中心（比旧版围绕原点更自然）；当前实现只用 pan
+    val state = rememberTransformableState { _, zoomChange, panChange, _ ->
         val next = (scale * zoomChange).coerceIn(1f, MAX_SCALE)
         offset = if (next > 1f) offset + panChange else Offset.Zero
         scale = next

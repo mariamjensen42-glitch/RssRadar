@@ -22,7 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.cycling.rssradar.core.data.db.FeedEntity
 import com.cycling.rssradar.core.data.store.ListViewMode
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
