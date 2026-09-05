@@ -29,7 +29,7 @@ class ReadingPrefsStoreTest {
         assertEquals(ReadingFontFamily.SYSTEM, s.state.value.style.fontFamily)
         assertEquals(ReadingImageState.DEFAULT_CORNER_RADIUS, s.state.value.image.cornerRadius)
         assertTrue(s.state.value.image.maximizeOnTap)
-        assertEquals(ReadingRenderer.WEBVIEW, s.state.value.renderer)
+        assertEquals(ReadingRenderer.NATIVE, s.state.value.renderer)
         assertEquals(TranslationViewMode.TRANSLATION_ONLY, s.state.value.translation.viewMode)
         assertEquals(BilingualLayout.STACKED, s.state.value.translation.bilingualLayout)
     }
@@ -121,7 +121,7 @@ class ReadingPrefsStoreTest {
 
         val v = ReadingPrefsStore(prefs).state.value
         assertEquals(ReadingFontFamily.SYSTEM, v.style.fontFamily)
-        assertEquals(ReadingRenderer.WEBVIEW, v.renderer)
+        assertEquals(ReadingRenderer.NATIVE, v.renderer)
         assertEquals(TranslationViewMode.TRANSLATION_ONLY, v.translation.viewMode)
         assertEquals(BilingualLayout.STACKED, v.translation.bilingualLayout)
     }

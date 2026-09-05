@@ -111,7 +111,7 @@ data class TranslationDisplayState(
 data class ReadingPrefs(
     val style: ReadingStyleState = ReadingStyleState(),
     val image: ReadingImageState = ReadingImageState(),
-    val renderer: ReadingRenderer = ReadingRenderer.WEBVIEW,
+    val renderer: ReadingRenderer = ReadingRenderer.NATIVE,
     val translation: TranslationDisplayState = TranslationDisplayState(),
 )
 
@@ -171,7 +171,7 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
         ),
         renderer = prefs.getString(KEY_RENDERER, null)
             ?.let { runCatching { ReadingRenderer.valueOf(it) }.getOrNull() }
-            ?: ReadingRenderer.WEBVIEW,
+            ?: ReadingRenderer.NATIVE,
         translation = TranslationDisplayState(
             viewMode = prefs.getString(KEY_VIEW_MODE, null)
                 ?.let { runCatching { TranslationViewMode.valueOf(it) }.getOrNull() }
