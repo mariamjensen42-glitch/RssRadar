@@ -92,7 +92,6 @@ fun SubscriptionsScreen(
     viewModel: SubscriptionsViewModel,
     onAddSubscription: () -> Unit = {},
     onCreateGroup: () -> Unit = {},
-    onFeedAction: (Long) -> Unit = {},
     /** 点击订阅源 → 进「订阅源文章列表」（issue #51）。 */
     onOpenFeed: (Long) -> Unit = {},
 ) {
@@ -111,6 +110,8 @@ fun SubscriptionsScreen(
     var createGroupDialog by remember { mutableStateOf(false) }
     /** 分组操作底栏（重命名/清空文章/删除分组，issue #8）。 */
     var groupActionTarget by remember { mutableStateOf<String?>(null) }
+    /** 订阅源操作底栏（重命名/移动分组/删除等），内联弹层不进导航栈。 */
+    var feedActionTarget by remember { mutableStateOf<Long?>(null) }
     var batchMoveDialog by remember { mutableStateOf(false) }
     /** 批量删除二次确认：级联删文章不可逆，不能一键直发。 */
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
@@ -272,7 +273,7 @@ fun SubscriptionsScreen(
                                     onOpenFeed(feedItem.feed.id)
                                 }
                             },
-                            onMore = { onFeedAction(feedItem.feed.id) },
+                            onMore = { feedActionTarget = feedItem.feed.id },
                         )
                     }
                 }
@@ -319,7 +320,7 @@ fun SubscriptionsScreen(
                                             onOpenFeed(feedItem.feed.id)
                                         }
                                     },
-                                    onMore = { onFeedAction(feedItem.feed.id) },
+                                    onMore = { feedActionTarget = feedItem.feed.id },
                                 )
                             }
                         }
@@ -422,6 +423,15 @@ fun SubscriptionsScreen(
             group = group,
             viewModel = viewModel,
             onDismiss = { groupActionTarget = null },
+        )
+    }
+
+    // 订阅源操作底栏：重命名 / 移动分组 / 删除等（原 nav 目的地，收回内联弹层）
+    feedActionTarget?.let { feedId ->
+        FeedActionScreen(
+            feedId = feedId,
+            viewModel = viewModel,
+            onDismiss = { feedActionTarget = null },
         )
     }
 

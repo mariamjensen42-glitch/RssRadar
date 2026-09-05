@@ -23,12 +23,15 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,10 +50,10 @@ import com.cycling.rssradar.core.ui.theme.radarColors
 
 
 /**
- * 订阅源操作（重命名 / 移动分组 / 删除）的 Nav 目的地内容。
- * 原 SubscriptionsScreen 的私有 FeedActionSheet 提升为 Nav 目的地（ADR-0002 #31）：
+ * 订阅源操作（重命名 / 移动分组 / 删除）的内联底部弹层（ADR-0002 #31 目的地形态已废弃：
+ * 整页导航只为弹个 sheet 没有必要，收回 [SubscriptionsScreen] 内，与 [GroupActionSheet] 同形态）。
  * feed 与 groupOptions 由传入的 SubscriptionsViewModel 解析，重命名子对话框自包含，
- * 关闭统一走 onDismiss（= 目的地出栈）。
+ * 关闭统一走 onDismiss。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,8 +78,18 @@ fun FeedActionScreen(
         ModalBottomSheet(
             onDismissRequest = onDismiss,
             containerColor = radarColors().surface1,
+            // 单锚点：内容较高时默认的双锚点（半开/全开）拖动过渡会反复重算高度造成抖动，
+            // skipPartiallyExpanded 直接全开，拖拽只做关闭手势
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         ) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    // 内容超过一屏时自身滚动，不与 sheet 的拖拽手势抢事件
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 24.dp),
+            ) {
                 Text(
                     text = f.title,
                     color = radarColors().textPrimary,

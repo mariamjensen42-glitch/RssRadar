@@ -44,7 +44,6 @@ import com.cycling.rssradar.ui.me.AiFeaturesViewModel
 import com.cycling.rssradar.ui.me.PromptTemplatesScreen
 import com.cycling.rssradar.ui.article.ArticleDetailScreen
 import com.cycling.rssradar.ui.article.ArticleDetailViewModel
-import com.cycling.rssradar.ui.subscriptions.FeedActionScreen
 import com.cycling.rssradar.ui.feed.FeedArticlesScreen
 import com.cycling.rssradar.ui.feed.FeedArticlesViewModel
 import com.cycling.rssradar.ui.feed.FeedListScreen
@@ -68,7 +67,6 @@ import com.cycling.rssradar.ui.navigation.AiFeaturesRoute
 import com.cycling.rssradar.ui.navigation.ArticleDetailRoute
 import com.cycling.rssradar.ui.navigation.CrashLogRoute
 import com.cycling.rssradar.ui.navigation.FeedArticlesRoute
-import com.cycling.rssradar.ui.navigation.FeedActionRoute
 import com.cycling.rssradar.ui.navigation.FeedRoute
 import com.cycling.rssradar.ui.navigation.FetchDiagnosticsRoute
 import com.cycling.rssradar.ui.navigation.InterestProfileRoute
@@ -199,7 +197,6 @@ private fun RssRadarAppContent() {
                     viewModel = vm,
                     onAddSubscription = { showAddSheet = true },
                     onCreateGroup = { /* TODO */ },
-                    onFeedAction = { navController.navigate(FeedActionRoute(it)) },
                     onOpenFeed = { navController.navigate(FeedArticlesRoute(it)) },
                 )
             }
@@ -301,15 +298,6 @@ private fun RssRadarAppContent() {
                     onOpenArticle = { navController.navigate(ArticleDetailRoute(it)) },
                 )
             }
-            composable<FeedActionRoute> { backStackEntry ->
-                val feedId = backStackEntry.toRoute<FeedActionRoute>().feedId
-                FeedActionScreen(
-                    feedId = feedId,
-                    viewModel = hiltViewModel<SubscriptionsViewModel>(),
-                    onDismiss = { navController.popBackStack() },
-                )
-            }
-            // 订阅源文章列表（issue #51）：订阅源清单整行点击进入
             composable<FeedArticlesRoute> { backStackEntry ->
                 FeedArticlesScreen(
                     viewModel = hiltViewModel<FeedArticlesViewModel>(),
