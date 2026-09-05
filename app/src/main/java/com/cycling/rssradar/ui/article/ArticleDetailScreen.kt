@@ -101,10 +101,17 @@ fun ArticleDetailScreen(
     val neighbors by viewModel.neighbors.collectAsState()
     val readingPrefs by viewModel.readingPrefs.collectAsState()
     val linkShare by viewModel.linkShare.collectAsState()
+    val aiArtifacts by viewModel.aiArtifacts.collectAsState()
+    val aiRunning by viewModel.aiRunning.collectAsState()
+    val aiMessage by viewModel.aiMessage.collectAsState()
+    val aiEnabledFeatures by viewModel.aiEnabledFeatures.collectAsState()
+    val aiKeyConfigured by viewModel.aiKeyConfigured.collectAsState()
     // 分享文章（#26）需要 Context 起系统分享面板
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var showStyleSheet by remember { mutableStateOf(false) }
+    // AI 分析面板：瞬时 UI，与排版面板同为 ModalBottomSheet，不入路由
+    var showAiSheet by remember { mutableStateOf(false) }
     // 全屏图片查看（issue #60）：瞬时 UI，不入路由、不占 back 栈
     var imageViewer by remember { mutableStateOf<ImageViewer?>(null) }
     // 整页滚动状态提升到 Screen：顶栏标题「滚出视口才出现」需要读滚动量
@@ -127,6 +134,9 @@ fun ArticleDetailScreen(
             snackbarHostState.showSnackbar((translationState as TranslationState.Failed).message)
         }
     }
+    // AI 提示刻意**不走** Snackbar：提示产生在 AI 面板里，Snackbar 会被面板挡住看不见，
+    // 而且这里一旦消费掉 message，面板里就永远读不到它了。提示由 AiArticleSheet 自己渲染，
+    // 并在下一次操作（点按钮/提问）或关闭面板时消费。
 
     Scaffold(
         containerColor = radarColors().bgRoot,
@@ -170,6 +180,7 @@ fun ArticleDetailScreen(
                     onStar = { viewModel.onIntent(ArticleDetailIntent.ToggleStarred) },
                     onBookmark = { viewModel.onIntent(ArticleDetailIntent.ToggleBookmarked) },
                     onOpenOriginal = { onOpenOriginal(item.article.link) },
+                    onOpenAi = { showAiSheet = true },
                 )
             }
         },
@@ -223,6 +234,25 @@ fun ArticleDetailScreen(
             images = viewer.images,
             initialIndex = viewer.index,
             onDismiss = { imageViewer = null },
+        )
+    }
+
+    if (showAiSheet) {
+        AiArticleSheet(
+            artifacts = aiArtifacts,
+            running = aiRunning,
+            message = aiMessage,
+            enabled = aiEnabledFeatures.enabled,
+            keyConfigured = aiKeyConfigured,
+            onRun = { feature -> viewModel.onIntent(ArticleDetailIntent.RunAi(feature)) },
+            onAsk = { question -> viewModel.onIntent(ArticleDetailIntent.AskArticle(question)) },
+            onExplain = { term -> viewModel.onIntent(ArticleDetailIntent.ExplainTerm(term)) },
+            onConsumeMessage = { viewModel.onIntent(ArticleDetailIntent.ConsumeAiMessage) },
+            onDismiss = {
+                showAiSheet = false
+                // 关掉面板就清掉提示，免得下次打开先看到一条过期的失败原因
+                viewModel.onIntent(ArticleDetailIntent.ConsumeAiMessage)
+            },
         )
     }
 
@@ -563,6 +593,8 @@ private fun ArticleActionsBar(
     onStar: () -> Unit,
     onBookmark: () -> Unit,
     onOpenOriginal: () -> Unit,
+    /** AI 智能功能面板（35 项里的文章级功能）。 */
+    onOpenAi: () -> Unit = {},
 ) {
     val insets = WindowInsets.navigationBars.asPaddingValues()
     Surface(color = radarColors().bgRoot) {
@@ -594,6 +626,14 @@ private fun ArticleActionsBar(
             ActionIcon(icon = Lucide.Star, checked = isStarred, contentDescription = "收藏", size = 40.dp, onClick = onStar)
             Spacer(Modifier.width(6.dp))
             ActionIcon(icon = Lucide.Bookmark, checked = isBookmarked, contentDescription = "稍后读", size = 40.dp, onClick = onBookmark)
+            Spacer(Modifier.width(6.dp))
+            ActionIcon(
+                icon = Lucide.Sparkles,
+                checked = false,
+                contentDescription = "AI 分析",
+                size = 40.dp,
+                onClick = onOpenAi,
+            )
             Spacer(Modifier.width(10.dp))
             Button(
                 onClick = onOpenOriginal,

@@ -1071,8 +1071,12 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
         ContentFetchLogEntity::class,
         ArchivedArticleTombstoneEntity::class,
         RecommendationFeedbackEntity::class,
+        // AI 智能功能模块（35 项）：产物 / 订阅源级配置 / 任务队列。见 AiSchema.kt。
+        AiArtifactEntity::class,
+        FeedAiProfileEntity::class,
+        AiTaskEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -1080,6 +1084,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun articleDao(): ArticleDao
     abstract fun contentFetchLogDao(): ContentFetchLogDao
     abstract fun recommendationFeedbackDao(): RecommendationFeedbackDao
+    abstract fun aiArtifactDao(): AiArtifactDao
+    abstract fun feedAiProfileDao(): FeedAiProfileDao
+    abstract fun aiTaskDao(): AiTaskDao
+    abstract fun aiSupportDao(): AiSupportDao
 }
 
 /**

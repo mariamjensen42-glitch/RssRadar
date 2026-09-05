@@ -4,8 +4,15 @@ import android.app.Application
 import android.content.Context
 import androidx.room.Room
 import androidx.room.withTransaction
+import com.cycling.rssradar.core.data.ai.AiArtifactRepository
+import com.cycling.rssradar.core.data.ai.AiBatchProcessor
+import com.cycling.rssradar.core.data.ai.AiFeatureRunner
+import com.cycling.rssradar.core.data.ai.AiRateLimiter
 import com.cycling.rssradar.core.data.ai.AiRepository
+import com.cycling.rssradar.core.data.ai.AiTaskQueue
 import com.cycling.rssradar.core.data.ai.DeepSeekClient
+import com.cycling.rssradar.core.data.store.AiBudgetStore
+import com.cycling.rssradar.core.data.store.AiFeatureStore
 import com.cycling.rssradar.core.data.db.AppDatabase
 import com.cycling.rssradar.core.data.parser.AndroidFetchLogger
 import com.cycling.rssradar.core.data.parser.ContentFetcher
@@ -42,6 +49,8 @@ import com.cycling.rssradar.core.data.db.MIGRATION_9_10
 import com.cycling.rssradar.core.data.db.MIGRATION_10_11
 import com.cycling.rssradar.core.data.db.MIGRATION_11_12
 import com.cycling.rssradar.core.data.db.MIGRATION_12_13
+import com.cycling.rssradar.core.data.db.FeedAiProfileDao
+import com.cycling.rssradar.core.data.db.MIGRATION_13_14
 import com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.core.data.parser.RssParser
 import com.cycling.rssradar.core.data.rss.BestIconFinder
@@ -80,6 +89,7 @@ object AppModule {
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                 MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
                 MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+                MIGRATION_13_14,
             )
             .build()
 
@@ -250,6 +260,98 @@ object AppModule {
     fun provideAiRepository(db: AppDatabase, client: DeepSeekClient): AiRepository =
         AiRepository(db.articleDao(), client)
 
+    // ── AI 智能功能模块（35 项） ────────────────────────────────────────────
+    // 装配顺序即依赖顺序：Store → 限流 → 产物 → 队列 → 执行器 → 编排器。
+    // 全部单例：限流器与预算必须是全局唯一，否则手动点击会各自记账、绕过日预算。
+
+    /**
+     * 订阅源级 AI 配置 DAO。
+     *
+     * 只有它需要做显式 @Provides：其余 AI 依赖都是我们自己写的类（构造注入或 @Provides 已覆盖），
+     * 而 Room 生成的 DAO 只能从 [AppDatabase] 取，Dagger 不会自动认。
+     * 注入方是 [com.cycling.rssradar.ui.subscriptions.SubscriptionsViewModel]——
+     * 订阅源操作页要读写该源的摘要提示词与自动化开关。
+     */
+    @Provides
+    @Singleton
+    fun provideFeedAiProfileDao(db: AppDatabase): FeedAiProfileDao = db.feedAiProfileDao()
+
+    /** 35 项功能的独立开关。 */
+    @Provides
+    @Singleton
+    fun provideAiFeatureStore(@ApplicationContext context: Context): AiFeatureStore =
+        AiFeatureStore(SettingsPrefs.of(context))
+
+    /** 日预算与用量统计。 */
+    @Provides
+    @Singleton
+    fun provideAiBudgetStore(@ApplicationContext context: Context): AiBudgetStore =
+        AiBudgetStore(SettingsPrefs.of(context))
+
+    @Provides
+    @Singleton
+    fun provideAiRateLimiter(budgetStore: AiBudgetStore): AiRateLimiter =
+        AiRateLimiter(budgetStore)
+
+    /**
+     * 产物门面。
+     *
+     * 除了产物 DAO 还带上订阅源与文章 DAO：产物中心要把 subjectId 翻成人能读的标题，
+     * 而数据库里只有一串 id。标题解析放在仓储层批量做，UI 侧不碰 DAO。
+     */
+    @Provides
+    @Singleton
+    fun provideAiArtifactRepository(db: AppDatabase): AiArtifactRepository =
+        AiArtifactRepository(
+            dao = db.aiArtifactDao(),
+            feedDao = db.feedDao(),
+            supportDao = db.aiSupportDao(),
+        )
+
+    @Provides
+    @Singleton
+    fun provideAiTaskQueue(db: AppDatabase): AiTaskQueue =
+        AiTaskQueue(db.aiTaskDao())
+
+    @Provides
+    @Singleton
+    fun provideAiFeatureRunner(
+        db: AppDatabase,
+        client: DeepSeekClient,
+        artifacts: AiArtifactRepository,
+        limiter: AiRateLimiter,
+        featureStore: AiFeatureStore,
+    ): AiFeatureRunner = AiFeatureRunner(
+        client = client,
+        articleDao = db.articleDao(),
+        feedDao = db.feedDao(),
+        supportDao = db.aiSupportDao(),
+        profileDao = db.feedAiProfileDao(),
+        artifacts = artifacts,
+        limiter = limiter,
+        featureStore = featureStore,
+    )
+
+    @Provides
+    @Singleton
+    fun provideAiBatchProcessor(
+        db: AppDatabase,
+        queue: AiTaskQueue,
+        runner: AiFeatureRunner,
+        artifacts: AiArtifactRepository,
+        budget: AiBudgetStore,
+        featureStore: AiFeatureStore,
+    ): AiBatchProcessor = AiBatchProcessor(
+        queue = queue,
+        runner = runner,
+        supportDao = db.aiSupportDao(),
+        profileDao = db.feedAiProfileDao(),
+        feedDao = db.feedDao(),
+        artifacts = artifacts,
+        budget = budget,
+        featureStore = featureStore,
+    )
+
     @Provides
     @Singleton
     fun provideNotificationStore(@ApplicationContext context: Context): NotificationStore =
@@ -323,6 +425,9 @@ interface AppEntryPoint {
     fun feedRepository(): FeedRepository
     fun autoSync(): AutoSync
     fun applicationScope(): CoroutineScope
+    fun aiBatchProcessor(): AiBatchProcessor
+    fun aiFeatureStore(): AiFeatureStore
+    fun aiBudgetStore(): AiBudgetStore
 }
 
 /** 生产事务 adapter：委托 Room 的 withTransaction。 */

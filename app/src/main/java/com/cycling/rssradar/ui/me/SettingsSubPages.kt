@@ -823,6 +823,8 @@ fun SettingsRssHubScreen(
 fun SettingsAiDiagScreen(
     viewModel: RssHubSettingsViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
+    onOpenAiFeatures: () -> Unit = {},
+    onOpenAiArtifacts: () -> Unit = {},
     onOpenFetchDiagnostics: () -> Unit = {},
     onOpenCrashLog: () -> Unit = {},
 ) {
@@ -878,6 +880,16 @@ fun SettingsAiDiagScreen(
                 }
             }
         }
+
+        Spacer(Modifier.height(24.dp))
+
+        // AI 智能功能（35 项）：开关矩阵、用量看板与任务队列
+        SectionHeader(
+            "AI 智能功能",
+            "35 项 AI 功能各自独立开关：内容处理、推荐发现、辅助推送。用量与后台任务队列在这里看。",
+        )
+        NavigateRow("功能开关与用量", onClick = onOpenAiFeatures)
+        NavigateRow("AI 生成结果", onClick = onOpenAiArtifacts)
 
         Spacer(Modifier.height(24.dp))
 

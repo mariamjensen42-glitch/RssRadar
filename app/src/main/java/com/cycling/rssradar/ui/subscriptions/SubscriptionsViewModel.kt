@@ -77,6 +77,15 @@ sealed interface SubscriptionsIntent {
 
     /** 内容类型（ADR-0014）：改的是列表浏览形态，不动数据。 */
     data class SetContentType(val feedId: Long, val contentType: Int) : SubscriptionsIntent
+
+    /**
+     * 订阅源级 AI 摘要提示词（AI 智能功能模块）。
+     * 传 null 或空白 = 清除覆盖，回落到内置模板。
+     */
+    data class SetFeedSummaryPrompt(val feedId: Long, val prompt: String?) : SubscriptionsIntent
+
+    /** 订阅源级「刷新后自动生成摘要」开关。null 语义由仓储层解释为"跟随全局"。 */
+    data class SetFeedAutoSummary(val feedId: Long, val enabled: Boolean) : SubscriptionsIntent
 }
 
 @HiltViewModel
@@ -86,6 +95,8 @@ class SubscriptionsViewModel @Inject constructor(
     private val groupStore: GroupStore,
     private val feedSortStore: FeedSortStore,
     @ApplicationContext private val appContext: Context,
+    /** AI 智能功能模块：订阅源级 AI 配置（摘要提示词覆盖与自动化开关）。 */
+    private val feedAiProfileDao: com.cycling.rssradar.core.data.db.FeedAiProfileDao,
 ) : ViewModel(), MviViewModel<SubscriptionsIntent> {
 
     private val _expandedIds = MutableStateFlow(setOf(GROUP_TECH, GROUP_DEV, GROUP_DESIGN))
@@ -126,6 +137,14 @@ class SubscriptionsViewModel @Inject constructor(
             .map { list -> list.find { it.id == feedId } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /**
+     * 按 id 取订阅源的 AI 配置（摘要提示词与自动化开关）。
+     * 与 [getFeed] 同形态：Room 的 Flow 会随写入自动重放，编辑后界面立即反映。
+     */
+    fun observeFeedAiProfile(feedId: Long): StateFlow<com.cycling.rssradar.core.data.db.FeedAiProfileEntity?> =
+        feedAiProfileDao.observe(feedId)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     var uiMessage by mutableStateOf<String?>(null)
         private set
 
@@ -152,6 +171,47 @@ class SubscriptionsViewModel @Inject constructor(
             is SubscriptionsIntent.SetSyncEnabled -> setSyncEnabled(intent.feedId, intent.enabled)
             is SubscriptionsIntent.SetNotificationsEnabled -> setNotificationsEnabled(intent.feedId, intent.enabled)
             is SubscriptionsIntent.SetContentType -> setContentType(intent.feedId, intent.contentType)
+            is SubscriptionsIntent.SetFeedSummaryPrompt -> setFeedSummaryPrompt(intent.feedId, intent.prompt)
+            is SubscriptionsIntent.SetFeedAutoSummary -> setFeedAutoSummary(intent.feedId, intent.enabled)
+        }
+    }
+
+    /**
+     * 写订阅源的摘要提示词覆盖。空白串一律当"清除覆盖"——
+     * 存一个只有空格的模板等于让模型收到空 system，输出会变得极不稳定。
+     */
+    private fun setFeedSummaryPrompt(feedId: Long, prompt: String?) {
+        val normalized = prompt?.trim()?.takeIf { it.isNotBlank() }
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val current = feedAiProfileDao.get(feedId)
+            if (current == null) {
+                if (normalized == null) return@launch // 本来就没配，无需建空行
+                feedAiProfileDao.upsert(
+                    com.cycling.rssradar.core.data.db.FeedAiProfileEntity(
+                        feedId = feedId,
+                        summaryPrompt = normalized,
+                        updatedAt = now,
+                    ),
+                )
+            } else {
+                feedAiProfileDao.updateSummaryPrompt(feedId, normalized, now)
+            }
+            // 刻意**不**清除已生成的摘要：旧摘要是按旧提示词写的，但内容依然忠实于原文，
+            // 清掉等于逼用户重新花钱生成一遍。用户在阅读页点"重新生成"即可套用新提示词。
+            uiMessage = if (normalized == null) "已改用内置摘要提示词" else "已保存该订阅源的摘要提示词"
+        }
+    }
+
+    private fun setFeedAutoSummary(feedId: Long, enabled: Boolean) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val current = feedAiProfileDao.get(feedId)
+            val base = current ?: com.cycling.rssradar.core.data.db.FeedAiProfileEntity(
+                feedId = feedId,
+                updatedAt = now,
+            )
+            feedAiProfileDao.upsert(base.copy(autoSummary = enabled, updatedAt = now))
         }
     }
 

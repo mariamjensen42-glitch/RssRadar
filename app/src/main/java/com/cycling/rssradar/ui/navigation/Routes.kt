@@ -51,5 +51,16 @@ import kotlinx.serialization.Serializable
 /** RSSHub：实例、自定义实例、内置镜像、路由目录。 */
 @Serializable data object SettingsRssHubRoute
 
-/** AI 与诊断：DeepSeek Key、全文抓取诊断、崩溃日志。 */
+/** AI 与诊断：DeepSeek Key、AI 功能开关、用量、全文抓取诊断、崩溃日志。 */
 @Serializable data object SettingsAiDiagRoute
+
+/** AI 功能总览（AI 智能功能模块）：35 项独立开关、用量看板、任务队列、预算设置。 */
+@Serializable data object AiFeaturesRoute
+
+/**
+ * AI 产物中心（AI 智能功能模块）：按功能摊开 `ai_artifacts` 里的全部产物。
+ *
+ * 它是 35 项功能的**通用出口**——只有一部分功能有专属展示位，
+ * 其余功能的产物至少要有地方能看见，否则"跑成功了但看不到结果"无从自查。
+ */
+@Serializable data object AiArtifactsRoute

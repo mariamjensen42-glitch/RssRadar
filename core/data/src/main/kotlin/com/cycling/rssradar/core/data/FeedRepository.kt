@@ -248,4 +248,27 @@ class FeedRepository(
 
     /** 同源文章 id（列表序：新→旧），详情页上一篇/下一篇导航用。 */
     suspend fun getFeedArticleIds(feedId: Long): List<Long> = articleDao.getFeedArticleIds(feedId)
+
+    /**
+     * 把 AI 提取出的正文回填到文章（AI 智能功能模块 · 自动提取全文）。
+     *
+     * 刻意复用抓取端的同一张口 [ArticleDao.updateFetchedContent]：
+     * 内容来源、阅读时长、不完整标记的处理与 ADR-0012 的按需抓取完全一致，
+     * 阅读页不需要为"这段正文是 AI 提取的"单独开一条渲染分支——
+     * 提取成功就是一段完整正文，与抓来的一样显示。
+     *
+     * @param html 模型还原出的正文 HTML
+     * @param plainText 去掉标签后的纯文本，用于检索与阅读时长
+     */
+    suspend fun applyExtractedContent(articleId: Long, html: String, plainText: String) {
+        articleDao.updateFetchedContent(
+            id = articleId,
+            content = html,
+            contentText = plainText,
+            contentSource = ArticleEntity.CONTENT_SOURCE_WEB,
+            readingMinutes = estimateReadingMinutes(plainText),
+            coverUrl = null,
+            contentIncomplete = false,
+        )
+    }
 }

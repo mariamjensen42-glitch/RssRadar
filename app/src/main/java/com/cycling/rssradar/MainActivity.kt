@@ -38,6 +38,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.cycling.rssradar.ui.addsubscription.AddSubscriptionSheet
 import com.cycling.rssradar.ui.addsubscription.AddSubscriptionViewModel
+import com.cycling.rssradar.ui.me.AiArtifactsScreen
+import com.cycling.rssradar.ui.me.AiFeaturesScreen
+import com.cycling.rssradar.ui.me.AiFeaturesViewModel
 import com.cycling.rssradar.ui.article.ArticleDetailScreen
 import com.cycling.rssradar.ui.article.ArticleDetailViewModel
 import com.cycling.rssradar.ui.subscriptions.FeedActionScreen
@@ -58,6 +61,8 @@ import com.cycling.rssradar.ui.subscriptions.SubscriptionsScreen
 import com.cycling.rssradar.ui.subscriptions.SubscriptionsViewModel
 import com.cycling.rssradar.core.ui.components.FloatingBottomBar
 import com.cycling.rssradar.ui.components.openUrl
+import com.cycling.rssradar.ui.navigation.AiArtifactsRoute
+import com.cycling.rssradar.ui.navigation.AiFeaturesRoute
 import com.cycling.rssradar.ui.navigation.ArticleDetailRoute
 import com.cycling.rssradar.ui.navigation.CrashLogRoute
 import com.cycling.rssradar.ui.navigation.FeedArticlesRoute
@@ -227,6 +232,8 @@ private fun RssRadarAppContent() {
             composable<SettingsAiDiagRoute> {
                 SettingsAiDiagScreen(
                     onBack = { navController.popBackStack() },
+                    onOpenAiFeatures = { navController.navigate(AiFeaturesRoute) },
+                    onOpenAiArtifacts = { navController.navigate(AiArtifactsRoute) },
                     onOpenFetchDiagnostics = { navController.navigate(FetchDiagnosticsRoute) },
                     onOpenCrashLog = { navController.navigate(CrashLogRoute) },
                 )
@@ -239,6 +246,22 @@ private fun RssRadarAppContent() {
                 FetchDiagnosticsScreen(
                     viewModel = hiltViewModel<FetchDiagnosticsViewModel>(),
                     onBack = { navController.popBackStack() },
+                )
+            }
+            // AI 智能功能总览：35 项独立开关、用量看板、任务队列
+            composable<AiFeaturesRoute> {
+                AiFeaturesScreen(
+                    viewModel = hiltViewModel<AiFeaturesViewModel>(),
+                    onBack = { navController.popBackStack() },
+                    onOpenArtifacts = { navController.navigate(AiArtifactsRoute) },
+                )
+            }
+            // AI 产物中心：全部功能的生成结果，按功能筛选后查看
+            composable<AiArtifactsRoute> {
+                AiArtifactsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenArticle = { navController.navigate(ArticleDetailRoute(it)) },
+                    onOpenFeed = { navController.navigate(FeedArticlesRoute(it)) },
                 )
             }
             // 崩溃日志（issue #61）

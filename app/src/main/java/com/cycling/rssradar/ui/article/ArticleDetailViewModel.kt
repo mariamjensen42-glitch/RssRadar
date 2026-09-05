@@ -7,7 +7,14 @@ import com.cycling.rssradar.core.data.db.ArticleEntity
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
 import com.cycling.rssradar.core.data.FeedRepository
 import com.cycling.rssradar.core.data.OnDemandFetch
+import com.cycling.rssradar.core.data.ai.AiArtifactRepository
+import com.cycling.rssradar.core.data.ai.AiFeature
+import com.cycling.rssradar.core.data.ai.AiFeatureRunner
+import com.cycling.rssradar.core.data.ai.AiFulltextPayload
+import com.cycling.rssradar.core.data.ai.AiParsers
 import com.cycling.rssradar.core.data.ai.AiRepository
+import com.cycling.rssradar.core.data.store.AiFeatureSettings
+import com.cycling.rssradar.core.data.store.AiFeatureStore
 import com.cycling.rssradar.core.data.store.AiStore
 import com.cycling.rssradar.core.data.store.LinkShareState
 import com.cycling.rssradar.core.data.store.LinkStore
@@ -16,6 +23,7 @@ import com.cycling.rssradar.core.data.store.ReadingPrefsStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,7 +41,49 @@ sealed interface ArticleDetailIntent {
     data object ToggleTranslation : ArticleDetailIntent
     /** 清缓存重译（issue #44：会话缓存 + 明确的重译按钮）。 */
     data object RetranslateArticle : ArticleDetailIntent
+
+    /** 手动跑一项文章级 AI 分析（AI 智能功能模块）。 */
+    data class RunAi(val feature: AiFeature) : ArticleDetailIntent
+
+    /** 向文章提问（AI 智能功能模块 · 文章问答）。question 为空时忽略。 */
+    data class AskArticle(val question: String) : ArticleDetailIntent
+
+    /** 解释文中术语（AI 智能功能模块 · 划词解释）。term 为空时忽略。 */
+    data class ExplainTerm(val term: String) : ArticleDetailIntent
+
+    data object ConsumeAiMessage : ArticleDetailIntent
 }
+
+/**
+ * 面板上以**按钮**触发的功能：不需要额外输入，点一下就跑。
+ *
+ * 只列**在单篇文章上有意义**的那些——全局功能（每日简报、阅读习惯）和订阅源级功能
+ * （健康监控）在文章页触发没有落点，列出来只会让用户点出一个莫名其妙的结果。
+ * 展示顺序即按钮顺序：便宜且常用的在前，贵而重的在后。
+ */
+val ARTICLE_AI_BUTTONS: List<AiFeature> = listOf(
+    AiFeature.OUTLINE,
+    AiFeature.OPINION,
+    AiFeature.CREDIBILITY,
+    AiFeature.SHARE_COPY,
+    AiFeature.FULLTEXT,
+    AiFeature.TAGS,
+    AiFeature.KEYWORDS,
+    AiFeature.CLASSIFY,
+    AiFeature.SENTIMENT,
+    AiFeature.QUALITY,
+    AiFeature.NOISE,
+)
+
+/**
+ * 面板里会**展示产物**的功能：[ARTICLE_AI_BUTTONS] 加上两个需要输入的功能
+ * （问答与划词解释）。
+ *
+ * 拆成两个清单是因为它们的触发方式不同：一个靠按钮，一个靠输入框。
+ * 但产物都挂在文章上、都该在面板里看到，所以展示时合并。
+ */
+val ARTICLE_AI_FEATURES: List<AiFeature> =
+    ARTICLE_AI_BUTTONS + listOf(AiFeature.QA, AiFeature.GLOSSARY)
 
 /** 同源相邻文章 id（底栏上一篇/下一篇）。prev = 更早一篇，next = 更新一篇；列表尽头为 null。 */
 data class ArticleNeighbors(val prevId: Long?, val nextId: Long?)
@@ -87,6 +137,10 @@ class ArticleDetailViewModel @Inject constructor(
     private val linkStore: LinkStore,
     private val aiRepository: AiRepository,
     private val aiStore: AiStore,
+    /** AI 智能功能模块：35 项功能的执行器与产物仓储。 */
+    private val featureRunner: AiFeatureRunner,
+    private val artifacts: AiArtifactRepository,
+    private val featureStore: AiFeatureStore,
 ) : ViewModel(), MviViewModel<ArticleDetailIntent> {
 
     private val _article = MutableStateFlow<ArticleWithFeed?>(null)
@@ -113,6 +167,37 @@ class ArticleDetailViewModel @Inject constructor(
     /** 同源上一篇/下一篇（底栏切换用），load 时随文章一起刷新。 */
     private val _neighbors = MutableStateFlow(ArticleNeighbors(prevId = null, nextId = null))
     val neighbors: StateFlow<ArticleNeighbors> = _neighbors.asStateFlow()
+
+    /**
+     * 本文已有的 AI 产物（feature.dbValue → 解析后的载荷）。
+     * 只有解析出实质内容的才进表——空壳产物（如 `{"tags": []}`）按"尚未生成"处理，
+     * 否则用户会看到一块什么都写不出来的空卡片。
+     */
+    private val _aiArtifacts = MutableStateFlow<Map<Int, Any>>(emptyMap())
+    val aiArtifacts: StateFlow<Map<Int, Any>> = _aiArtifacts.asStateFlow()
+
+    /** 正在生成的 feature.dbValue 集合，按钮置灰与转圈用。 */
+    private val _aiRunning = MutableStateFlow<Set<Int>>(emptySet())
+    val aiRunning: StateFlow<Set<Int>> = _aiRunning.asStateFlow()
+
+    /** AI 面板的一次性提示（失败原因 / 额度用尽），由 UI 消费后清除。 */
+    private val _aiMessage = MutableStateFlow<String?>(null)
+    val aiMessage: StateFlow<String?> = _aiMessage.asStateFlow()
+
+    /**
+     * 已开启的 AI 功能集合。面板要靠它把「未开启」的功能渲染成灰色并给出开启引导——
+     * 35 项里绝大多数默认关闭，若按钮一律长成能点的样子，
+     * 用户点下去只会得到一个静默失败，这是最糟糕的一类反馈。
+     */
+    val aiEnabledFeatures: StateFlow<AiFeatureSettings> = featureStore.state
+
+    /**
+     * 是否已配置 API Key。
+     * 未配置时面板顶部直接给指引，而不是等用户点了某个功能、跑完一轮才被告知——
+     * 少一次必然失败的等待。
+     */
+    private val _aiKeyConfigured = MutableStateFlow(aiStore.hasKey())
+    val aiKeyConfigured: StateFlow<Boolean> = _aiKeyConfigured.asStateFlow()
 
     /** 当前文章 id，AI 操作的目标；load 时更新。 */
     private var currentArticleId: Long = -1L
@@ -157,6 +242,9 @@ class ArticleDetailViewModel @Inject constructor(
             translationJob = null
             _translationState.value = TranslationState.None
             _aiSummaryState.value = AiSummaryState.Idle
+            _aiArtifacts.value = emptyMap()
+            _aiRunning.value = emptySet()
+            _aiMessage.value = null
         }
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
@@ -170,6 +258,84 @@ class ArticleDetailViewModel @Inject constructor(
             // 这一列不参与内容状态刷新，也不影响已读语义。
             repository.markOpened(articleId)
             fetchFullContentIfNeeded(articleId)
+            loadAiArtifacts(articleId)
+        }
+        // 每次进文章都重读一次：用户可能刚在设置页填了 Key 就切回来。
+        _aiKeyConfigured.value = aiStore.hasKey()
+    }
+
+    /** 读本文已有的 AI 产物。与正文加载串行，避免同篇文章两个协程抢写 _article。 */
+    private suspend fun loadAiArtifacts(articleId: Long) {
+        val loaded = HashMap<Int, Any>()
+        ARTICLE_AI_FEATURES.forEach { feature ->
+            val raw = artifacts.rawOf(feature, articleId) ?: return@forEach
+            val parsed = runCatching { AiParsers.parse(feature, raw) }.getOrNull() ?: return@forEach
+            if (AiParsers.isMeaningful(feature, parsed)) loaded[feature.dbValue] = parsed
+        }
+        _aiArtifacts.value = loaded
+    }
+
+    /**
+     * 把 AI 提取的正文写回文章并重载。
+     *
+     * 纯文本用标签剔除的方式得到：阅读时长、检索、以及后续所有 AI 分析的输入都吃
+     * `contentText`，只写 HTML 会让它们全部落空。
+     */
+    private suspend fun applyExtractedContent(articleId: Long, html: String) {
+        val plainText = stripHtmlTags(html)
+        repository.applyExtractedContent(articleId, html, plainText)
+        _article.value = repository.getArticle(articleId)
+    }
+
+    /** 去标签取纯文本。够用即可——这里只为了生成 contentText，不是要做 HTML 解析器。 */
+    private fun stripHtmlTags(html: String): String =
+        html.replace(Regex("<[^>]+>"), " ")
+            .replace("&nbsp;", " ")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
+    private fun runAi(feature: AiFeature, question: String? = null) {
+        val articleId = currentArticleId
+        if (articleId < 0) return
+        val key = feature.dbValue
+        if (key in _aiRunning.value) return
+        if (!featureStore.isEnabled(feature)) {
+            _aiMessage.value = "「${feature.label}」未开启，可在设置里打开"
+            return
+        }
+        viewModelScope.launch {
+            _aiRunning.value = _aiRunning.value + key
+            try {
+                when (val outcome = featureRunner.run(feature, articleId, question)) {
+                    is AiFeatureRunner.Outcome.Success -> {
+                        val parsed = runCatching { AiParsers.parse(feature, outcome.payload) }.getOrNull()
+                        if (parsed != null) {
+                            _aiArtifacts.value = _aiArtifacts.value + (key to parsed)
+                        }
+                        // 全文提取的产物必须落回正文——只存进产物表等于用户什么都没看到。
+                        if (feature == AiFeature.FULLTEXT && parsed is AiFulltextPayload && parsed.ok) {
+                            applyExtractedContent(articleId, parsed.html)
+                        }
+                    }
+
+                    is AiFeatureRunner.Outcome.Failed -> _aiMessage.value = outcome.message
+                    AiFeatureRunner.Outcome.OutOfBudget -> _aiMessage.value = "今日 AI 额度已用尽，明天再试"
+                    is AiFeatureRunner.Outcome.Skipped -> _aiMessage.value = outcome.reason
+                }
+            } catch (e: CancellationException) {
+                // 协程取消（切文章、退出页面）必须原样抛出，吞掉会破坏结构化并发。
+                throw e
+            } catch (e: Exception) {
+                // 兜底：任何漏网的异常都要把 loading 收掉并给出原因。
+                // 少这层 try，一次异常就会让按钮永久转圈，而用户无从得知发生了什么。
+                _aiMessage.value = "「${feature.label}」出错了：${e.message ?: e.javaClass.simpleName}"
+            } finally {
+                _aiRunning.value = _aiRunning.value - key
+            }
         }
     }
 
@@ -205,6 +371,14 @@ class ArticleDetailViewModel @Inject constructor(
             ArticleDetailIntent.GenerateSummary -> generateSummary()
             ArticleDetailIntent.ToggleTranslation -> toggleTranslation()
             ArticleDetailIntent.RetranslateArticle -> retranslate()
+            is ArticleDetailIntent.RunAi -> runAi(intent.feature)
+            is ArticleDetailIntent.AskArticle ->
+                if (intent.question.isNotBlank()) runAi(AiFeature.QA, intent.question.trim())
+
+            is ArticleDetailIntent.ExplainTerm ->
+                if (intent.term.isNotBlank()) runAi(AiFeature.GLOSSARY, intent.term.trim())
+
+            ArticleDetailIntent.ConsumeAiMessage -> _aiMessage.value = null
         }
     }
 

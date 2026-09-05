@@ -42,6 +42,7 @@ import com.composables.icons.lucide.Eraser
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Trash2
+import com.cycling.rssradar.core.data.ai.AiPrompts
 import com.cycling.rssradar.core.ui.theme.radarColors
 
 
@@ -60,7 +61,11 @@ fun FeedActionScreen(
 ) {
     val feed by viewModel.getFeed(feedId).collectAsState()
     val groupOptions by viewModel.groupsList.collectAsState()
+    val aiProfile by viewModel.observeFeedAiProfile(feedId).collectAsState()
+    // 未单独配置时跟随全局开关（全局默认开摘要），与 FeedAiProfile.resolve 的三态语义一致
+    val autoSummary = aiProfile?.autoSummary ?: true
     var renameTarget by remember { mutableStateOf<String?>(null) }
+    var aiPromptTarget by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
 
     feed?.let { f ->
@@ -182,6 +187,45 @@ fun FeedActionScreen(
                     }
                 }
                 Spacer(Modifier.height(16.dp))
+                // AI 摘要提示词（AI 智能功能模块）：订阅源级覆盖，留空则跟随内置模板
+                Text(
+                    text = "AI",
+                    color = radarColors().textTertiary,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = radarColors().surface2,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { aiPromptTarget = true },
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("摘要提示词", color = radarColors().textPrimary, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                text = if (aiProfile?.summaryPrompt.isNullOrBlank()) "使用内置模板" else "已自定义",
+                                color = radarColors().textTertiary,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        Text("编辑", color = radarColors().accent, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                SwitchRow(
+                    title = "刷新后自动生成摘要",
+                    subtitle = "关闭后此订阅源的新文章不自动跑 AI 摘要",
+                    checked = autoSummary,
+                    onCheckedChange = { v ->
+                        viewModel.onIntent(SubscriptionsIntent.SetFeedAutoSummary(f.id, v))
+                    },
+                )
+                Spacer(Modifier.height(16.dp))
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = radarColors().surface2,
@@ -268,6 +312,68 @@ fun FeedActionScreen(
             },
             dismissButton = {
                 TextButton(onClick = { renameTarget = null }) {
+                    Text("取消", color = radarColors().textTertiary)
+                }
+            },
+        )
+    }
+
+    // 订阅源级摘要提示词编辑（AI 智能功能模块）：留空 = 回落内置模板
+    if (aiPromptTarget) {
+        var value by remember { mutableStateOf(aiProfile?.summaryPrompt.orEmpty()) }
+        AlertDialog(
+            onDismissRequest = { aiPromptTarget = false },
+            containerColor = radarColors().surface1,
+            titleContentColor = radarColors().textPrimary,
+            textContentColor = radarColors().textSecondary,
+            title = {
+                Text("摘要提示词", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "只影响这个订阅源。留空则使用内置模板。" +
+                            "可用变量：" + AiPrompts.summaryVariableHelp(),
+                        color = radarColors().textTertiary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = value,
+                        onValueChange = { value = it },
+                        modifier = Modifier.fillMaxWidth().height(160.dp),
+                        maxLines = 8,
+                        placeholder = {
+                            Text(
+                                "例如：用一句话说清这条快讯发生了什么",
+                                color = radarColors().textTertiary,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = radarColors().surface2,
+                            unfocusedContainerColor = radarColors().surface2,
+                            focusedBorderColor = radarColors().accent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedTextColor = radarColors().textPrimary,
+                            unfocusedTextColor = radarColors().textPrimary,
+                            cursorColor = radarColors().accent,
+                        ),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.onIntent(SubscriptionsIntent.SetFeedSummaryPrompt(feedId, value))
+                        aiPromptTarget = false
+                    },
+                ) {
+                    Text("保存", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { aiPromptTarget = false }) {
                     Text("取消", color = radarColors().textTertiary)
                 }
             },
