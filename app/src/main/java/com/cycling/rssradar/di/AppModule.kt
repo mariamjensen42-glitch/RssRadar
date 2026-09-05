@@ -50,6 +50,7 @@ import com.cycling.rssradar.core.data.db.MIGRATION_10_11
 import com.cycling.rssradar.core.data.db.MIGRATION_11_12
 import com.cycling.rssradar.core.data.db.MIGRATION_12_13
 import com.cycling.rssradar.core.data.db.FeedAiProfileDao
+import com.cycling.rssradar.core.data.db.FeedDao
 import com.cycling.rssradar.core.data.db.MIGRATION_13_14
 import com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.core.data.parser.RssParser
@@ -275,6 +276,16 @@ object AppModule {
     @Provides
     @Singleton
     fun provideFeedAiProfileDao(db: AppDatabase): FeedAiProfileDao = db.feedAiProfileDao()
+
+    /**
+     * 订阅源 DAO。
+     *
+     * 与 [provideFeedAiProfileDao] 同理：提示词模板管理页（PromptTemplatesViewModel）
+     * 要把 profile 的 feedId 翻成源名、并提供全部源供「新增覆盖」选择。
+     */
+    @Provides
+    @Singleton
+    fun provideFeedDao(db: AppDatabase): FeedDao = db.feedDao()
 
     /** 35 项功能的独立开关。 */
     @Provides
