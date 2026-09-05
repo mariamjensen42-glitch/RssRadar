@@ -3,6 +3,9 @@ package com.cycling.rssradar.ui.feed
 import android.text.format.DateUtils
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.clickable
@@ -19,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -49,12 +53,8 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxState
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.runtime.LaunchedEffect
@@ -63,6 +63,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -74,7 +75,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
@@ -123,6 +127,9 @@ import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.SlidersHorizontal
 import com.cycling.rssradar.core.ui.theme.radarColors
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 
 @Composable
@@ -1224,11 +1231,12 @@ private fun StickyDateHeader(label: String) {
  * 列表手势：右滑收藏 / 左滑切换已读——RSS 阅读器的肌肉记忆。
  *
  * 两个动作都不该让卡片从列表里消失（标已读后它只是变灰，收藏后只是多颗星），
- * 所以走的是「落定即执行 + 立刻弹回」的路子：动作在 [LaunchedEffect] 里执行，
- * 随后 [SwipeToDismissBoxState.reset] 把卡片动画回原位。
+ * 所以走「落定即执行 + 弹回」的路子。
  *
- * 动作刻意不挂在 `SwipeToDismissBox(onDismiss = …)` 上：onDismiss 与 reset 各在
- * 自己的协程里跑，先后顺序不受控，抢跑会把 settledValue 冲成 Settled 导致动作漏执行。
+ * 刻意不用 M3 SwipeToDismissBox：它的手势仲裁是「哪个轴先过 touch slop 谁赢」，
+ * 垂直滚动时手指的横向漂移经常抢到第一拍，卡片被误判成横滑并触发收藏/已读。
+ * 这里改为自研手势（[Modifier.pointerInput]）：横向位移不仅要过 slop，还要
+ * 显著大于纵向（1.5 倍）才接管；其余手势一律不消费，完整交还给纵向滚动。
  */
 @Composable
 private fun SwipeableArticleCard(
@@ -1241,35 +1249,86 @@ private fun SwipeableArticleCard(
     onDelete: () -> Unit,
     onReduceSuch: (() -> Unit)? = null,
 ) {
-    val state = rememberSwipeToDismissBoxState()
-    // 回调每次重组都是新 lambda，而本协程的 key 只有 settledValue（不能带回调，
-    // 否则每次重组都会重启并重复触发动作）——用 UpdatedState 保证拿到最新回调。
+    // 回调每次重组都是新 lambda，而手势协程是长生命周期（key=Unit）——
+    // 用 UpdatedState 保证拿到最新回调。
     val currentToggleRead by rememberUpdatedState(onToggleRead)
     val currentToggleStarred by rememberUpdatedState(onToggleStarred)
-    // 动作不走 onDismiss（理由见函数注释），但 SwipeToDismissBox 内部把它当作
-    // 协程 key——用稳定实例，避免列表每次重组都白重启一次内部协程。
-    val noopDismiss: (SwipeToDismissBoxValue) -> Unit = remember { {} }
 
-    LaunchedEffect(state.settledValue) {
-        when (state.settledValue) {
-            SwipeToDismissBoxValue.StartToEnd -> currentToggleStarred() // 右滑：收藏
-            SwipeToDismissBoxValue.EndToStart -> currentToggleRead() // 左滑：切换已读
-            SwipeToDismissBoxValue.Settled -> return@LaunchedEffect
-        }
-        state.reset()
-    }
+    val density = LocalDensity.current
+    val maxOffsetPx = with(density) { 120.dp.toPx() } // 滑动位移上限
+    val triggerPx = with(density) { 72.dp.toPx() } // 松手触发动作的距离阈值
+    val touchSlopPx = LocalViewConfiguration.current.touchSlop
+    // 高速轻扫阈值（px/s）：位移不够但速度够快也算有意滑动（fling 手感）
+    val flingVelocityPx = with(density) { 1200.dp.toPx() }
 
-    SwipeToDismissBox(
-        state = state,
-        onDismiss = noopDismiss,
-        backgroundContent = {
-            SwipeActionBackground(
-                direction = state.dismissDirection,
-                isRead = item.article.isRead,
-                isStarred = item.article.isStarred,
-            )
-        },
-        content = {
+    // 卡片横向偏移：拖动中 snapTo 跟手，松手 animateTo(0) 弹回
+    val offsetX = remember { Animatable(0f) }
+    var swipeDir by remember { mutableStateOf<SwipeDirection?>(null) }
+    val scope = rememberCoroutineScope()
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        // 背景：滑动中按方向露出动作提示
+        SwipeActionBackground(
+            modifier = Modifier.matchParentSize(), // 背景不参与测量，跟随卡片尺寸
+            direction = swipeDir,
+            isRead = item.article.isRead,
+            isStarred = item.article.isStarred,
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                .pointerInput(maxOffsetPx, triggerPx, touchSlopPx, flingVelocityPx) {
+                    val tracker = VelocityTracker()
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        tracker.resetTracking()
+                        var total = Offset.Zero
+                        var engaged = false
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val pressed = event.changes.firstOrNull { it.pressed }
+                            if (pressed == null) break // 全部指针抬起/取消
+                            // 手动差分而非 positionChange()：旁观阶段不消费事件，
+                            // 需要的是「忽略消费状态」的位移（等价 positionChangeIgnoreConsumed）
+                            val delta = pressed.position - pressed.previousPosition
+                            total += delta
+                            if (!engaged && total.getDistance() > touchSlopPx) {
+                                // 方向仲裁（见函数注释）：横向需 1.5 倍优势
+                                engaged = abs(total.x) > abs(total.y) * 1.5f
+                            }
+                            if (engaged) {
+                                // 接管后消费全部事件：纵向滚动停止，clickable 也因
+                                // move 被消费而取消，不会误触发点击
+                                event.changes.forEach { it.consume() }
+                                val next = (offsetX.value + delta.x)
+                                    .coerceIn(-maxOffsetPx, maxOffsetPx)
+                                swipeDir =
+                                    if (next >= 0f) SwipeDirection.RIGHT else SwipeDirection.LEFT
+                                tracker.addPosition(pressed.uptimeMillis, pressed.position)
+                                scope.launch { offsetX.snapTo(next) }
+                            }
+                        }
+                        if (engaged) {
+                            val vx = tracker.calculateVelocity().x
+                            val offset = offsetX.value
+                            when {
+                                offset > triggerPx || (offset > 0 && vx > flingVelocityPx) ->
+                                    currentToggleStarred() // 右滑：收藏
+                                offset < -triggerPx || (offset < 0 && vx < -flingVelocityPx) ->
+                                    currentToggleRead() // 左滑：切换已读
+                            }
+                            swipeDir = null
+                            scope.launch {
+                                offsetX.animateTo(
+                                    0f,
+                                    spring(stiffness = Spring.StiffnessMediumLow),
+                                )
+                            }
+                        }
+                    }
+                },
+        ) {
             ArticleCard(
                 item = item,
                 display = display,
@@ -1280,38 +1339,42 @@ private fun SwipeableArticleCard(
                 onDelete = onDelete,
                 onReduceSuch = onReduceSuch,
             )
-        },
-    )
+        }
+    }
 }
+
+/** 横向滑动方向：决定背景从哪侧露出。 */
+private enum class SwipeDirection { LEFT, RIGHT }
 
 /** 滑动时露出的背景：图标 + 文案说明会发生什么（文案随当前状态变，避免猜）。 */
 @Composable
 private fun SwipeActionBackground(
-    direction: SwipeToDismissBoxValue,
+    modifier: Modifier = Modifier,
+    direction: SwipeDirection?,
     isRead: Boolean,
     isStarred: Boolean,
 ) {
     val (label, icon, tint) = when (direction) {
-        SwipeToDismissBoxValue.StartToEnd ->
+        SwipeDirection.RIGHT ->
             Triple(
                 if (isStarred) "取消收藏" else "收藏",
                 Lucide.Star,
                 radarColors().accent,
             )
 
-        SwipeToDismissBoxValue.EndToStart ->
+        SwipeDirection.LEFT ->
             Triple(
                 if (isRead) "标未读" else "标已读",
                 Lucide.Check,
                 radarColors().textSecondary,
             )
 
-        SwipeToDismissBoxValue.Settled -> return
+        null -> return
     }
     // 卡片往左移 → 背景右侧露出 → 内容靠右；反之靠左
     Box(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
-        contentAlignment = if (direction == SwipeToDismissBoxValue.EndToStart) {
+        modifier = modifier.padding(horizontal = 24.dp),
+        contentAlignment = if (direction == SwipeDirection.LEFT) {
             Alignment.CenterEnd
         } else {
             Alignment.CenterStart
