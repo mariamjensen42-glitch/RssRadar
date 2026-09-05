@@ -677,13 +677,23 @@ private fun ArticleWebView(
                     currentOnScroll?.invoke(t)
                 }
 
-                // WebView 被布局移动后（首帧头部量测把它推到最终位置），硬件绘制不跟随，
-                // 旧位置留残影叠在 Compose 头部上（真机实拍：署名块叠在标题上）；用户一
-                // 开始内部滚动它自己会重绘，所以只在「还没滚过」时补强制重绘。
-                // scrollY==0 作闸门：视口模式随滚折叠期间每帧都在改布局位置，不能每帧全量重绘。
+                // WebView 被布局移动后（首帧头部量测把它推到最终位置），Chromium 合成层
+                // 不跟随移动——旧位置残影叠在 Compose 头部上，且 invalidate() 无效
+                // （真机实证：dumpsys 里 View bounds 已正确，画面却停在旧 y；只有内部
+                // 滚动能逼 Chromium 出新帧）。所以在布局变化时制造一次 ±1px 的净零滚动，
+                // 强制合成器按新位置出帧；scrollY==0 作闸门：视口模式随滚折叠期间每帧
+                // 都在改布局位置，不能每帧都触发。
                 override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
                     super.onLayout(changed, l, t, r, b)
-                    if (changed && scrollY == 0) invalidate()
+                    if (changed && scrollY == 0) {
+                        // 短内容滚不动（canScrollVertically false），scrollBy 是 no-op，
+                        // 那种页面残影最多盖到自己身上，不叠加头部，可接受。
+                        if (canScrollVertically(1)) {
+                            scrollBy(0, 1)
+                            scrollBy(0, -1)
+                        }
+                        invalidate()
+                    }
                 }
             }.apply {
                 settings.javaScriptEnabled = false
