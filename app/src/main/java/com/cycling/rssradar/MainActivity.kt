@@ -336,12 +336,21 @@ private fun RssRadarAppContent() {
             FloatingBottomBar(
                 currentRoute = selectedTab,
                 onTabSelected = { key ->
-                    val route = when (key) {
-                        "feed" -> FeedRoute
-                        "subs" -> SubscriptionsRoute
-                        "search" -> SearchRoute
-                        "me" -> MeRoute
+                    // 目标 tab 已在返回栈里（如顶栏搜索图标把 SearchRoute 裸 push 在
+                    // Feed 之上）时，必须直接 pop 回去。走 navigate + popUpTo(saveState)
+                    // + restoreState 会把刚弹出的栈存档又原样还原，表现为「点了 tab
+                    // 还停在旧页面」。只有目标 tab 不在栈里才走标准 tab 导航。
+                    val (route, routeClass) = when (key) {
+                        "feed" -> FeedRoute to FeedRoute::class
+                        "subs" -> SubscriptionsRoute to SubscriptionsRoute::class
+                        "search" -> SearchRoute to SearchRoute::class
+                        "me" -> MeRoute to MeRoute::class
                         else -> return@FloatingBottomBar
+                    }
+                    val inBackStack = navController.currentBackStack.value
+                        .any { it.destination.hasRoute(routeClass) }
+                    if (inBackStack && navController.popBackStack(route, inclusive = false)) {
+                        return@FloatingBottomBar
                     }
                     navController.navigate(route) {
                         popUpTo<FeedRoute> { saveState = true }
