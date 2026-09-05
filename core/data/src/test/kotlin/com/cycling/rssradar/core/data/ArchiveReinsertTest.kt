@@ -139,6 +139,8 @@ class ArchiveReinsertTest {
                 iconUrl = "https://example.com/icon.png", // 有图标，避免触发 backfill
             )
             "getSyncEnabledFeedIds" -> listOf(feedId)
+            // 刷新成功/失败埋点（#82）：本测试不关心计数，吞掉即可
+            "recordRefreshSuccess", "recordRefreshFailure" -> 0
             else -> throw UnsupportedOperationException(name)
         }
     }
