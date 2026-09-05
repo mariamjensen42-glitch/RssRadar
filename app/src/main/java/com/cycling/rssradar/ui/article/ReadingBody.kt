@@ -28,11 +28,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -117,32 +120,58 @@ internal fun ReadingBody(
     val renderer = LocalReadingPrefs.current.renderer
     // 渲染模式与它所需的产物一次算清：判据本身要解析 HTML 才能知道"解析一无所获"，
     // 分开算就是同一份 HTML 解析两遍。纯函数，见 BodyMode.kt（可 JVM 单测）。
-    val plan = remember(
-        translationUi,
-        translationSegments,
-        article.article.content,
-        article.article.summary,
-        renderer,
-    ) {
-        resolveBodyPlan(
-            translationActive = translationUi != null,
-            translationSegments = translationSegments,
-            content = article.article.content,
-            summary = article.article.summary,
-            renderer = renderer,
-        )
+    // 导航丝滑（用户反馈）：长文 HTML 解析 + 图片正则提取是几十毫秒级的主线程阻塞，
+    // 以前在 remember 里同步跑，正好砸在导航动画的帧上——表现为动画期间空白卡顿、
+    // 正文"加载完才蹦出来"。改为后台线程计算，头部（源名/标题）立即渲染，解析完
+    // 正文无缝接上；null = 还在算，正文区暂时留白。
+    var plan by remember(translationUi, translationSegments, article.article.content, article.article.summary, renderer) {
+        mutableStateOf<BodyPlan?>(null)
+    }
+    LaunchedEffect(translationUi, translationSegments, article.article.content, article.article.summary, renderer) {
+        plan = withContext(Dispatchers.Default) {
+            resolveBodyPlan(
+                translationActive = translationUi != null,
+                translationSegments = translationSegments,
+                content = article.article.content,
+                summary = article.article.summary,
+                renderer = renderer,
+            )
+        }
+    }
+    // 后台解析尚未出结果：头部先上屏（导航动画期间用户看到的就是它），正文区留白
+    val resolvedPlan = plan
+    if (resolvedPlan == null) {
+        Column(modifier = modifier.padding(vertical = 8.dp)) {
+            ArticleHeader(
+                article = article,
+                aiSummaryState = aiSummaryState,
+                onGenerateSummary = onGenerateSummary,
+                translationUi = translationUi,
+                onRetranslate = onRetranslate,
+                onShowOriginal = onShowOriginal,
+                onTranslationDisplayChange = onTranslationDisplayChange,
+                onTitleMeasured = onTitleMeasured,
+            )
+        }
+        return
     }
     // OOM 防线（闪退诊断）：整页包高的 WebView 会被 Chromium 视为全部内容可见，
     // 有图文章的所有图片同时解码进 Java 堆，图多必 OOM（256MB 堆几十秒吃满）。
     // 只有含图的 WebView 路受限，原生路与译文路没有这个约束。
-    val viewport = shouldUseViewport(plan.mode, article.article.content)
+    val viewport = shouldUseViewport(resolvedPlan.mode, article.article.content)
     // 全屏查看页的多图列表与点击分流共用这一份；只有 WebView 路需要（译文路与原生路
     // 由 Compose 直接处理图片点击）。空串/无图正文 → 空集合，自动静默。
-    val imageUrls = remember(plan.mode, article.article.content) {
-        if (plan.mode == BodyMode.WEBVIEW) {
-            article.article.content?.let { ReadingImages.extract(it) } ?: emptyList()
+    // 与 plan 同批后台算：同为主线程正则，同样会卡导航动画的帧。
+    var imageUrls by remember(resolvedPlan.mode, article.article.content) {
+        mutableStateOf(emptyList<String>())
+    }
+    LaunchedEffect(resolvedPlan.mode, article.article.content) {
+        if (resolvedPlan.mode == BodyMode.WEBVIEW) {
+            imageUrls = withContext(Dispatchers.Default) {
+                article.article.content?.let { ReadingImages.extract(it) } ?: emptyList()
+            }
         } else {
-            emptyList()
+            imageUrls = emptyList()
         }
     }
 
@@ -177,7 +206,7 @@ internal fun ReadingBody(
                 article = article,
                 isFetchingContent = isFetchingContent,
                 translationSegments = translationSegments,
-                plan = plan,
+                plan = resolvedPlan,
                 viewport = true,
                 imageUrls = imageUrls,
                 onHeaderScroll = onHeaderScroll,
@@ -212,7 +241,7 @@ internal fun ReadingBody(
                 article = article,
                 isFetchingContent = isFetchingContent,
                 translationSegments = translationSegments,
-                plan = plan,
+                plan = resolvedPlan,
                 viewport = false,
                 imageUrls = imageUrls,
                 onHeaderScroll = onHeaderScroll,
