@@ -196,7 +196,8 @@ fun FeedListScreen(
                 onMarkAllRead = { showMarkReadSheet = true },
                 onOpenViewMode = { showViewModeSheet = true },
                 viewMode = viewMode,
-                filterActive = uiState.selectedGroup != null,
+                // 分组或内容类型任一生效即亮点（内容类型已收进筛选弹层，首页不再常驻一行 chip）
+                filterActive = uiState.selectedGroup != null || uiState.selectedContentType != ContentTypeFilter.All,
             )
         },
     ) { padding ->
@@ -212,12 +213,7 @@ fun FeedListScreen(
                 tabs = if (recommendationEnabled) FeedTab.entries else FeedTab.entries.filter { it != FeedTab.Recommended },
                 onSelect = { viewModel.onIntent(FeedListIntent.SelectTab(it)) },
             )
-            // 内容分区 chip 行（issue #75，PRD 方案 C）：常驻显示，与状态 tab 行同心智
-            ContentTypeChipRow(
-                selected = uiState.selectedContentType,
-                onSelect = { viewModel.onIntent(FeedListIntent.SelectContentType(it)) },
-            )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
             PullToRefreshBox(
                 isRefreshing = uiState.isRefreshing,
                 onRefresh = { viewModel.onIntent(FeedListIntent.Refresh) },
@@ -289,6 +285,8 @@ fun FeedListScreen(
         GroupFilterSheet(
             groups = groupOptions,
             selected = uiState.selectedGroup,
+            contentType = uiState.selectedContentType,
+            onSelectContentType = { viewModel.onIntent(FeedListIntent.SelectContentType(it)) },
             onSelect = { group ->
                 viewModel.onIntent(FeedListIntent.SelectGroup(group))
                 showGroupSheet = false
@@ -444,38 +442,12 @@ private fun FeedListTabRow(
     }
 }
 
-/**
- * 内容分区 chip 行（issue #75，PRD 方案 C）：全部/图片/视频/音频，文章即默认态不设「文章」chip。
- * 常驻显示（含「全部」选中态）：可见、可解释；4 个 chip 窄屏放得下，
- * 但与 [FeedListTabRow] 同样用横向滚动兜底，保持一致心智。收起态留二期。
- */
-@Composable
-private fun ContentTypeChipRow(
-    selected: ContentTypeFilter,
-    onSelect: (ContentTypeFilter) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        ContentTypeFilter.entries.forEach { type ->
-            // 复用文件内私有 FilterChip，选中态与状态 tab 行天然一致
-            FilterChip(
-                label = type.label,
-                selected = type == selected,
-                onClick = { onSelect(type) },
-            )
-        }
-    }
-}
-
 @Composable
 private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    val bg = if (selected) radarColors().accent else radarColors().surface1
-    val fg = if (selected) MaterialTheme.colorScheme.onPrimary else radarColors().textPrimary
+    // 轻量化选中样式：选中 = 低透明度 accent 底 + accent 文字（不再整块实色填充），
+    // 未选中 = 透明底 + 次级文字，仅留可点区域。整体视觉重量比旧胶囊低一档。
+    val bg = if (selected) radarColors().accent.copy(alpha = 0.16f) else Color.Transparent
+    val fg = if (selected) radarColors().accent else radarColors().textSecondary
     Surface(
         shape = RoundedCornerShape(50),
         color = bg,
@@ -485,27 +457,63 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
             text = label,
             color = fg,
             style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
         )
     }
 }
 
-/** 分组筛选底部弹层：「全部」+ 各分组。 */
+/**
+ * 顶栏筛选底部弹层：分组 + 内容类型（图片/视频/音频）。
+ * 内容分区原本常驻首页一行 chip（issue #75 PRD 方案 C），低频操作不值得占一行，
+ * 现收进本弹层；分组或内容类型非默认时顶栏 SlidersHorizontal 亮小红点。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GroupFilterSheet(
     groups: List<String>,
     selected: String?,
+    contentType: ContentTypeFilter,
+    onSelectContentType: (ContentTypeFilter) -> Unit,
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = radarColors().surface1) {
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
             Text(
-                text = "分组筛选",
+                text = "筛选",
                 color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
+            // 内容类型：一排轻量 chip，即时生效且不关弹层（与分组列表「选中即关」区分：
+            // 这里是多选前的快速试切，关弹层交给用户下滑手势）
+            Text(
+                text = "内容类型",
+                color = radarColors().textSecondary,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ContentTypeFilter.entries.forEach { type ->
+                    FilterChip(
+                        label = type.label,
+                        selected = type == contentType,
+                        onClick = { onSelectContentType(type) },
+                    )
+                }
+            }
+            Text(
+                text = "分组",
+                color = radarColors().textSecondary,
+                style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
             )
             LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
