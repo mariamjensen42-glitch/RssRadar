@@ -552,6 +552,24 @@ interface ArticleDao {
     suspend fun loadRecommendationCandidates(since: Long, limit: Int): List<ArticleWithFeed>
 
     /**
+     * 相关阅读候选池（AiFeature.RELATED）：近期文章（已读未读都算——读过的相关文章
+     * 恰恰是最该推荐的），排除焦点文章本身。窗口基准与推荐池一致（COALESCE）。
+     */
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.id != :excludeId
+            AND COALESCE(articles.publishedAt, articles.fetchedAt) >= :since
+        ORDER BY COALESCE(articles.publishedAt, articles.fetchedAt) DESC
+        LIMIT :limit
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun loadRelatedCandidates(excludeId: Long, since: Long, limit: Int): List<ArticleWithFeed>
+
+    /**
      * 画像样本（ADR-0013）：真实表达过兴趣的文章——打开过、收藏或稍后读。
      * 按最近一次打开时间倒序取前 [limit] 条，越近的行为在画像里权重越高。
      */

@@ -280,12 +280,13 @@ private fun RssRadarAppContent() {
             composable<ArticleDetailRoute>(
                 deepLinks = listOf(navDeepLink { uriPattern = "rssradar://article/{articleId}" }),
             ) { backStackEntry ->
-                val articleId = backStackEntry.toRoute<ArticleDetailRoute>().articleId
+                val navArticleId = backStackEntry.toRoute<ArticleDetailRoute>().articleId
                 ArticleDetailScreen(
                     viewModel = hiltViewModel<ArticleDetailViewModel>(),
-                    articleId = articleId,
+                    articleId = navArticleId,
                     onBack = { navController.popBackStack() },
                     onOpenOriginal = { url -> context.openUrl(url) },
+                    onOpenArticle = { navController.navigate(ArticleDetailRoute(it)) },
                 )
             }
             composable<FeedActionRoute> { backStackEntry ->

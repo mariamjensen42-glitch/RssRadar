@@ -7,6 +7,7 @@ import com.cycling.rssradar.core.data.db.ArticleEntity
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
 import com.cycling.rssradar.core.data.FeedRepository
 import com.cycling.rssradar.core.data.OnDemandFetch
+import com.cycling.rssradar.core.data.Recommendation
 import com.cycling.rssradar.core.data.ai.AiArtifactRepository
 import com.cycling.rssradar.core.data.ai.AiFeature
 import com.cycling.rssradar.core.data.ai.AiFeatureRunner
@@ -141,6 +142,8 @@ class ArticleDetailViewModel @Inject constructor(
     private val featureRunner: AiFeatureRunner,
     private val artifacts: AiArtifactRepository,
     private val featureStore: AiFeatureStore,
+    /** 相关阅读（AiFeature.RELATED）：本地内容相似度，needsLlm=false。 */
+    private val recommendation: Recommendation,
 ) : ViewModel(), MviViewModel<ArticleDetailIntent> {
 
     private val _article = MutableStateFlow<ArticleWithFeed?>(null)
@@ -167,6 +170,14 @@ class ArticleDetailViewModel @Inject constructor(
     /** 同源上一篇/下一篇（底栏切换用），load 时随文章一起刷新。 */
     private val _neighbors = MutableStateFlow(ArticleNeighbors(prevId = null, nextId = null))
     val neighbors: StateFlow<ArticleNeighbors> = _neighbors.asStateFlow()
+
+    /**
+     * 相关阅读（AiFeature.RELATED）：与本文内容最相近的近期文章。
+     * 功能关闭或没有候选时是空表——空表 = UI 不渲染入口，
+     * 「看得见的按钮必须能用」比「永远摆一排卡片」重要。
+     */
+    private val _related = MutableStateFlow<List<ArticleWithFeed>>(emptyList())
+    val related: StateFlow<List<ArticleWithFeed>> = _related.asStateFlow()
 
     /**
      * 本文已有的 AI 产物（feature.dbValue → 解析后的载荷）。
@@ -245,6 +256,8 @@ class ArticleDetailViewModel @Inject constructor(
             _aiArtifacts.value = emptyMap()
             _aiRunning.value = emptySet()
             _aiMessage.value = null
+            // 相关阅读随文章换：先清空避免上一篇文章的相关推荐闪现在新文章下
+            _related.value = emptyList()
         }
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
@@ -259,9 +272,22 @@ class ArticleDetailViewModel @Inject constructor(
             repository.markOpened(articleId)
             fetchFullContentIfNeeded(articleId)
             loadAiArtifacts(articleId)
+            loadRelated(articleId)
         }
         // 每次进文章都重读一次：用户可能刚在设置页填了 Key 就切回来。
         _aiKeyConfigured.value = aiStore.hasKey()
+    }
+
+    /**
+     * 相关阅读：功能开启才算（关了就不该白算，哪怕它是纯本地的）。
+     * 结果回来时若用户已切到别的文章（currentArticleId 变了）则丢弃——
+     * 慢半拍的旧结果盖在新文章上是典型的过期覆盖。
+     */
+    private suspend fun loadRelated(articleId: Long) {
+        if (!featureStore.isEnabled(AiFeature.RELATED)) return
+        val ids = recommendation.related(articleId)
+        val items = recommendation.loadOrdered(ids)
+        if (currentArticleId == articleId) _related.value = items
     }
 
     /** 读本文已有的 AI 产物。与正文加载串行，避免同篇文章两个协程抢写 _article。 */

@@ -294,8 +294,8 @@ enum class AiFeature(
         needsLlm = false,
         label = "文章关联推荐",
         summary = "读某篇时给出内容相关的其他文章（跨源），复用推荐引擎的内容相似度。",
-        entry = "阅读页底部的「相关阅读」横滑列表。",
-        presentation = "阅读页底部横滑卡片：标题 + 来源 + 相似理由。",
+        entry = "阅读页底部「相关阅读」横滑条；纯本地相似度，不调模型、不耗额度。",
+        presentation = "阅读页底部横滑卡片：标题 + 来源，点击跳转原文；无候选时不显示。",
     ),
     AGGREGATE(
         dbValue = 22,

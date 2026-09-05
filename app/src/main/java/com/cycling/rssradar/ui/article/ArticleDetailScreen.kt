@@ -2,6 +2,7 @@ package com.cycling.rssradar.ui.article
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -92,6 +93,8 @@ fun ArticleDetailScreen(
     articleId: Long,
     onBack: () -> Unit,
     onOpenOriginal: (String) -> Unit = {},
+    /** 相关阅读卡片点击跳转（AiFeature.RELATED）。 */
+    onOpenArticle: (Long) -> Unit = {},
 ) {
     val article by viewModel.article.collectAsState()
     val initialLoadDone by viewModel.initialLoadDone.collectAsState()
@@ -207,27 +210,34 @@ fun ArticleDetailScreen(
             }
             return@Scaffold
         }
-        ReadingBody(
-            article = current,
-            isFetchingContent = isFetchingContent,
-            aiSummaryState = aiSummaryState,
-            translationState = translationState,
-            scrollState = scrollState,
-            headerScrollY = headerScrollY,
-            onHeaderScroll = { headerScrollY = it },
-            onTitleMeasured = { titleHideOffset = it },
-            onGenerateSummary = { viewModel.onIntent(ArticleDetailIntent.GenerateSummary) },
-            onRetranslate = { viewModel.onIntent(ArticleDetailIntent.RetranslateArticle) },
-            onShowOriginal = { viewModel.onIntent(ArticleDetailIntent.ToggleTranslation) },
-            onTranslationDisplayChange = { next ->
-                viewModel.updateReadingPrefs { it.copy(translation = next) }
-            },
-            onImageClick = { url -> imageViewer = openImageViewer(current, url) },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        )
-    }
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            ReadingBody(
+                article = current,
+                isFetchingContent = isFetchingContent,
+                aiSummaryState = aiSummaryState,
+                translationState = translationState,
+                scrollState = scrollState,
+                headerScrollY = headerScrollY,
+                onHeaderScroll = { headerScrollY = it },
+                onTitleMeasured = { titleHideOffset = it },
+                onGenerateSummary = { viewModel.onIntent(ArticleDetailIntent.GenerateSummary) },
+                onRetranslate = { viewModel.onIntent(ArticleDetailIntent.RetranslateArticle) },
+                onShowOriginal = { viewModel.onIntent(ArticleDetailIntent.ToggleTranslation) },
+                onTranslationDisplayChange = { next ->
+                    viewModel.updateReadingPrefs { it.copy(translation = next) }
+                },
+                onImageClick = { url -> imageViewer = openImageViewer(current, url) },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            )
+            // 相关阅读（AiFeature.RELATED）：横滑卡片条，仅在有候选时出现——
+            // 空态不占高度，阅读区恢复满屏。
+            val related by viewModel.related.collectAsState()
+            if (related.isNotEmpty()) {
+                RelatedArticlesStrip(items = related, onOpen = onOpenArticle)
+            }
+        }    }
 
     imageViewer?.let { viewer ->
         ReaderImagePage(
@@ -695,5 +705,70 @@ private fun ActionIcon(
                 modifier = Modifier.size(20.dp),
             )
         }
+    }
+}
+
+// ── 相关阅读（AiFeature.RELATED）───────────────────────────────────────────
+
+/**
+ * 相关阅读横滑条：与本文内容最相近的近期文章（本地 bigram 相似度，needsLlm=false）。
+ *
+ * 刻意的呈现决定：
+ * - **无候选时整体不渲染**而不是显示「暂无相关」——阅读页寸土寸金，
+ *   一块永远写着"没有"的常驻面板只会消耗注意力。
+ * - 卡片只放标题与来源，不放相似度分数——0.37 vs 0.41 对用户没有意义，
+ *   排序已经把"更相关"表达完了，再亮数字就是拿实现细节打扰阅读。
+ */
+@Composable
+private fun RelatedArticlesStrip(
+    items: List<ArticleWithFeed>,
+    onOpen: (Long) -> Unit,
+) {
+    val colors = radarColors()
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            text = "相关阅读",
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.textTertiary,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items.forEach { item ->
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = colors.surface1,
+                    modifier = Modifier
+                        .width(200.dp)
+                        .clickable { onOpen(item.article.id) },
+                ) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(
+                            text = item.article.title,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.textPrimary,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = item.feedTitle,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.textTertiary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
     }
 }

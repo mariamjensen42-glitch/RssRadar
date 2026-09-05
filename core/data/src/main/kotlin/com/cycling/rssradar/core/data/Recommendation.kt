@@ -3,6 +3,7 @@ package com.cycling.rssradar.core.data
 import com.cycling.rssradar.core.domain.recommendation.EngagementSample
 import com.cycling.rssradar.core.domain.recommendation.InterestProfile
 import com.cycling.rssradar.core.domain.recommendation.RecommendationCandidate
+import com.cycling.rssradar.core.domain.recommendation.RelatedScoring
 import com.cycling.rssradar.core.domain.recommendation.RecommendationScoring
 import com.cycling.rssradar.core.data.db.AppDatabase
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
@@ -56,6 +57,30 @@ class Recommendation(
         val feedOf = candidates.associate { it.id to it.feedId }
         RecommendationScoring.diversify(scored.map { it.id to (feedOf[it.id] ?: -1L) })
     }
+
+    /**
+     * 相关阅读（AiFeature.RELATED）：与指定文章内容最相近的近期文章 id 序。
+     *
+     * 纯本地词面相似度（[RelatedScoring]，needsLlm=false），不花钱、不落产物——
+     * 进阅读页即算，算完即用。已读文章也在候选池里：读过的相关文章恰恰值得再读。
+     * 文章不存在或没有候选时返回空表，调用方据此决定是否渲染入口。
+     */
+    suspend fun related(articleId: Long, limit: Int = RELATED_LIMIT): List<Long> =
+        withContext(ioDispatcher) {
+            val focus = database.articleDao().loadByIds(listOf(articleId)).firstOrNull()
+                ?: return@withContext emptyList()
+            val since = System.currentTimeMillis() - RELATED_WINDOW_DAYS * DAY_MILLIS
+            val candidates = database.articleDao()
+                .loadRelatedCandidates(articleId, since, CANDIDATE_LIMIT)
+                .map { it.toCandidate() }
+            if (candidates.isEmpty()) return@withContext emptyList()
+            RelatedScoring.rank(
+                focusTitle = focus.article.title,
+                focusSummary = focus.article.summary,
+                candidates = candidates,
+                limit = limit,
+            ).map { it.articleId }
+        }
 
     /**
      * 按分组过滤推荐序（issue #74）：查这批 id 的所属分组，仅保留命中的。
@@ -140,6 +165,12 @@ class Recommendation(
 
         /** 画像样本上限：最近 500 条有效行为，足够代表近期兴趣。 */
         const val SAMPLE_LIMIT = 500
+
+        /** 相关阅读返回条数：横滑一屏的量，再多用户也点不过来。 */
+        const val RELATED_LIMIT = 8
+
+        /** 相关阅读候选窗口（天）：与推荐池同窗，太老的文章谈不上"相关"。 */
+        const val RELATED_WINDOW_DAYS = 14L
 
         /** 每点一次「减少此类」的降权步长。 */
         private const val PENALTY_STEP = 0.6
