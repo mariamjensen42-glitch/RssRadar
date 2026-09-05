@@ -6,6 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.cycling.rssradar.core.data.ContentQualification
 import java.io.ByteArrayInputStream
 
 class RssParserTest {
@@ -197,8 +198,8 @@ class RssParserTest {
         assertEquals("only a summary", article.summary)
         // 摘要留在 content 列（列表检索与详情页兜底要用），但**不够格当正文**——
         // contentSource 因此记 NONE，详情页才会去抓原文。这是"正文只有摘要"的根因修复
-        // （ADR-0012 / RssParser.FULL_TEXT_MIN_CHARS）。
-        assertFalse(RssParser.isFullText(article.contentHtml, article.contentText))
+        // （ADR-0012 / ContentQualification.FULL_TEXT_MIN_CHARS）。
+        assertFalse(ContentQualification.qualifies(article.contentHtml, article.contentText))
     }
 
     @Test
@@ -479,21 +480,21 @@ class RssParserTest {
         // 只给摘要的 feed（RSSHub 大量路由如此）：描述不到 300 字
         val summary = "这是一篇文章摘要，".repeat(20) // 约 180 字
 
-        assertFalse(RssParser.isFullText("<p>$summary</p>", summary))
+        assertFalse(ContentQualification.qualifies("<p>$summary</p>", summary))
     }
 
     @Test
     fun `long content is treated as full text`() {
         val body = "这是正文内容，".repeat(200) // 约 1400 字
 
-        assertTrue(RssParser.isFullText("<p>$body</p>", body))
+        assertTrue(ContentQualification.qualifies("<p>$body</p>", body))
     }
 
     @Test
     fun `null or blank content is never full text`() {
-        assertFalse(RssParser.isFullText(null, null))
-        assertFalse(RssParser.isFullText("", ""))
-        assertFalse(RssParser.isFullText("   ", "  "))
+        assertFalse(ContentQualification.qualifies(null, null))
+        assertFalse(ContentQualification.qualifies("", ""))
+        assertFalse(ContentQualification.qualifies("   ", "  "))
     }
 
     @Test
@@ -513,7 +514,7 @@ class RssParserTest {
         val article = parser.parse(ByteArrayInputStream(xml.toByteArray())).articles.single()
 
         // 摘要仍要留下（列表与检索用），但这段内容不够格当正文
-        assertFalse(RssParser.isFullText(article.contentHtml, article.contentText))
+        assertFalse(ContentQualification.qualifies(article.contentHtml, article.contentText))
         assertTrue(article.summary.orEmpty().contains("短摘要"))
     }
 

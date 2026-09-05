@@ -56,7 +56,7 @@ class OnDemandFetch(
         // Feed 级预设（issue #9）：该源关闭全文抓取时不联网，静默降级到摘要
         val feed = feedDao.getById(item.article.feedId)
         if (feed != null && !feed.fullContentEnabled) return@withContext false
-        if (hasUsableContent(item.article)) return@withContext true
+        if (ContentQualification.hasUsableContent(item.article)) return@withContext true
 
         val link = item.article.link
         val outcome = fetchOutcome(link)
@@ -103,14 +103,7 @@ class OnDemandFetch(
     suspend fun historyOf(link: String): List<ContentFetchLogEntity> =
         contentFetchLogDao.historyOf(link, limit = 5)
 
-    /**
-     * 是否已有「够格」的正文。
-     * contentSource != NONE 的才够格——摘要级 feed 内容虽然也躺在 content 列，
-     * 但记的是 NONE（见 [com.cycling.rssradar.core.data.parser.RssParser.FULL_TEXT_MIN_CHARS]），
-     * 否则详情页永远不会去抓原文。
-     */
-    private fun hasUsableContent(article: ArticleEntity): Boolean =
-        article.content != null && article.contentSource != ArticleEntity.CONTENT_SOURCE_NONE
+    // 读侧判定收敛到 ContentQualification（「够格」规则唯一落点），本类不再自持实现。
 
     /** 抓取结果 → 诊断记录。失败与「成功但不完整」都留痕，只是 ok/issue 字段不同。 */
     private fun FetchOutcome.toLog(link: String): ContentFetchLogEntity = when (this) {

@@ -214,12 +214,11 @@ class RefreshEngine(
                 if (article.link in tombstoned) return@forEach
                 val readingMinutes = article.contentText?.let { estimateReadingMinutes(it) }
                 // 摘要级内容不当正文：contentSource 记 NONE，详情页才会去抓原文
-                // （RssParser.FULL_TEXT_MIN_CHARS，详见该常量注释）
-                val contentSource = if (RssParser.isFullText(article.contentHtml, article.contentText)) {
-                    ArticleEntity.CONTENT_SOURCE_FEED
-                } else {
-                    ArticleEntity.CONTENT_SOURCE_NONE
-                }
+                // （判定唯一落点：ContentQualification）
+                val contentSource = ContentQualification.contentSourceFor(
+                    article.contentHtml,
+                    article.contentText,
+                )
                 val existingId = existing[article.link]
                 if (existingId == null) {
                     newArticles += ArticleEntity(

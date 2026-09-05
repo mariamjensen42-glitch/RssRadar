@@ -3,7 +3,7 @@ package com.cycling.rssradar.ui.article
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.core.data.db.ArticleEntity
+import com.cycling.rssradar.core.data.ContentQualification
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
 import com.cycling.rssradar.core.data.FeedRepository
 import com.cycling.rssradar.core.data.OnDemandFetch
@@ -383,7 +383,8 @@ class ArticleDetailViewModel @Inject constructor(
      */
     private suspend fun fetchFullContentIfNeeded(articleId: Long) {
         val current = _article.value ?: return
-        if (current.article.contentSource != ArticleEntity.CONTENT_SOURCE_NONE) return
+        // 读侧「够格」判定唯一落点在 ContentQualification；ON_DEMAND 兜底防已抓过的重复触发
+        if (ContentQualification.hasUsableContent(current.article)) return
         _isFetchingContent.value = true
         runCatching { onDemandFetch.fetch(articleId) }
         _isFetchingContent.value = false

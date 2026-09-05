@@ -197,27 +197,6 @@ class RssParser {
         const val MEDIA_KIND_VIDEO = 1
         const val MEDIA_KIND_AUDIO = 2
 
-        /**
-         * 「这段内容够不够格当正文」的字数门槛。
-         *
-         * 背景（正文不完整的根因）：description 与 content 取较长者，只给摘要的 feed
-         * （RSSHub 大量路由如此）拿到的就是两三百字的摘要；旧实现只要 `contentHtml != null`
-         * 就标 `CONTENT_SOURCE_FEED`，于是 `OnDemandFetch.fetch` 的
-         * 「已有正文就不抓」早退条件命中 → 详情页永远不去抓原文 → 用户只看到摘要，
-         * 且没有任何失败记录。
-         *
-         * 低于门槛的内容**仍然存进 content 列**（列表摘要与检索要用），但 contentSource 记 NONE，
-         * 详情页才会去抓原文。
-         */
-        const val FULL_TEXT_MIN_CHARS = 300
-
-        /** 该 feed 内容是否够格当正文（够长才算全文，见 [FULL_TEXT_MIN_CHARS]）。 */
-        internal fun isFullText(contentHtml: String?, contentText: String?): Boolean {
-            if (contentHtml.isNullOrBlank()) return false
-            val length = contentText?.length ?: textLength(contentHtml)
-            return length >= FULL_TEXT_MIN_CHARS
-        }
-
         private const val ONE_DAY_MS = 24 * 60 * 60 * 1000L
 
         /** 按"可见文本长度"比较，避免把带更多 HTML 标签的串误判为更长。 */
