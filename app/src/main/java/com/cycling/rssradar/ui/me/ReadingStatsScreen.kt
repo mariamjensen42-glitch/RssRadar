@@ -34,7 +34,8 @@ import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
 import com.cycling.rssradar.core.data.db.ArticleDao
 import com.cycling.rssradar.core.data.db.FeedOpenStat
-import com.cycling.rssradar.core.domain.ai.AiReadingStats
+import com.cycling.rssradar.core.domain.stats.ReadingStatsDashboard
+import com.cycling.rssradar.core.domain.stats.TopFeed
 import com.cycling.rssradar.core.ui.theme.radarColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -80,29 +81,36 @@ class ReadingStatsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            // 口径装配收敛到 ReadingStatsDashboard（core/domain 纯函数，JVM 可测）——
+            // 本 VM 只负责取数：每个数字都能回溯到一条查询，装配规则只写一遍。
             val now = System.currentTimeMillis()
-            val since = now - WEEK_MS
             val zoneOffset = java.util.TimeZone.getDefault().getOffset(now)
 
-            val window = articleDao.readingWindowStat(since)
+            val window = articleDao.readingWindowStat(now - WEEK_MS)
             // 全部打开时间戳：活跃时段只要近 7 天的，streak 要全部历史（断一天就断）
             val allOpened = articleDao.allOpenedTimestamps()
-            val hours = AiReadingStats.activeHours(allOpened.filter { it >= since }, zoneOffset)
-            // epoch day 手写除法（floorDiv 在 check-kotlin 下解析不到）：时间戳恒正，普通除法等价
-            val dayKeys = allOpened.map { (it + zoneOffset) / DAY_MS }.toSet()
-            val todayDay = (now + zoneOffset) / DAY_MS
+            val perFeed = articleDao.openedCountsByFeedSince(now - WEEK_MS)
+            val top = articleDao.topOpenedFeeds(now - WEEK_MS, TOP_FEED_LIMIT)
 
-            val perFeed = articleDao.openedCountsByFeedSince(since)
-            val top = articleDao.topOpenedFeeds(since, TOP_FEED_LIMIT)
+            val summary = ReadingStatsDashboard.assemble(
+                ReadingStatsDashboard.Inputs(
+                    now = now,
+                    zoneOffsetMillis = zoneOffset,
+                    windowCnt = window.cnt,
+                    windowMinutes = window.minutes,
+                    allOpened = allOpened,
+                    openedCountsByFeed = perFeed.map { it.cnt },
+                    topFeeds = top.map { TopFeed(it.feedTitle, it.cnt) },
+                ),
+            )
 
             _state.value = ReadingStatsUiState(
-                weekOpens = window.cnt,
-                weekMinutes = window.minutes ?: 0L,
-                activeHours = hours,
+                weekOpens = summary.weekOpens,
+                weekMinutes = summary.weekMinutes,
+                activeHours = summary.activeHours,
                 topFeeds = top,
-                // 集中度用「全部有打开的源」算，不是 top5——top5 算出来必然虚高
-                concentration = AiReadingStats.concentration(perFeed.map { it.cnt }),
-                streakDays = AiReadingStats.streakDays(dayKeys, todayDay),
+                concentration = summary.concentration,
+                streakDays = summary.streakDays,
                 starredCount = articleDao.starredCount(),
                 bookmarkedCount = articleDao.bookmarkedCount(),
                 loaded = true,

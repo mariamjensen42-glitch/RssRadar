@@ -260,14 +260,21 @@ def main() -> int:
         "-Xmx3g",
         "-cp", os.pathsep.join(classpath),
         "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
+    ]
+    # 文件清单 + 双份 classpath 很容易顶爆 Windows 32k 命令行上限（WinError 206），
+    # kotlinc 自身的参数全部走 @argfile，只有 java 启动器的 -cp 留在命令行。
+    kotlinc_args = [
         "-no-stdlib",
         "-jvm-target", "17",
         "-d", str(out),
     ]
     for plugin in plugins:
-        cmd += [f"-Xplugin={plugin}"]
-    cmd += ["-classpath", os.pathsep.join(classpath)]
-    cmd += files
+        kotlinc_args += [f"-Xplugin={plugin}"]
+    kotlinc_args += ["-classpath", os.pathsep.join(classpath)]
+    kotlinc_args += files
+    argfile = out / "kotlinc-args.txt"
+    argfile.write_text("\n".join(a if " " not in a else f'"{a}"' for a in kotlinc_args), encoding="utf-8")
+    cmd += [f"@{argfile}"]
 
     print(f"编译 {len(files)} 个文件 …")
     result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
