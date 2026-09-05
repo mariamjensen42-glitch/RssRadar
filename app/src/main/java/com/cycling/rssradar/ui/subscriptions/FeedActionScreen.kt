@@ -59,9 +59,12 @@ fun FeedActionScreen(
     viewModel: SubscriptionsViewModel,
     onDismiss: () -> Unit,
 ) {
-    val feed by viewModel.getFeed(feedId).collectAsState()
-    val groupOptions by viewModel.groupsList.collectAsState()
-    val aiProfile by viewModel.observeFeedAiProfile(feedId).collectAsState()
+    // getFeed/observeFeedAiProfile 每次 fun 调用都会新建 StateFlow（初始值 null），
+    // 直接在 Composable 里调用会随重组重建 flow、把 feed 打回 null，
+    // 导致 ModalBottomSheet 被反复卸载（空白且无法返回）。必须 remember 固定实例。
+    val feed by remember(feedId) { viewModel.getFeed(feedId) }.collectAsState()
+    val groupOptions by remember { viewModel.groupsList }.collectAsState()
+    val aiProfile by remember(feedId) { viewModel.observeFeedAiProfile(feedId) }.collectAsState()
     // 未单独配置时跟随全局开关（全局默认开摘要），与 FeedAiProfile.resolve 的三态语义一致
     val autoSummary = aiProfile?.autoSummary ?: true
     var renameTarget by remember { mutableStateOf<String?>(null) }
