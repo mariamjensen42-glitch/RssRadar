@@ -35,7 +35,6 @@ import com.composables.icons.lucide.Lucide
 import com.cycling.rssradar.core.data.db.ArticleDao
 import com.cycling.rssradar.core.data.db.FeedOpenStat
 import com.cycling.rssradar.core.domain.stats.ReadingStatsDashboard
-import com.cycling.rssradar.core.domain.stats.TopFeed
 import com.cycling.rssradar.core.ui.theme.radarColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -43,9 +42,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-
-private const val DAY_MS = 24 * 60 * 60 * 1000L
-private const val WEEK_MS = 7 * DAY_MS
 
 /** 统计仪表盘 UiState（#83）：所有数字来自 DB 真实计算，一个都不许编。 */
 data class ReadingStatsUiState(
@@ -86,11 +82,12 @@ class ReadingStatsViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             val zoneOffset = java.util.TimeZone.getDefault().getOffset(now)
 
-            val window = articleDao.readingWindowStat(now - WEEK_MS)
+            val since = now - ReadingStatsDashboard.WINDOW_DAYS * ReadingStatsDashboard.DAY_MS
+            val window = articleDao.readingWindowStat(since)
             // 全部打开时间戳：活跃时段只要近 7 天的，streak 要全部历史（断一天就断）
             val allOpened = articleDao.allOpenedTimestamps()
-            val perFeed = articleDao.openedCountsByFeedSince(now - WEEK_MS)
-            val top = articleDao.topOpenedFeeds(now - WEEK_MS, TOP_FEED_LIMIT)
+            val perFeed = articleDao.openedCountsByFeedSince(since)
+            val top = articleDao.topOpenedFeeds(since, ReadingStatsDashboard.TOP_FEED_LIMIT)
 
             val summary = ReadingStatsDashboard.assemble(
                 ReadingStatsDashboard.Inputs(
@@ -100,7 +97,6 @@ class ReadingStatsViewModel @Inject constructor(
                     windowMinutes = window.minutes,
                     allOpened = allOpened,
                     openedCountsByFeed = perFeed.map { it.cnt },
-                    topFeeds = top.map { TopFeed(it.feedTitle, it.cnt) },
                 ),
             )
 
@@ -124,10 +120,7 @@ class ReadingStatsViewModel @Inject constructor(
         }
     }
 
-    companion object {
-        const val TOP_FEED_LIMIT = 5
     }
-}
 
 /** 统计仪表盘页（#83）：一屏卡片，近 7 天滚动窗，无切换。 */
 @Composable

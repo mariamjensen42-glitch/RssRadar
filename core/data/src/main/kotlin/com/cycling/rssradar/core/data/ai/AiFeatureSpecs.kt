@@ -8,7 +8,7 @@ package com.cycling.rssradar.core.data.ai
  * （isMeaningful 的 `else -> true` 分支会放行空壳产物）。
  *
  * 现在加一项功能的动作收敛为：AiFeature 加枚举 → AiPayloads 加载荷 →
- * AiParsers 加解析函数 → 在这里登记一行 → app 侧 AiResultRenders 登记渲染。
+ * AiParsers 加解析函数 → 在这里登记一行 → app 侧 AiArticleSheet 的 AI_RESULT_RENDERS 登记渲染。
  * 每项功能的全部行为知识在一行里可读，且各环节都可独立单测。
  */
 class AiFeatureSpec(
@@ -59,10 +59,10 @@ object AiFeatureSpecs {
         // ── 推荐发现 ──
         spec(AiFeature.FEED_RECOMMEND, prompt = { c, _ -> AiPrompts.feedRecommend(c) }, parse = AiParsers::feedRecommend, isMeaningful = { (it as AiFeedRecommendPayload).suggestions.isNotEmpty() })
         spec(AiFeature.DISCOVER, prompt = { c, _ -> AiPrompts.discover(c) }, parse = AiParsers::discover, isMeaningful = { (it as AiDiscoverPayload).articleIds.isNotEmpty() }, restrictIds = ::restrictDiscover)
-        spec(AiFeature.BUBBLE_BREAK, prompt = { c, _ -> AiPrompts.bubbleBreak(c) }, parse = AiParsers::bubble, isMeaningful = { (it as AiBubblePayload).blindSpots.isNotEmpty() || (it as AiBubblePayload).articleIds.isNotEmpty() }, restrictIds = ::restrictBubble)
-        spec(AiFeature.AGGREGATE, prompt = { c, _ -> AiPrompts.aggregate(c) }, parse = AiParsers::aggregate, isMeaningful = { (it as AiAggregatePayload).consensus.isNotEmpty() || (it as AiAggregatePayload).divergence.isNotEmpty() }, restrictIds = ::restrictAggregate)
+        spec(AiFeature.BUBBLE_BREAK, prompt = { c, _ -> AiPrompts.bubbleBreak(c) }, parse = AiParsers::bubble, isMeaningful = { with(it as AiBubblePayload) { blindSpots.isNotEmpty() || articleIds.isNotEmpty() } }, restrictIds = ::restrictBubble)
+        spec(AiFeature.AGGREGATE, prompt = { c, _ -> AiPrompts.aggregate(c) }, parse = AiParsers::aggregate, isMeaningful = { with(it as AiAggregatePayload) { consensus.isNotEmpty() || divergence.isNotEmpty() } }, restrictIds = ::restrictAggregate)
         spec(AiFeature.INTEREST_RANK, prompt = { c, _ -> AiPrompts.interestRank(c) }, parse = AiParsers::interestRank, isMeaningful = { (it as AiInterestRankPayload).interests.isNotEmpty() })
-        spec(AiFeature.EVENT_MERGE, prompt = { c, _ -> AiPrompts.eventMerge(c) }, parse = AiParsers::event, isMeaningful = { (it as AiEventPayload).event.isNotBlank() && (it as AiEventPayload).timeline.isNotEmpty() }, restrictIds = ::restrictEvent)
+        spec(AiFeature.EVENT_MERGE, prompt = { c, _ -> AiPrompts.eventMerge(c) }, parse = AiParsers::event, isMeaningful = { with(it as AiEventPayload) { event.isNotBlank() && timeline.isNotEmpty() } }, restrictIds = ::restrictEvent)
         spec(AiFeature.COLD_START, prompt = { c, _ -> AiPrompts.coldStart(c) }, parse = AiParsers::coldStart, isMeaningful = { (it as AiColdStartPayload).seeds.isNotEmpty() })
         // 纯本地：不进模型，产物不落 ai_artifacts（相关阅读走实时计算）。
         spec(AiFeature.PERSONAL_FEED, prompt = { _, _ -> null })
@@ -70,12 +70,13 @@ object AiFeatureSpecs {
         spec(AiFeature.RELATED, prompt = { _, _ -> null })
 
         // ── 辅助推送 ──
-        spec(AiFeature.DAILY_BRIEF, prompt = { c, _ -> AiPrompts.dailyBrief(c) }, parse = AiParsers::dailyBrief, isMeaningful = { (it as AiBriefPayload).items.isNotEmpty() || (it as AiBriefPayload).headline.isNotBlank() }, restrictIds = ::restrictBrief)
+        spec(AiFeature.DAILY_BRIEF, prompt = { c, _ -> AiPrompts.dailyBrief(c) }, parse = AiParsers::dailyBrief, isMeaningful = { with(it as AiBriefPayload) { items.isNotEmpty() || headline.isNotBlank() } }, restrictIds = ::restrictBrief)
         spec(AiFeature.SHARE_COPY, prompt = { c, _ -> AiPrompts.shareCopy(c) }, parse = AiParsers::shareCopy, isMeaningful = { (it as AiSharePayload).variants.isNotEmpty() })
         spec(AiFeature.SMART_NOTIFY, prompt = { c, _ -> AiPrompts.importance(c) }, parse = AiParsers::importance)
         spec(AiFeature.FEED_HEALTH, prompt = { c, _ -> AiPrompts.feedHealth(c) }, parse = AiParsers::feedHealth)
         spec(AiFeature.HABIT, prompt = { c, _ -> AiPrompts.habit(c) }, parse = AiParsers::habit)
-        spec(AiFeature.DAILY_REPORT, prompt = { c, _ -> AiPrompts.dailyReport(c) }, parse = AiParsers::dailyReport, isMeaningful = { (it as AiReportPayload).summary.isNotBlank() || (it as AiReportPayload).highlights.isNotEmpty() }, restrictIds = ::restrictReport)
+        // DAILY_REPORT 的空壳判定是刻意收紧：旧实现落 else -> true 会存下 summary/highlights 全空的报告壳。
+        spec(AiFeature.DAILY_REPORT, prompt = { c, _ -> AiPrompts.dailyReport(c) }, parse = AiParsers::dailyReport, isMeaningful = { with(it as AiReportPayload) { summary.isNotBlank() || highlights.isNotEmpty() } }, restrictIds = ::restrictReport)
         spec(AiFeature.FILTER_RULE, prompt = { c, _ -> AiPrompts.filterRule(c) }, parse = AiParsers::filterRule, isMeaningful = { (it as AiFilterRulePayload).rules.isNotEmpty() })
         spec(AiFeature.USAGE, prompt = { _, _ -> null })
         spec(AiFeature.TASK_QUEUE, prompt = { _, _ -> null })

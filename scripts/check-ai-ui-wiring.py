@@ -104,34 +104,35 @@ def has_generic_trigger() -> bool:
 
 
 def sheet_render_branches() -> set[str]:
-    """AiResultCard 的 when 里已处理的 payload 类型名。"""
+    """AI_RESULT_RENDERS 注册表里已处理的 payload 类型名。"""
     src = read(SHEET_FILE)
-    card = src.split("private fun AiResultCard(", 1)[1]
-    card = card.split("\n@Composable", 1)[0]
-    return set(re.findall(r"is (Ai[A-Za-z]*Payload)", card))
+    table = src.split("AI_RESULT_RENDERS: Map<AiFeature,", 1)[1]
+    table = table.split("\n}", 1)[0]
+    return set(re.findall(r"as (Ai[A-Za-z]*Payload)", table))
 
 
 def payload_type_of() -> dict[str, str]:
     """
-    功能 → 产物类型，唯一权威来源是 AiParsers.parse 的分派 + 各解析函数的返回类型。
+    功能 → 产物类型，唯一权威来源是 AiFeatureSpecs 的 spec 登记 + 各解析函数的返回类型。
 
     刻意不去猜 `Ai<PascalCase>Payload`——SHARE_COPY 的真实类型是 AiSharePayload，
-    猜名字会造出假红。这里顺着 parse 的分支走到解析函数签名上取返回类型。
+    猜名字会造出假红。这里顺着 spec 的 parse = AiParsers::fn 走到解析函数签名上取返回类型。
     """
-    src = read(PARSERS_FILE)
+    specs = read(PARSERS_FILE)
+    parsers = read(ROOT / "core/data/src/main/kotlin/com/cycling/rssradar/core/data/ai/AiParsers.kt")
 
-    # parse() 的分派表：AiFeature.X -> 调用的解析函数名
-    dispatch_src = src.split("fun parse(feature: AiFeature, raw: String): Any = when (feature) {", 1)[1]
-    dispatch_src = dispatch_src.split("\n}", 1)[0]
+    # spec 登记表：AiFeature.X -> parse 指向的解析函数名
     dispatch: dict[str, str] = {}
-    for line in dispatch_src.splitlines():
-        m = re.match(r"\s*AiFeature\.([A-Z][A-Z0-9_]*)\s*->\s*([a-zA-Z0-9_]+)\(raw\)", line)
-        if m:
-            dispatch[m.group(1)] = m.group(2)
+    for m in re.finditer(
+        r"spec\(\s*AiFeature\.([A-Z][A-Z0-9_]*)[^)]*?parse\s*=\s*AiParsers::([a-zA-Z0-9_]+)",
+        specs,
+        re.S,
+    ):
+        dispatch[m.group(1)] = m.group(2)
 
     # 各解析函数的返回类型
     returns = dict(
-        re.findall(r"fun\s+([a-zA-Z0-9_]+)\s*\(\s*raw:\s*String\s*\)\s*:\s*([A-Za-z0-9_]+)", src)
+        re.findall(r"fun\s+([a-zA-Z0-9_]+)\s*\(\s*raw:\s*String\s*\)\s*:\s*([A-Za-z0-9_]+)", parsers)
     )
 
     out: dict[str, str] = {}

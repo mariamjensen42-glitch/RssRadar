@@ -260,12 +260,12 @@ _Avoid_: 不感兴趣（口语可用，正式术语是"减少此类"）、屏蔽
 **AI 功能（AI feature）**:
 一项可由用户独立开关的 AI 能力，共 35 项，分内容处理 / 推荐发现 / 辅助推送三组。
 每项在 `AiFeature` 枚举里登记触发方式、交互入口、AI 处理流程与结果展示方式——
-**加一项新功能只需要在这个枚举加一行**，产物落库与任务排队都按枚举自动生效。
+**加一项新功能 = 枚举加一行 + AiPayloads 加载荷 + AiParsers 加解析函数 + AiFeatureSpecs 登记一行（prompt 构建/解析/空壳判定/id 收口）+ AiArticleSheet 的渲染注册表补一行**，产物落库与任务排队都按枚举自动生效。
 _Avoid_: AI 特性、智能能力、模型功能
 
 **AI 产物（AI artifact）**:
 一次 AI 调用留下的模型原文，存在 `ai_artifacts` 的 (subjectKind, subjectId, kind) 三元组上。
-存原文而不是解析后的结构，是为了让清洗规则可改、排查时可追溯；解析在读取时由 `AiParsers` 完成。
+存原文而不是解析后的结构，是为了让清洗规则可改、排查时可追溯；解析在读取时由 `AiFeatureSpecs`（按功能登记的 spec 表）完成。
 _Avoid_: AI 结果、分析结果、缓存
 
 **AI 任务（AI task）**:

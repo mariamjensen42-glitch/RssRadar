@@ -19,7 +19,6 @@ class ReadingStatsDashboardTest {
             windowMinutes = 45L,
             allOpened = listOf(now, now - dayMs, now - 8 * dayMs), // 8 天前的不进时段
             openedCountsByFeed = listOf(3, 3),
-            topFeeds = listOf(TopFeed("A", 3), TopFeed("B", 3)),
         )
 
         val summary = ReadingStatsDashboard.assemble(inputs)
@@ -38,7 +37,6 @@ class ReadingStatsDashboardTest {
             windowMinutes = null,
             allOpened = listOf(now - dayMs, now - 2 * dayMs), // 今天还没打开
             openedCountsByFeed = listOf(1, 1),
-            topFeeds = emptyList(),
         )
 
         val summary = ReadingStatsDashboard.assemble(inputs)
@@ -56,7 +54,6 @@ class ReadingStatsDashboardTest {
             windowMinutes = null,
             allOpened = emptyList(),
             openedCountsByFeed = listOf(9, 1),
-            topFeeds = emptyList(),
         )
 
         val summary = ReadingStatsDashboard.assemble(inputs)

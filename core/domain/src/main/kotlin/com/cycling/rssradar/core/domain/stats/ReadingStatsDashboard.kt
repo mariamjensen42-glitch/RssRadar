@@ -2,9 +2,6 @@ package com.cycling.rssradar.core.domain.stats
 
 import com.cycling.rssradar.core.domain.ai.AiReadingStats
 
-/** 一条「最常打开的订阅源」行。刻意用本模块自己的类型，不让 domain 认识 Room。 */
-data class TopFeed(val feedTitle: String, val opens: Int)
-
 /**
  * 统计仪表盘的**口径唯一落点**（#83）。
  *
@@ -30,8 +27,6 @@ object ReadingStatsDashboard {
         val allOpened: List<Long>,
         /** 每源打开次数（全部有打开的源，不是 top——top 算集中度必然虚高）。 */
         val openedCountsByFeed: List<Int>,
-        /** 每源打开次数 + 标题，来自 topOpenedFeeds。 */
-        val topFeeds: List<TopFeed>,
     )
 
     data class Summary(
@@ -39,7 +34,6 @@ object ReadingStatsDashboard {
         /** 估算阅读分钟合计——UI 必须标注「估算」（CONTEXT.md），不得表述为真实停留。 */
         val weekMinutes: Long,
         val activeHours: List<Int>,
-        val topFeeds: List<TopFeed>,
         /** 归一化 HHI，0~1。 */
         val concentration: Double,
         val streakDays: Int,
@@ -56,7 +50,6 @@ object ReadingStatsDashboard {
             weekOpens = inputs.windowCnt,
             weekMinutes = inputs.windowMinutes ?: 0L,
             activeHours = hours,
-            topFeeds = inputs.topFeeds,
             concentration = AiReadingStats.concentration(inputs.openedCountsByFeed),
             streakDays = AiReadingStats.streakDays(dayKeys, todayDay),
         )
