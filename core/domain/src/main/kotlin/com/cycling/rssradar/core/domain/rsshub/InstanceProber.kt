@@ -28,17 +28,21 @@ class HttpHealthzProber(
 
     override suspend fun probe(host: String): Long? = withContext(Dispatchers.IO) {
         val start = System.currentTimeMillis()
+        // 连接提升到 try 外，保证异常分支也能 disconnect（否则 gzip Inflater 靠 GC 兜底 end）。
+        var connection: HttpURLConnection? = null
         try {
-            val connection = URL(host.trimEnd('/') + "/healthz").openConnection() as HttpURLConnection
+            connection = URL(host.trimEnd('/') + "/healthz").openConnection() as HttpURLConnection
             connection.connectTimeout = timeoutMs
             connection.readTimeout = timeoutMs
             connection.instanceFollowRedirects = true
             connection.setRequestProperty("User-Agent", RSSRADAR_USER_AGENT)
             val code = connection.responseCode
-            connection.disconnect()
+            runCatching { connection.errorStream?.close() }
             if (code > 0) System.currentTimeMillis() - start else null
         } catch (_: Exception) {
             null
+        } finally {
+            connection?.disconnect()
         }
     }
 

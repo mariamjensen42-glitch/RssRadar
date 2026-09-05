@@ -97,4 +97,37 @@ class FeedProbeResultTest {
             serving.interrupt()
         }
     }
+
+    @Test
+    fun `非2xx响应抛状态码异常且分支完整走完`() {
+        // 锁定 2026-09-05 的 CloseGuard 泄漏：非 2xx 分支过去只 disconnect 不关 errorStream，
+        // 平台 gzip Inflater 靠 GC 才 end（真机 logcat "A resource failed to call end" ×N）。
+        // 本测试驱动改动后的同一分支（读 errorStream → 关闭 → disconnect → 抛 HttpStatusException）。
+        // CloseGuard 本身在 JVM 上无断言缝（android 系 API），泄漏计数归零靠真机复现环验收：
+        // 刷新 60s 窗口内 "failed to call end" 应为 0。
+        val body = "not found".toByteArray()
+        val server = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
+        val serving = Thread {
+            runCatching {
+                server.accept().use { socket ->
+                    socket.getInputStream().readBytes() // 吃掉请求行/头
+                    socket.getOutputStream().write(
+                        ("HTTP/1.1 404 Not Found\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n").toByteArray() + body,
+                    )
+                }
+            }
+        }.apply { isDaemon = true; start() }
+        try {
+            val fetcher = HttpUrlFetcher(connectTimeoutMs = 2_000, readTimeoutMs = 2_000)
+            try {
+                fetcher.fetch("http://127.0.0.1:${server.localPort}/feed.xml")
+                fail("404 应当抛 HttpStatusException")
+            } catch (e: HttpStatusException) {
+                assertEquals(404, e.code)
+            }
+        } finally {
+            server.close()
+            serving.interrupt()
+        }
+    }
 }

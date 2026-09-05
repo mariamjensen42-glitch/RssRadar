@@ -421,6 +421,9 @@ class ContentFetcher(
         } catch (_: Exception) {
             Download.Err(FetchFailure.NETWORK, null, null)
         } finally {
+            // 错误分支（401/403/404/429/5xx）从不读 errorStream——必须显式关掉，
+            // 否则平台 gzip Inflater 等 GC 才 end（真机 CloseGuard 实证）。
+            runCatching { connection.errorStream?.close() }
             connection.disconnect()
         }
     }

@@ -89,12 +89,17 @@ class HttpUrlFetcher(
             connected = true
             connection.responseCode
         } catch (e: SocketTimeoutException) {
+            // 超时分支同理：errorStream 可能已建立，先关再断，别留给 GC。
+            runCatching { connection.errorStream?.close() }
             connection.disconnect()
             throw HttpTimeoutException(
                 if (connected) HttpTimeoutException.Phase.READ else HttpTimeoutException.Phase.CONNECT,
             )
         }
         if (code !in 200..299) {
+            // errorStream 必须显式读完再关：不碰它的话，平台 HTTP 栈为 gzip 响应建的
+            // Inflater 要等 GC 才 end（真机实测 "A resource failed to call end" ×N）。
+            runCatching { connection.errorStream?.close() }
             connection.disconnect()
             throw HttpStatusException(code)
         }
