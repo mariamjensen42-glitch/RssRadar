@@ -676,6 +676,15 @@ private fun ArticleWebView(
                     super.onScrollChanged(l, t, oldl, oldt)
                     currentOnScroll?.invoke(t)
                 }
+
+                // WebView 被布局移动后（首帧头部量测把它推到最终位置），硬件绘制不跟随，
+                // 旧位置留残影叠在 Compose 头部上（真机实拍：署名块叠在标题上）；用户一
+                // 开始内部滚动它自己会重绘，所以只在「还没滚过」时补强制重绘。
+                // scrollY==0 作闸门：视口模式随滚折叠期间每帧都在改布局位置，不能每帧全量重绘。
+                override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+                    super.onLayout(changed, l, t, r, b)
+                    if (changed && scrollY == 0) invalidate()
+                }
             }.apply {
                 settings.javaScriptEnabled = false
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
