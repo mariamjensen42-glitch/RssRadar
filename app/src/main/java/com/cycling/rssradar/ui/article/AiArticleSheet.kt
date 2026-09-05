@@ -382,25 +382,34 @@ private fun AiResultCard(feature: AiFeature, payload: Any) {
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(8.dp))
-            when (payload) {
-                is AiTagsPayload -> ChipFlow(payload.tags)
-                is AiKeywordsPayload -> ChipFlow(payload.keywords)
-                is AiClassifyPayload -> ClassifyBody(payload)
-                is AiSentimentPayload -> SentimentBody(payload)
-                is AiQualityPayload -> QualityBody(payload)
-                is AiNoisePayload -> NoiseBody(payload)
-                is AiOutlinePayload -> OutlineBody(payload)
-                is AiOpinionPayload -> OpinionBody(payload)
-                is AiCredibilityPayload -> CredibilityBody(payload)
-                is AiSharePayload -> ShareBody(payload)
-                is AiQaPayload -> QaBody(payload)
-                is AiBriefPayload -> BriefBody(payload)
-                is AiGlossaryPayload -> GlossaryBody(payload)
-                is AiFulltextPayload -> FulltextBody(payload)
-            }
+            // 渲染分发收敛到注册表：每项功能的渲染入口在 AI_RESULT_RENDERS 一行可查，
+            // 新功能在映射里登记一行即可，不再往 when 里追加分支。
+            AI_RESULT_RENDERS[feature]?.invoke(payload)
         }
     }
 }
+
+/**
+ * 各功能的产物渲染注册表：AiFeature → 渲染 composable。
+ * 与 core 侧 [com.cycling.rssradar.core.data.ai.AiFeatureSpecs] 同一取向——
+ * 每项功能的知识（core 侧行为 + app 侧渲染）各只有一处登记点。
+ */
+private val AI_RESULT_RENDERS: Map<AiFeature, @Composable (Any) -> Unit> = mapOf(
+    AiFeature.TAGS to { p -> ChipFlow((p as AiTagsPayload).tags) },
+    AiFeature.KEYWORDS to { p -> ChipFlow((p as AiKeywordsPayload).keywords) },
+    AiFeature.CLASSIFY to { p -> ClassifyBody(p as AiClassifyPayload) },
+    AiFeature.SENTIMENT to { p -> SentimentBody(p as AiSentimentPayload) },
+    AiFeature.QUALITY to { p -> QualityBody(p as AiQualityPayload) },
+    AiFeature.NOISE to { p -> NoiseBody(p as AiNoisePayload) },
+    AiFeature.OUTLINE to { p -> OutlineBody(p as AiOutlinePayload) },
+    AiFeature.OPINION to { p -> OpinionBody(p as AiOpinionPayload) },
+    AiFeature.CREDIBILITY to { p -> CredibilityBody(p as AiCredibilityPayload) },
+    AiFeature.SHARE_COPY to { p -> ShareBody(p as AiSharePayload) },
+    AiFeature.QA to { p -> QaBody(p as AiQaPayload) },
+    AiFeature.DAILY_BRIEF to { p -> BriefBody(p as AiBriefPayload) },
+    AiFeature.GLOSSARY to { p -> GlossaryBody(p as AiGlossaryPayload) },
+    AiFeature.FULLTEXT to { p -> FulltextBody(p as AiFulltextPayload) },
+)
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable

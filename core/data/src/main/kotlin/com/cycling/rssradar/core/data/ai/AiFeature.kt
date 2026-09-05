@@ -4,7 +4,8 @@ package com.cycling.rssradar.core.data.ai
  * AI 智能功能的唯一注册表：35 项功能各占一个枚举项。
  *
  * 加一项新功能的成本被压到最低——在这里加一行枚举常量（拿到 dbValue），
- * 再在 [AiPrompts] 加一个 prompt、在 [AiFeatureRunner] 加一个分支。
+ * 在 AiPayloads 加载荷、AiParsers 加解析函数，再到 [AiFeatureSpecs] 登记一行
+ * （prompt 构建 + 解析 + 空壳判定 + id 收口），app 侧 AiArticleSheet 的渲染注册表补一行。
  * 产物落 `ai_artifacts` 的 (subjectKind, subjectId, kind) 三元组，**不需要 schema 迁移**，
  * 这是本表刻意不做外键、改由每日任务清理孤儿换来的（见 AiSchema.kt 注释）。
  *

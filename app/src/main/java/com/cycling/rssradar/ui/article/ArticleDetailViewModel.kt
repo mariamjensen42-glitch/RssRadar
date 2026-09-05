@@ -12,7 +12,7 @@ import com.cycling.rssradar.core.data.ai.AiArtifactRepository
 import com.cycling.rssradar.core.data.ai.AiFeature
 import com.cycling.rssradar.core.data.ai.AiFeatureRunner
 import com.cycling.rssradar.core.data.ai.AiFulltextPayload
-import com.cycling.rssradar.core.data.ai.AiParsers
+import com.cycling.rssradar.core.data.ai.AiFeatureSpecs
 import com.cycling.rssradar.core.data.ai.AiRepository
 import com.cycling.rssradar.core.data.store.AiFeatureSettings
 import com.cycling.rssradar.core.data.store.AiFeatureStore
@@ -295,8 +295,8 @@ class ArticleDetailViewModel @Inject constructor(
         val loaded = HashMap<Int, Any>()
         ARTICLE_AI_FEATURES.forEach { feature ->
             val raw = artifacts.rawOf(feature, articleId) ?: return@forEach
-            val parsed = runCatching { AiParsers.parse(feature, raw) }.getOrNull() ?: return@forEach
-            if (AiParsers.isMeaningful(feature, parsed)) loaded[feature.dbValue] = parsed
+            val parsed = runCatching { AiFeatureSpecs.parse(feature, raw) }.getOrNull() ?: return@forEach
+            if (AiFeatureSpecs.isMeaningful(feature, parsed)) loaded[feature.dbValue] = parsed
         }
         _aiArtifacts.value = loaded
     }
@@ -338,7 +338,7 @@ class ArticleDetailViewModel @Inject constructor(
             try {
                 when (val outcome = featureRunner.run(feature, articleId, question)) {
                     is AiFeatureRunner.Outcome.Success -> {
-                        val parsed = runCatching { AiParsers.parse(feature, outcome.payload) }.getOrNull()
+                        val parsed = runCatching { AiFeatureSpecs.parse(feature, outcome.payload) }.getOrNull()
                         if (parsed != null) {
                             _aiArtifacts.value = _aiArtifacts.value + (key to parsed)
                         }

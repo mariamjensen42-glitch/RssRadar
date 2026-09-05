@@ -60,59 +60,10 @@ object AiPrompts {
     private val SUMMARY_VARIABLES = listOf("{title}", "{feed}", "{author}", "{content}")
 
     /**
-     * 构建某项功能的 prompt。
-     *
-     * @return null 表示这项功能不由大模型产出（如用量看板、任务队列），调用方不应发起请求。
+     * 按功能分发 prompt 的 when 已收敛到 [AiFeatureSpecs]——每项功能的 prompt 构建
+     * 与它的解析、空壳判定登记在同一行。本对象只保留各功能的模板实现与
+     * 摘要提示词的公共出口（[summaryVariableHelp] / [builtInSummaryPrompt]）。
      */
-    fun build(
-        feature: AiFeature,
-        context: AiPromptContext,
-        overrides: AiPromptOverrides = AiPromptOverrides(),
-    ): AiPrompt? {
-        if (!feature.needsLlm) return null
-        return when (feature) {
-            AiFeature.SUMMARY -> summary(context, overrides.summaryPrompt)
-            AiFeature.TRANSLATE -> translate(context)
-            AiFeature.CLASSIFY -> classify(context)
-            AiFeature.TAGS -> tags(context)
-            AiFeature.SENTIMENT -> sentiment(context)
-            AiFeature.KEYWORDS -> keywords(context)
-            AiFeature.OPINION -> opinion(context)
-            AiFeature.QA -> qa(context)
-            AiFeature.FULLTEXT -> fulltext(context)
-            AiFeature.DEDUPE -> dedupe(context)
-            AiFeature.QUALITY -> quality(context)
-            AiFeature.NOISE -> noise(context)
-            AiFeature.OUTLINE -> outline(context)
-            AiFeature.CREDIBILITY -> credibility(context)
-            AiFeature.GLOSSARY -> glossary(context)
-
-            AiFeature.FEED_RECOMMEND -> feedRecommend(context)
-            AiFeature.DISCOVER -> discover(context)
-            AiFeature.BUBBLE_BREAK -> bubbleBreak(context)
-            AiFeature.AGGREGATE -> aggregate(context)
-            AiFeature.INTEREST_RANK -> interestRank(context)
-            AiFeature.EVENT_MERGE -> eventMerge(context)
-            AiFeature.COLD_START -> coldStart(context)
-
-            AiFeature.DAILY_BRIEF -> dailyBrief(context)
-            AiFeature.SHARE_COPY -> shareCopy(context)
-            AiFeature.SMART_NOTIFY -> importance(context)
-            AiFeature.FEED_HEALTH -> feedHealth(context)
-            AiFeature.HABIT -> habit(context)
-            AiFeature.DAILY_REPORT -> dailyReport(context)
-            AiFeature.FILTER_RULE -> filterRule(context)
-
-            // 非 LLM 功能：本地计算，不进模型。
-            AiFeature.PERSONAL_FEED,
-            AiFeature.TOPIC_GALAXY,
-            AiFeature.RELATED,
-            AiFeature.USAGE,
-            AiFeature.TASK_QUEUE,
-            AiFeature.PROMPT_TEMPLATE,
-            -> null
-        }
-    }
 
     /** 订阅源级摘要提示词支持的变量说明，设置页渲染给用户看。 */
     fun summaryVariableHelp(): String =

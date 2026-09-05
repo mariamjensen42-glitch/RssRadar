@@ -84,10 +84,10 @@ class AiParsersTest {
 
     @Test
     fun `空壳产物被判为无意义`() {
-        assertFalse(AiParsers.isMeaningful(AiFeature.TAGS, AiParsers.tags("""{"tags":[]}""")))
-        assertFalse(AiParsers.isMeaningful(AiFeature.CLASSIFY, AiParsers.classify("""{"topic":""}""")))
-        assertFalse(AiParsers.isMeaningful(AiFeature.SUMMARY, "   "))
-        assertTrue(AiParsers.isMeaningful(AiFeature.TAGS, AiParsers.tags("""{"tags":["a"]}""")))
+        assertFalse(AiFeatureSpecs.isMeaningful(AiFeature.TAGS, AiParsers.tags("""{"tags":[]}""")))
+        assertFalse(AiFeatureSpecs.isMeaningful(AiFeature.CLASSIFY, AiParsers.classify("""{"topic":""}""")))
+        assertFalse(AiFeatureSpecs.isMeaningful(AiFeature.SUMMARY, "   "))
+        assertTrue(AiFeatureSpecs.isMeaningful(AiFeature.TAGS, AiParsers.tags("""{"tags":["a"]}""")))
     }
 
     @Test
@@ -112,7 +112,7 @@ class AiParsersTest {
 
     @Test
     fun `解析出的载荷按功能类型正确分发`() {
-        val parsed = AiParsers.parse(AiFeature.KEYWORDS, """{"keywords":["甲","乙"]}""")
+        val parsed = AiFeatureSpecs.parse(AiFeature.KEYWORDS, """{"keywords":["甲","乙"]}""")
         assertTrue(parsed is AiKeywordsPayload)
         assertEquals(listOf("甲", "乙"), (parsed as AiKeywordsPayload).keywords)
     }

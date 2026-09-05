@@ -90,7 +90,7 @@ class AiFeatureRunner(
         context: AiPromptContext,
     ): Outcome {
         val overrides = AiPromptOverrides(summaryPrompt = summaryPromptFor(feature, subjectId))
-        val prompt = AiPrompts.build(feature, context, overrides)
+        val prompt = AiFeatureSpecs.buildPrompt(feature, context, overrides)
             ?: return Outcome.Skipped("${feature.label}不调用模型")
 
         val raw = try {
@@ -116,14 +116,14 @@ class AiFeatureRunner(
         // （Room 写入失败、序列化异常……）。这段没有保护的话，异常会一路冒到调用方的
         // launch 块，把 loading 状态永远留在那——表现就是按钮一直转圈。
         return try {
-            val parsed = AiParsers.parse(feature, raw)
-            if (!AiParsers.isMeaningful(feature, parsed)) {
+            val parsed = AiFeatureSpecs.parse(feature, raw)
+            if (!AiFeatureSpecs.isMeaningful(feature, parsed)) {
                 limiter.record(prompt.user.length, raw.length, success = false)
                 return Outcome.Failed("AI 没有返回有效结果，请重试")
             }
 
             // 涉及文章 id 的产物要按本次真实候选集收口，防止模型给出列表里不存在的 id。
-            val payload = restrictIdsIfNeeded(feature, raw, context)
+            val payload = AiFeatureSpecs.restrictIds(feature, raw, context.companions.map { it.id }.toSet())
             limiter.record(prompt.user.length, payload.length, success = true)
             artifacts.save(
                 feature = feature,
@@ -139,77 +139,6 @@ class AiFeatureRunner(
             throw e
         } catch (e: Exception) {
             Outcome.Failed("结果处理失败：${e.message ?: e.javaClass.simpleName}")
-        }
-    }
-
-    /**
-     * 把产物里引用的文章 id 限制在本次送进 prompt 的候选集内。
-     *
-     * 模型"顺着语义"给出一个没在列表里出现过的 id 是高频失败：UI 照单全收后，
-     * 用户点进去看到完全不相关的文章，且毫无察觉。这里按候选集过滤掉越界 id。
-     * 只有引用了 id 的载荷需要这道处理，其余原样返回。
-     */
-    private fun restrictIdsIfNeeded(
-        feature: AiFeature,
-        raw: String,
-        context: AiPromptContext,
-    ): String {
-        val allowed = context.companions.map { it.id }.toSet()
-        if (allowed.isEmpty()) return raw
-
-        return when (feature) {
-            AiFeature.DISCOVER -> {
-                val parsed = AiParsers.discover(raw)
-                AiJson.encodeToString(
-                    AiDiscoverPayload.serializer(),
-                    parsed.copy(articleIds = AiParsers.restrictIds(parsed.articleIds, allowed)),
-                )
-            }
-
-            AiFeature.DAILY_BRIEF -> {
-                val parsed = AiParsers.dailyBrief(raw)
-                AiJson.encodeToString(
-                    AiBriefPayload.serializer(),
-                    parsed.copy(
-                        items = parsed.items.filter { it.articleId == 0L || it.articleId in allowed },
-                        skippable = AiParsers.restrictIds(parsed.skippable, allowed),
-                    ),
-                )
-            }
-
-            AiFeature.AGGREGATE -> {
-                val parsed = AiParsers.aggregate(raw)
-                AiJson.encodeToString(
-                    AiAggregatePayload.serializer(),
-                    parsed.copy(sourceIds = AiParsers.restrictIds(parsed.sourceIds, allowed)),
-                )
-            }
-
-            AiFeature.BUBBLE_BREAK -> {
-                val parsed = AiParsers.bubble(raw)
-                AiJson.encodeToString(
-                    AiBubblePayload.serializer(),
-                    parsed.copy(articleIds = AiParsers.restrictIds(parsed.articleIds, allowed)),
-                )
-            }
-
-            AiFeature.EVENT_MERGE -> {
-                val parsed = AiParsers.event(raw)
-                AiJson.encodeToString(
-                    AiEventPayload.serializer(),
-                    parsed.copy(timeline = parsed.timeline.filter { it.articleId in allowed }),
-                )
-            }
-
-            AiFeature.DAILY_REPORT -> {
-                val parsed = AiParsers.dailyReport(raw)
-                AiJson.encodeToString(
-                    AiReportPayload.serializer(),
-                    parsed.copy(missed = AiParsers.restrictIds(parsed.missed, allowed)),
-                )
-            }
-
-            else -> raw
         }
     }
 
