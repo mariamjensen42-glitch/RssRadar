@@ -66,7 +66,7 @@ class RefreshEngineProgressTest {
         val success = engine().refreshAll { done, total -> synced += done to total }
         assertEquals("全部源应刷新成功", feedCount, success)
         assertEquals("每个源恰好回调一次", feedCount, seen.size)
-        // done 单调递增：8 路并发下回调顺序不定，但值必须严格 1,2,3
+        // done 单调递增：多路并发下回调顺序不定，但值必须严格 1,2,3
         val dones = seen.map { it.first }
         assertEquals((1..feedCount).toList(), dones.sorted())
         seen.forEach { (_, total) -> assertEquals("total 恒为源总数", feedCount, total) }

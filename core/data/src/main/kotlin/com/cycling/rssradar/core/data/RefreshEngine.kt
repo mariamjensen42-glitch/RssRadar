@@ -29,7 +29,7 @@ import java.io.IOException
  *   （refreshAutoSyncFeeds，issue #58「同步屏蔽」）。失败源静默跳过，保留已有数据。
  * - **用户状态保护**：按 link 增量 upsert 时只更新内容状态字段，已读/收藏/稍后读
  *   原样保留（CONTEXT.md「用户状态」，SQL 层由 ArticleDao.updateContentState 保证）。
- * - **有界并发**：Semaphore(8)（issue #48），HttpURLConnection 无状态、Room 写入串行。
+ * - **有界并发**：Semaphore(32)（#48 引入，2026-09-06 提到 32），HttpURLConnection 无状态、Room 写入串行。
  * - **图标回填**：仅 iconUrl 为 null 时抓，永不覆盖（CONTEXT.md「站点图标」），
  *   fire-and-forget，不占并发名额。
  *
@@ -55,8 +55,12 @@ class RefreshEngine(
 ) {
 
     companion object {
-        /** 刷新的有界并发度（#48）：8 路并行，几百个源不再串行排队几十分钟。 */
-        private const val REFRESH_CONCURRENCY = 8
+        /**
+         * 刷新的有界并发度：HttpURLConnection 每请求一线程式的轻量协程阻塞，
+         * 32 路在百级源场景下把总耗时压到 1/4（原 8 路是 #48 保守值，真机反馈仍嫌慢）。
+         * 瓶颈在网络 IO 不在本机资源，再往上收益递减且容易触发站点限流。
+         */
+        const val REFRESH_CONCURRENCY = 32
     }
 
     private val refreshSemaphore = Semaphore(REFRESH_CONCURRENCY)
@@ -111,9 +115,9 @@ class RefreshEngine(
     }
 
     /**
-     * 有界并发刷新（#48）：Semaphore(8) 同时处理 8 个源。
+     * 有界并发刷新（#48）：Semaphore(32) 同时处理 32 个源。
      * 整体跑在 ioDispatcher 上，不让并发骨架占用调用方（Main）线程。
-     * [onProgress]：8 路并发下回调可能乱序交错，但 done 单调递增（AtomicInteger），
+     * [onProgress]：多路并发下回调可能乱序交错，但 done 单调递增（AtomicInteger），
      * 708 源全量刷新可达数十分钟——没有进度用户无法区分「在跑」和「卡死」。
      */
     private suspend fun refreshInParallel(
