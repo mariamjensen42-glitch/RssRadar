@@ -680,20 +680,32 @@ private fun ArticleWebView(
                 // WebView 被布局移动后（首帧头部量测把它推到最终位置），Chromium 合成层
                 // 不跟随移动——旧位置残影叠在 Compose 头部上，且 invalidate() 无效
                 // （真机实证：dumpsys 里 View bounds 已正确，画面却停在旧 y；只有内部
-                // 滚动能逼 Chromium 出新帧）。所以在布局变化时制造一次 ±1px 的净零滚动，
-                // 强制合成器按新位置出帧；scrollY==0 作闸门：视口模式随滚折叠期间每帧
-                // 都在改布局位置，不能每帧都触发。
+                // 滚动能逼 Chromium 出新帧）。净零滚动 ±1px 强制合成器按新位置出帧。
+                // 带图文章尤其严重：图片加载期 Chromium 首帧画得早（页面 reflow 中），
+                // 落定后往往不再有布局回调，光靠 onLayout 触发不了——所以除了布局变化
+                // 触发，还在加载完成和落定后延时补帧。scrollY==0 闸门：视口模式随滚折叠
+                // 期间每帧都在改布局，不能每次都触发。
+                fun forceFrame() {
+                    if (canScrollVertically(1)) {
+                        scrollBy(0, 1)
+                        scrollBy(0, -1)
+                    }
+                    invalidate()
+                }
+
                 override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
                     super.onLayout(changed, l, t, r, b)
-                    if (changed && scrollY == 0) {
-                        // 短内容滚不动（canScrollVertically false），scrollBy 是 no-op，
-                        // 那种页面残影最多盖到自己身上，不叠加头部，可接受。
-                        if (canScrollVertically(1)) {
-                            scrollBy(0, 1)
-                            scrollBy(0, -1)
-                        }
-                        invalidate()
-                    }
+                    if (changed && scrollY == 0) forceFrame()
+                }
+
+                override fun onAttachedToWindow() {
+                    super.onAttachedToWindow()
+                    // 图片加载造成的 reflow 在头几百毫秒到数秒内反复发生，落定时刻不确定；
+                    // 分四个延时各补一帧兜底，幂等且 ±1px 净零滚动本身无害。
+                    post { forceFrame() }
+                    postDelayed({ forceFrame() }, 300)
+                    postDelayed({ forceFrame() }, 800)
+                    postDelayed({ forceFrame() }, 2000)
                 }
             }.apply {
                 settings.javaScriptEnabled = false
