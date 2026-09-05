@@ -540,9 +540,11 @@ private fun PayloadLineRow(line: AiPayloadLine) {
             .fillMaxWidth()
             .padding(start = (line.depth * 12).dp, top = 3.dp, bottom = 3.dp),
     ) {
-        if (line.label != null) {
+        // label 来自另一模块的 data class，smart cast 不可用，必须先落到本地变量
+        val label = line.label
+        if (label != null) {
             Text(
-                text = line.label,
+                text = label,
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.textTertiary,
                 modifier = Modifier.width(84.dp),
