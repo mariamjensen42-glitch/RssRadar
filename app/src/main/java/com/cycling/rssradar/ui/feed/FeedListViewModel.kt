@@ -57,6 +57,9 @@ data class FeedListUiState(
     val isLoadingMore: Boolean = false,
     /** 下拉刷新进行中。 */
     val isRefreshing: Boolean = false,
+    /** 刷新进度（真机反馈缺口）：已完成的源数 / 总源数；非刷新期为 0/0 不渲染。 */
+    val refreshDone: Int = 0,
+    val refreshTotal: Int = 0,
     val isAddingFeed: Boolean = false,
     /** 一次性提示消息（Snackbar），消费后置空。 */
     val uiMessage: String? = null,
@@ -336,7 +339,10 @@ class FeedListViewModel @Inject constructor(
         if (_uiState.value.isRefreshing) return
         viewModelScope.launch {
             update { it.copy(isRefreshing = true) }
-            val successCount = repository.refreshAllFeeds()
+            // 进度回调从 IO 线程来；StateFlow 赋值线程安全，直接落 UiState
+            val successCount = repository.refreshAllFeeds { done, total ->
+                update { it.copy(refreshDone = done, refreshTotal = total) }
+            }
             loadFirstPage()
             // 刷新可能改变了分区内容（新订阅的源抓到文章），复核空分区态（issue #75）
             recheckPartitionEmpty()
@@ -344,6 +350,8 @@ class FeedListViewModel @Inject constructor(
             update {
                 it.copy(
                     isRefreshing = false,
+                    refreshDone = 0,
+                    refreshTotal = 0,
                     uiMessage = when {
                         hasFeeds && successCount == 0 -> "刷新失败，展示的是上次内容"
                         successCount > 0 -> "已更新 $successCount 个订阅源"

@@ -102,9 +102,10 @@ class FeedRepository(
 
     /**
      * 刷新全部订阅源，返回成功刷新的源数。失败源静默跳过（保留已有数据），
-     * 供下拉刷新调用。
+     * 供下拉刷新调用。[onProgress] 每 完成一个源 回调 (done, total)，供 UI 显示进度。
      */
-    suspend fun refreshAllFeeds(): Int = engine.refreshAll()
+    suspend fun refreshAllFeeds(onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): Int =
+        engine.refreshAll(onProgress)
 
     /**
      * 自动同步路径（issue #58）：只刷新参与自动同步的源（syncEnabled = 1）。

@@ -213,6 +213,16 @@ fun FeedListScreen(
                 tabs = if (recommendationEnabled) FeedTab.entries else FeedTab.entries.filter { it != FeedTab.Recommended },
                 onSelect = { viewModel.onIntent(FeedListIntent.SelectTab(it)) },
             )
+            // 刷新进度（真机反馈缺口）：708 源全量刷新可达数十分钟，
+            // 一个孤零零的转圈分不清「在跑」还是「卡死」——必须带计数。
+            if (uiState.isRefreshing && uiState.refreshTotal > 0) {
+                Text(
+                    text = "正在刷新 ${uiState.refreshDone}/${uiState.refreshTotal}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = radarColors().textTertiary,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
             Spacer(Modifier.height(4.dp))
             PullToRefreshBox(
                 isRefreshing = uiState.isRefreshing,

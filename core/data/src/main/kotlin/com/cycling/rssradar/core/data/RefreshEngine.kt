@@ -56,8 +56,9 @@ class RefreshEngine(
 
     // —— 对外接口：四条刷新路径，全部返回「成功源数 / 是否成功」，失败语义一致 ——
 
-    /** 手动路径：刷新全部订阅源，供下拉刷新调用。 */
-    suspend fun refreshAll(): Int = refreshInParallel(feedDao.getAll().map { it.id })
+    /** 手动路径：刷新全部订阅源，供下拉刷新调用。[onProgress] 每 完成一个源 回调 (done, total)。 */
+    suspend fun refreshAll(onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): Int =
+        refreshInParallel(feedDao.getAll().map { it.id }, onProgress)
 
     /** 自动同步路径（issue #58）：只刷新参与自动同步的源（syncEnabled = 1）。 */
     suspend fun refreshAutoSyncFeeds(): Int =
@@ -105,12 +106,25 @@ class RefreshEngine(
     /**
      * 有界并发刷新（#48）：Semaphore(8) 同时处理 8 个源。
      * 整体跑在 ioDispatcher 上，不让并发骨架占用调用方（Main）线程。
+     * [onProgress]：8 路并发下回调可能乱序交错，但 done 单调递增（AtomicInteger），
+     * 708 源全量刷新可达数十分钟——没有进度用户无法区分「在跑」和「卡死」。
      */
-    private suspend fun refreshInParallel(feedIds: List<Long>): Int = withContext(ioDispatcher) {
+    private suspend fun refreshInParallel(
+        feedIds: List<Long>,
+        onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
+    ): Int = withContext(ioDispatcher) {
         coroutineScope {
+            val total = feedIds.size
+            val done = java.util.concurrent.atomic.AtomicInteger(0)
             feedIds.map { feedId ->
                 async {
-                    refreshSemaphore.withPermit { refreshFeed(feedId) }
+                    refreshSemaphore.withPermit {
+                        try {
+                            refreshFeed(feedId)
+                        } finally {
+                            onProgress(done.incrementAndGet(), total)
+                        }
+                    }
                 }
             }.awaitAll().count { it }
         }
