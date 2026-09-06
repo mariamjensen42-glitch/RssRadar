@@ -342,6 +342,14 @@ interface FeedDao {
     @Query("UPDATE feeds SET title = :title WHERE id = :feedId")
     suspend fun updateTitle(feedId: Long, title: String)
 
+    /**
+     * 失效源自愈（对标 ReadYou 的地址纠错）：旧地址解析不出 feed、但从其 HTML
+     * autodiscovery 验证出新地址后改写。同时清掉旧地址的 ETag/Last-Modified 协商凭证
+     * ——凭证是旧 URL 的，带着去请求新 URL 语义错误（服务器若碰巧命中 304 会丢整轮更新）。
+     */
+    @Query("UPDATE feeds SET url = :url, etag = NULL, lastModified = NULL WHERE id = :feedId")
+    suspend fun updateUrl(feedId: Long, url: String)
+
     /** 站点图标回填（只在为 null 时抓，写入后不再覆盖，见 CONTEXT.md「站点图标」）。 */
     @Query("UPDATE feeds SET iconUrl = :iconUrl WHERE id = :feedId")
     suspend fun updateIconUrl(feedId: Long, iconUrl: String)

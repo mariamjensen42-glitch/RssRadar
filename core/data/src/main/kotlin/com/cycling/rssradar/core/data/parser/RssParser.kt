@@ -6,6 +6,7 @@ import com.rometools.rome.io.SyndFeedInput
 import com.rometools.rome.io.XmlReader
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
+import java.io.ByteArrayInputStream
 import java.io.InputStream
 
 
@@ -55,10 +56,18 @@ class RssParser {
 
     /** 解析失败（非法 XML / 非 RSS·Atom 内容）时抛 [IllegalArgumentException]。 */
     fun parse(input: InputStream): ParsedFeed {
+        val raw = input.readBytes()
         val feed = try {
-            SyndFeedInput().build(XmlReader(input))
-        } catch (e: Exception) {
-            throw IllegalArgumentException("Not a valid RSS/Atom feed", e)
+            SyndFeedInput().build(XmlReader(ByteArrayInputStream(raw)))
+        } catch (first: Exception) {
+            // 容错二次解析：真实世界的 feed 大量是"稍微坏掉"的 XML（控制字符、
+            // HTML 实体、裸 &）。ReadYou 靠容错吃下这些源，我们直接判 INVALID_FEED
+            // 连续 2 次就死——所以第一遍严格解析失败后清洗重试，还不行才算无效。
+            try {
+                SyndFeedInput().build(java.io.StringReader(sanitizeXml(decodeText(raw))))
+            } catch (second: Exception) {
+                throw IllegalArgumentException("Not a valid RSS/Atom feed", second)
+            }
         }
         val articles = feed.entries.mapNotNull { it.toArticle() }
         return ParsedFeed(
@@ -67,6 +76,46 @@ class RssParser {
             siteUrl = atomSiteUrl(feed),
         )
     }
+
+    /** 按 BOM / XML 声明探测编码解码（复用 rome 的 XmlReader 探测逻辑）。 */
+    private fun decodeText(raw: ByteArray): String =
+        XmlReader(ByteArrayInputStream(raw)).use { it.readText() }
+
+    /**
+     * XML 清洗（容错二次解析用，只修"常见的坏"，不试图修所有坏）：
+     * 1. XML 1.0 非法控制字符（RSS 正文里混入 \\x00-\\x1F 是解析失败第一大来源）；
+     * 2. 未定义的 HTML 命名实体（&nbsp; 等在 XML 里没有定义，转成数值引用）；
+     * 3. 裸 & 转义成 &amp;（写作工具把正文直接塞进 RSS 的经典产物）。
+     */
+    internal fun sanitizeXml(text: String): String {
+        var t = text.filter { c -> !isIllegalXmlChar(c) }
+        HTML_ENTITY_REPLACEMENTS.forEach { (name, code) ->
+            t = t.replace("&$name;", "&#$code;")
+        }
+        return t.replace(Regex("&(?!#[0-9]+;|#x[0-9a-fA-F]+;|[a-zA-Z][a-zA-Z0-9]*;)"), "&amp;")
+    }
+
+    /** XML 1.0 合法字符集之外的字符（Tab/LF/CR 保留，DEL 一并清掉）。 */
+    internal fun isIllegalXmlChar(c: Char): Boolean =
+        (c.code < 0x20 && c != '\t' && c != '\n' && c != '\r') || c.code == 0x7F
+
+    /** XML 未定义但 HTML/写作工具常见的命名实体 → 数值引用（覆盖实测高频集合）。 */
+    private val HTML_ENTITY_REPLACEMENTS = mapOf(
+        "nbsp" to 160, "iexcl" to 161, "cent" to 162, "pound" to 163, "curren" to 164,
+        "yen" to 165, "sect" to 167, "uml" to 168, "copy" to 169, "ordf" to 170,
+        "laquo" to 171, "not" to 172, "reg" to 174, "macr" to 175, "deg" to 176,
+        "plusmn" to 177, "sup2" to 178, "sup3" to 179, "acute" to 180, "micro" to 181,
+        "para" to 182, "middot" to 183, "cedil" to 184, "sup1" to 185, "ordm" to 186,
+        "raquo" to 187, "frac14" to 188, "frac12" to 189, "frac34" to 190,
+        "times" to 215, "divide" to 247, "szlig" to 223,
+        "bull" to 8226, "hellip" to 8230, "prime" to 8242, "Prime" to 8243,
+        "oline" to 8254, "frasl" to 8260, "euro" to 8364, "trade" to 8482,
+        "larr" to 8592, "uarr" to 8593, "rarr" to 8594, "darr" to 8595,
+        "harr" to 8596, "minus" to 8722, "ldquo" to 8220, "rdquo" to 8221,
+        "lsquo" to 8216, "rsquo" to 8217, "sbquo" to 8218, "bdquo" to 8222,
+        "lsaquo" to 8249, "rsaquo" to 8250, "mdash" to 8212, "ndash" to 8211,
+        "dagger" to 8224, "Dagger" to 8225, "permil" to 8240,
+    )
 
     /**
      * 站点主页 URL。rome 对 Atom 的 [SyndFeed.getLink] 会取第一个 `<link>`

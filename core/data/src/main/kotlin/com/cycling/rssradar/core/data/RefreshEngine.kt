@@ -6,6 +6,7 @@ import com.cycling.rssradar.core.data.db.FeedDao
 import com.cycling.rssradar.core.data.db.FeedEntity
 import com.cycling.rssradar.core.data.parser.RssParser
 import com.cycling.rssradar.core.data.rss.BestIconFinder
+import com.cycling.rssradar.core.data.rss.FeedDiscovery
 import com.cycling.rssradar.core.domain.rss.ConditionalFetchResult
 import com.cycling.rssradar.core.domain.rss.ConditionalHttpFetcher
 import com.cycling.rssradar.core.domain.rss.FeedFailureCategory
@@ -64,6 +65,12 @@ class RefreshEngine(
          * 瓶颈在网络 IO 不在本机资源，再往上收益递减且容易触发站点限流。
          */
         const val REFRESH_CONCURRENCY = 32
+
+        /**
+         * 自愈尝试的连续失败门槛：第一次失败可能是站点临时抽风，直接花 N 个请求做
+         * 发现是浪费；连续 2 次（与 FeedHealth 的失效判定对齐）还解析不出才值得修。
+         */
+        const val HEAL_FAILURE_THRESHOLD = 2
     }
 
     private val refreshSemaphore = Semaphore(REFRESH_CONCURRENCY)
@@ -169,7 +176,12 @@ class RefreshEngine(
             throw e
         } catch (e: Exception) {
             feedDao.recordRefreshFailure(feedId, FeedFailureCategory.from(FeedProbeResult.from(e)).stored)
-            false
+            // 失效自愈（对标 ReadYou 地址纠错）：抓得到但解析不出（INVALID_FEED）大概率是
+            // OPML 盲导进了站点首页/已迁移地址。连续失败达到阈值才试（不给每次刷新都白付
+            // 一次发现成本）；自愈换地址后立即补一轮刷新，成功走下方统一的恢复清零。
+            val canHeal = FeedProbeResult.from(e) == FeedProbeResult.InvalidFeed &&
+                feed.consecutiveFailures + 1 >= HEAL_FAILURE_THRESHOLD
+            if (canHeal) healAndRefresh(feed) else false
         }
         // 写放大守门（1000+ 源全量刷新）：只有「确实有失败要清」或「从未记过成功」
         // 才写一次——健康源的常规刷新（200/304）对 feeds 表零额外写入。
@@ -178,6 +190,52 @@ class RefreshEngine(
             feedDao.recordRefreshSuccess(feedId, System.currentTimeMillis())
         }
         ok
+    }
+
+    /** 自愈换地址成功后立即补一轮刷新；自愈失败或补刷新失败都返回 false。 */
+    private suspend fun healAndRefresh(feed: FeedEntity): Boolean {
+        val healed = tryHealUrl(feed) ?: return false
+        return try {
+            doRefreshFeed(healed)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * 失效源自愈：旧地址抓回来的是 HTML（或其他非 feed 内容）时，按 #5 的
+     * autodiscovery 规则找候选（link rel=alternate 声明 → 常见路径兜底），
+     * 逐个「真能解析出文章」验证，命中即改写 feed.url（[feedDao.updateUrl]
+     * 顺带清掉旧地址的协商凭证）。目标地址已被订阅则跳过——不制造重复源。
+     *
+     * 找不到就返回 null，调用方维持失败现状；本函数自身的一切失败也返回 null
+     * ——自愈是尽力而为的修复，绝不能把网络抖动放大成新问题。
+     */
+    private suspend fun tryHealUrl(feed: FeedEntity): FeedEntity? {
+        val html = try {
+            http.fetch(feed.url).use { it.readBytes().toString(Charsets.UTF_8) }
+        } catch (_: Exception) {
+            return null
+        }
+        val candidates = (
+            FeedDiscovery.candidateLinks(feed.url, html) +
+                FeedDiscovery.guessedLinks(feed.url)
+            ).distinct().take(FeedDiscovery.MAX_CANDIDATES)
+        for (candidate in candidates) {
+            if (feedDao.findIdByUrl(candidate) != null) continue
+            val parsed = try {
+                http.fetch(candidate).use { parser.parse(it) }
+            } catch (_: Exception) {
+                continue
+            }
+            if (parsed.articles.isEmpty()) continue
+            feedDao.updateUrl(feed.id, candidate)
+            // 凭证已由 updateUrl 清空，内存副本同步置空：补刷新才会发无条件请求
+            return feed.copy(url = candidate, etag = null, lastModified = null)
+        }
+        return null
     }
 
     /**

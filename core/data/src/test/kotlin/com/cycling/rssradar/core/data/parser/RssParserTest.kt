@@ -554,4 +554,23 @@ class RssParserTest {
         assertFalse("摘要不得残留 markdown 标记: $summary", summary.contains("##") || summary.contains("**"))
         assertTrue(summary.contains("标题行"))
     }
+
+    @Test
+    fun `容错二次解析 吃下控制字符与HTML实体的坏feed`() {
+        // 真实世界的"稍微坏"：XML 非法控制字符 + 未定义 HTML 实体 + 裸 &
+        val bad = "<rss version=\"2.0\"><channel><title>Bad</title><item>" +
+            "<title>T1</title><link>https://e.com/1</link>" +
+            "<description>A\u0001B&nbsp;&amp; C \u0010 </description>" +
+            "</item></channel></rss>"
+
+        val article = parser.parse(ByteArrayInputStream(bad.toByteArray())).articles.single()
+        assertEquals("T1", article.title)
+    }
+
+    @Test
+    fun `彻底不是feed的输入仍然报错`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            parser.parse(ByteArrayInputStream("<html><body>not a feed</body></html>".toByteArray()))
+        }
+    }
 }
