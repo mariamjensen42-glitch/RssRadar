@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -337,8 +338,15 @@ fun SubscriptionsScreen(
             // 展开大分组只组合可见行——原 AnimatedVisibility { forEach } 会把
             // 几百行一次性同步组合在主线程上，点击分组卡顿的根因。
             groups.forEach { group ->
-                item(key = "header-${group.group}", contentType = "header") {
-                    Box(modifier = Modifier.animateItem(itemFadeSpec, itemPlacementSpec, itemFadeSpec)) {
+                // 分组头吸顶（stickyHeader 是 LazyListScope 成员，foundation 1.10+ 无需 import）；
+                // 贴顶时后续内容会从背后滚过，必须铺 bgRoot 底色遮住
+                stickyHeader(key = "header-${group.group}", contentType = "header") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(radarColors().bgRoot)
+                            .animateItem(itemFadeSpec, itemPlacementSpec, itemFadeSpec),
+                    ) {
                         GroupHeader(
                             title = group.group,
                             feedCount = group.feeds.size,
