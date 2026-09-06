@@ -111,16 +111,17 @@ internal fun ReadingBody(
         else -> emptyList()
     }
     val renderer = LocalReadingPrefs.current.renderer
+    val immersive = LocalReadingPrefs.current.immersive
     // 渲染模式与它所需的产物一次算清：判据本身要解析 HTML 才能知道"解析一无所获"，
     // 分开算就是同一份 HTML 解析两遍。纯函数，见 BodyMode.kt（可 JVM 单测）。
     // 导航丝滑（用户反馈）：长文 HTML 解析 + 图片正则提取是几十毫秒级的主线程阻塞，
     // 以前在 remember 里同步跑，正好砸在导航动画的帧上——表现为动画期间空白卡顿、
     // 正文"加载完才蹦出来"。改为后台线程计算，头部（源名/标题）立即渲染，解析完
     // 正文无缝接上；null = 还在算，正文区暂时留白。
-    var plan by remember(translationUi, translationSegments, article.article.content, article.article.summary, renderer) {
+    var plan by remember(translationUi, translationSegments, article.article.content, article.article.summary, renderer, immersive) {
         mutableStateOf<BodyPlan?>(null)
     }
-    LaunchedEffect(translationUi, translationSegments, article.article.content, article.article.summary, renderer) {
+    LaunchedEffect(translationUi, translationSegments, article.article.content, article.article.summary, renderer, immersive) {
         plan = withContext(Dispatchers.Default) {
             resolveBodyPlan(
                 translationActive = translationUi != null,
@@ -128,6 +129,7 @@ internal fun ReadingBody(
                 content = article.article.content,
                 summary = article.article.summary,
                 renderer = renderer,
+                immersive = immersive,
             )
         }
     }

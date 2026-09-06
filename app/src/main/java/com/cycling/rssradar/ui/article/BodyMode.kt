@@ -63,6 +63,8 @@ internal fun resolveBodyPlan(
     content: String?,
     summary: String?,
     renderer: ReadingRenderer,
+    /** 沉浸阅读（issue #93）：开则原生路对中间树做显示层降噪（[ReadingDenoise]）。 */
+    immersive: Boolean = false,
 ): BodyPlan {
     if (translationActive) {
         // 每个分段取「有译文用译文，否则原文」判断能不能渲染出东西
@@ -83,7 +85,9 @@ internal fun resolveBodyPlan(
     }
     if (content == null) return BodyPlan(BodyMode.NO_CONTENT)
     if (renderer == ReadingRenderer.NATIVE) {
-        val nodes = ReadingNodes.parse(content)
+        var nodes = ReadingNodes.parse(content)
+        // 沉浸阅读：剥掉分享/推荐/导航等杂乱块；安全网保证误伤时回退原文树
+        if (immersive && nodes.isNotEmpty()) nodes = ReadingDenoise.clean(nodes)
         if (nodes.isNotEmpty()) return BodyPlan(BodyMode.NATIVE, nativeNodes = nodes)
     }
     return BodyPlan(BodyMode.WEBVIEW)

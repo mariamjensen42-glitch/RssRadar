@@ -291,6 +291,9 @@ fun ArticleDetailScreen(
             onImageMaximize = { v ->
                 viewModel.updateReadingPrefs { it.copy(image = it.image.copy(maximizeOnTap = v)) }
             },
+            onImmersive = { v ->
+                viewModel.updateReadingPrefs { it.copy(immersive = v) }
+            },
             onDismiss = { showStyleSheet = false },
         )
     }
@@ -423,6 +426,7 @@ private fun ReadingStyleSheet(
     onFontFamily: (ReadingFontFamily) -> Unit,
     onImageCornerRadius: (Int) -> Unit,
     onImageMaximize: (Boolean) -> Unit,
+    onImmersive: (Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val style = prefs.style
@@ -609,6 +613,33 @@ private fun ReadingStyleSheet(
                 Switch(
                     checked = image.maximizeOnTap,
                     onCheckedChange = onImageMaximize,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = radarColors().onAccent,
+                        checkedTrackColor = radarColors().accent,
+                    ),
+                )
+            }
+
+            // 沉浸模式（issue #93）：只留正文与图片，剥掉分享/推荐/评论等网页杂乱元素
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "沉浸模式",
+                        color = radarColors().textPrimary,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = "隐藏分享按钮、推荐阅读、评论区等杂乱内容",
+                        color = radarColors().textTertiary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Switch(
+                    checked = prefs.immersive,
+                    onCheckedChange = onImmersive,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = radarColors().onAccent,
                         checkedTrackColor = radarColors().accent,

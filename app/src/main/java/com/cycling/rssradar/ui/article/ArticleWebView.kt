@@ -49,9 +49,10 @@ internal fun ArticleWebView(
     val link = toCssColor(radarColors().link)
     val style = LocalReadingPrefs.current.style
     val image = LocalReadingPrefs.current.image
+    val immersive = LocalReadingPrefs.current.immersive
     // 关闭"点击放大"就传空集合：正文不包链接，图片点击在 WebView 里自然无反应。
     val linkedImages = if (image.maximizeOnTap) imageUrls.toSet() else emptySet()
-    val styledHtml = remember(html, style, image, linkedImages, bg, fg, muted, codeBg, border, link) {
+    val styledHtml = remember(html, style, image, linkedImages, bg, fg, muted, codeBg, border, link, immersive) {
         ReadingContentHtml.build(
             contentHtml = html,
             style = style,
@@ -63,6 +64,7 @@ internal fun ArticleWebView(
             link = link,
             imageUrls = linkedImages,
             imageCorners = image.cornerRadius,
+            immersive = immersive,
         )
     }
     // factory 只跑一次，回调经 updated 引用保持最新

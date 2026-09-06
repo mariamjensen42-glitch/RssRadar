@@ -113,6 +113,12 @@ data class ReadingPrefs(
     val image: ReadingImageState = ReadingImageState(),
     val renderer: ReadingRenderer = ReadingRenderer.NATIVE,
     val translation: TranslationDisplayState = TranslationDisplayState(),
+    /**
+     * 沉浸阅读（issue #93）：开则阅读页做显示层降噪——原生路剥掉分享/推荐/导航等
+     * 杂乱块（带正文安全网），WebView 路注入降噪 CSS。默认开：只删明显噪声，
+     * 误伤有安全网兜底；不想要极简以外的行为时用户可关。
+     */
+    val immersive: Boolean = true,
 )
 
 /**
@@ -145,6 +151,7 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
             .putString(KEY_RENDERER, next.renderer.name)
             .putString(KEY_VIEW_MODE, next.translation.viewMode.name)
             .putString(KEY_BILINGUAL_LAYOUT, next.translation.bilingualLayout.name)
+            .putBoolean(KEY_IMMERSIVE, next.immersive)
             .apply()
         _state.value = next
     }
@@ -180,6 +187,7 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
                 ?.let { runCatching { BilingualLayout.valueOf(it) }.getOrNull() }
                 ?: BilingualLayout.STACKED,
         ),
+        immersive = prefs.getBoolean(KEY_IMMERSIVE, true),
     )
 
     private fun coerce(prefs: ReadingPrefs): ReadingPrefs = prefs.copy(
@@ -204,5 +212,6 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
         const val KEY_RENDERER = "reading_renderer"
         const val KEY_VIEW_MODE = "translation_view_mode"
         const val KEY_BILINGUAL_LAYOUT = "translation_bilingual_layout"
+        const val KEY_IMMERSIVE = "reading_immersive"
     }
 }
