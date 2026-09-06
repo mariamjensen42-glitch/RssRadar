@@ -51,6 +51,11 @@ data class FeedListUiState(
      * 不靠 DB 失效重查——那正是数万行重查询 OOM 的根源。
      */
     val articles: List<ArticleWithFeed> = emptyList(),
+    /**
+     * 首屏数据是否还没落过一次：true 时 UI 不渲染空态——空库查询期间的
+     * EmptyState 会让用户每次进 App 都先看一眼「没有订阅源」再闪出列表。
+     */
+    val isFirstLoad: Boolean = true,
     /** 是否还有下一页（四个 tab 均分页）。 */
     val hasMore: Boolean = false,
     /**
@@ -484,7 +489,13 @@ class FeedListViewModel @Inject constructor(
         // 总数与第一页同批取：切 tab/改筛选/刷新后一起刷新，翻页不重查
         val total = countTabPage()
         update {
-            it.copy(articles = page, hasMore = hasMoreAfter(0, page.size), totalCount = total)
+            it.copy(
+                articles = page,
+                hasMore = hasMoreAfter(0, page.size),
+                totalCount = total,
+                // 无论查到与否，第一次查询已落地，之后空列表就是真空态
+                isFirstLoad = false,
+            )
         }
     }
 

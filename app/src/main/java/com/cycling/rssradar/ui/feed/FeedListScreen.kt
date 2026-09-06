@@ -259,6 +259,12 @@ fun FeedListScreen(
             ) {
                 if (uiState.isRanking) {
                     RecommendationLoading(modifier = Modifier.fillMaxSize())
+                } else if (currentList.isEmpty() && uiState.isFirstLoad) {
+                    // 首屏查询在途：不渲染空态——空库查询期间的 EmptyState 会让用户
+                    // 每次进 App 都先看一眼「没有订阅源」再闪出列表。给个居中轻指示。
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = radarColors().accent)
+                    }
                 } else if (currentList.isEmpty()) {
                     EmptyState(
                         selectedTab = uiState.selectedTab,
