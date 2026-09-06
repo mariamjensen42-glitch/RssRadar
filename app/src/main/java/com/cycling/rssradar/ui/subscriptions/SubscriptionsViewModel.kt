@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -97,6 +98,9 @@ sealed interface SubscriptionsIntent {
 
     /** 只看失效源（#82）：订阅列表在「全部」与「仅失效」之间切换。 */
     data object ToggleUnhealthyFilter : SubscriptionsIntent
+
+    /** 一键删除全部失效源（#82）：文章级联删除，UI 侧有二次确认。 */
+    data object DeleteUnhealthyFeeds : SubscriptionsIntent
 }
 
 @HiltViewModel
@@ -212,6 +216,25 @@ class SubscriptionsViewModel @Inject constructor(
             is SubscriptionsIntent.SetFeedSummaryPrompt -> setFeedSummaryPrompt(intent.feedId, intent.prompt)
             is SubscriptionsIntent.SetFeedAutoSummary -> setFeedAutoSummary(intent.feedId, intent.enabled)
             SubscriptionsIntent.ToggleUnhealthyFilter -> _unhealthyOnly.value = !_unhealthyOnly.value
+            SubscriptionsIntent.DeleteUnhealthyFeeds -> deleteUnhealthyFeeds()
+        }
+    }
+
+    /**
+     * 一键删除全部失效源：删除清单执行时从 DB 现取（不走 unhealthyFeeds StateFlow——
+     * 它 WhileSubscribed，且弹窗期间数据可能变化），判定与 #82 同一函数，不另立标准。
+     * 文章级联删除，不可逆；确认对话框在 UI 侧。
+     */
+    private fun deleteUnhealthyFeeds() {
+        viewModelScope.launch {
+            val targets = repository.observeFeeds().first()
+                .filter { FeedHealth.isUnhealthy(it.consecutiveFailures, it.failureReason) }
+            if (targets.isEmpty()) {
+                uiMessage = "没有失效的订阅源"
+                return@launch
+            }
+            repository.deleteFeeds(targets.map { it.id })
+            uiMessage = "已删除 ${targets.size} 个失效订阅源（含其文章）"
         }
     }
 

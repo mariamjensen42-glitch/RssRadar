@@ -40,7 +40,7 @@ data class ListDisplayState(
     val showDate: Boolean = true,
     val showThumbnail: Boolean = true,
     val descMode: ListDescMode = ListDescMode.SHORT,
-    val stickyDateHeader: Boolean = false,
+    val stickyDateHeader: Boolean = true,
     val dimRead: Boolean = false,
     /**
      * 滚动时自动标记已读（#11）：卡片滚出视口顶部即标记为已读。
@@ -84,7 +84,7 @@ class ListDisplayStore(private val prefs: SharedPreferences) {
         descMode = prefs.getString(KEY_DESC_MODE, null)
             ?.let { name -> runCatching { ListDescMode.valueOf(name) }.getOrNull() }
             ?: ListDescMode.SHORT,
-        stickyDateHeader = prefs.getBoolean(KEY_STICKY_DATE, false),
+        stickyDateHeader = prefs.getBoolean(KEY_STICKY_DATE, true),
         dimRead = prefs.getBoolean(KEY_DIM_READ, false),
         markReadOnScroll = prefs.getBoolean(KEY_MARK_READ_ON_SCROLL, false),
     )

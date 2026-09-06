@@ -2,6 +2,7 @@ package com.cycling.rssradar.di
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import androidx.room.Room
 import androidx.room.withTransaction
 import com.cycling.rssradar.core.data.ai.AiArtifactRepository
@@ -156,6 +157,11 @@ object AppModule {
         iconFinder = iconFinder,
         externalScope = externalScope,
         conditionalHttp = conditionalHttp,
+        // 自愈会静默改写订阅地址：至少落一条日志，否则用户反馈「这个源内容变了」
+        // 时查无可查（UI 级提示要等通知模块，见 docs）。
+        onHealed = { feedId, oldUrl, newUrl ->
+            Log.i("RssRadar", "feed $feedId healed: $oldUrl -> $newUrl")
+        },
     )
 
     /** 应用级外部作用域：fire-and-forget 任务（站点图标抓取等）不随任何 ViewModel/刷新协程死亡。 */

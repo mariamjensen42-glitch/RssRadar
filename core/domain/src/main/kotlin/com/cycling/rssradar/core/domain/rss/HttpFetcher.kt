@@ -9,8 +9,16 @@ import java.net.URL
 /**
  * 全应用统一的 UA 常量：feed 抓取、图标抓取、实例探活共用一条缝的同一份配置。
  * 此前三处各写一份字面量，改 UA / 加代理要改三个文件——locality 事故。
+ *
+ * 用真实浏览器 UA 而非自报家门（"RssRadar/1.0"）：大量站点（Cloudflare 及各类反爬
+ * 中间件）对陌生客户端 UA 直接回 403/503，而 4xx 属高置信失效、连续 2 次就把源判死
+ * ——伪装成浏览器是抓取器的通行证，不是欺骗。对标 ReadYou（OkHttp + 浏览器 UA）。
  */
-const val RSSRADAR_USER_AGENT = "Mozilla/5.0 (Android) RssRadar/1.0"
+const val RSSRADAR_USER_AGENT =
+    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+
+/** 告诉服务器我们接受什么：feed MIME 优先，xml/任意兜底。部分 CDN 按协商头分流。 */
+const val RSSRADAR_ACCEPT = "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8"
 
 /**
  * URL 规范化（订阅链路与图标抓取共用）：补 https 前缀、解析合法性校验。
@@ -107,8 +115,7 @@ class HttpUrlFetcher(
 ) : HttpFetcher, ConditionalHttpFetcher {
 
     override fun fetch(url: String): InputStream {
-        val connection = open(url)
-        val code = connectPhaseAware(connection)
+        val (connection, code) = request(url, etag = null, lastModified = null)
         if (code !in 200..299) {
             release(connection)
             throw HttpStatusException(code)
@@ -117,11 +124,7 @@ class HttpUrlFetcher(
     }
 
     override fun fetchConditional(url: String, etag: String?, lastModified: String?): ConditionalFetchResult {
-        val connection = open(url)
-        // 协商凭证只在该值非空时携带；null = 首次刷新，走普通请求
-        etag?.takeIf { it.isNotBlank() }?.let { connection.setRequestProperty("If-None-Match", it) }
-        lastModified?.takeIf { it.isNotBlank() }?.let { connection.setRequestProperty("If-Modified-Since", it) }
-        val code = connectPhaseAware(connection)
+        val (connection, code) = request(url, etag, lastModified)
         if (code == 304) {
             release(connection)
             return ConditionalFetchResult.NotModified
@@ -143,7 +146,39 @@ class HttpUrlFetcher(
         connection.readTimeout = readTimeoutMs
         connection.instanceFollowRedirects = true
         connection.setRequestProperty("User-Agent", userAgent)
+        connection.setRequestProperty("Accept", RSSRADAR_ACCEPT)
         return connection
+    }
+
+    /**
+     * 发请求并返回「连接 + 状态码」，重定向在本层消化。
+     *
+     * HttpURLConnection 的 instanceFollowRedirects **不跨协议**（http↔https 互跳直接把
+     * 3xx 交回来，底层抛 IOException）——而大量站点把 http 首页/feed 301 到 https，
+     * 原样放行就是「浏览器能打开、App 失效」。所以这里手动跟随：每次重定向按
+     * RFC 3986 相对当前 URL 解析 Location（协议切换是本逻辑存在的理由），
+     * 同协议重定向仍由 instanceFollowRedirects 先吃掉，本循环只是兜底。
+     * 协商凭证在重定向后原样重发：对最终 URL 做条件协商语义不变。
+     */
+    private fun request(url: String, etag: String?, lastModified: String?): Pair<HttpURLConnection, Int> {
+        var current = url
+        var redirects = 0
+        while (true) {
+            val connection = open(current)
+            etag?.takeIf { it.isNotBlank() }?.let { connection.setRequestProperty("If-None-Match", it) }
+            lastModified?.takeIf { it.isNotBlank() }?.let { connection.setRequestProperty("If-Modified-Since", it) }
+            val code = connectPhaseAware(connection)
+            val isRedirect = code == 301 || code == 302 || code == 303 || code == 307 || code == 308
+            if (isRedirect && redirects < MAX_REDIRECTS) {
+                val location = connection.getHeaderField("Location")
+                release(connection)
+                if (location.isNullOrBlank()) throw HttpStatusException(code)
+                current = URL(URL(current), location).toString()
+                redirects++
+            } else {
+                return connection to code
+            }
+        }
     }
 
     /**
@@ -182,5 +217,8 @@ class HttpUrlFetcher(
 
         /** 兼容旧引用；真身是顶层 [RSSRADAR_USER_AGENT]。 */
         const val USER_AGENT = RSSRADAR_USER_AGENT
+
+        /** 手动重定向上限：与浏览器一致，防循环 301。 */
+        const val MAX_REDIRECTS = 5
     }
 }

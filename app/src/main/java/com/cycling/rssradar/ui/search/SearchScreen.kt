@@ -34,7 +34,10 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -115,6 +118,7 @@ fun SearchScreen(
                     history = state.history,
                     onPick = { viewModel.onIntent(SearchIntent.QueryChange(it)) },
                     onClear = { viewModel.onIntent(SearchIntent.ClearHistory) },
+                    onDeleteItem = { viewModel.onIntent(SearchIntent.DeleteHistoryItem(it)) },
                 )
                 // 无历史时的托底内容：整页只剩一句"暂无搜索记录"太空洞
                 if (state.history.isEmpty()) {
@@ -146,50 +150,42 @@ private fun SearchBar(
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier.fillMaxWidth()) {
-        OutlinedTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            modifier = Modifier.weight(1f),
-            placeholder = {
-                Text(
-                    "搜索文章、来源或关键词",
-                    color = radarColors().textTertiary,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(50),
-            leadingIcon = {
-                Icon(Lucide.Search, contentDescription = null, tint = radarColors().textTertiary, modifier = Modifier.size(18.dp))
-            },
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    IconButton(onClick = onClear) {
-                        Icon(Lucide.X, contentDescription = "清空", tint = radarColors().textTertiary, modifier = Modifier.size(18.dp))
-                    }
-                }
-            },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = radarColors().surface1,
-                unfocusedContainerColor = radarColors().surface1,
-                focusedBorderColor = radarColors().accent,
-                unfocusedBorderColor = radarColors().surface2,
-                focusedTextColor = radarColors().textPrimary,
-                unfocusedTextColor = radarColors().textPrimary,
-                cursorColor = radarColors().accent,
-            ),
-        )
-        Spacer(Modifier.width(8.dp))
-        TextButton(onClick = onSubmit) {
+    // 键盘 action 触发搜索（UI 审计 S1）：移动端惯例，去掉右上角文字按钮
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = modifier.fillMaxWidth(),
+        placeholder = {
             Text(
-                text = "搜索",
-                color = radarColors().link,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                "搜索文章、来源或关键词",
+                color = radarColors().textTertiary,
+                style = MaterialTheme.typography.bodyMedium,
             )
-        }
-    }
+        },
+        singleLine = true,
+        shape = RoundedCornerShape(50),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
+        leadingIcon = {
+            Icon(Lucide.Search, contentDescription = null, tint = radarColors().textTertiary, modifier = Modifier.size(18.dp))
+        },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = onClear) {
+                    Icon(Lucide.X, contentDescription = "清空", tint = radarColors().textTertiary, modifier = Modifier.size(18.dp))
+                }
+            }
+        },
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = radarColors().surface1,
+            unfocusedContainerColor = radarColors().surface1,
+            focusedBorderColor = radarColors().accent,
+            unfocusedBorderColor = radarColors().surface2,
+            focusedTextColor = radarColors().textPrimary,
+            unfocusedTextColor = radarColors().textPrimary,
+            cursorColor = radarColors().accent,
+        ),
+    )
 }
 
 @Composable
@@ -197,6 +193,8 @@ private fun RecentSearches(
     history: List<String>,
     onPick: (String) -> Unit,
     onClear: () -> Unit,
+    /** 删除单条历史（UI 审计 S2）。 */
+    onDeleteItem: (String) -> Unit,
 ) {
     Column(modifier = Modifier.padding(horizontal = 20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -226,7 +224,11 @@ private fun RecentSearches(
                 history.chunked(3).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         row.forEach { term ->
-                            HistoryChip(term = term, onClick = { onPick(term) })
+                            HistoryChip(
+                                term = term,
+                                onClick = { onPick(term) },
+                                onDelete = { onDeleteItem(term) },
+                            )
                         }
                     }
                 }
@@ -282,18 +284,29 @@ private fun IdleSuggestions(onOpenSubscriptions: () -> Unit) {
 }
 
 @Composable
-private fun HistoryChip(term: String, onClick: () -> Unit) {
+private fun HistoryChip(term: String, onClick: () -> Unit, onDelete: (String) -> Unit) {
     Surface(
         shape = RoundedCornerShape(50),
         color = radarColors().surface1,
         modifier = Modifier.clickable(onClick = onClick),
     ) {
-        Text(
-            text = term,
-            color = radarColors().textPrimary,
-            style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = term,
+                color = radarColors().textPrimary,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(start = 14.dp),
+            )
+            // 尾随 × 删除单条（UI 审计 S2）
+            IconButton(onClick = { onDelete(term) }, modifier = Modifier.size(24.dp)) {
+                Icon(
+                    Lucide.X,
+                    contentDescription = "删除「$term」",
+                    tint = radarColors().textTertiary,
+                    modifier = Modifier.size(12.dp),
+                )
+            }
+        }
     }
 }
 

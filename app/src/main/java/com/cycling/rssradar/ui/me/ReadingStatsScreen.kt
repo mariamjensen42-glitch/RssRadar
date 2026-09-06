@@ -34,7 +34,7 @@ import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
 import com.cycling.rssradar.core.data.db.ArticleDao
 import com.cycling.rssradar.core.data.db.FeedOpenStat
-import com.cycling.rssradar.core.domain.ai.AiReadingStats
+import com.cycling.rssradar.core.domain.stats.ReadingStatsDashboard
 import com.cycling.rssradar.core.ui.theme.radarColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -42,9 +42,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-
-private const val DAY_MS = 24 * 60 * 60 * 1000L
-private const val WEEK_MS = 7 * DAY_MS
 
 /** 统计仪表盘 UiState（#83）：所有数字来自 DB 真实计算，一个都不许编。 */
 data class ReadingStatsUiState(
@@ -80,29 +77,36 @@ class ReadingStatsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            // 口径装配收敛到 ReadingStatsDashboard（core/domain 纯函数，JVM 可测）——
+            // 本 VM 只负责取数：每个数字都能回溯到一条查询，装配规则只写一遍。
             val now = System.currentTimeMillis()
-            val since = now - WEEK_MS
             val zoneOffset = java.util.TimeZone.getDefault().getOffset(now)
 
+            val since = now - ReadingStatsDashboard.WINDOW_DAYS * ReadingStatsDashboard.DAY_MS
             val window = articleDao.readingWindowStat(since)
             // 全部打开时间戳：活跃时段只要近 7 天的，streak 要全部历史（断一天就断）
             val allOpened = articleDao.allOpenedTimestamps()
-            val hours = AiReadingStats.activeHours(allOpened.filter { it >= since }, zoneOffset)
-            // epoch day 手写除法（floorDiv 在 check-kotlin 下解析不到）：时间戳恒正，普通除法等价
-            val dayKeys = allOpened.map { (it + zoneOffset) / DAY_MS }.toSet()
-            val todayDay = (now + zoneOffset) / DAY_MS
-
             val perFeed = articleDao.openedCountsByFeedSince(since)
-            val top = articleDao.topOpenedFeeds(since, TOP_FEED_LIMIT)
+            val top = articleDao.topOpenedFeeds(since, ReadingStatsDashboard.TOP_FEED_LIMIT)
+
+            val summary = ReadingStatsDashboard.assemble(
+                ReadingStatsDashboard.Inputs(
+                    now = now,
+                    zoneOffsetMillis = zoneOffset,
+                    windowCnt = window.cnt,
+                    windowMinutes = window.minutes,
+                    allOpened = allOpened,
+                    openedCountsByFeed = perFeed.map { it.cnt },
+                ),
+            )
 
             _state.value = ReadingStatsUiState(
-                weekOpens = window.cnt,
-                weekMinutes = window.minutes ?: 0L,
-                activeHours = hours,
+                weekOpens = summary.weekOpens,
+                weekMinutes = summary.weekMinutes,
+                activeHours = summary.activeHours,
                 topFeeds = top,
-                // 集中度用「全部有打开的源」算，不是 top5——top5 算出来必然虚高
-                concentration = AiReadingStats.concentration(perFeed.map { it.cnt }),
-                streakDays = AiReadingStats.streakDays(dayKeys, todayDay),
+                concentration = summary.concentration,
+                streakDays = summary.streakDays,
                 starredCount = articleDao.starredCount(),
                 bookmarkedCount = articleDao.bookmarkedCount(),
                 loaded = true,
@@ -116,10 +120,7 @@ class ReadingStatsViewModel @Inject constructor(
         }
     }
 
-    companion object {
-        const val TOP_FEED_LIMIT = 5
     }
-}
 
 /** 统计仪表盘页（#83）：一屏卡片，近 7 天滚动窗，无切换。 */
 @Composable
@@ -182,9 +183,10 @@ fun ReadingStatsScreen(
             )
         }
         Spacer(Modifier.height(10.dp))
+        // 「当前未读」已移除（UI 审计 G2）：未读存量在信息流与「我的」页已展示，
+        // 本页只保留行为统计，避免同一数字四处重复
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             StatsBigCard(value = state.streakDays.toString(), label = "连续阅读天数", modifier = Modifier.weight(1f))
-            StatsBigCard(value = state.unreadCount.toString(), label = "当前未读", modifier = Modifier.weight(1f))
             StatsBigCard(value = (state.starredCount + state.bookmarkedCount).toString(), label = "收藏/稍后读", modifier = Modifier.weight(1f))
         }
 

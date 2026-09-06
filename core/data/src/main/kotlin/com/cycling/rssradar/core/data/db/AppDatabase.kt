@@ -342,6 +342,14 @@ interface FeedDao {
     @Query("UPDATE feeds SET title = :title WHERE id = :feedId")
     suspend fun updateTitle(feedId: Long, title: String)
 
+    /**
+     * 失效源自愈（对标 ReadYou 的地址纠错）：旧地址解析不出 feed、但从其 HTML
+     * autodiscovery 验证出新地址后改写。同时清掉旧地址的 ETag/Last-Modified 协商凭证
+     * ——凭证是旧 URL 的，带着去请求新 URL 语义错误（服务器若碰巧命中 304 会丢整轮更新）。
+     */
+    @Query("UPDATE feeds SET url = :url, etag = NULL, lastModified = NULL WHERE id = :feedId")
+    suspend fun updateUrl(feedId: Long, url: String)
+
     /** 站点图标回填（只在为 null 时抓，写入后不再覆盖，见 CONTEXT.md「站点图标」）。 */
     @Query("UPDATE feeds SET iconUrl = :iconUrl WHERE id = :feedId")
     suspend fun updateIconUrl(feedId: Long, iconUrl: String)
@@ -473,6 +481,64 @@ interface ArticleDao {
     )
     @Suppress("QUERY_MISMATCH")
     suspend fun loadBookmarkedWithFeedPaged(limit: Int, offset: Int): List<ArticleWithFeed>
+
+    // —— 总数 COUNT（滚动位置指示条）：谓词与上面的分页查询严格同构，保证分母一致。
+    // 翻页只追加不重算总数，指示条 thumb 不随 totalItemsCount 增长而跳变。 ——
+
+    @Query("SELECT COUNT(*) FROM articles JOIN feeds ON articles.feedId = feeds.id")
+    suspend fun countAllWithFeed(): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE
+        """,
+    )
+    suspend fun countAllWithFeedFiltered(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+    ): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.isRead = 0 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE
+        """,
+    )
+    suspend fun countUnreadWithFeedFiltered(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+    ): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.isStarred = 1 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE
+        """,
+    )
+    suspend fun countStarredWithFeedFiltered(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+    ): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.isBookmarked = 1 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE
+        """,
+    )
+    suspend fun countBookmarkedWithFeedFiltered(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+    ): Int
 
     // —— 组合筛选变体（issue #74 分组 + issue #75 分区）：两个过滤维度收进同一条查询，
     // 四个常规 tab 各一条，DAO 查询总数不随维度组合膨胀 ——

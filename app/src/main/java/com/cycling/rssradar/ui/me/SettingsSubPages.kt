@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -31,7 +32,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -58,7 +59,6 @@ import com.cycling.rssradar.core.ui.components.OptionPickerSheet
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Eye
-import com.composables.icons.lucide.EyeOff
 import com.composables.icons.lucide.Lucide
 import com.cycling.rssradar.core.ui.theme.radarColors
 
@@ -571,6 +571,13 @@ fun SettingsSyncScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    imageVector = Lucide.ChevronRight,
+                    contentDescription = "选择",
+                    tint = radarColors().textTertiary,
+                    modifier = Modifier.size(16.dp),
+                )
             }
         }
 
@@ -717,10 +724,19 @@ fun SettingsRssHubScreen(
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 4.dp),
         )
-        Spacer(Modifier.height(10.dp))
-        TextButton(onClick = viewModel::saveCustomHost) {
-            Text("保存", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
-        }
+                Spacer(Modifier.height(10.dp))
+                // 主操作用实心按钮（UI 审计 G3）：文本链接样式地位不符、点击面积小
+                Button(
+                    onClick = viewModel::saveCustomHost,
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = radarColors().accent,
+                        contentColor = radarColors().onAccent,
+                    ),
+                ) {
+                    Text("保存", style = MaterialTheme.typography.labelLarge)
+                }
 
         Spacer(Modifier.height(16.dp))
         Text(
@@ -857,7 +873,8 @@ fun SettingsAiDiagScreen(
                     )
                 }
                 Spacer(Modifier.height(12.dp))
-                // Key 默认打码：这页一截图就泄密（真机截图实测）。点眼睛临时可见。
+                // Key 默认打码：这页一截图就泄密（真机截图实测）。
+                // 按住眼睛才临时可见，松手立即回打码——泄密窗口只有按住期间（UI 审计 G1）。
                 var showAiKey by remember { mutableStateOf(false) }
                 OutlinedTextField(
                     value = state.aiKeyInput,
@@ -867,10 +884,22 @@ fun SettingsAiDiagScreen(
                     singleLine = true,
                     visualTransformation = if (showAiKey) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
-                        IconButton(onClick = { showAiKey = !showAiKey }) {
+                        // 按住显示、松手即隐藏（onClick 空操作，手势全在 pointerInput）
+                        IconButton(onClick = {}, modifier = Modifier.pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    showAiKey = true
+                                    try {
+                                        awaitRelease()
+                                    } finally {
+                                        showAiKey = false
+                                    }
+                                },
+                            )
+                        }) {
                             Icon(
-                                imageVector = if (showAiKey) Lucide.EyeOff else Lucide.Eye,
-                                contentDescription = if (showAiKey) "隐藏 Key" else "显示 Key",
+                                imageVector = Lucide.Eye,
+                                contentDescription = "按住显示 Key，松手隐藏",
                                 tint = radarColors().textTertiary,
                             )
                         }
@@ -891,8 +920,16 @@ fun SettingsAiDiagScreen(
                     Text(text = message, color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
                 }
                 Spacer(Modifier.height(10.dp))
-                TextButton(onClick = viewModel::saveAiKey) {
-                    Text("保存 Key", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                Button(
+                    onClick = viewModel::saveAiKey,
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = radarColors().accent,
+                        contentColor = radarColors().onAccent,
+                    ),
+                ) {
+                    Text("保存 Key", style = MaterialTheme.typography.labelLarge)
                 }
             }
         }

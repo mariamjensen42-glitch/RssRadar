@@ -2,10 +2,13 @@ package com.cycling.rssradar.core.data.parser
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.cycling.rssradar.core.data.ContentQualification
+import com.cycling.rssradar.core.domain.rss.FeedProbeResult
 import java.io.ByteArrayInputStream
 
 class RssParserTest {
@@ -197,8 +200,8 @@ class RssParserTest {
         assertEquals("only a summary", article.summary)
         // 摘要留在 content 列（列表检索与详情页兜底要用），但**不够格当正文**——
         // contentSource 因此记 NONE，详情页才会去抓原文。这是"正文只有摘要"的根因修复
-        // （ADR-0012 / RssParser.FULL_TEXT_MIN_CHARS）。
-        assertFalse(RssParser.isFullText(article.contentHtml, article.contentText))
+        // （ADR-0012 / ContentQualification.FULL_TEXT_MIN_CHARS）。
+        assertFalse(ContentQualification.qualifies(article.contentHtml, article.contentText))
     }
 
     @Test
@@ -479,21 +482,21 @@ class RssParserTest {
         // 只给摘要的 feed（RSSHub 大量路由如此）：描述不到 300 字
         val summary = "这是一篇文章摘要，".repeat(20) // 约 180 字
 
-        assertFalse(RssParser.isFullText("<p>$summary</p>", summary))
+        assertFalse(ContentQualification.qualifies("<p>$summary</p>", summary))
     }
 
     @Test
     fun `long content is treated as full text`() {
         val body = "这是正文内容，".repeat(200) // 约 1400 字
 
-        assertTrue(RssParser.isFullText("<p>$body</p>", body))
+        assertTrue(ContentQualification.qualifies("<p>$body</p>", body))
     }
 
     @Test
     fun `null or blank content is never full text`() {
-        assertFalse(RssParser.isFullText(null, null))
-        assertFalse(RssParser.isFullText("", ""))
-        assertFalse(RssParser.isFullText("   ", "  "))
+        assertFalse(ContentQualification.qualifies(null, null))
+        assertFalse(ContentQualification.qualifies("", ""))
+        assertFalse(ContentQualification.qualifies("   ", "  "))
     }
 
     @Test
@@ -513,7 +516,7 @@ class RssParserTest {
         val article = parser.parse(ByteArrayInputStream(xml.toByteArray())).articles.single()
 
         // 摘要仍要留下（列表与检索用），但这段内容不够格当正文
-        assertFalse(RssParser.isFullText(article.contentHtml, article.contentText))
+        assertFalse(ContentQualification.qualifies(article.contentHtml, article.contentText))
         assertTrue(article.summary.orEmpty().contains("短摘要"))
     }
 
@@ -552,5 +555,58 @@ class RssParserTest {
         val summary = article.summary.orEmpty()
         assertFalse("摘要不得残留 markdown 标记: $summary", summary.contains("##") || summary.contains("**"))
         assertTrue(summary.contains("标题行"))
+    }
+
+    @Test
+    fun `容错二次解析 吃下控制字符与HTML实体的坏feed`() {
+        // 真实世界的"稍微坏"：XML 非法控制字符 + 未定义 HTML 实体 + 裸 &
+        val bad = "<rss version=\"2.0\"><channel><title>Bad</title><item>" +
+            "<title>T1</title><link>https://e.com/1</link>" +
+            "<description>A\u0001B&nbsp;&amp; C \u0010 </description>" +
+            "</item></channel></rss>"
+
+        val article = parser.parse(ByteArrayInputStream(bad.toByteArray())).articles.single()
+        assertEquals("T1", article.title)
+    }
+
+    @Test
+    fun `彻底不是feed的输入仍然报错`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            parser.parse(ByteArrayInputStream("<html><body>not a feed</body></html>".toByteArray()))
+        }
+    }
+
+    @Test
+    fun `清洗 已有的转义不被二次转义`() {
+        assertEquals("a &amp; b", parser.sanitizeXml("a &amp; b"))
+        assertEquals("&#160;", parser.sanitizeXml("&#160;"))
+    }
+
+    @Test
+    fun `清洗 命名实体大小写不敏感`() {
+        // XML 实体名大小写敏感，&NBSP; / &AMP; 在 XML 里都是非法的，必须修
+        assertEquals("&#160;", parser.sanitizeXml("&NBSP;"))
+        assertEquals("&amp;", parser.sanitizeXml("&AMP;"))
+    }
+
+    @Test
+    fun `清洗 裸和与查不到的实体`() {
+        assertEquals("a &amp; b", parser.sanitizeXml("a & b"))
+        assertEquals("&amp;unknown;", parser.sanitizeXml("&unknown;"))
+    }
+
+    @Test
+    fun `清洗 去非法控制字符但保留Tab与换行`() {
+        assertEquals("ab", parser.sanitizeXml("a\u0001b"))
+        assertEquals("\t\n\r", parser.sanitizeXml("\t\n\r"))
+    }
+
+    @Test
+    fun `超大feed 按网络失败处理而不是判成失效源`() {
+        // 判成 INVALID_FEED 会触发自愈改写地址——把「只是太大」的健康源改掉是最贵的误伤
+        val e = assertThrows(FeedTooLargeException::class.java) {
+            parser.parse(ByteArrayInputStream(ByteArray(RssParser.MAX_FEED_BYTES + 1)))
+        }
+        assertNotEquals(FeedProbeResult.InvalidFeed, FeedProbeResult.from(e))
     }
 }

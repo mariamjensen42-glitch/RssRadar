@@ -84,6 +84,25 @@ class FeedRepository(
         if (group == null && contentType == null) articleDao.loadBookmarkedWithFeedPaged(limit, offset)
         else articleDao.loadBookmarkedWithFeedPagedFiltered(group, group == DEFAULT_GROUP, contentType, limit, offset)
 
+    // —— 总数 COUNT（滚动位置指示条）：与上面 loadXxxPageFiltered 同谓词同分支，分母保证一致 ——
+
+    /** All tab + 组合筛选：文章总数。 */
+    suspend fun countArticlesFiltered(group: String?, contentType: Int?): Int =
+        if (group == null && contentType == null) articleDao.countAllWithFeed()
+        else articleDao.countAllWithFeedFiltered(group, group == DEFAULT_GROUP, contentType)
+
+    /** 未读 tab + 组合筛选：文章总数。 */
+    suspend fun countUnreadFiltered(group: String?, contentType: Int?): Int =
+        articleDao.countUnreadWithFeedFiltered(group, group == DEFAULT_GROUP, contentType)
+
+    /** 收藏 tab + 组合筛选：文章总数。 */
+    suspend fun countStarredFiltered(group: String?, contentType: Int?): Int =
+        articleDao.countStarredWithFeedFiltered(group, group == DEFAULT_GROUP, contentType)
+
+    /** 稍后读 tab + 组合筛选：文章总数。 */
+    suspend fun countBookmarkedFiltered(group: String?, contentType: Int?): Int =
+        articleDao.countBookmarkedWithFeedFiltered(group, group == DEFAULT_GROUP, contentType)
+
     /** 空分区空态判定（issue #75）：是否有任何该内容类型的订阅源。 */
     suspend fun hasFeedsOfType(contentType: Int): Boolean =
         feedDao.countFeedsByContentType(contentType) > 0

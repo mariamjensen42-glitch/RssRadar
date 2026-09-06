@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -28,7 +29,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -58,7 +58,6 @@ import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.core.data.store.FeedSortMode
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.components.FeedIcon
-import com.cycling.rssradar.core.ui.components.FloatingTabBarFabOffset
 import com.cycling.rssradar.core.ui.components.OptionPickerSheet
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.composables.icons.lucide.ArrowDownUp
@@ -79,6 +78,7 @@ import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.Square
 import com.composables.icons.lucide.SquareCheckBig
+import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.X
 import com.cycling.rssradar.core.data.db.FeedEntity
 import com.cycling.rssradar.core.ui.components.pressScale
@@ -124,6 +124,8 @@ fun SubscriptionsScreen(
     var showSortSheet by remember { mutableStateOf(false) }
     /** 「全部标记为已读」二次确认（批量不可逆，不能一键直发）。 */
     var showMarkAllReadConfirm by remember { mutableStateOf(false) }
+    /** 一键删除失效源二次确认（级联删文章不可逆，不能一键直发）。 */
+    var showDeleteUnhealthyConfirm by remember { mutableStateOf(false) }
     /** 订阅源搜索：非空时拍平展示命中的订阅行，绕过分组结构直达。 */
     var searchQuery by remember { mutableStateOf("") }
 
@@ -184,26 +186,6 @@ fun SubscriptionsScreen(
                     onAdd = onAddSubscription,
                     totalUnread = totalUnread,
                     onMarkAllRead = { showMarkAllReadConfirm = true },
-                )
-            }
-        },
-        floatingActionButton = {
-            // 多选态隐藏 FAB：它与「选完再移动」的操作流冲突
-            if (!selectionMode) {
-                // 主操作按钮按压缩放（docs/motion.md #2）
-                val fabInteraction = remember { MutableInteractionSource() }
-                ExtendedFloatingActionButton(
-                    onClick = onAddSubscription,
-                    interactionSource = fabInteraction,
-                    containerColor = radarColors().accent,
-                    contentColor = radarColors().onAccent,
-                    icon = { Icon(Lucide.Plus, contentDescription = null) },
-                    text = { Text("添加") },
-                    shape = RoundedCornerShape(20.dp),
-                    // 抬升让开底部悬浮 TabBar（与 FeedListScreen 的 FAB 同一规则）
-                    modifier = Modifier
-                        .padding(bottom = FloatingTabBarFabOffset)
-                        .pressScale(fabInteraction),
                 )
             }
         },
@@ -310,6 +292,21 @@ fun SubscriptionsScreen(
                         )
                     }
                 } else {
+                    // 一键删除失效源：入口就在失效列表顶部，紧邻目标，不用逐个进操作菜单
+                    item(key = "delete-unhealthy", contentType = "action") {
+                        TextButton(
+                            onClick = { showDeleteUnhealthyConfirm = true },
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        ) {
+                            Icon(Lucide.Trash2, contentDescription = null, tint = Danger, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "删除全部失效源（${unhealthyFeeds.size}）",
+                                color = Danger,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                    }
                     items(unhealthyFeeds, key = { "unhealthy-${it.feed.id}" }, contentType = { "feed" }) { feedItem ->
                         FeedRow(
                             item = feedItem,
@@ -337,8 +334,15 @@ fun SubscriptionsScreen(
             // 展开大分组只组合可见行——原 AnimatedVisibility { forEach } 会把
             // 几百行一次性同步组合在主线程上，点击分组卡顿的根因。
             groups.forEach { group ->
-                item(key = "header-${group.group}", contentType = "header") {
-                    Box(modifier = Modifier.animateItem(itemFadeSpec, itemPlacementSpec, itemFadeSpec)) {
+                // 分组头吸顶（stickyHeader 是 LazyListScope 成员，foundation 1.10+ 无需 import）；
+                // 贴顶时后续内容会从背后滚过，必须铺 bgRoot 底色遮住
+                stickyHeader(key = "header-${group.group}", contentType = "header") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(radarColors().bgRoot)
+                            .animateItem(itemFadeSpec, itemPlacementSpec, itemFadeSpec),
+                    ) {
                         GroupHeader(
                             title = group.group,
                             feedCount = group.feeds.size,
@@ -391,8 +395,6 @@ fun SubscriptionsScreen(
                 }
             }
             }
-
-            item { Spacer(Modifier.height(96.dp)) } // 避让 FAB
         }
     }
 
@@ -466,6 +468,31 @@ fun SubscriptionsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showBatchDeleteConfirm = false }) {
+                    Text("取消", color = radarColors().textTertiary)
+                }
+            },
+        )
+    }
+
+    // 一键删除失效源确认：失效不等于用户确认不要（可能只是暂时故障），必须让用户看见数量再动手
+    if (showDeleteUnhealthyConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteUnhealthyConfirm = false },
+            containerColor = radarColors().surface1,
+            titleContentColor = radarColors().textPrimary,
+            textContentColor = radarColors().textSecondary,
+            title = { Text("删除失效订阅源", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
+            text = { Text("将删除 ${unhealthyFeeds.size} 个失效订阅源及其全部文章，此操作不可撤销。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteUnhealthyConfirm = false
+                    viewModel.onIntent(SubscriptionsIntent.DeleteUnhealthyFeeds)
+                }) {
+                    Text("删除", color = Danger, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteUnhealthyConfirm = false }) {
                     Text("取消", color = radarColors().textTertiary)
                 }
             },
@@ -769,17 +796,8 @@ private fun FeedRow(
 
 @Composable
 private fun UnreadBadge(count: Int) {
-    if (count <= 0) {
-        Surface(shape = RoundedCornerShape(50), color = radarColors().surface2) {
-            Text(
-                text = "已读",
-                color = radarColors().textTertiary,
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            )
-        }
-        return
-    }
+    // 无未读不留任何徽标（UI 审计 F1）：灰色「已读」徽标无信息价值，还与状态标签混淆
+    if (count <= 0) return
     Surface(shape = RoundedCornerShape(50), color = radarColors().accent) {
         Text(
             text = count.coerceAtMost(999).toString(),

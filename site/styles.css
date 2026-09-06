@@ -219,6 +219,44 @@ table.tech td:first-child { color: var(--muted); width: 30%; }
 .footer-nav a:hover { color: var(--text); text-decoration: none; }
 .footer-note { width: 100%; color: var(--dim); font-size: 12.5px; margin: 8px 0 0; }
 
+/* ====== changelog ====== */
+.cl-section { max-width: 760px; margin: 0 auto; }
+.cl-list { display: flex; flex-direction: column; gap: 24px; }
+.cl-item {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px 24px;
+}
+.cl-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+  padding-bottom: 12px; margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.cl-version { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+.cl-latest {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+  color: var(--accent); background: var(--accent-dim);
+  border: 1px solid var(--accent-dim);
+  padding: 2px 8px; border-radius: 999px;
+}
+.cl-date { color: var(--dim); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.cl-group { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.cl-group:last-child { margin-bottom: 0; }
+.cl-tag {
+  flex: none; margin-top: 2px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.4px;
+  padding: 2px 9px; border-radius: 999px; border: 1px solid;
+  white-space: nowrap;
+}
+.cl-tag-feature { color: var(--accent); border-color: var(--accent-dim); background: var(--accent-dim); }
+.cl-tag-improvement { color: #a5b8d6; border-color: var(--border); background: var(--surface-2); }
+.cl-tag-fix { color: #f0a5b8; border-color: rgba(240, 165, 184, 0.25); background: rgba(240, 165, 184, 0.12); }
+.cl-items { list-style: none; margin: 2px 0 0; padding: 0; color: var(--muted); font-size: 14.5px; }
+.cl-items li { padding-left: 16px; position: relative; margin-bottom: 6px; }
+.cl-items li:last-child { margin-bottom: 0; }
+.cl-items li::before { content: "·"; position: absolute; left: 2px; color: var(--accent); font-weight: 700; }
+.cl-noscript { color: var(--muted); text-align: center; }
+
 /* ====== responsive ====== */
 @media (max-width: 900px) {
   .topbar { padding: 12px 18px; gap: 14px; }
@@ -234,6 +272,9 @@ table.tech td:first-child { color: var(--muted); width: 30%; }
   .inst-list { grid-template-columns: 1fr; }
   main { padding: 0 18px; }
   .section { padding: 56px 0 40px; }
+  .cl-item { padding: 18px 16px; }
+  /* 分组标签换到条目上方一行，窄屏不再挤压正文 */
+  .cl-group { flex-direction: column; gap: 6px; }
 }
 @media (max-width: 520px) {
   .strip { grid-template-columns: repeat(2, 1fr); }

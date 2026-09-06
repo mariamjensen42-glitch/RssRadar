@@ -6,7 +6,20 @@ import com.rometools.rome.io.SyndFeedInput
 import com.rometools.rome.io.XmlReader
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.io.InputStream
+import java.io.StringReader
+
+/**
+ * 单份 feed 超过 [RssParser.MAX_FEED_BYTES]。
+ *
+ * **必须继承 IOException 而不是 IllegalArgumentException**：后者会被
+ * [com.cycling.rssradar.core.domain.rss.FeedProbeResult.from] 归成 INVALID_FEED，
+ * 进而触发失效源自愈——把一个只是「太大」的健康源当成坏源改地址，是自愈最贵的误伤。
+ */
+class FeedTooLargeException(val bytes: Int) : IOException("Feed too large: $bytes bytes")
 
 
 /**
@@ -53,12 +66,26 @@ class RssParser {
         val siteUrl: String = "",
     )
 
-    /** 解析失败（非法 XML / 非 RSS·Atom 内容）时抛 [IllegalArgumentException]。 */
+    /**
+     * 解析失败（非法 XML / 非 RSS·Atom 内容）时抛 [IllegalArgumentException]；
+     * 体积超过 [MAX_FEED_BYTES] 时抛 [FeedTooLargeException]（IOException 系）。
+     */
     fun parse(input: InputStream): ParsedFeed {
+        val raw = readCapped(input)
         val feed = try {
-            SyndFeedInput().build(XmlReader(input))
-        } catch (e: Exception) {
-            throw IllegalArgumentException("Not a valid RSS/Atom feed", e)
+            SyndFeedInput().build(XmlReader(ByteArrayInputStream(raw)))
+        } catch (first: Exception) {
+            // 容错二次解析：真实世界的 feed 大量是"稍微坏掉"的 XML（控制字符、
+            // HTML 实体、裸 &）。ReadYou 靠容错吃下这些源，我们直接判 INVALID_FEED
+            // 连续 2 次就死——所以第一遍严格解析失败后清洗重试，还不行才算无效。
+            try {
+                SyndFeedInput().build(StringReader(sanitizeXml(decodeText(raw))))
+            } catch (second: Exception) {
+                // 抛出二次失败，但把第一次的原因挂成 suppressed：只看第二次的堆栈
+                // 分不清「清洗没覆盖到这种坏」还是「这根本不是 feed」。
+                second.addSuppressed(first)
+                throw IllegalArgumentException("Not a valid RSS/Atom feed", second)
+            }
         }
         val articles = feed.entries.mapNotNull { it.toArticle() }
         return ParsedFeed(
@@ -67,6 +94,92 @@ class RssParser {
             siteUrl = atomSiteUrl(feed),
         )
     }
+
+    /**
+     * 带上限地读完流。二次容错解析必须先看到全量（流式没法回退重来），
+     * 但 32 路并发下无上限就是 OOM 入口（ADR-0007 起这个项目就有 OOM 前史）。
+     */
+    private fun readCapped(input: InputStream): ByteArray {
+        val buffer = ByteArrayOutputStream()
+        val chunk = ByteArray(DEFAULT_BUFFER_SIZE)
+        var total = 0
+        while (true) {
+            val read = input.read(chunk)
+            if (read < 0) break
+            total += read
+            if (total > MAX_FEED_BYTES) throw FeedTooLargeException(total)
+            buffer.write(chunk, 0, read)
+        }
+        return buffer.toByteArray()
+    }
+
+    /** 按 BOM / XML 声明探测编码解码（复用 rome 的 XmlReader 探测逻辑）。 */
+    private fun decodeText(raw: ByteArray): String =
+        XmlReader(ByteArrayInputStream(raw)).use { it.readText() }
+
+    /**
+     * XML 清洗（容错二次解析用，只修"常见的坏"，不试图修所有坏），**单趟**扫描：
+     * 1. XML 1.0 非法控制字符（RSS 正文里混入 0x00-0x1F 控制字符是解析失败第一大来源）；
+     * 2. 未定义的 HTML 命名实体（&nbsp; 等在 XML 里没有定义）→ 数值引用，大小写不敏感；
+     * 3. 未知命名实体 → 退化成字面文本（XML 未定义的实体只有这一条活路）；
+     * 4. 裸 & 转义成 &amp;（写作工具把正文直接塞进 RSS 的经典产物）。
+     *
+     * 单趟而不是「控制字符 filter 一遍 + 57 个实体各 replace 一遍」：后者是
+     * O(57 × N) 的全串拷贝，2MB 的坏 feed 就是上百 MB 瞬时分配，还每次新建 Regex。
+     * 控制字符在扫描时顺手跳过，不额外产中间字符串。
+     */
+    internal fun sanitizeXml(text: String): String {
+        val out = StringBuilder(text.length)
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            if (isIllegalXmlChar(c)) {
+                i++
+                continue
+            }
+            if (c != '&') {
+                out.append(c)
+                i++
+                continue
+            }
+            // 实体名最长 32 字符（HTML5 里最长的是 CounterClockwiseContourIntegral）；
+            // 找不到配对 `;` 或长得不像实体，一律按裸 & 处理。
+            val end = text.indexOf(';', i + 1)
+            val body = if (end > i + 1 && end <= i + MAX_ENTITY_LENGTH) text.substring(i + 1, end) else null
+            if (body == null) {
+                out.append("&amp;")
+                i++
+                continue
+            }
+            if (!(body[0] == '#' || isEntityName(body))) {
+                out.append("&amp;")
+                i++
+                continue
+            }
+            val lowered = body.lowercase()
+            val code = HTML_ENTITY_CODES[lowered]
+            when {
+                // 数值引用（&#160; / &#xA0;）：XML 原生语法，原样放过
+                body[0] == '#' -> out.append('&').append(body).append(';')
+                // XML 预定义实体，含大写变体（&AMP; 在 XML 里非法，统一成规范小写）
+                lowered in XML_PREDEFINED_ENTITIES -> out.append('&').append(lowered).append(';')
+                code != null -> out.append("&#").append(code).append(';')
+                // 查不到的命名实体：转义成字面文本，总好过让整份文档解析失败
+                else -> out.append("&amp;").append(body).append(';')
+            }
+            i = end + 1
+        }
+        return out.toString()
+    }
+
+    /** 形状像实体名（字母开头 + 字母数字），不是就当裸 & 处理。 */
+    private fun isEntityName(body: String): Boolean =
+        body.first().isLetter() && body.all { it.isLetterOrDigit() }
+
+    /** XML 1.0 合法字符集之外的字符（Tab/LF/CR 保留，DEL 与 0xFFFE/0xFFFF 一并清掉）。 */
+    internal fun isIllegalXmlChar(c: Char): Boolean =
+        (c.code < 0x20 && c != '\t' && c != '\n' && c != '\r') ||
+            c.code == 0x7F || c.code == 0xFFFE || c.code == 0xFFFF
 
     /**
      * 站点主页 URL。rome 对 Atom 的 [SyndFeed.getLink] 会取第一个 `<link>`
@@ -197,28 +310,38 @@ class RssParser {
         const val MEDIA_KIND_VIDEO = 1
         const val MEDIA_KIND_AUDIO = 2
 
-        /**
-         * 「这段内容够不够格当正文」的字数门槛。
-         *
-         * 背景（正文不完整的根因）：description 与 content 取较长者，只给摘要的 feed
-         * （RSSHub 大量路由如此）拿到的就是两三百字的摘要；旧实现只要 `contentHtml != null`
-         * 就标 `CONTENT_SOURCE_FEED`，于是 `OnDemandFetch.fetch` 的
-         * 「已有正文就不抓」早退条件命中 → 详情页永远不去抓原文 → 用户只看到摘要，
-         * 且没有任何失败记录。
-         *
-         * 低于门槛的内容**仍然存进 content 列**（列表摘要与检索要用），但 contentSource 记 NONE，
-         * 详情页才会去抓原文。
-         */
-        const val FULL_TEXT_MIN_CHARS = 300
-
-        /** 该 feed 内容是否够格当正文（够长才算全文，见 [FULL_TEXT_MIN_CHARS]）。 */
-        internal fun isFullText(contentHtml: String?, contentText: String?): Boolean {
-            if (contentHtml.isNullOrBlank()) return false
-            val length = contentText?.length ?: textLength(contentHtml)
-            return length >= FULL_TEXT_MIN_CHARS
-        }
-
         private const val ONE_DAY_MS = 24 * 60 * 60 * 1000L
+
+        /**
+         * 单份 feed 的体积上限：容错二次解析必须先看到全量（流式没法回退重来），
+         * 但刷新并发 32 路，无上限就是 OOM 入口（ADR-0007 起这个项目就有 OOM 前史）。
+         * 12MB 远超真实 feed（实测最大的聚合源 ~4MB），超了按 [FeedTooLargeException] 处理。
+         */
+        const val MAX_FEED_BYTES = 12 * 1024 * 1024
+
+        /** 实体名长度上限：HTML5 最长的是 CounterClockwiseContourIntegral（31）。 */
+        private const val MAX_ENTITY_LENGTH = 32
+
+        /** XML 预定义实体（唯一合法的命名实体），大写变体非法、统一成规范小写。 */
+        private val XML_PREDEFINED_ENTITIES = setOf("amp", "lt", "gt", "quot", "apos")
+
+        /** XML 未定义但 HTML/写作工具常见的命名实体 → 数值引用（覆盖实测高频集合）。 */
+        private val HTML_ENTITY_CODES = mapOf(
+            "nbsp" to 160, "iexcl" to 161, "cent" to 162, "pound" to 163, "curren" to 164,
+            "yen" to 165, "sect" to 167, "uml" to 168, "copy" to 169, "ordf" to 170,
+            "laquo" to 171, "not" to 172, "reg" to 174, "macr" to 175, "deg" to 176,
+            "plusmn" to 177, "sup2" to 178, "sup3" to 179, "acute" to 180, "micro" to 181,
+            "para" to 182, "middot" to 183, "cedil" to 184, "sup1" to 185, "ordm" to 186,
+            "raquo" to 187, "frac14" to 188, "frac12" to 189, "frac34" to 190,
+            "times" to 215, "divide" to 247, "szlig" to 223,
+            "bull" to 8226, "hellip" to 8230, "prime" to 8242, "oline" to 8254,
+            "frasl" to 8260, "euro" to 8364, "trade" to 8482,
+            "larr" to 8592, "uarr" to 8593, "rarr" to 8594, "darr" to 8595,
+            "harr" to 8596, "minus" to 8722, "ldquo" to 8220, "rdquo" to 8221,
+            "lsquo" to 8216, "rsquo" to 8217, "sbquo" to 8218, "bdquo" to 8222,
+            "lsaquo" to 8249, "rsaquo" to 8250, "mdash" to 8212, "ndash" to 8211,
+            "dagger" to 8224, "permil" to 8240,
+        )
 
         /** 按"可见文本长度"比较，避免把带更多 HTML 标签的串误判为更长。 */
         internal fun textLength(html: String?): Int =
