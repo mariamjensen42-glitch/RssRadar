@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -237,6 +238,11 @@ private fun UsageCard(budget: AiBudgetState) {
                             .background(colors.accent, RoundedCornerShape(3.dp)),
                     )
                 }
+                // 空进度条状态不明（UI 审计 M4）：0 时直接说明
+                if (budget.usedToday == 0) {
+                    Spacer(Modifier.height(6.dp))
+                    Text("今日未使用", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
+                }
             }
             Spacer(Modifier.height(10.dp))
             UsageRow("今日输入 / 输出", "${formatCount(budget.inputCharsToday)} / ${formatCount(budget.outputCharsToday)} 字")
@@ -354,6 +360,8 @@ private fun QueueSection(
     viewModel: AiFeaturesViewModel,
 ) {
     val colors = radarColors()
+    // 清空待执行是批量丢弃（UI 审计 M3）：二次确认，不一键直发
+    var confirmClearPending by remember { mutableStateOf(false) }
     Surface(shape = RoundedCornerShape(14.dp), color = colors.surface1) {
         Column(Modifier.padding(16.dp)) {
             Text(
@@ -380,11 +388,34 @@ private fun QueueSection(
                 TextButton(onClick = { viewModel.onIntent(AiFeaturesIntent.RetryFailed) }) {
                     Text("重试失败", color = colors.textSecondary)
                 }
-                TextButton(onClick = { viewModel.onIntent(AiFeaturesIntent.ClearPending) }) {
+                TextButton(onClick = { confirmClearPending = true }) {
                     Text("清空待执行", color = colors.textSecondary)
                 }
             }
         }
+    }
+    if (confirmClearPending) {
+        AlertDialog(
+            onDismissRequest = { confirmClearPending = false },
+            containerColor = colors.surface1,
+            titleContentColor = colors.textPrimary,
+            textContentColor = colors.textSecondary,
+            title = { Text("清空待执行", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
+            text = { Text("将丢弃队列中 ${queue.pending} 个待执行任务，此操作不可撤销。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmClearPending = false
+                    viewModel.onIntent(AiFeaturesIntent.ClearPending)
+                }) {
+                    Text("清空", color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClearPending = false }) {
+                    Text("取消", color = colors.textTertiary)
+                }
+            },
+        )
     }
 }
 
@@ -413,6 +444,8 @@ private fun CategoryHeader(
     val colors = radarColors()
     val all = AiFeature.ofCategory(category)
     val enabledCount = settings.countIn(category)
+    // 一键全开涉及 API 费用（UI 审计 M3）：开启需确认，关闭直接执行
+    var confirmEnableAll by remember { mutableStateOf(false) }
     Column(modifier = Modifier.padding(top = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -428,13 +461,42 @@ private fun CategoryHeader(
                     color = colors.textTertiary,
                 )
             }
-            TextButton(onClick = { onSetAll(!settings.allIn(category)) }) {
+            TextButton(onClick = {
+                if (settings.allIn(category)) {
+                    onSetAll(false)
+                } else {
+                    confirmEnableAll = true
+                }
+            }) {
                 Text(
                     text = if (settings.allIn(category)) "全部关闭" else "全部开启",
                     color = colors.accent,
                 )
             }
         }
+    }
+    if (confirmEnableAll) {
+        AlertDialog(
+            onDismissRequest = { confirmEnableAll = false },
+            containerColor = colors.surface1,
+            titleContentColor = colors.textPrimary,
+            textContentColor = colors.textSecondary,
+            title = { Text("全部开启「${category.label}」", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
+            text = { Text("将开启 ${all.size} 项功能，可能产生 API 调用费用。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmEnableAll = false
+                    onSetAll(true)
+                }) {
+                    Text("开启", color = colors.accent, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmEnableAll = false }) {
+                    Text("取消", color = colors.textTertiary)
+                }
+            },
+        )
     }
 }
 

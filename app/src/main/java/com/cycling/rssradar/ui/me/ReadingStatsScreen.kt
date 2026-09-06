@@ -183,9 +183,10 @@ fun ReadingStatsScreen(
             )
         }
         Spacer(Modifier.height(10.dp))
+        // 「当前未读」已移除（UI 审计 G2）：未读存量在信息流与「我的」页已展示，
+        // 本页只保留行为统计，避免同一数字四处重复
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             StatsBigCard(value = state.streakDays.toString(), label = "连续阅读天数", modifier = Modifier.weight(1f))
-            StatsBigCard(value = state.unreadCount.toString(), label = "当前未读", modifier = Modifier.weight(1f))
             StatsBigCard(value = (state.starredCount + state.bookmarkedCount).toString(), label = "收藏/稍后读", modifier = Modifier.weight(1f))
         }
 

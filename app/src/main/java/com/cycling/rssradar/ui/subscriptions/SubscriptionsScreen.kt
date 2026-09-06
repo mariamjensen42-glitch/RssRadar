@@ -769,17 +769,8 @@ private fun FeedRow(
 
 @Composable
 private fun UnreadBadge(count: Int) {
-    if (count <= 0) {
-        Surface(shape = RoundedCornerShape(50), color = radarColors().surface2) {
-            Text(
-                text = "已读",
-                color = radarColors().textTertiary,
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            )
-        }
-        return
-    }
+    // 无未读不留任何徽标（UI 审计 F1）：灰色「已读」徽标无信息价值，还与状态标签混淆
+    if (count <= 0) return
     Surface(shape = RoundedCornerShape(50), color = radarColors().accent) {
         Text(
             text = count.coerceAtMost(999).toString(),

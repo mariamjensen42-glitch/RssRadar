@@ -36,6 +36,8 @@ sealed interface SearchIntent {
     data class QueryChange(val value: String) : SearchIntent
     data object Submit : SearchIntent
     data object ClearHistory : SearchIntent
+    /** 删除单条历史（UI 审计 S2）。 */
+    data class DeleteHistoryItem(val value: String) : SearchIntent
     data class SetRead(val articleId: Long, val read: Boolean) : SearchIntent
     data class ToggleStarred(val articleId: Long) : SearchIntent
     data class ToggleBookmarked(val articleId: Long) : SearchIntent
@@ -76,6 +78,8 @@ class SearchViewModel @Inject constructor(
             is SearchIntent.QueryChange -> queryChange(intent.value)
             SearchIntent.Submit -> submit()
             SearchIntent.ClearHistory -> clearHistory()
+            is SearchIntent.DeleteHistoryItem -> _state.value =
+                _state.value.copy(history = _state.value.history - intent.value)
             is SearchIntent.SetRead -> setRead(intent.articleId, intent.read)
             is SearchIntent.ToggleStarred -> toggleStarred(intent.articleId)
             is SearchIntent.ToggleBookmarked -> toggleBookmarked(intent.articleId)

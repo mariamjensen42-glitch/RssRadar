@@ -1,12 +1,17 @@
 package com.cycling.rssradar.ui.feed
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -98,7 +103,17 @@ fun FeedArticlesScreen(
                     .padding(padding),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("此订阅源还没有文章", color = radarColors().textSecondary)
+                // 空态带 CTA（UI 审计 F3）：用户最快的下一步就是刷新
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("此订阅源还没有文章", color = radarColors().textSecondary)
+                    Spacer(Modifier.height(12.dp))
+                    FilledTonalButton(
+                        onClick = { viewModel.onIntent(FeedArticlesIntent.Refresh) },
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Text("立即刷新")
+                    }
+                }
             }
         } else if (viewModel.feed?.contentType == FeedEntity.CONTENT_TYPE_IMAGE) {
             // 图片类源（ADR-0014）：两列画廊网格，点击仍走详情

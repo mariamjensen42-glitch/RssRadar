@@ -1,5 +1,13 @@
 package com.cycling.rssradar.ui.article
 
+import android.content.ContentValues
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Environment
+import android.provider.MediaStore
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
@@ -27,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,8 +55,13 @@ import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.crossfadeMotion
+import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Share2
 import com.composables.icons.lucide.X
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** 捏合放大的上限。 */
 private const val MAX_SCALE = 5f
@@ -123,8 +137,105 @@ fun ReaderImagePage(
                 ) {
                     Icon(Lucide.X, contentDescription = "关闭")
                 }
+                Spacer(Modifier.weight(1f))
+                // 保存 / 分享（UI 审计 D3）：查看器只有关闭和页码时用户无法把图带走
+                val context = LocalContext.current
+                val scope = rememberCoroutineScope()
+                var busy by remember { mutableStateOf(false) }
+                // 已保存的 MediaStore uri 供分享复用，同一张图不重复落盘
+                var savedUri by remember { mutableStateOf<Uri?>(null) }
+                var savedUrl by remember { mutableStateOf<String?>(null) }
+
+                suspend fun currentBitmap(url: String): Bitmap? = withContext(Dispatchers.IO) {
+                    // 不走 Coil ImageLoader（3.3.0 无 Context.imageLoader 扩展依赖），
+                    // 直接 HttpURLConnection 下载原图后软件位图解码，MediaStore 才能压缩落盘
+                    runCatching {
+                        val conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                        conn.connectTimeout = 10_000
+                        conn.readTimeout = 20_000
+                        conn.inputStream.use { BitmapFactory.decodeStream(it) }
+                    }.getOrNull()
+                }
+
+                suspend fun saveToGallery(url: String): Uri? = withContext(Dispatchers.IO) {
+                    val bitmap = currentBitmap(url) ?: return@withContext null
+                    val values = ContentValues().apply {
+                        put(MediaStore.Images.Media.DISPLAY_NAME, "rssradar-${System.currentTimeMillis()}.jpg")
+                        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                        put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/RssRadar")
+                    }
+                    val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                        ?: return@withContext null
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
+                    } ?: return@withContext null
+                    uri
+                }
+
+                fun onSave(url: String) {
+                    if (busy) return
+                    scope.launch {
+                        busy = true
+                        val uri = saveToGallery(url)
+                        busy = false
+                        savedUri = uri
+                        savedUrl = url
+                        Toast.makeText(
+                            context,
+                            if (uri != null) "已保存到 图片/RssRadar" else "保存失败：图片下载或写入失败",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                }
+
+                fun onShare(url: String) {
+                    if (busy) return
+                    scope.launch {
+                        busy = true
+                        val uri = when {
+                            savedUri != null && savedUrl == url -> savedUri
+                            else -> saveToGallery(url).also { savedUri = it; savedUrl = url }
+                        }
+                        busy = false
+                        if (uri == null) {
+                            Toast.makeText(context, "分享失败：图片下载或写入失败", Toast.LENGTH_SHORT).show()
+                            return@launch
+                        }
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "image/jpeg"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(send, "分享图片"))
+                    }
+                }
+
+                val pageUrl = images[pagerState.currentPage]
+                IconButton(
+                    onClick = { onSave(pageUrl) },
+                    enabled = !busy,
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = Color.Black.copy(alpha = 0.5f),
+                        contentColor = Color.White,
+                    ),
+                ) {
+                    if (busy) {
+                        CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.padding(6.dp))
+                    } else {
+                        Icon(Lucide.Download, contentDescription = "保存图片")
+                    }
+                }
+                IconButton(
+                    onClick = { onShare(pageUrl) },
+                    enabled = !busy,
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = Color.Black.copy(alpha = 0.5f),
+                        contentColor = Color.White,
+                    ),
+                ) {
+                    Icon(Lucide.Share2, contentDescription = "分享图片")
+                }
                 if (count > 1) {
-                    Spacer(Modifier.weight(1f))
                     Text(
                         text = "${pagerState.currentPage + 1} / $count",
                         color = Color.White,

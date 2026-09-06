@@ -73,6 +73,7 @@ fun FeedActionScreen(
     var renameTarget by remember { mutableStateOf<String?>(null) }
     var aiPromptTarget by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
 
     feed?.let { f ->
         ModalBottomSheet(
@@ -277,20 +278,21 @@ fun FeedActionScreen(
                     }
                 }
                 Spacer(Modifier.height(8.dp))
+                // 删除是级联不可逆动作（UI 审计 F4）：红色警示 + 二次确认，不再一键直发
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = radarColors().surface2,
+                    color = Danger.copy(alpha = 0.10f),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { viewModel.onIntent(SubscriptionsIntent.DeleteFeed(f.id, f.title)); onDismiss() },
+                        .clickable { confirmDelete = true },
                 ) {
                     Row(
                         Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Lucide.Trash2, contentDescription = null, tint = radarColors().textTertiary, modifier = Modifier.size(18.dp))
+                        Icon(Lucide.Trash2, contentDescription = null, tint = Danger, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("删除订阅（含其文章）", color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium)
+                        Text("删除订阅（含其文章）", color = Danger, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
@@ -424,6 +426,38 @@ fun FeedActionScreen(
             },
             dismissButton = {
                 TextButton(onClick = { confirmClear = false }) { Text("取消", color = radarColors().textTertiary) }
+            },
+        )
+    }
+
+    // 删除订阅二次确认（UI 审计 F4）：级联删文章不可逆，明确影响范围后再动手
+    if (confirmDelete) {
+        val title = feed?.title.orEmpty()
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            containerColor = radarColors().surface1,
+            titleContentColor = radarColors().textPrimary,
+            textContentColor = radarColors().textSecondary,
+            title = { Text("删除订阅", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
+            text = {
+                Text(
+                    "将删除「$title」及其全部文章，此操作不可撤销。",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.onIntent(SubscriptionsIntent.DeleteFeed(feedId, title))
+                        confirmDelete = false
+                        onDismiss()
+                    },
+                ) {
+                    Text("删除", color = Danger, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text("取消", color = radarColors().textTertiary) }
             },
         )
     }
