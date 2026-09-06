@@ -78,6 +78,7 @@ import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.Square
 import com.composables.icons.lucide.SquareCheckBig
+import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.X
 import com.cycling.rssradar.core.data.db.FeedEntity
 import com.cycling.rssradar.core.ui.components.pressScale
@@ -123,6 +124,8 @@ fun SubscriptionsScreen(
     var showSortSheet by remember { mutableStateOf(false) }
     /** 「全部标记为已读」二次确认（批量不可逆，不能一键直发）。 */
     var showMarkAllReadConfirm by remember { mutableStateOf(false) }
+    /** 一键删除失效源二次确认（级联删文章不可逆，不能一键直发）。 */
+    var showDeleteUnhealthyConfirm by remember { mutableStateOf(false) }
     /** 订阅源搜索：非空时拍平展示命中的订阅行，绕过分组结构直达。 */
     var searchQuery by remember { mutableStateOf("") }
 
@@ -289,6 +292,21 @@ fun SubscriptionsScreen(
                         )
                     }
                 } else {
+                    // 一键删除失效源：入口就在失效列表顶部，紧邻目标，不用逐个进操作菜单
+                    item(key = "delete-unhealthy", contentType = "action") {
+                        TextButton(
+                            onClick = { showDeleteUnhealthyConfirm = true },
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        ) {
+                            Icon(Lucide.Trash2, contentDescription = null, tint = Danger, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "删除全部失效源（${unhealthyFeeds.size}）",
+                                color = Danger,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                    }
                     items(unhealthyFeeds, key = { "unhealthy-${it.feed.id}" }, contentType = { "feed" }) { feedItem ->
                         FeedRow(
                             item = feedItem,
@@ -450,6 +468,31 @@ fun SubscriptionsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showBatchDeleteConfirm = false }) {
+                    Text("取消", color = radarColors().textTertiary)
+                }
+            },
+        )
+    }
+
+    // 一键删除失效源确认：失效不等于用户确认不要（可能只是暂时故障），必须让用户看见数量再动手
+    if (showDeleteUnhealthyConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteUnhealthyConfirm = false },
+            containerColor = radarColors().surface1,
+            titleContentColor = radarColors().textPrimary,
+            textContentColor = radarColors().textSecondary,
+            title = { Text("删除失效订阅源", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
+            text = { Text("将删除 ${unhealthyFeeds.size} 个失效订阅源及其全部文章，此操作不可撤销。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteUnhealthyConfirm = false
+                    viewModel.onIntent(SubscriptionsIntent.DeleteUnhealthyFeeds)
+                }) {
+                    Text("删除", color = Danger, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteUnhealthyConfirm = false }) {
                     Text("取消", color = radarColors().textTertiary)
                 }
             },
