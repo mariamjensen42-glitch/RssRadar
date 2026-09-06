@@ -11,6 +11,7 @@ import com.cycling.rssradar.core.domain.rss.ConditionalHttpFetcher
 import com.cycling.rssradar.core.domain.rss.FeedFailureCategory
 import com.cycling.rssradar.core.domain.rss.FeedProbeResult
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
+import com.cycling.rssradar.core.domain.rss.retryOnSlowResponse
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -157,7 +158,12 @@ class RefreshEngine(
     private suspend fun refreshFeed(feedId: Long): Boolean = withContext(ioDispatcher) {
         val feed = feedDao.getById(feedId) ?: return@withContext false
         val ok = try {
-            doRefreshFeed(feed)
+            // 刷新链路也吃「等响应超时重试」：此前只有订阅预览有这个待遇，导致
+            // RSSHub 冷路由第一次刷新读超时 → 记一次失败，用户手动再刷也撞同一堵墙。
+            // 重试只针对 isRetryableTimeout（第二次常命中实例缓存秒回），
+            // upsert 按 link 幂等，重入无副作用。CancellationException 在 retryOnSlowResponse
+            // 里非可重试类会原样上抛，下方 catch 再放行。
+            retryOnSlowResponse { doRefreshFeed(feed) }
         } catch (e: kotlinx.coroutines.CancellationException) {
             // 协程取消不是源失败：不能把「刷新被取消」记成一次连续失败（假数据）
             throw e
