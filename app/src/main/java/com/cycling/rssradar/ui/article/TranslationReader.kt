@@ -59,6 +59,9 @@ internal fun TranslationReader(
 ) {
     val display = LocalReadingPrefs.current.translation
     val style = LocalReadingPrefs.current.style
+    // 沉浸阅读（issue #94）：块解析后经 [ReadingDenoise] 过滤，与原生路同一套降噪规则。
+    // 块粒度小于正文路，安全网（清洗后 < 清洗前一半）按块生效，误伤风险更低。
+    val immersive = LocalReadingPrefs.current.immersive
     // 块级配对：原文块与其译文块一一对应。分段内容变了才重算（渐进更新不重排已翻部分）。
     // 原文块边界由分段计划给定，这里只切译文侧。
     val pairs: List<TranslationBlockPair> = remember(segments) {
@@ -74,16 +77,23 @@ internal fun TranslationReader(
     ) {
         pairs.forEachIndexed { index, pair ->
             // 每块解析结果按 HTML 串缓存：渐进更新只重组变化的块，已翻完的块不重复解析
-            val originalNodes = remember(pair.originalHtml) {
-                if (pair.originalHtml.isBlank()) emptyList() else ReadingNodes.parse(pair.originalHtml)
+            val originalNodes = remember(pair.originalHtml, immersive) {
+                if (pair.originalHtml.isBlank()) {
+                    emptyList()
+                } else {
+                    val nodes = ReadingNodes.parse(pair.originalHtml)
+                    if (immersive) ReadingDenoise.clean(nodes) else nodes
+                }
             }
-            val translatedNodes = remember(pair.translatedHtml) {
+            val translatedNodes = remember(pair.translatedHtml, immersive) {
                 pair.translatedHtml?.takeIf { it.isNotBlank() }
                     ?.let { ReadingNodes.parse(it) }
                     ?.takeIf { it.isNotEmpty() }
+                    ?.let { if (immersive) ReadingDenoise.clean(it) else it }
+                    ?.takeIf { it.isNotEmpty() }
             }
             // 列表块拆到条目级：项一原文→项一译文→项二原文→项二译文…
-            val units = remember(pair.originalHtml, pair.translatedHtml) {
+            val units = remember(pair.originalHtml, pair.translatedHtml, immersive) {
                 buildRenderUnits(originalNodes, translatedNodes)
             }
             units.forEachIndexed { unitIndex, unit ->
