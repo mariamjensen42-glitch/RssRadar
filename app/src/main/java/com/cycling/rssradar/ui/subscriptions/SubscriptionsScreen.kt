@@ -29,7 +29,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -59,7 +58,6 @@ import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.core.data.store.FeedSortMode
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.components.FeedIcon
-import com.cycling.rssradar.core.ui.components.FloatingTabBarFabOffset
 import com.cycling.rssradar.core.ui.components.OptionPickerSheet
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.composables.icons.lucide.ArrowDownUp
@@ -185,26 +183,6 @@ fun SubscriptionsScreen(
                     onAdd = onAddSubscription,
                     totalUnread = totalUnread,
                     onMarkAllRead = { showMarkAllReadConfirm = true },
-                )
-            }
-        },
-        floatingActionButton = {
-            // 多选态隐藏 FAB：它与「选完再移动」的操作流冲突
-            if (!selectionMode) {
-                // 主操作按钮按压缩放（docs/motion.md #2）
-                val fabInteraction = remember { MutableInteractionSource() }
-                ExtendedFloatingActionButton(
-                    onClick = onAddSubscription,
-                    interactionSource = fabInteraction,
-                    containerColor = radarColors().accent,
-                    contentColor = radarColors().onAccent,
-                    icon = { Icon(Lucide.Plus, contentDescription = null) },
-                    text = { Text("添加") },
-                    shape = RoundedCornerShape(20.dp),
-                    // 抬升让开底部悬浮 TabBar（与 FeedListScreen 的 FAB 同一规则）
-                    modifier = Modifier
-                        .padding(bottom = FloatingTabBarFabOffset)
-                        .pressScale(fabInteraction),
                 )
             }
         },
@@ -399,8 +377,6 @@ fun SubscriptionsScreen(
                 }
             }
             }
-
-            item { Spacer(Modifier.height(96.dp)) } // 避让 FAB
         }
     }
 
