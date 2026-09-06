@@ -1,6 +1,8 @@
 package com.cycling.rssradar.core.data.rss
 
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
+import java.io.InputStream
 
 /**
  * Feed 自动发现（#5）的纯函数层：从站点 HTML 里挑出候选 feed 地址。
@@ -42,6 +44,21 @@ object FeedDiscovery {
     fun candidateLinks(baseUrl: String, html: String): List<String> {
         if (html.isBlank()) return emptyList()
         val doc = runCatching { Jsoup.parse(html, baseUrl) }.getOrNull() ?: return emptyList()
+        return extract(doc)
+    }
+
+    /**
+     * 直接从响应流提取候选：charset 交给 jsoup 按 BOM / meta 探测。
+     *
+     * 不能 `readBytes().toString(UTF_8)` 硬解——国内大量站点首页是 GBK，
+     * 硬解成 UTF-8 直接乱码，autodiscovery 一个 href 都拿不到。
+     */
+    fun candidateLinks(baseUrl: String, input: InputStream): List<String> {
+        val doc = runCatching { Jsoup.parse(input, null, baseUrl) }.getOrNull() ?: return emptyList()
+        return extract(doc)
+    }
+
+    private fun extract(doc: Document): List<String> {
         val out = LinkedHashSet<String>()
         doc.select("link[rel~=(?i)alternate]").forEach { link ->
             val type = link.attr("type").trim().lowercase()

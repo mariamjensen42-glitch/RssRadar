@@ -13,6 +13,7 @@ import com.cycling.rssradar.core.domain.rss.FeedFailureCategory
 import com.cycling.rssradar.core.domain.rss.FeedProbeResult
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import com.cycling.rssradar.core.domain.rss.retryOnSlowResponse
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 刷新子系统深模块（深化自原 FeedRepository）：订阅源刷新的全部规则都沉在这里，
@@ -56,6 +58,11 @@ class RefreshEngine(
      * 非 null 时每源刷新先带凭证发 If-None-Match / If-Modified-Since，304 直接跳过。
      */
     private val conditionalHttp: ConditionalHttpFetcher? = null,
+    /**
+     * 自愈留痕缝：地址被自动改写时回调 (feedId, 旧地址, 新地址)。
+     * 默认空实现——core/data 不依赖日志框架与 UI，由装配层决定「怎么让用户看见」。
+     */
+    private val onHealed: suspend (feedId: Long, oldUrl: String, newUrl: String) -> Unit = { _, _, _ -> },
 ) {
 
     companion object {
@@ -71,9 +78,31 @@ class RefreshEngine(
          * 发现是浪费；连续 2 次（与 FeedHealth 的失效判定对齐）还解析不出才值得修。
          */
         const val HEAL_FAILURE_THRESHOLD = 2
+
+        /**
+         * 每轮刷新的自愈配额：单个坏源最多 1（抓 HTML）+ 8（候选校验）+ 1（补刷新）
+         * 个请求，而且全程占着并发名额（最坏 10 × 20s 读超时）。700 源里若有一批坏源，
+         * 无配额能把全量刷新从几分钟拖到几十分钟，后台自动同步还白烧移动流量。
+         */
+        const val MAX_HEALS_PER_ROUND = 10
     }
 
     private val refreshSemaphore = Semaphore(REFRESH_CONCURRENCY)
+
+    /** 本轮刷新剩余的自愈名额（[refreshInParallel] / [refreshSingle] 每轮重置）。 */
+    private val healBudget = AtomicInteger(MAX_HEALS_PER_ROUND)
+
+    /**
+     * 占一个自愈名额。并发下用 CAS 而不是先 get 再 set：先判断再减会超发，
+     * 超发就意味着「配额」名存实亡。
+     */
+    private fun claimHealSlot(): Boolean {
+        while (true) {
+            val current = healBudget.get()
+            if (current <= 0) return false
+            if (healBudget.compareAndSet(current, current - 1)) return true
+        }
+    }
 
     // —— 对外接口：四条刷新路径，全部返回「成功源数 / 是否成功」，失败语义一致 ——
 
@@ -88,8 +117,11 @@ class RefreshEngine(
     /** 定向刷新一批订阅源（OPML 盲导后补文章用）。 */
     suspend fun refreshFeeds(feedIds: List<Long>): Int = refreshInParallel(feedIds)
 
-    /** 单源刷新（订阅源文章列表顶栏动作用）。 */
-    suspend fun refreshSingle(feedId: Long): Boolean = refreshFeed(feedId)
+    /** 单源刷新（订阅源文章列表顶栏动作用）：手动动作，独占本轮自愈名额（1 个就够）。 */
+    suspend fun refreshSingle(feedId: Long): Boolean {
+        healBudget.set(1)
+        return refreshFeed(feedId)
+    }
 
     /**
      * 抓取并解析一次 feed XML，供订阅链路（预览 probe / 添加 addFeed）复用。
@@ -136,7 +168,8 @@ class RefreshEngine(
     ): Int = withContext(ioDispatcher) {
         coroutineScope {
             val total = feedIds.size
-            val done = java.util.concurrent.atomic.AtomicInteger(0)
+            healBudget.set(MAX_HEALS_PER_ROUND)
+            val done = AtomicInteger(0)
             feedIds.map { feedId ->
                 async {
                     refreshSemaphore.withPermit {
@@ -171,7 +204,7 @@ class RefreshEngine(
             // upsert 按 link 幂等，重入无副作用。CancellationException 在 retryOnSlowResponse
             // 里非可重试类会原样上抛，下方 catch 再放行。
             retryOnSlowResponse { doRefreshFeed(feed) }
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             // 协程取消不是源失败：不能把「刷新被取消」记成一次连续失败（假数据）
             throw e
         } catch (e: Exception) {
@@ -180,7 +213,8 @@ class RefreshEngine(
             // OPML 盲导进了站点首页/已迁移地址。连续失败达到阈值才试（不给每次刷新都白付
             // 一次发现成本）；自愈换地址后立即补一轮刷新，成功走下方统一的恢复清零。
             val canHeal = FeedProbeResult.from(e) == FeedProbeResult.InvalidFeed &&
-                feed.consecutiveFailures + 1 >= HEAL_FAILURE_THRESHOLD
+                feed.consecutiveFailures + 1 >= HEAL_FAILURE_THRESHOLD &&
+                claimHealSlot()
             if (canHeal) healAndRefresh(feed) else false
         }
         // 写放大守门（1000+ 源全量刷新）：只有「确实有失败要清」或「从未记过成功」
@@ -197,7 +231,7 @@ class RefreshEngine(
         val healed = tryHealUrl(feed) ?: return false
         return try {
             doRefreshFeed(healed)
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             false
@@ -214,29 +248,49 @@ class RefreshEngine(
      * ——自愈是尽力而为的修复，绝不能把网络抖动放大成新问题。
      */
     private suspend fun tryHealUrl(feed: FeedEntity): FeedEntity? {
-        val html = try {
-            http.fetch(feed.url).use { it.readBytes().toString(Charsets.UTF_8) }
+        val candidates = try {
+            // charset 交给 jsoup 按 BOM / meta 探测（国内大量首页是 GBK，硬解 UTF-8 全乱码）
+            val declared = http.fetch(feed.url).use { FeedDiscovery.candidateLinks(feed.url, it) }
+            (declared + FeedDiscovery.guessedLinks(feed.url))
+                .distinct()
+                .take(FeedDiscovery.MAX_CANDIDATES)
+        } catch (e: CancellationException) {
+            throw e // 取消不是源失败：绝不能把「刷新被取消」咽下去继续打 8 个候选请求
         } catch (_: Exception) {
             return null
         }
-        val candidates = (
-            FeedDiscovery.candidateLinks(feed.url, html) +
-                FeedDiscovery.guessedLinks(feed.url)
-            ).distinct().take(FeedDiscovery.MAX_CANDIDATES)
-        for (candidate in candidates) {
+        // 同主机优先：跨主机候选（站点把 feed 托管到第三方）可能是另一个源，
+        // 排在后面当兜底，不抢在主 feed 前面改写地址（sortedBy 稳定，组内保序）。
+        val feedHost = hostOf(feed.url)
+        for (candidate in candidates.sortedBy { hostOf(it) != feedHost }) {
             if (feedDao.findIdByUrl(candidate) != null) continue
             val parsed = try {
                 http.fetch(candidate).use { parser.parse(it) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 continue
             }
             if (parsed.articles.isEmpty()) continue
-            feedDao.updateUrl(feed.id, candidate)
+            try {
+                feedDao.updateUrl(feed.id, candidate)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // feeds.url 有唯一索引：并发刷新下可能与另一个源撞车，撞了就换下一个候选
+                continue
+            }
+            // 留痕缝：自愈会静默改写订阅地址，没有它用户只会觉得「这个源内容变了」
+            onHealed(feed.id, feed.url, candidate)
             // 凭证已由 updateUrl 清空，内存副本同步置空：补刷新才会发无条件请求
             return feed.copy(url = candidate, etag = null, lastModified = null)
         }
         return null
     }
+
+    /** 主机比较用；解析不出（非法 URL）按「不同主机」处理，保守排后面。 */
+    private fun hostOf(url: String): String? =
+        runCatching { java.net.URL(url).host }.getOrNull()
 
     /**
      * 单次「抓取 → 写库」本体：异常一律上抛给 [refreshFeed] 统一归类，

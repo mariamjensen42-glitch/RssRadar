@@ -2,11 +2,13 @@ package com.cycling.rssradar.core.data.parser
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.cycling.rssradar.core.data.ContentQualification
+import com.cycling.rssradar.core.domain.rss.FeedProbeResult
 import java.io.ByteArrayInputStream
 
 class RssParserTest {
@@ -572,5 +574,39 @@ class RssParserTest {
         assertThrows(IllegalArgumentException::class.java) {
             parser.parse(ByteArrayInputStream("<html><body>not a feed</body></html>".toByteArray()))
         }
+    }
+
+    @Test
+    fun `清洗 已有的转义不被二次转义`() {
+        assertEquals("a &amp; b", parser.sanitizeXml("a &amp; b"))
+        assertEquals("&#160;", parser.sanitizeXml("&#160;"))
+    }
+
+    @Test
+    fun `清洗 命名实体大小写不敏感`() {
+        // XML 实体名大小写敏感，&NBSP; / &AMP; 在 XML 里都是非法的，必须修
+        assertEquals("&#160;", parser.sanitizeXml("&NBSP;"))
+        assertEquals("&amp;", parser.sanitizeXml("&AMP;"))
+    }
+
+    @Test
+    fun `清洗 裸和与查不到的实体`() {
+        assertEquals("a &amp; b", parser.sanitizeXml("a & b"))
+        assertEquals("&amp;unknown;", parser.sanitizeXml("&unknown;"))
+    }
+
+    @Test
+    fun `清洗 去非法控制字符但保留Tab与换行`() {
+        assertEquals("ab", parser.sanitizeXml("a\u0001b"))
+        assertEquals("\t\n\r", parser.sanitizeXml("\t\n\r"))
+    }
+
+    @Test
+    fun `超大feed 按网络失败处理而不是判成失效源`() {
+        // 判成 INVALID_FEED 会触发自愈改写地址——把「只是太大」的健康源改掉是最贵的误伤
+        val e = assertThrows(FeedTooLargeException::class.java) {
+            parser.parse(ByteArrayInputStream(ByteArray(RssParser.MAX_FEED_BYTES + 1)))
+        }
+        assertNotEquals(FeedProbeResult.InvalidFeed, FeedProbeResult.from(e))
     }
 }
