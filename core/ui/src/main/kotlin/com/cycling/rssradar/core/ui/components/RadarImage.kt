@@ -1,10 +1,5 @@
 package com.cycling.rssradar.core.ui.components
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -16,9 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
@@ -92,32 +84,4 @@ fun RadarImage(
             }
         }
     }
-}
-
-/**
- * 加载中 shimmer：单色线性渐变从左到右平移循环。
- * 只用主题色（surface1 打底 + textSecondary 低透明高光），不引第三方依赖。
- */
-@Composable
-private fun ShimmerOverlay(modifier: Modifier = Modifier) {
-    val base = radarColors().surface1
-    val highlight = radarColors().textSecondary.copy(alpha = 0.18f)
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val shift by transition.animateFloat(
-        initialValue = -1f,
-        targetValue = 2f,
-        animationSpec = infiniteRepeatable(tween(1100, easing = LinearEasing)),
-        label = "shimmerShift",
-    )
-    Box(
-        modifier = modifier.drawBehind {
-            drawRect(
-                brush = Brush.linearGradient(
-                    colors = listOf(base, highlight, base),
-                    start = Offset(size.width * shift, 0f),
-                    end = Offset(size.width * (shift + 1f), size.height),
-                ),
-            )
-        },
-    )
 }

@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
 import coil3.size.Size
 import com.cycling.rssradar.core.data.store.ReadingFontFamily
@@ -60,6 +61,7 @@ import com.cycling.rssradar.core.data.store.ReadingImageState
 import com.cycling.rssradar.core.data.store.ReadingStyleState
 import com.cycling.rssradar.ui.theme.LocalReadingPrefs
 import kotlin.math.sqrt
+import com.cycling.rssradar.core.ui.components.ShimmerOverlay
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.crossfadeMotion
 import com.cycling.rssradar.core.ui.theme.radarColors
@@ -315,6 +317,9 @@ private fun RenderNode(
                 LocalConfiguration.current.screenWidthDp.dp.roundToPx()
             }
             val maxHeightPx = with(LocalDensity.current) { IMAGE_MAX_HEIGHT_DP.dp.roundToPx() }
+            // 加载态驱动 shimmer 占位：图片高度未知，加载中先垫一块固定高度扫光，
+            // 成功后替换成真图（高度跳变是加载占位的固有代价，好过空白后突然弹出）
+            var imageLoading by remember(node.src) { mutableStateOf(true) }
             val model = remember(node.src, screenWidthPx, maxHeightPx, reducedMotion) {
                 ImageRequest.Builder(context)
                     .data(node.src)
@@ -323,19 +328,34 @@ private fun RenderNode(
                     .crossfadeMotion(reducedMotion)
                     .build()
             }
-            AsyncImage(
-                model = model,
-                contentDescription = node.alt,
-                contentScale = ContentScale.FillWidth,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    // 极端长图（1×N 像素的追踪图/长条图）会把整屏撑爆，给个上限
-                    .heightIn(max = 4000.dp)
-                    .clip(RoundedCornerShape(image.cornerRadius.dp))
-                    .then(formulaBg)
-                    .then(click)
-                    .padding(bottom = bottomPadding),
-            )
+            Box(Modifier.fillMaxWidth()) {
+                AsyncImage(
+                    model = model,
+                    contentDescription = node.alt,
+                    contentScale = ContentScale.FillWidth,
+                    onState = { state ->
+                        imageLoading = state is AsyncImagePainter.State.Empty ||
+                            state is AsyncImagePainter.State.Loading
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        // 极端长图（1×N 像素的追踪图/长条图）会把整屏撑爆，给个上限
+                        .heightIn(max = 4000.dp)
+                        .clip(RoundedCornerShape(image.cornerRadius.dp))
+                        .then(formulaBg)
+                        .then(click)
+                        .padding(bottom = bottomPadding),
+                )
+                if (imageLoading && !reducedMotion) {
+                    ShimmerOverlay(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .clip(RoundedCornerShape(image.cornerRadius.dp))
+                            .padding(bottom = bottomPadding),
+                    )
+                }
+            }
             node.caption?.let { caption ->
                 Text(
                     text = caption,
