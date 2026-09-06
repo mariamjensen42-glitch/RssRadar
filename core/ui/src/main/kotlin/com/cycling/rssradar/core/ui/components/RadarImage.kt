@@ -1,5 +1,10 @@
 package com.cycling.rssradar.core.ui.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -11,6 +16,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
@@ -25,7 +33,7 @@ import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 统一图片组件：包 coil AsyncImage，提供全应用一致的加载行为——
- * crossfade 渐显；url 为空 / 加载中 / 失败时统一 surface1 底色，
+ * 加载中 shimmer 扫光过渡；crossfade 渐显；url 为空 / 失败时统一 surface1 底色，
  * 空 url 或失败再叠加 [fallback] 兜底图标（线性描边风格），
  * 内存 + 磁盘缓存走 coil 默认。
  *
@@ -42,6 +50,8 @@ fun RadarImage(
     fallbackSize: Dp = 18.dp,
 ) {
     var failed by remember(url) { mutableStateOf(false) }
+    // Loading 态驱动 shimmer：首帧即视为加载中（缓存命中时 coil 首个 onState 会立刻纠正）
+    var loading by remember(url) { mutableStateOf(true) }
     val context = LocalContext.current
     val reducedMotion = LocalReducedMotion.current
     Box(
@@ -69,9 +79,45 @@ fun RadarImage(
                 model = model,
                 contentDescription = contentDescription,
                 contentScale = contentScale,
-                onState = { failed = it is coil3.compose.AsyncImagePainter.State.Error },
+                onState = { state ->
+                    failed = state is coil3.compose.AsyncImagePainter.State.Error
+                    loading = state is coil3.compose.AsyncImagePainter.State.Empty ||
+                        state is coil3.compose.AsyncImagePainter.State.Loading
+                },
                 modifier = Modifier.matchParentSize(),
             )
+            // 扫光叠在图上，Success 一到即消失；reduce-motion 不启用（动画红线）
+            if (loading && !reducedMotion) {
+                ShimmerOverlay(Modifier.matchParentSize())
+            }
         }
     }
+}
+
+/**
+ * 加载中 shimmer：单色线性渐变从左到右平移循环。
+ * 只用主题色（surface1 打底 + textSecondary 低透明高光），不引第三方依赖。
+ */
+@Composable
+private fun ShimmerOverlay(modifier: Modifier = Modifier) {
+    val base = radarColors().surface1
+    val highlight = radarColors().textSecondary.copy(alpha = 0.18f)
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val shift by transition.animateFloat(
+        initialValue = -1f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(tween(1100, easing = LinearEasing)),
+        label = "shimmerShift",
+    )
+    Box(
+        modifier = modifier.drawBehind {
+            drawRect(
+                brush = Brush.linearGradient(
+                    colors = listOf(base, highlight, base),
+                    start = Offset(size.width * shift, 0f),
+                    end = Offset(size.width * (shift + 1f), size.height),
+                ),
+            )
+        },
+    )
 }
