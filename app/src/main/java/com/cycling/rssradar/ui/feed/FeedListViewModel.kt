@@ -53,6 +53,12 @@ data class FeedListUiState(
     val articles: List<ArticleWithFeed> = emptyList(),
     /** 是否还有下一页（四个 tab 均分页）。 */
     val hasMore: Boolean = false,
+    /**
+     * 当前 tab + 筛选条件下的文章总数（滚动位置指示条的分母）。
+     * 翻页只追加不改它，thumb 不随加载跳变；推荐流是内存排序无 DB 总数，恒为 null
+     * （指示条退回按已加载量估算）。单篇删除等局部变更不重查，指示条允许轻微过期。
+     */
+    val totalCount: Int? = null,
     /** 是否正在加载下一页。 */
     val isLoadingMore: Boolean = false,
     /** 下拉刷新进行中。 */
@@ -475,8 +481,27 @@ class FeedListViewModel @Inject constructor(
     private suspend fun loadFirstPage(cancelPendingLoadMore: Boolean = false) {
         if (cancelPendingLoadMore) loadMoreJob?.cancel()
         val page = loadTabPage(PAGE_SIZE, 0)
+        // 总数与第一页同批取：切 tab/改筛选/刷新后一起刷新，翻页不重查
+        val total = countTabPage()
         update {
-            it.copy(articles = page, hasMore = hasMoreAfter(0, page.size))
+            it.copy(articles = page, hasMore = hasMoreAfter(0, page.size), totalCount = total)
+        }
+    }
+
+    /**
+     * 当前 tab + 筛选条件下的文章总数（滚动指示条分母）。与 [loadTabPage] 的
+     * 分支严格同构，谓词同源所以分母一致；推荐流不在 DB，返回 null 走兜底。
+     */
+    private suspend fun countTabPage(): Int? {
+        val state = _uiState.value
+        val group = state.selectedGroup
+        val contentType = state.selectedContentType.dbValue
+        return when (state.selectedTab) {
+            FeedTab.All -> repository.countArticlesFiltered(group, contentType)
+            FeedTab.Unread -> repository.countUnreadFiltered(group, contentType)
+            FeedTab.Starred -> repository.countStarredFiltered(group, contentType)
+            FeedTab.Bookmarked -> repository.countBookmarkedFiltered(group, contentType)
+            FeedTab.Recommended -> null
         }
     }
 

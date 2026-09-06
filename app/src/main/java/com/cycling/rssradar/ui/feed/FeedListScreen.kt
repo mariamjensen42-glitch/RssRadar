@@ -298,6 +298,7 @@ fun FeedListScreen(
                         markReadPassed = { ids ->
                             viewModel.onIntent(FeedListIntent.MarkReadPassed(ids))
                         },
+                        totalCount = uiState.totalCount,
                     )
                     Box(
                         modifier = Modifier
@@ -647,6 +648,11 @@ fun ArticleCardList(
      * 由 [LocalListDisplay] 的开关决定是否启用，关闭时本回调不会被调用。
      */
     markReadPassed: (List<Long>) -> Unit = {},
+    /**
+     * 当前筛选下的文章总数（滚动指示条分母）：翻页追加时不变，thumb 稳定。
+     * null = 总数未知（推荐流/单源页），退回按已加载量估算。
+     */
+    totalCount: Int? = null,
     modifier: Modifier = Modifier,
 ) {
     val display = LocalListDisplay.current.let {
@@ -794,7 +800,7 @@ fun ArticleCardList(
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
                 .width(6.dp)
-                .articleScrollbar(listState, radarColors().textTertiary),
+                .articleScrollbar(listState, radarColors().textTertiary, totalCount),
         )
     }
 }
@@ -1242,22 +1248,30 @@ private fun StickyDateHeader(label: String) {
 }
 
 /**
- * 滚动位置指示条：在自身范围内按 LazyList/LazyGrid 的 layoutInfo 画一个 thumb。
+ * 滚动位置指示条：按 LazyList 的 layoutInfo 画一个 thumb。
  * - draw 阶段直接读 layoutInfo（snapshot state），滚动时自动重绘，不引入重组；
- * - thumb 高度 = 视口占比 × 可见/总条目数，条目数随分页增长，比例会自然变小；
- * - 条目一屏放得下时不画；纯指示不做拖拽定位（首页列表不需要双向交互）。
+ * - 分页适配：[totalCount] 非空时以 DB 总数为分母——翻页追加不改它，thumb 位置
+ *   与长度都稳定（thumb 长度 = 已加载占比）；null 时退回按已加载量估算，会随
+ *   翻页轻微收缩。粘性日期头也占槽位，条目数与文章数有少量出入，指示条容忍。
+ * - 一屏放得下时不画；纯指示不做拖拽定位（首页列表不需要双向交互）。
  */
-private fun Modifier.articleScrollbar(state: LazyListState, color: Color): Modifier =
+private fun Modifier.articleScrollbar(
+    state: LazyListState,
+    color: Color,
+    totalCount: Int? = null,
+): Modifier =
     drawWithContent {
         drawContent()
         val info = state.layoutInfo
-        val total = info.totalItemsCount
+        val loaded = info.totalItemsCount
         val visible = info.visibleItemsInfo.size
+        // 分母取 DB 总数与已加载量的较大者：删除等局部变更后 count 可能暂时小于 loaded
+        val total = maxOf(loaded, totalCount ?: 0)
         if (total <= 0 || visible >= total) return@drawWithContent
         val viewport = size.height
         val thumbWidth = 4.dp.toPx()
-        // 最小 thumb 高度：内容极长时 thumb 不能细到看不见
-        val thumbHeight = (viewport * visible / total).coerceAtLeast(32.dp.toPx())
+        // thumb 长度 = 已加载占比：翻页时分母不变，长度不跳
+        val thumbHeight = (viewport * loaded / total).coerceAtLeast(32.dp.toPx())
         val firstIndex = info.visibleItemsInfo.first().index
         val scrollFraction = firstIndex / (total - visible).toFloat()
         val thumbY = scrollFraction * (viewport - thumbHeight)

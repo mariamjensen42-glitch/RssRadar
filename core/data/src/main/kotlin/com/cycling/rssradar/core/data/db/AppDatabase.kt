@@ -474,6 +474,64 @@ interface ArticleDao {
     @Suppress("QUERY_MISMATCH")
     suspend fun loadBookmarkedWithFeedPaged(limit: Int, offset: Int): List<ArticleWithFeed>
 
+    // —— 总数 COUNT（滚动位置指示条）：谓词与上面的分页查询严格同构，保证分母一致。
+    // 翻页只追加不重算总数，指示条 thumb 不随 totalItemsCount 增长而跳变。 ——
+
+    @Query("SELECT COUNT(*) FROM articles JOIN feeds ON articles.feedId = feeds.id")
+    suspend fun countAllWithFeed(): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE
+        """,
+    )
+    suspend fun countAllWithFeedFiltered(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+    ): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.isRead = 0 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE
+        """,
+    )
+    suspend fun countUnreadWithFeedFiltered(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+    ): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.isStarred = 1 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE
+        """,
+    )
+    suspend fun countStarredWithFeedFiltered(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+    ): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE articles.isBookmarked = 1 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE
+        """,
+    )
+    suspend fun countBookmarkedWithFeedFiltered(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+    ): Int
+
     // —— 组合筛选变体（issue #74 分组 + issue #75 分区）：两个过滤维度收进同一条查询，
     // 四个常规 tab 各一条，DAO 查询总数不随维度组合膨胀 ——
     // 筛选语义（默认组同时命中空串、分区「全部」短路）与排序约定统一收口在
