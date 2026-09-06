@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -70,6 +71,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -714,18 +718,19 @@ fun ArticleCardList(
                 if (passed.isNotEmpty()) markReadPassed(passed)
             }
     }
-    LazyColumn(
-        state = listState,
-        modifier = modifier.fillMaxSize(),
-        // 底部让位：tab 屏让开悬浮 TabBar，最后一条文章能完整滚出胶囊
-        contentPadding = PaddingValues(
-            start = 16.dp,
-            end = 16.dp,
-            top = 4.dp,
-            bottom = bottomPadding,
-        ),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            // 底部让位：tab 屏让开悬浮 TabBar，最后一条文章能完整滚出胶囊
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = 4.dp,
+                bottom = bottomPadding,
+            ),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
         // 杂志模式：首篇大图突出（hero 跟随列表首项，翻页后仍是当前加载段的第一篇）
         val heroId = if (effective.viewMode == ListViewMode.MAGAZINE) articles.firstOrNull()?.article?.id else null
         if (display.stickyDateHeader) {
@@ -782,6 +787,15 @@ fun ArticleCardList(
                 }
             }
         }
+        }
+        // 滚动位置指示条：叠加在右缘，不参与布局与手势
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .width(6.dp)
+                .articleScrollbar(listState, radarColors().textTertiary),
+        )
     }
 }
 
@@ -1226,6 +1240,34 @@ private fun StickyDateHeader(label: String) {
         )
     }
 }
+
+/**
+ * 滚动位置指示条：在自身范围内按 LazyList/LazyGrid 的 layoutInfo 画一个 thumb。
+ * - draw 阶段直接读 layoutInfo（snapshot state），滚动时自动重绘，不引入重组；
+ * - thumb 高度 = 视口占比 × 可见/总条目数，条目数随分页增长，比例会自然变小；
+ * - 条目一屏放得下时不画；纯指示不做拖拽定位（首页列表不需要双向交互）。
+ */
+private fun Modifier.articleScrollbar(state: LazyListState, color: Color): Modifier =
+    drawWithContent {
+        drawContent()
+        val info = state.layoutInfo
+        val total = info.totalItemsCount
+        val visible = info.visibleItemsInfo.size
+        if (total <= 0 || visible >= total) return@drawWithContent
+        val viewport = size.height
+        val thumbWidth = 4.dp.toPx()
+        // 最小 thumb 高度：内容极长时 thumb 不能细到看不见
+        val thumbHeight = (viewport * visible / total).coerceAtLeast(32.dp.toPx())
+        val firstIndex = info.visibleItemsInfo.first().index
+        val scrollFraction = firstIndex / (total - visible).toFloat()
+        val thumbY = scrollFraction * (viewport - thumbHeight)
+        drawRoundRect(
+            color = color.copy(alpha = 0.55f),
+            topLeft = Offset(size.width - thumbWidth, thumbY),
+            size = Size(thumbWidth, thumbHeight),
+            cornerRadius = CornerRadius(thumbWidth / 2f),
+        )
+    }
 
 /**
  * 列表手势：右滑收藏 / 左滑切换已读——RSS 阅读器的肌肉记忆。
