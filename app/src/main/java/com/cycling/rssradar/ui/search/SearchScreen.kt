@@ -387,7 +387,7 @@ private fun SearchResultRow(
     Box {
         Surface(
             shape = RoundedCornerShape(12.dp),
-            color = radarColors().surface1,
+            color = radarColors().articleCard,
             modifier = Modifier
                 .fillMaxWidth()
                 .pressScale(interactionSource)

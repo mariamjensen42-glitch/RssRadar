@@ -923,7 +923,7 @@ private fun MagazineHeroCard(
     val interactionSource = remember { MutableInteractionSource() }
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = radarColors().surface1,
+        color = radarColors().articleCard,
         modifier = Modifier
             .fillMaxWidth()
             .pressScale(interactionSource)
@@ -1010,7 +1010,7 @@ private fun MagazineCard(
     val interactionSource = remember { MutableInteractionSource() }
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = radarColors().surface1,
+        color = radarColors().articleCard,
         modifier = Modifier
             .fillMaxWidth()
             .pressScale(interactionSource)
@@ -1156,7 +1156,7 @@ private fun GridArticleCard(
     val interactionSource = remember { MutableInteractionSource() }
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = radarColors().surface1,
+        color = radarColors().articleCard,
         modifier = Modifier
             .fillMaxWidth()
             .pressScale(interactionSource)
@@ -1479,7 +1479,7 @@ fun ArticleCard(
     Box {
         Surface(
             shape = RoundedCornerShape(14.dp),
-            color = radarColors().surface1,
+            color = radarColors().articleCard,
             modifier = Modifier
                 .fillMaxWidth()
                 .pressScale(interactionSource)
