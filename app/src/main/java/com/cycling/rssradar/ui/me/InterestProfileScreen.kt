@@ -1,5 +1,7 @@
 package com.cycling.rssradar.ui.me
 
+import androidx.compose.ui.res.stringResource
+import com.cycling.rssradar.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,10 +65,10 @@ fun InterestProfileScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = radarColors().textPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.back), tint = radarColors().textPrimary)
             }
             Text(
-                text = "兴趣画像",
+                text = stringResource(R.string.profile_title),
                 color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
@@ -80,8 +82,7 @@ fun InterestProfileScreen(
                 .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
         ) {
             Text(
-                text = "推荐流按你的真实阅读行为排序：打开过的文章、收藏、稍后读都会计入画像，" +
-                    "越近的行为权重越高。画像只存在本机，不上传。",
+                text = stringResource(R.string.profile_desc),
                 color = radarColors().textTertiary,
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -104,11 +105,11 @@ fun InterestProfileScreen(
                                     modifier = Modifier.size(18.dp),
                                 )
                                 Spacer(Modifier.width(8.dp))
-                                Text("还没有学到偏好", color = radarColors().textPrimary, style = MaterialTheme.typography.bodyMedium)
+                                Text(stringResource(R.string.profile_empty), color = radarColors().textPrimary, style = MaterialTheme.typography.bodyMedium)
                             }
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text = "多读几篇文章后这里会出现兴趣词；在此之前，推荐 tab 按订阅源轮转展示最近未读。",
+                                text = stringResource(R.string.profile_empty_hint),
                                 color = radarColors().textTertiary,
                                 style = MaterialTheme.typography.bodySmall,
                             )
@@ -117,7 +118,7 @@ fun InterestProfileScreen(
                 }
                 else -> {
                     Text(
-                        text = "兴趣词 ${state.terms.size} 个",
+                        text = stringResource(R.string.profile_terms, state.terms.size),
                         color = radarColors().textSecondary,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
@@ -163,7 +164,7 @@ fun InterestProfileScreen(
                             }
                             if (state.terms.size > 30) {
                                 Text(
-                                    text = "仅展示权重最高的 30 个，完整词袋共 ${state.terms.size} 个",
+                                    text = stringResource(R.string.profile_top_hint, state.terms.size),
                                     color = radarColors().textTertiary,
                                     style = MaterialTheme.typography.bodySmall,
                                 )
@@ -174,7 +175,7 @@ fun InterestProfileScreen(
                     if (state.affinities.isNotEmpty()) {
                         Spacer(Modifier.height(20.dp))
                         Text(
-                            text = "订阅源亲和度 ${state.affinities.size} 个",
+                            text = stringResource(R.string.profile_affinities, state.affinities.size),
                             color = radarColors().textSecondary,
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
@@ -186,7 +187,7 @@ fun InterestProfileScreen(
                                     Column {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
-                                                text = row.title.ifBlank { "（已删除的订阅源）" },
+                                                text = row.title.ifBlank { stringResource(R.string.deleted_feed) },
                                                 color = radarColors().textPrimary,
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 modifier = Modifier.weight(1f),
@@ -218,7 +219,7 @@ fun InterestProfileScreen(
                                     }
                                 }
                                 Text(
-                                    text = "亲和度 = 该源文章的历史打开率（越近的打开权重越高），按最高的那个源归一化。",
+                                    text = stringResource(R.string.profile_formula),
                                     color = radarColors().textTertiary,
                                     style = MaterialTheme.typography.bodySmall,
                                 )

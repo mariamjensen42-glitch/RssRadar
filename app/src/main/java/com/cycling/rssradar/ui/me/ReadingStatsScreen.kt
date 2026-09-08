@@ -1,5 +1,7 @@
 package com.cycling.rssradar.ui.me
 
+import androidx.compose.ui.res.stringResource
+import com.cycling.rssradar.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -140,11 +142,11 @@ fun ReadingStatsScreen(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
-                Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = colors.textPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.back), tint = colors.textPrimary)
             }
             Spacer(Modifier.width(4.dp))
             Text(
-                text = "阅读统计",
+                text = stringResource(R.string.stats_title),
                 color = colors.textPrimary,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
@@ -152,7 +154,7 @@ fun ReadingStatsScreen(
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "近 7 天 · 口径为真实打开文章，滑动标已读不计入",
+            text = stringResource(R.string.stats_scope),
             color = colors.textTertiary,
             style = MaterialTheme.typography.labelMedium,
         )
@@ -172,13 +174,13 @@ fun ReadingStatsScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             StatsBigCard(
                 value = state.weekOpens.toString(),
-                label = "近 7 天打开",
+                label = stringResource(R.string.stats_opened),
                 modifier = Modifier.weight(1f),
             )
             StatsBigCard(
                 // 「估算」如实标注：readingMinutes 是按字数估的，不是真实停留计时（CONTEXT.md）
                 value = formatMinutes(state.weekMinutes),
-                label = "阅读分钟（估算）",
+                label = stringResource(R.string.stats_minutes),
                 modifier = Modifier.weight(1f),
             )
         }
@@ -186,24 +188,24 @@ fun ReadingStatsScreen(
         // 「当前未读」已移除（UI 审计 G2）：未读存量在信息流与「我的」页已展示，
         // 本页只保留行为统计，避免同一数字四处重复
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            StatsBigCard(value = state.streakDays.toString(), label = "连续阅读天数", modifier = Modifier.weight(1f))
-            StatsBigCard(value = (state.starredCount + state.bookmarkedCount).toString(), label = "收藏/稍后读", modifier = Modifier.weight(1f))
+            StatsBigCard(value = state.streakDays.toString(), label = stringResource(R.string.stats_streak), modifier = Modifier.weight(1f))
+            StatsBigCard(value = (state.starredCount + state.bookmarkedCount).toString(), label = stringResource(R.string.stats_saved), modifier = Modifier.weight(1f))
         }
 
         Spacer(Modifier.height(16.dp))
 
         // —— 活跃时段 ——
-        StatsSectionCard(title = "活跃时段") {
+        StatsSectionCard(title = stringResource(R.string.stats_hours)) {
             if (state.activeHours.isEmpty()) {
-                StatsEmpty("样本不足——近 7 天打开太少，看不出习惯")
+                StatsEmpty(stringResource(R.string.stats_insufficient))
             } else {
                 Text(
-                    text = state.activeHours.joinToString("、") { "$it 点" },
+                    text = state.activeHours.map { stringResource(R.string.stats_hour, it) }.joinToString("、"),
                     color = colors.textPrimary,
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
-                    text = "明显高于全天平均的打开时段",
+                    text = stringResource(R.string.stats_peak),
                     color = colors.textTertiary,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(top = 4.dp),
@@ -213,9 +215,9 @@ fun ReadingStatsScreen(
         Spacer(Modifier.height(10.dp))
 
         // —— Top 5 + 集中度 ——
-        StatsSectionCard(title = "最常打开的订阅源") {
+        StatsSectionCard(title = stringResource(R.string.stats_top_feeds)) {
             if (state.topFeeds.isEmpty()) {
-                StatsEmpty("近 7 天还没有打开记录")
+                StatsEmpty(stringResource(R.string.stats_no_records))
             } else {
                 state.topFeeds.forEachIndexed { index, feed ->
                     Row(
@@ -236,7 +238,7 @@ fun ReadingStatsScreen(
                             maxLines = 1,
                         )
                         Text(
-                            text = "${feed.cnt} 篇",
+                            text = stringResource(R.string.stats_articles, feed.cnt),
                             color = colors.textSecondary,
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -246,9 +248,9 @@ fun ReadingStatsScreen(
                 Text(
                     text = "源集中度 $pct%——${
                         when {
-                            pct >= 60 -> "阅读集中在少数源"
-                            pct >= 30 -> "分布适中"
-                            else -> "阅读相当分散"
+                            pct >= 60 -> stringResource(R.string.stats_concentrated)
+                            pct >= 30 -> stringResource(R.string.stats_moderate)
+                            else -> stringResource(R.string.stats_scattered)
                         }
                     }",
                     color = colors.textTertiary,

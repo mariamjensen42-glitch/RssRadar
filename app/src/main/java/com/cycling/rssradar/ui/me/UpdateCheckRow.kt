@@ -3,6 +3,8 @@ package com.cycling.rssradar.ui.me
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.compose.ui.res.stringResource
+import com.cycling.rssradar.R
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,12 +42,12 @@ internal fun UpdateCheckRow(modifier: Modifier = Modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "当前版本",
+                    text = stringResource(R.string.update_current_version),
                     color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Text(
-                    text = version ?: "未知",
+                    text = version ?: stringResource(R.string.unknown),
                     color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -55,7 +57,7 @@ internal fun UpdateCheckRow(modifier: Modifier = Modifier) {
                 enabled = state !is UpdateState.Checking,
             ) {
                 Text(
-                    text = if (state is UpdateState.Checking) "检查中…" else "检查更新",
+                    text = if (state is UpdateState.Checking) stringResource(R.string.checking) else stringResource(R.string.check_updates),
                     color = radarColors().accent,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -63,18 +65,18 @@ internal fun UpdateCheckRow(modifier: Modifier = Modifier) {
         }
         when (val current = state) {
             UpdateState.Idle, UpdateState.Checking -> Unit
-            UpdateState.UpToDate -> ResultLine("已是最新版本")
+            UpdateState.UpToDate -> ResultLine(stringResource(R.string.up_to_date))
             is UpdateState.Failed -> ResultLine(current.message)
             is UpdateState.Available -> Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "发现新版本 ${current.version}",
+                    text = stringResource(R.string.new_version_found, current.version),
                     color = radarColors().accent,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f),
                 )
                 TextButton(onClick = { context.openUrl(current.url) }) {
                     Text(
-                        text = "去下载",
+                        text = stringResource(R.string.go_download),
                         color = radarColors().accent,
                         style = MaterialTheme.typography.bodyMedium,
                     )

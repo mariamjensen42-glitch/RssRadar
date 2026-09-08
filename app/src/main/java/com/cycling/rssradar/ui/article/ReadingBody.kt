@@ -842,8 +842,7 @@ private fun formatDate(ts: Long?): String =
     ts?.let { DateUtils.getRelativeTimeSpanString(it).toString() } ?: stringResource(R.string.unknown_time)
 
 /** ADR-0017：枚举只给身份，人话由 UI 层按当前语言翻译。 */
-@Composable
-private fun FetchFailure.uiRes(): Int = when (this) {
+internal fun FetchFailure.uiRes(): Int = when (this) {
     FetchFailure.INVALID_URL -> R.string.fetch_invalid_url
     FetchFailure.TIMEOUT -> R.string.fetch_timeout
     FetchFailure.NETWORK -> R.string.fetch_network

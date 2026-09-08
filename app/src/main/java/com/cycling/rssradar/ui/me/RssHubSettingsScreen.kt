@@ -2,6 +2,11 @@ package com.cycling.rssradar.ui.me
 
 import android.content.Context
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.res.stringResource
+import com.cycling.rssradar.R
+import com.cycling.rssradar.i18n.labelRes
+import com.cycling.rssradar.i18n.UiText
+import com.cycling.rssradar.i18n.resolve
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -83,7 +88,7 @@ data class RssHubSettingsUiState(
     val customInput: String = "",
     val probing: Boolean = false,
     /** 最近一次探测的提示文案；null 表示没有要展示的提示。 */
-    val probeMessage: String? = null,
+    val probeMessage: UiText? = null,
     /** 当前主题模式。 */
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
@@ -96,7 +101,7 @@ data class RssHubSettingsUiState(
     /** 是否已配置 Key（用于状态展示，不回显完整 Key）。 */
     val aiKeyConfigured: Boolean = false,
     /** AI Key 保存的提示文案。 */
-    val aiMessage: String? = null,
+    val aiMessage: UiText? = null,
     /** 信息流列表显示项（issue #56）。 */
     val listDisplay: ListDisplayState = ListDisplayState(),
     /** 归档保留档位（issue #57）。 */
@@ -112,14 +117,14 @@ data class RssHubSettingsUiState(
     /** 系统通知权限是否已授予（Android 13+）；true = 低版本无需权限。 */
     val notifyPermissionGranted: Boolean = true,
     /** 通知设置的提示文案（权限被拒时说明原因）。 */
-    val notifyMessage: String? = null,
+    val notifyMessage: UiText? = null,
     /** 路由目录（issue #59）：条数 / 数据时间 / 来源。 */
     val catalogRouteCount: Int = 0,
     val catalogGeneratedAt: Long? = null,
     val catalogSource: CatalogSource = CatalogSource.BUILTIN,
     val catalogRefreshing: Boolean = false,
     /** 目录更新结果的提示文案。 */
-    val catalogMessage: String? = null,
+    val catalogMessage: UiText? = null,
     /** 「我的」页统计条：订阅源数 / 未读文章数（全部来自 DB 真实计数，禁止编造）。 */
     val feedCount: Int = 0,
     val unreadCount: Int = 0,
@@ -255,13 +260,14 @@ class RssHubSettingsViewModel @Inject constructor(
                 .onSuccess { count ->
                     _state.value = _state.value.copy(
                         catalogRefreshing = false,
-                        catalogMessage = "已更新，共 $count 条路由",
+                        catalogMessage = UiText.res(R.string.catalog_updated, "$count"),
                     )
                 }
                 .onFailure { error ->
                     _state.value = _state.value.copy(
                         catalogRefreshing = false,
-                        catalogMessage = "更新失败：${error.message ?: "网络错误"}",
+                        catalogMessage = error.message?.let { UiText.res(R.string.catalog_update_failed, it) }
+                            ?: UiText.res(R.string.catalog_update_failed_generic),
                     )
                 }
         }
@@ -275,7 +281,7 @@ class RssHubSettingsViewModel @Inject constructor(
         val granted = NotificationHelper.hasPermission(appContext)
         _state.value = _state.value.copy(
             notifyPermissionGranted = granted,
-            notifyMessage = if (enabled && !granted) "请在系统弹窗中允许通知权限" else null,
+            notifyMessage = if (enabled && !granted) UiText.res(R.string.notify_permission_needed) else null,
         )
         if (enabled && !granted) return // 等权限结果回来（见 onNotifyPermissionResult）
         notificationStore.set(enabled)
@@ -286,7 +292,7 @@ class RssHubSettingsViewModel @Inject constructor(
         notificationStore.set(granted)
         _state.value = _state.value.copy(
             notifyPermissionGranted = granted,
-            notifyMessage = if (granted) null else "没有通知权限，无法开启新文章通知",
+            notifyMessage = if (granted) null else UiText.res(R.string.notify_permission_missing),
         )
     }
 
@@ -358,7 +364,7 @@ class RssHubSettingsViewModel @Inject constructor(
         aiStore.apiKey = key.ifEmpty { null }
         _state.value = _state.value.copy(
             aiKeyConfigured = aiStore.hasKey(),
-            aiMessage = if (key.isEmpty()) "已清除 API Key" else "API Key 已保存",
+            aiMessage = if (key.isEmpty()) UiText.res(R.string.ai_key_cleared) else UiText.res(R.string.ai_key_saved),
         )
     }
 
@@ -366,18 +372,18 @@ class RssHubSettingsViewModel @Inject constructor(
         val raw = _state.value.customInput.trim()
         if (raw.isEmpty()) {
             store.customHost = null
-            _state.value = _state.value.copy(activeHost = store.currentOrDefault(), probeMessage = "已清除自定义实例")
+            _state.value = _state.value.copy(activeHost = store.currentOrDefault(), probeMessage = UiText.res(R.string.instance_cleared))
             return
         }
         val normalized = normalizeHost(raw) ?: run {
-            _state.value = _state.value.copy(probeMessage = "实例地址格式不正确")
+            _state.value = _state.value.copy(probeMessage = UiText.res(R.string.instance_invalid))
             return
         }
         store.customHost = normalized
         _state.value = _state.value.copy(
             activeHost = store.currentOrDefault(),
             customInput = normalized,
-            probeMessage = "已保存：$normalized",
+            probeMessage = UiText.res(R.string.instance_saved, normalized),
         )
     }
 
@@ -391,9 +397,9 @@ class RssHubSettingsViewModel @Inject constructor(
                 probing = false,
                 activeHost = store.currentOrDefault(),
                 probeMessage = if (available != null) {
-                    "探测到可用实例：$available"
+                    UiText.res(R.string.probe_found, "$available")
                 } else {
-                    "所有内置实例均不可达，请检查网络或填入自建实例"
+                    UiText.res(R.string.probe_none)
                 },
             )
         }
@@ -407,10 +413,11 @@ class RssHubSettingsViewModel @Inject constructor(
     }
 }
 
+@Composable
 private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
-    ThemeMode.SYSTEM -> "跟随系统"
-    ThemeMode.LIGHT -> "浅色"
-    ThemeMode.DARK -> "深色"
+    ThemeMode.SYSTEM -> stringResource(R.string.theme_system)
+    ThemeMode.LIGHT -> stringResource(R.string.theme_light)
+    ThemeMode.DARK -> stringResource(R.string.theme_dark)
 }
 
 /**
@@ -442,7 +449,7 @@ fun RssHubSettingsScreen(
             ),
     ) {
         Text(
-            text = "我的",
+            text = stringResource(R.string.me_title),
             color = radarColors().textPrimary,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
@@ -456,30 +463,30 @@ fun RssHubSettingsScreen(
                 .padding(bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            StatCard(label = "订阅源", value = state.feedCount.toString(), modifier = Modifier.weight(1f))
-            StatCard(label = "未读文章", value = state.unreadCount.toString(), modifier = Modifier.weight(1f))
+            StatCard(label = stringResource(R.string.me_feeds), value = state.feedCount.toString(), modifier = Modifier.weight(1f))
+            StatCard(label = stringResource(R.string.me_unread), value = state.unreadCount.toString(), modifier = Modifier.weight(1f))
         }
 
         // 阅读统计入口（#83）：与统计条相邻，数字页不动设置页布局
         SettingsEntryCard(
             icon = Lucide.Activity,
-            title = "阅读统计",
-            summary = "近 7 天",
+            title = stringResource(R.string.stats_title),
+            summary = stringResource(R.string.last_7_days),
             onClick = onOpenReadingStats,
         )
         Spacer(Modifier.height(10.dp))
 
         SettingsEntryCard(
             icon = Lucide.Palette,
-            title = "通用",
+            title = stringResource(R.string.settings_general),
             summary = themeModeLabel(state.themeMode),
             onClick = onOpenGeneral,
         )
         Spacer(Modifier.height(10.dp))
         SettingsEntryCard(
             icon = Lucide.RefreshCw,
-            title = "同步与清理",
-            summary = state.sync.interval.label,
+            title = stringResource(R.string.settings_sync),
+            summary = stringResource(state.sync.interval.labelRes()),
             onClick = onOpenSync,
         )
         Spacer(Modifier.height(10.dp))
@@ -492,8 +499,8 @@ fun RssHubSettingsScreen(
         Spacer(Modifier.height(10.dp))
         SettingsEntryCard(
             icon = Lucide.Bot,
-            title = "AI 与诊断",
-            summary = if (state.aiKeyConfigured) "已配置" else "未配置",
+            title = stringResource(R.string.settings_ai),
+            summary = if (state.aiKeyConfigured) stringResource(R.string.ai_configured) else stringResource(R.string.ai_not_configured),
             onClick = onOpenAiDiag,
         )
         Spacer(Modifier.height(32.dp))
@@ -576,7 +583,7 @@ private fun SettingsEntryCard(
             Spacer(Modifier.width(6.dp))
             Icon(
                 imageVector = Lucide.ChevronRight,
-                contentDescription = "进入",
+                contentDescription = stringResource(R.string.enter),
                 tint = radarColors().textTertiary,
                 modifier = Modifier.size(18.dp),
             )

@@ -1,5 +1,7 @@
 package com.cycling.rssradar.ui.me
 
+import com.cycling.rssradar.R
+import com.cycling.rssradar.i18n.UiText
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.ai.AiArtifactGroup
@@ -37,7 +39,7 @@ data class AiArtifactsUiState(
     /** 选中的功能；null = 全部功能。 */
     val selectedKind: Int? = null,
     val detail: AiArtifactDetail? = null,
-    val message: String? = null,
+    val message: UiText? = null,
 )
 
 
@@ -147,7 +149,7 @@ class AiArtifactsViewModel @Inject constructor(
                 artifacts.delete(item.feature, item.subjectId)
                 true
             }
-            if (!ok) _state.update { it.copy(message = "删除失败，请重试") }
+            if (!ok) _state.update { it.copy(message = UiText.res(R.string.aimsg_delete_failed)) }
             // 删掉的正是当前打开的这条时，面板要一起关，否则会停在一个已不存在的数据上。
             val wasOpen = _state.value.detail?.item === item
             if (wasOpen) _state.update { it.copy(detail = null) }

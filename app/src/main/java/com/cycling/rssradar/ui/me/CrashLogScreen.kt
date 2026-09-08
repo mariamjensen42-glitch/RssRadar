@@ -3,6 +3,8 @@ package com.cycling.rssradar.ui.me
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.ui.res.stringResource
+import com.cycling.rssradar.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -129,10 +131,10 @@ fun CrashLogScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = radarColors().textPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.back), tint = radarColors().textPrimary)
             }
             Text(
-                text = "崩溃日志",
+                text = stringResource(R.string.crash_title),
                 color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
@@ -140,7 +142,7 @@ fun CrashLogScreen(
             )
             if (records.isNotEmpty()) {
                 IconButton(onClick = { confirmClear = true }) {
-                    Icon(Lucide.Trash, contentDescription = "清空日志", tint = radarColors().textSecondary)
+                    Icon(Lucide.Trash, contentDescription = stringResource(R.string.crash_clear), tint = radarColors().textSecondary)
                 }
             }
         }
@@ -152,10 +154,10 @@ fun CrashLogScreen(
                     .padding(horizontal = 20.dp, vertical = 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("暂无崩溃记录", color = radarColors().textSecondary, style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.crash_empty), color = radarColors().textSecondary, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "应用崩溃时会自动记录异常与设备信息，最多保留 5 份",
+                    stringResource(R.string.crash_desc),
                     color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -187,7 +189,7 @@ fun CrashLogScreen(
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     SelectionContainer {
                         Text(
-                            text = crash.text.ifBlank { "（日志已丢失或读取失败）" },
+                            text = crash.text.ifBlank { stringResource(R.string.crash_lost) },
                             color = radarColors().textSecondary,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -196,11 +198,11 @@ fun CrashLogScreen(
             },
             confirmButton = {
                 TextButton(onClick = { context.shareCrashLog(crash.text, crash.head) }) {
-                    Text("导出", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.export), color = radarColors().accent, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::close) { Text("关闭", color = radarColors().textSecondary) }
+                TextButton(onClick = viewModel::close) { Text(stringResource(R.string.close), color = radarColors().textSecondary) }
             },
             containerColor = radarColors().surface1,
         )
@@ -209,18 +211,18 @@ fun CrashLogScreen(
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("清空崩溃日志？", color = radarColors().textPrimary) },
-            text = { Text("已记录的 ${records.size} 份崩溃日志会被删除，无法恢复。", color = radarColors().textSecondary) },
+            title = { Text(stringResource(R.string.crash_confirm_title), color = radarColors().textPrimary) },
+            text = { Text(stringResource(R.string.crash_confirm_msg, records.size), color = radarColors().textSecondary) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         confirmClear = false
                         viewModel.clear(context)
                     },
-                ) { Text("清空", color = Danger, fontWeight = FontWeight.SemiBold) }
+                ) { Text(stringResource(R.string.clear), color = Danger, fontWeight = FontWeight.SemiBold) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text("取消", color = radarColors().textSecondary) }
+                TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.cancel), color = radarColors().textSecondary) }
             },
             containerColor = radarColors().surface1,
         )
@@ -262,7 +264,7 @@ private fun CrashRow(record: CrashRecord, onClick: () -> Unit) {
                         style = MaterialTheme.typography.labelSmall,
                     )
                     Text(
-                        text = "点击查看全文",
+                        text = stringResource(R.string.tap_expand),
                         color = radarColors().textTertiary,
                         style = MaterialTheme.typography.labelSmall,
                     )
@@ -281,17 +283,17 @@ private fun CrashRow(record: CrashRecord, onClick: () -> Unit) {
 /** 导出：纯文本 ACTION_SEND，不引 FileProvider，用户自己决定发到哪儿。 */
 private fun Context.shareCrashLog(text: String, head: String) {
     if (text.isBlank()) {
-        Toast.makeText(this, "日志为空，无法导出", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.crash_export_empty), Toast.LENGTH_SHORT).show()
         return
     }
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, "RssRadar 崩溃日志")
+        putExtra(Intent.EXTRA_SUBJECT, getString(R.string.crash_file_title))
         putExtra(Intent.EXTRA_TEXT, text)
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    runCatching { startActivity(Intent.createChooser(intent, "导出崩溃日志")) }
-        .onFailure { Toast.makeText(this, "无法导出", Toast.LENGTH_SHORT).show() }
+    runCatching { startActivity(Intent.createChooser(intent, getString(R.string.crash_export_title))) }
+        .onFailure { Toast.makeText(this, getString(R.string.crash_export_failed), Toast.LENGTH_SHORT).show() }
 }
 
 private fun formatTime(millis: Long): String =
