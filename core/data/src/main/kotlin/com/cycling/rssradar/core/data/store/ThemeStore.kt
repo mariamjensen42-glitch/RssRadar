@@ -27,6 +27,13 @@ class ThemeStore(private val prefs: SharedPreferences) {
     private val _dynamicColor = MutableStateFlow(prefs.getBoolean(KEY_DYNAMIC_COLOR, false))
     val dynamicColor: StateFlow<Boolean> = _dynamicColor.asStateFlow()
 
+    /**
+     * 自定义强调色 ARGB（对照表 #29）；null = 用默认紫。
+     * 与 [dynamicColor] 互斥：自定义优先，两个来源同时存在时「到底哪个生效」无法解释。
+     */
+    private val _customAccent = MutableStateFlow(readPersistedAccent())
+    val customAccent: StateFlow<Long?> = _customAccent.asStateFlow()
+
     fun setMode(mode: ThemeMode) {
         prefs.edit().putString(KEY_THEME_MODE, mode.name).apply()
         _mode.value = mode
@@ -37,13 +44,27 @@ class ThemeStore(private val prefs: SharedPreferences) {
         _dynamicColor.value = enabled
     }
 
+    /** 传 null 表示回到默认紫。 */
+    fun setCustomAccent(argb: Long?) {
+        val editor = prefs.edit()
+        if (argb == null) editor.remove(KEY_CUSTOM_ACCENT) else editor.putLong(KEY_CUSTOM_ACCENT, argb)
+        editor.apply()
+        _customAccent.value = argb
+    }
+
     private fun readPersistedMode(): ThemeMode {
         val name = prefs.getString(KEY_THEME_MODE, null) ?: return ThemeMode.SYSTEM
         return runCatching { ThemeMode.valueOf(name) }.getOrDefault(ThemeMode.SYSTEM)
     }
 
+    private fun readPersistedAccent(): Long? {
+        if (!prefs.contains(KEY_CUSTOM_ACCENT)) return null
+        return prefs.getLong(KEY_CUSTOM_ACCENT, 0L)
+    }
+
     companion object {
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_DYNAMIC_COLOR = "theme_dynamic_color"
+        private const val KEY_CUSTOM_ACCENT = "theme_custom_accent"
     }
 }

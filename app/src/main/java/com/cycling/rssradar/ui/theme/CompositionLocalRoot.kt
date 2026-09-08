@@ -51,8 +51,9 @@ fun CompositionLocalRoot(content: @Composable () -> Unit) {
     val readingPrefsStore = entryPoint.readingPrefsStore()
     val listDisplayStore = entryPoint.listDisplayStore()
     val themeMode by themeStore.mode.collectAsState()
-    // Material You 动态取色（#27）：只换强调色，默认关
+    // 强调色（#27 动态取色 / #29 自定义主色）：自定义优先于系统取色
     val dynamicColor by themeStore.dynamicColor.collectAsState()
+    val customAccent by themeStore.customAccent.collectAsState()
     val readingPrefs by readingPrefsStore.state.collectAsState()
     val listDisplay by listDisplayStore.state.collectAsState()
     val systemDark = isSystemInDarkTheme()
@@ -70,7 +71,11 @@ fun CompositionLocalRoot(content: @Composable () -> Unit) {
         LocalListDisplay provides listDisplay,
         LocalReducedMotion provides reducedMotion,
     ) {
-        RssRadarTheme(darkTheme = darkTheme, dynamicColor = dynamicColor) {
+        RssRadarTheme(
+            darkTheme = darkTheme,
+            dynamicColor = dynamicColor,
+            customAccentArgb = customAccent,
+        ) {
             content()
         }
     }

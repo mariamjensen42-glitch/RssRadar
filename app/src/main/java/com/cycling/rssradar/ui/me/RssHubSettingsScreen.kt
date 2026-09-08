@@ -86,6 +86,8 @@ data class RssHubSettingsUiState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     /** Material You 动态取色（#27）：开则强调色跟随系统壁纸，表面阶梯不变。 */
     val dynamicColor: Boolean = false,
+    /** 自定义强调色 ARGB（#29）；null = 默认紫。与动态取色互斥。 */
+    val customAccent: Long? = null,
     /** DeepSeek API Key 输入（issue #44）。 */
     val aiKeyInput: String = "",
     /** 是否已配置 Key（用于状态展示，不回显完整 Key）。 */
@@ -176,6 +178,12 @@ class RssHubSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             themeStore.dynamicColor.collect { enabled ->
                 _state.value = _state.value.copy(dynamicColor = enabled)
+            }
+        }
+        // 自定义强调色（#29）
+        viewModelScope.launch {
+            themeStore.customAccent.collect { argb ->
+                _state.value = _state.value.copy(customAccent = argb)
             }
         }
         // 列表显示项跟随 ListDisplayStore 的 flow（issue #56）
@@ -286,9 +294,22 @@ class RssHubSettingsViewModel @Inject constructor(
         themeStore.setMode(mode)
     }
 
-    /** Material You 动态取色（#27）。 */
+    /**
+     * Material You 动态取色（#27）。**开则清掉自定义色**——两个来源同时挂着时
+     * 「到底哪个生效」没法向用户解释。
+     */
     fun setDynamicColor(enabled: Boolean) {
         themeStore.setDynamicColor(enabled)
+        if (enabled) themeStore.setCustomAccent(null)
+    }
+
+    /**
+     * 自定义强调色（#29）：传 null 回到默认紫。
+     * 选了具体颜色就顺手关掉动态取色，同样是为了互斥。
+     */
+    fun setCustomAccent(argb: Long?) {
+        if (argb != null) themeStore.setDynamicColor(false)
+        themeStore.setCustomAccent(argb)
     }
 
     /** 归档保留档位（issue #57）。 */

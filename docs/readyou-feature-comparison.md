@@ -106,12 +106,20 @@
 > - **低于 Android 12 禁用并给出原因文案**（`supportsDynamicColor()`），不静默失效。
 > - M3 `colorScheme` 与 `RadarColors` 现在由同一份色板映射生成（`darkScheme`/`lightScheme`
 >   以 `RadarColors` 为入参），不会再出现 Local 换色而 M3 组件没换的走偏。
+>
+> 2026-09-08 追加（#29 自定义主色）：
+> - **优先级**：自定义 > 系统动态取色 > 默认紫。两个上层开关互斥（选色即关跟随壁纸，
+>   开跟随壁纸即清自定义色），否则「到底哪个生效」没法向用户解释。
+> - **前景色算出来**：自定义色可能被挑出一枚很浅的颜色，白字画上去直接糊掉，
+>   所以 `onAccentFor()` 按 WCAG 对比度在黑/白里选。固定配色不动——默认紫配白字是设计决策。
+> - **HSL 滑杆手写转换**：不用 compose 的 `Color.hsl`，它会把 `ui-util` 拽进运行时，
+>   本地单测 classpath 缺类直接挂（同 `lerp` 的教训）。
 
 | # | 功能 | ReadYou 依据 | 状态 |
 |---|------|--------------|------|
 | 27 | Material You 动态取色（Monet）——**只换强调色**，表面阶梯不变 | `ui/theme/palette/` | ✅ 2026-09-08 |
 | 28 | AMOLED 纯黑 | `AmoledDarkThemePreference.kt` | ✅ 补标（深色本来就是纯黑 `#000000`） |
-| 29 | 自定义主色 | `CustomPrimaryColorPreference.kt` | — |
+| 29 | 自定义主色——12 预设色板 + HSL 滑杆；只换强调色，前景色按 WCAG 对比度自动选黑/白 | `CustomPrimaryColorPreference.kt` | ✅ 2026-09-08 |
 | 30 | Feeds/Flow/Reading 三区独立主题预览 | `ui/page/settings/color/` | — |
 
 ### 六、系统级

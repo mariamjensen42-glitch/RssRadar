@@ -77,20 +77,24 @@ fun deriveAccentColors(accent: Color, onAccent: Color, darkTheme: Boolean): Acce
 fun supportsDynamicColor(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
 /**
- * 只换强调色四件套，表面阶梯与文字层级仍用自有色板。
+ * 强调色四件套整体替换，表面阶梯与文字层级不动。
  *
- * 不全盘换成 Monet：整套色板跟随壁纸会让「RssRadar 长什么样」这件事消失，
- * 且已上线的紫调表面阶梯与新强调色未必同源，混着用会脏。
+ * 只换强调色：整套色板跟随（壁纸或用户拾色）会让「RssRadar 长什么样」这件事消失，
+ * 且既有的紫调表面阶梯与新强调色不同源，混着用会脏。
  */
-private fun RadarColors.withSystemAccent(context: Context, darkTheme: Boolean): RadarColors {
-    val scheme = if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-    val derived = deriveAccentColors(scheme.primary, scheme.onPrimary, darkTheme)
+private fun RadarColors.withAccent(accent: Color, onAccent: Color, darkTheme: Boolean): RadarColors {
+    val derived = deriveAccentColors(accent, onAccent, darkTheme)
     return copy(
         accent = derived.accent,
         accentPressed = derived.accentPressed,
         onAccent = derived.onAccent,
         link = derived.link,
     )
+}
+
+private fun RadarColors.withSystemAccent(context: Context, darkTheme: Boolean): RadarColors {
+    val scheme = if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    return withAccent(scheme.primary, scheme.onPrimary, darkTheme)
 }
 
 /**
@@ -143,13 +147,23 @@ private fun lightScheme(colors: RadarColors) = lightColorScheme(
 fun RssRadarTheme(
     darkTheme: Boolean,
     dynamicColor: Boolean = false,
+    customAccentArgb: Long? = null,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    // 色板快照注入 CompositionLocal，UI 读 radarColors() 时随主题切换自动重组
-    val colors = remember(darkTheme, dynamicColor, context) {
+    // 色板快照注入 CompositionLocal，UI 读 radarColors() 时随主题切换自动重组。
+    // 强调色三选一：自定义 > 系统动态取色 > 默认紫。两个上层开关由调用方保证互斥，
+    // 这里只按优先级取，不替用户做「两个都开」的猜测。
+    val colors = remember(darkTheme, dynamicColor, customAccentArgb, context) {
         val base = if (darkTheme) RadarColors.Dark else RadarColors.Light
-        if (dynamicColor && supportsDynamicColor()) base.withSystemAccent(context, darkTheme) else base
+        when {
+            customAccentArgb != null -> {
+                val accent = Color(customAccentArgb)
+                base.withAccent(accent, onAccentFor(accent), darkTheme)
+            }
+            dynamicColor && supportsDynamicColor() -> base.withSystemAccent(context, darkTheme)
+            else -> base
+        }
     }
     CompositionLocalProvider(LocalRadarColors provides colors) {
         MaterialTheme(
