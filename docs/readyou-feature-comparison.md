@@ -132,7 +132,7 @@
 | 32 | 桌面小部件（文章卡片 + 列表两种，带配置页） | `ui/widget/ArticleCardWidget.kt`、`ArticleListWidget.kt` | — |
 | 33 | 应用内多语言切换 | `ui/page/settings/languages/` | — |
 | 34 | 系统分享/文本选择 intent 接入（SEND / PROCESS_TEXT；TRANSLATE 主动不做） | `AndroidManifest.xml`（SEND / PROCESS_TEXT / TRANSLATE） | ✅ 2026-09-08 |
-| 35 | 应用内检查更新 | `NewVersionNumberPreference.kt`、`domain/service/AppService.kt` | — |
+| 35 | 应用内检查更新（只查 latest release，不自动下载安装——装包必须过用户） | `NewVersionNumberPreference.kt`、`domain/service/AppService.kt` | ✅ 2026-09-08 |
 | 36 | 崩溃报告页**已做**（CrashLogScreen + CrashLogRoute）；使用提示/疑难解答页**未做** | `CrashReportActivity`、`ui/page/settings/tips|troubleshooting/` | ⚠️ 部分 |
 
 ## 反向差距（RssRadar 独有，ReadYou 没有）

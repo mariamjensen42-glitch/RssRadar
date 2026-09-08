@@ -457,6 +457,17 @@ fun SettingsGeneralScreen(
                 )
             }
         }
+
+        Spacer(Modifier.height(24.dp))
+
+        // 检查更新（#35）：只查 latest release，不自动下载安装——装包必须过用户这一关，
+        // 这里只负责把「有新版本」和去 Release 页的链接摆出来。
+        SectionHeader("关于", "版本号来自已安装包；检查更新只读取 GitHub 的 latest release。")
+        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                UpdateCheckRow()
+            }
+        }
         Spacer(Modifier.height(24.dp))
     }
 

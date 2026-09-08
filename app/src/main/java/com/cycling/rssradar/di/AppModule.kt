@@ -58,6 +58,7 @@ import com.cycling.rssradar.core.data.db.MIGRATION_15_16
 import com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.core.data.parser.RssParser
 import com.cycling.rssradar.core.data.rss.BestIconFinder
+import com.cycling.rssradar.core.data.update.UpdateChecker
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import com.cycling.rssradar.core.domain.rss.ConditionalHttpFetcher
 import com.cycling.rssradar.core.domain.rss.HttpUrlFetcher
@@ -131,6 +132,11 @@ object AppModule {
     @Provides
     @Singleton
     fun provideConditionalHttpFetcher(): ConditionalHttpFetcher = HttpUrlFetcher()
+
+    /** 检查更新（#35）：复用同一条抓取缝，超时与 UA 与 feed 抓取一致。 */
+    @Provides
+    @Singleton
+    fun provideUpdateChecker(http: HttpFetcher): UpdateChecker = UpdateChecker(http)
 
     /** 真 Room 事务；JVM 测试用 DirectTransactionRunner 直跑。 */
     @Provides
