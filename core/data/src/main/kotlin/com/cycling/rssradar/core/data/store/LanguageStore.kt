@@ -1,6 +1,7 @@
 package com.cycling.rssradar.core.data.store
 
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,7 +21,7 @@ class LanguageStore(private val prefs: SharedPreferences) {
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
 
     fun setLanguage(language: AppLanguage) {
-        prefs.edit().putString(KEY_APP_LANGUAGE, language.name).apply()
+        prefs.edit { putString(KEY_APP_LANGUAGE, language.name) }
         _language.value = language
     }
 
