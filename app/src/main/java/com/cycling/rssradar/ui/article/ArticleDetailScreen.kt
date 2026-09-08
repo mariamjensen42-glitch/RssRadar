@@ -106,6 +106,8 @@ fun ArticleDetailScreen(
     val article by viewModel.article.collectAsState()
     val initialLoadDone by viewModel.initialLoadDone.collectAsState()
     val isFetchingContent by viewModel.isFetchingContent.collectAsState()
+    val contentFetchState by viewModel.contentFetch.collectAsState()
+    val preferSummary by viewModel.preferSummary.collectAsState()
     val aiSummaryState by viewModel.aiSummaryState.collectAsState()
     val translationState by viewModel.translationState.collectAsState()
     val neighbors by viewModel.neighbors.collectAsState()
@@ -221,6 +223,12 @@ fun ArticleDetailScreen(
             ReadingBody(
                 article = current,
                 isFetchingContent = isFetchingContent,
+                contentFetchState = contentFetchState,
+                onRetryFetch = { viewModel.onIntent(ArticleDetailIntent.RetryFetch) },
+                preferSummary = preferSummary,
+                onShowFullContent = {
+                    viewModel.onIntent(ArticleDetailIntent.SetPreferSummary(false))
+                },
                 aiSummaryState = aiSummaryState,
                 translationState = translationState,
                 scrollState = scrollState,
@@ -293,6 +301,15 @@ fun ArticleDetailScreen(
             },
             onImmersive = { v ->
                 viewModel.updateReadingPrefs { it.copy(immersive = v) }
+            },
+            // 正文/摘要：只在两者实质不同时给（canSwitchToSummary），否则点了等于没点
+            canSwitchToSummary = canSwitchToSummary(
+                content = article?.article?.content,
+                summary = article?.article?.summary,
+            ),
+            preferSummary = preferSummary,
+            onPreferSummary = { v ->
+                viewModel.onIntent(ArticleDetailIntent.SetPreferSummary(v))
             },
             onDismiss = { showStyleSheet = false },
         )
@@ -427,6 +444,11 @@ private fun ReadingStyleSheet(
     onImageCornerRadius: (Int) -> Unit,
     onImageMaximize: (Boolean) -> Unit,
     onImmersive: (Boolean) -> Unit,
+    /** 本文能否在「正文 / 摘要」之间切（[canSwitchToSummary]）：不能切时整块不出现。 */
+    canSwitchToSummary: Boolean = false,
+    /** 当前是否切成摘要。 */
+    preferSummary: Boolean = false,
+    onPreferSummary: (Boolean) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     val style = prefs.style
@@ -445,6 +467,46 @@ private fun ReadingStyleSheet(
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(8.dp))
+
+            // 本文：正文 / 摘要（ReadYou 的 renderFullContent/renderDescriptionContent 同款）。
+            // 只在两者实质不同时给这一块：ADR-0001 入库时取 description 与 content 的较长者，
+            // 大量源的 content 就是 summary——那时给个开关，点下去屏幕纹丝不动。
+            // 没有意义的按钮不该存在，所以不成立时整块不渲染。
+            if (canSwitchToSummary) {
+                Text(
+                    text = "本文",
+                    color = radarColors().textPrimary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(false to "正文", true to "摘要").forEach { (isSummary, label) ->
+                        val selected = isSummary == preferSummary
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = if (selected) radarColors().accent else radarColors().surface2,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onPreferSummary(isSummary) },
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (selected) radarColors().onAccent else radarColors().textSecondary,
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp),
+                            )
+                        }
+                    }
+                }
+                Text(
+                    text = "摘要 = 订阅源自带的简介。仅对本文生效，换一篇自动恢复正文。",
+                    color = radarColors().textTertiary,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Spacer(Modifier.height(12.dp))
+            }
 
             // 正文渲染器：WebView / 原生 Compose 二选一（ADR-0009）。
             // 原生路对表格/视频/内联样式退化，仅建议被 WebView 滚动闪烁困扰时启用。

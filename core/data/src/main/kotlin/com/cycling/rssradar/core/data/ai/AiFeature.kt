@@ -144,11 +144,13 @@ enum class AiFeature(
         category = AiCategory.CONTENT,
         scope = AiScope.ARTICLE,
         trigger = AiTrigger.MANUAL,
-        defaultEnabled = true,
+        // 默认关闭：正文由规则提取器负责（ADR-0012），模型不参与正文生产——
+        // 「AI 不捏造」在正文上比在摘要上更硬：摘要错了是一句话，正文错了是一整篇。
+        defaultEnabled = false,
         needsLlm = true,
-        label = "自动提取全文",
-        summary = "规则提取器失败时，用模型从原始 HTML 中还原正文，弥补 ADR-0012 的漏抓。",
-        entry = "阅读页正文不完整提示卡上的「用 AI 提取」。",
+        label = "AI 正文还原",
+        summary = "规则提取器拿不到正文时，用模型从网页原始 HTML 还原正文。默认关闭，不是正文的常规来源。",
+        entry = "未接线：阅读页不提供入口（规则提取 + 抓取诊断已覆盖正文获取）。",
         presentation = "成功则替换正文并清除不完整标记，失败如实提示不写脏数据。",
     ),
     DEDUPE(

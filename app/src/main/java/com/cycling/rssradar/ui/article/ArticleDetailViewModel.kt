@@ -7,7 +7,10 @@ import com.cycling.rssradar.core.data.ContentQualification
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
 import com.cycling.rssradar.core.data.FeedRepository
 import com.cycling.rssradar.core.data.OnDemandFetch
+import com.cycling.rssradar.core.data.OnDemandResult
 import com.cycling.rssradar.core.data.Recommendation
+import com.cycling.rssradar.core.data.parser.ExtractionIssue
+import com.cycling.rssradar.core.data.parser.FetchFailure
 import com.cycling.rssradar.core.data.ai.AiArtifactRepository
 import com.cycling.rssradar.core.data.ai.AiFeature
 import com.cycling.rssradar.core.data.ai.AiFeatureRunner
@@ -32,6 +35,30 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 
+/**
+ * 按需抓取在阅读页的可见状态（对齐 ReadYou 的 ReaderState：Loading / FullContent / Error）。
+ *
+ * 此前抓取结果是一个被 `runCatching` 吞掉的 Boolean：读者只看到「正在获取全文…」然后
+ * 什么都没有——不知道失败原因，也没有重试入口。这里把每种结果都摊开，由 UI 决定显示什么：
+ * **可能失败的交互必须让原因可见，且必须能重试**（UI 铁律）。
+ */
+sealed interface ContentFetchState {
+    /** 尚未抓取。 */
+    data object Idle : ContentFetchState
+
+    /** 正在抓取。 */
+    data object Loading : ContentFetchState
+
+    /** 已有够格正文（自带或已抓到）：UI 不显示任何抓取提示。 */
+    data object Ready : ContentFetchState
+
+    /** 抓到了但没过完整性校验：issue 说明是哪一类不完整。 */
+    data class Incomplete(val issue: ExtractionIssue?) : ContentFetchState
+
+    /** 没抓到：reason 是给读者看的中文原因（不是日志里的枚举名）。 */
+    data class Failed(val reason: String) : ContentFetchState
+}
+
 /** 文章详情事件（候选 A，ADR-0003）。load 为生命周期，留 init，不进 Intent。 */
 sealed interface ArticleDetailIntent {
     data object ToggleStarred : ArticleDetailIntent
@@ -42,6 +69,15 @@ sealed interface ArticleDetailIntent {
     data object ToggleTranslation : ArticleDetailIntent
     /** 清缓存重译（issue #44：会话缓存 + 明确的重译按钮）。 */
     data object RetranslateArticle : ArticleDetailIntent
+
+    /** 重新抓取正文：抓取失败后读者点一下重试（ReadYou 的 Error 态重试同款）。 */
+    data object RetryFetch : ArticleDetailIntent
+
+    /**
+     * 正文源切换：true = 看订阅源摘要（ReadYou 的 renderDescriptionContent），
+     * false = 看正文。只作用于当前这一篇，换文章即复位。
+     */
+    data class SetPreferSummary(val preferSummary: Boolean) : ArticleDetailIntent
 
     /** 手动跑一项文章级 AI 分析（AI 智能功能模块）。 */
     data class RunAi(val feature: AiFeature) : ArticleDetailIntent
@@ -67,7 +103,9 @@ val ARTICLE_AI_BUTTONS: List<AiFeature> = listOf(
     AiFeature.OPINION,
     AiFeature.CREDIBILITY,
     AiFeature.SHARE_COPY,
-    AiFeature.FULLTEXT,
+    // FULLTEXT（AI 正文还原）刻意不进按钮：正文的第一来源永远是规则提取器，
+    // 让模型"还原"正文与「AI 不捏造」相冲，ReadYou 同类产品也没有这一步。
+    // 枚举、prompt 与产物解析都保留，需要时把它加回这里即可恢复接线。
     AiFeature.TAGS,
     AiFeature.KEYWORDS,
     AiFeature.CLASSIFY,
@@ -157,9 +195,25 @@ class ArticleDetailViewModel @Inject constructor(
     private val _initialLoadDone = MutableStateFlow(false)
     val initialLoadDone: StateFlow<Boolean> = _initialLoadDone.asStateFlow()
 
-    /** 正在按需抓取原网页正文。失败是常态（反爬/JS 页），静默降级，UI 不弹错误。 */
+    /** 正在按需抓取原网页正文。只管转圈；原因与重试看 [contentFetch]。 */
     private val _isFetchingContent = MutableStateFlow(false)
     val isFetchingContent: StateFlow<Boolean> = _isFetchingContent.asStateFlow()
+
+    /**
+     * 按需抓取的可见状态（ReadYou 的 Error 态同款）：失败原因、不完整原因、是否已就绪
+     * 都由它驱动，UI 据此决定展示什么提示、要不要给重试按钮。
+     */
+    private val _contentFetch = MutableStateFlow<ContentFetchState>(ContentFetchState.Idle)
+    val contentFetch: StateFlow<ContentFetchState> = _contentFetch.asStateFlow()
+
+    /**
+     * 正文源：true = 读者手动切回订阅源摘要。
+     *
+     * 刻意**单篇瞬时**、不落库也不进阅读偏好：这是「这篇抓坏了 / 太长先看摘要」的临时决定，
+     * 不是「以后都给我摘要」的长期偏好。ReadYou 同样只在 ReaderState 里存着，切走就忘。
+     */
+    private val _preferSummary = MutableStateFlow(false)
+    val preferSummary: StateFlow<Boolean> = _preferSummary.asStateFlow()
 
     private val _aiSummaryState = MutableStateFlow<AiSummaryState>(AiSummaryState.Idle)
     val aiSummaryState: StateFlow<AiSummaryState> = _aiSummaryState.asStateFlow()
@@ -258,12 +312,20 @@ class ArticleDetailViewModel @Inject constructor(
             _aiMessage.value = null
             // 相关阅读随文章换：先清空避免上一篇文章的相关推荐闪现在新文章下
             _related.value = emptyList()
+            // 抓取状态随文章换：上一篇的「抓取失败」提示不能贴在新文章上
+            _contentFetch.value = ContentFetchState.Idle
+            // 摘要模式是单篇决定：上一篇「切回摘要」的选择不能带到下一篇
+            _preferSummary.value = false
         }
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             _article.value = repository.getArticle(articleId)
             _initialLoadDone.value = true
-            _neighbors.value = loadNeighbors(articleId)
+            val neighbors = loadNeighbors(articleId)
+            _neighbors.value = neighbors
+            // 相邻预取在 loadJob 之外：它是顺手活，不该被下一次 load 取消，
+            // 也不该拖慢当前文章正文的加载（与 ReadYou 预取相邻文章同一动机）。
+            prefetchNeighbors(neighbors)
             if (_article.value?.article?.isRead == false) {
                 repository.markRead(articleId)
             }
@@ -379,16 +441,66 @@ class ArticleDetailViewModel @Inject constructor(
 
     /**
      * 文章没有 feed 自带正文时按需抓原网页（ADR-0001）。
-     * 成功后重新加载文章；失败静默，详情页继续显示摘要。
+     *
+     * 结果写进 [contentFetch]：不再 `runCatching` 一吞了之——失败要给出中文原因，
+     * 读者才知道该重试还是该去看原文。
      */
     private suspend fun fetchFullContentIfNeeded(articleId: Long) {
         val current = _article.value ?: return
-        // 读侧「够格」判定唯一落点在 ContentQualification；ON_DEMAND 兜底防已抓过的重复触发
-        if (ContentQualification.hasUsableContent(current.article)) return
+        // 读侧「够格」判定唯一落点在 ContentQualification；够格就不联网。
+        // 但库里已带「不完整」标记的，仍要把它显示出来——这次不抓不等于那标记不存在。
+        if (ContentQualification.hasUsableContent(current.article)) {
+            _contentFetch.value = if (current.article.contentIncomplete) {
+                ContentFetchState.Incomplete(null)
+            } else {
+                ContentFetchState.Ready
+            }
+            return
+        }
         _isFetchingContent.value = true
-        runCatching { onDemandFetch.fetch(articleId) }
+        _contentFetch.value = ContentFetchState.Loading
+        val result = runCatching { onDemandFetch.fetchWithResult(articleId) }
+            .getOrElse { OnDemandResult.Failed(FetchFailure.NETWORK) }
         _isFetchingContent.value = false
+        _contentFetch.value = result.toState()
         _article.value = repository.getArticle(articleId)
+    }
+
+    /**
+     * 相邻文章的正文预取：翻到上一篇/下一篇时正文已在库里，不用再等一次抓取。
+     *
+     * 只预取紧邻的两篇，且 [OnDemandFetch] 自己会跳过已有正文的、以及关闭了全文抓取的源。
+     * **不做全量后台预抓**（ReadYou 的 ReaderWorker 会抓全部未读）：流量与电量不可控，
+     * 也违背本项目「按需抓取」的约定。
+     */
+    private fun prefetchNeighbors(neighbors: ArticleNeighbors) {
+        listOfNotNull(neighbors.prevId, neighbors.nextId).forEach { id ->
+            viewModelScope.launch { runCatching { onDemandFetch.fetch(id) } }
+        }
+    }
+
+    /** 抓取结果 → 阅读页可见状态。中文原因统一在这里产生，UI 只负责显示。 */
+    private fun OnDemandResult.toState(): ContentFetchState = when (this) {
+        is OnDemandResult.AlreadyUsable -> ContentFetchState.Ready
+        is OnDemandResult.FeedDisabled ->
+            ContentFetchState.Failed("该订阅源关闭了正文抓取，只显示订阅源自带内容")
+
+        is OnDemandResult.Missing -> ContentFetchState.Failed("文章不存在或已被清理")
+        is OnDemandResult.Fetched ->
+            if (incomplete) ContentFetchState.Incomplete(issue) else ContentFetchState.Ready
+
+        is OnDemandResult.ShorterThanExisting ->
+            ContentFetchState.Failed("抓到的正文比现有内容还短（$got 字 < $existing 字），未覆盖")
+
+        is OnDemandResult.Failed -> ContentFetchState.Failed(kind.label)
+    }
+
+    /** 重新抓取正文（读者点重试）。正在抓取、或这篇已有正文时无动作。 */
+    private fun retryFetch() {
+        val id = currentArticleId
+        if (id < 0) return
+        if (_contentFetch.value is ContentFetchState.Loading) return
+        viewModelScope.launch { fetchFullContentIfNeeded(id) }
     }
 
     override fun onIntent(intent: ArticleDetailIntent) {
@@ -398,6 +510,8 @@ class ArticleDetailViewModel @Inject constructor(
             ArticleDetailIntent.GenerateSummary -> generateSummary()
             ArticleDetailIntent.ToggleTranslation -> toggleTranslation()
             ArticleDetailIntent.RetranslateArticle -> retranslate()
+            ArticleDetailIntent.RetryFetch -> retryFetch()
+            is ArticleDetailIntent.SetPreferSummary -> _preferSummary.value = intent.preferSummary
             is ArticleDetailIntent.RunAi -> runAi(intent.feature)
             is ArticleDetailIntent.AskArticle ->
                 if (intent.question.isNotBlank()) runAi(AiFeature.QA, intent.question.trim())

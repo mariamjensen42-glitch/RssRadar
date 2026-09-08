@@ -10,9 +10,46 @@ import com.cycling.rssradar.core.data.db.ContentFetchLogDao
 import com.cycling.rssradar.core.data.db.ContentFetchLogEntity
 import com.cycling.rssradar.core.data.db.FeedDao
 import com.cycling.rssradar.core.data.db.FetchHostStat
+import com.cycling.rssradar.core.data.parser.ArticleExtractor
 import com.cycling.rssradar.core.data.parser.ContentFetcher
+import com.cycling.rssradar.core.data.parser.ExtractionIssue
+import com.cycling.rssradar.core.data.parser.FetchFailure
 import com.cycling.rssradar.core.data.parser.FetchLogger
 import com.cycling.rssradar.core.data.parser.FetchOutcome
+
+/**
+ * 一次按需抓取的结果。
+ *
+ * 存在理由：抓取失败是常态（反爬 / JS 渲染 / 付费墙），但「常态」不等于「可以不说」。
+ * 旧契约返回 Boolean，调用方用 `runCatching {}` 一包就把原因丢了——读者只看到
+ * 「正在获取全文…」然后什么都没有，失败与「这篇本来就没有正文」混为一谈，也无从重试。
+ * ReadYou 的做法是让阅读页有一个 `Error(message)` 态；这里把原因结构化，
+ * 由 UI 层取 [FetchFailure.label] / [ExtractionIssue.label] 说人话。
+ */
+sealed interface OnDemandResult {
+
+    /** 已有够格正文，未联网。**不是失败**。 */
+    data object AlreadyUsable : OnDemandResult
+
+    /** 该订阅源关闭了全文抓取（CONTEXT.md：全文抓取开关）。不联网，但必须告知原因。 */
+    data object FeedDisabled : OnDemandResult
+
+    /** 文章不存在（可能刚被归档清理）。 */
+    data object Missing : OnDemandResult
+
+    /** 抓到并已写入。incomplete = 没过完整性校验，issue 说明是哪一类不完整。 */
+    data class Fetched(
+        val chars: Int,
+        val incomplete: Boolean,
+        val issue: ExtractionIssue?,
+    ) : OnDemandResult
+
+    /** 抓到了但比现有内容短 → 按「不把正文越抓越少」放弃写入。 */
+    data class ShorterThanExisting(val got: Int, val existing: Int) : OnDemandResult
+
+    /** 一个字都没抓到：kind 即原因。 */
+    data class Failed(val kind: FetchFailure) : OnDemandResult
+}
 
 /**
  * **按需抓取**（On-demand fetch）模块：只在读者打开某篇文章时才去原网页取正文，
@@ -51,18 +88,27 @@ class OnDemandFetch(
      * 订阅源级预设（全文抓取开关）关闭时静默跳过：详情页只显示订阅源自带内容。
      * 失败是常态（反爬/JS 页），调用方静默降级即可，不必弹错误。
      */
-    suspend fun fetch(articleId: Long): Boolean = withContext(ioDispatcher) {
-        val item = articleDao.getWithFeed(articleId) ?: return@withContext false
-        // Feed 级预设（issue #9）：该源关闭全文抓取时不联网，静默降级到摘要
+    suspend fun fetch(articleId: Long): Boolean = when (fetchWithResult(articleId)) {
+        is OnDemandResult.AlreadyUsable, is OnDemandResult.Fetched -> true
+        else -> false
+    }
+
+    /**
+     * 同 [fetch]，但把结果说清楚：够格的不重抓、源关闭、抓短了、失败了，
+     * 各自有各自的返回值，调用方据此决定给读者看什么（失败原因可见、可重试）。
+     */
+    suspend fun fetchWithResult(articleId: Long): OnDemandResult = withContext(ioDispatcher) {
+        val item = articleDao.getWithFeed(articleId) ?: return@withContext OnDemandResult.Missing
+        // Feed 级预设（issue #9）：该源关闭全文抓取时不联网，降级到摘要（但原因要说出来）
         val feed = feedDao.getById(item.article.feedId)
-        if (feed != null && !feed.fullContentEnabled) return@withContext false
-        if (ContentQualification.hasUsableContent(item.article)) return@withContext true
+        if (feed != null && !feed.fullContentEnabled) return@withContext OnDemandResult.FeedDisabled
+        if (ContentQualification.hasUsableContent(item.article)) return@withContext OnDemandResult.AlreadyUsable
 
         val link = item.article.link
         val outcome = fetchOutcome(link)
         contentFetchLogDao.insert(outcome.toLog(link))
         when (outcome) {
-            is FetchOutcome.Failure -> false
+            is FetchOutcome.Failure -> OnDemandResult.Failed(outcome.kind)
             is FetchOutcome.Success -> {
                 val content = outcome.content
                 val existingLength = item.article.contentText?.length ?: 0
@@ -73,18 +119,27 @@ class OnDemandFetch(
                         "抓取结果比现有内容短，放弃写入 chars=${content.contentText.length} " +
                             "existing=$existingLength host=${outcome.report.host} url=$link",
                     )
-                    return@withContext false
+                    return@withContext OnDemandResult.ShorterThanExisting(
+                        got = content.contentText.length,
+                        existing = existingLength,
+                    )
                 }
+                // 正文里与文章标题重复的标题行：头部已经显示过标题，正文里那段是多余的
+                val html = ArticleExtractor.dropDuplicateTitle(content.contentHtml, item.article.title)
                 articleDao.updateFetchedContent(
                     id = articleId,
-                    content = content.contentHtml,
+                    content = html,
                     contentText = content.contentText,
                     contentSource = ArticleEntity.CONTENT_SOURCE_WEB,
                     readingMinutes = estimateReadingMinutes(content.contentText),
                     coverUrl = content.coverUrl,
                     contentIncomplete = !content.isComplete,
                 )
-                true
+                OnDemandResult.Fetched(
+                    chars = content.contentText.length,
+                    incomplete = !content.isComplete,
+                    issue = content.issue,
+                )
             }
         }
     }

@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">RssRadar</string>
+    <!-- #34：分享单 / 选中文字菜单里本应用动作的名字 -->
+    <string name="intent_subscribe">用 RssRadar 订阅</string>
 </resources>

@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.parser.ExtractionIssue
 import com.cycling.rssradar.core.data.store.BilingualLayout
 import com.cycling.rssradar.core.data.store.ReadingFontFamily
 import com.cycling.rssradar.core.data.store.ReadingStyleState
@@ -57,6 +58,7 @@ import com.composables.icons.lucide.CircleAlert
 import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
+import com.composables.icons.lucide.Type
 import kotlin.math.roundToInt
 import com.cycling.rssradar.core.ui.theme.radarColors
 
@@ -76,6 +78,17 @@ import com.cycling.rssradar.core.ui.theme.radarColors
 internal fun ReadingBody(
     article: ArticleWithFeed,
     isFetchingContent: Boolean,
+    /**
+     * 按需抓取的可见状态：失败要给出原因，不完整要说明是哪一类（ReadYou 的 Error 态同款）。
+     * 此前这些原因只有诊断页看得到，读者只看到「正在获取全文…」然后什么都没有。
+     */
+    contentFetchState: ContentFetchState,
+    /** 抓取失败后的重试出口（[ContentFetchState.Failed] 才出现）。 */
+    onRetryFetch: () -> Unit,
+    /** 读者手动切回订阅源摘要（[canSwitchToSummary] 为真时才有意义）。 */
+    preferSummary: Boolean = false,
+    /** 摘要态下「看正文」的回退出口：切换是单篇瞬时决定，必须有反向出口。 */
+    onShowFullContent: () -> Unit = {},
     aiSummaryState: AiSummaryState,
     translationState: TranslationState,
     scrollState: ScrollState,
@@ -118,10 +131,26 @@ internal fun ReadingBody(
     // 以前在 remember 里同步跑，正好砸在导航动画的帧上——表现为动画期间空白卡顿、
     // 正文"加载完才蹦出来"。改为后台线程计算，头部（源名/标题）立即渲染，解析完
     // 正文无缝接上；null = 还在算，正文区暂时留白。
-    var plan by remember(translationUi, translationSegments, article.article.content, article.article.summary, renderer, immersive) {
+    var plan by remember(
+        translationUi,
+        translationSegments,
+        article.article.content,
+        article.article.summary,
+        renderer,
+        immersive,
+        preferSummary,
+    ) {
         mutableStateOf<BodyPlan?>(null)
     }
-    LaunchedEffect(translationUi, translationSegments, article.article.content, article.article.summary, renderer, immersive) {
+    LaunchedEffect(
+        translationUi,
+        translationSegments,
+        article.article.content,
+        article.article.summary,
+        renderer,
+        immersive,
+        preferSummary,
+    ) {
         plan = withContext(Dispatchers.Default) {
             resolveBodyPlan(
                 translationActive = translationUi != null,
@@ -129,6 +158,7 @@ internal fun ReadingBody(
                 content = article.article.content,
                 summary = article.article.summary,
                 renderer = renderer,
+                preferSummary = preferSummary,
                 immersive = immersive,
             )
         }
@@ -153,17 +183,20 @@ internal fun ReadingBody(
     // OOM 防线（闪退诊断）：整页包高的 WebView 会被 Chromium 视为全部内容可见，
     // 有图文章的所有图片同时解码进 Java 堆，图多必 OOM（256MB 堆几十秒吃满）。
     // 只有含图的 WebView 路受限，原生路与译文路没有这个约束。
-    val viewport = shouldUseViewport(resolvedPlan.mode, article.article.content)
+    // 摘要模式下「当前正文」是 summary 而不是 content：视口判定与图片列表都得换源，
+    // 否则会出现「按 content 判定无图 → 整页 WebView，实际渲染的是带图的摘要」这种错位。
+    val bodyHtml = if (resolvedPlan.summaryMode) article.article.summary else article.article.content
+    val viewport = shouldUseViewport(resolvedPlan.mode, bodyHtml)
     // 全屏查看页的多图列表与点击分流共用这一份；只有 WebView 路需要（译文路与原生路
     // 由 Compose 直接处理图片点击）。空串/无图正文 → 空集合，自动静默。
     // 与 plan 同批后台算：同为主线程正则，同样会卡导航动画的帧。
-    var imageUrls by remember(resolvedPlan.mode, article.article.content) {
+    var imageUrls by remember(resolvedPlan.mode, bodyHtml) {
         mutableStateOf(emptyList<String>())
     }
-    LaunchedEffect(resolvedPlan.mode, article.article.content) {
+    LaunchedEffect(resolvedPlan.mode, bodyHtml) {
         if (resolvedPlan.mode == BodyMode.WEBVIEW) {
             imageUrls = withContext(Dispatchers.Default) {
-                article.article.content?.let { ReadingImages.extract(it) } ?: emptyList()
+                bodyHtml?.let { ReadingImages.extract(it) } ?: emptyList()
             }
         } else {
             imageUrls = emptyList()
@@ -197,6 +230,19 @@ internal fun ReadingBody(
                     onTitleMeasured = onTitleMeasured,
                 )
             }
+            // 抓取结果横幅放在折叠区**之外**：viewport 模式下头部会随滚动折走，
+            // 失败原因不能跟着一起消失。
+            FetchStateBanner(
+                state = contentFetchState,
+                onRetry = onRetryFetch,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
+            if (resolvedPlan.summaryMode && translationUi == null) {
+                SummaryModeBanner(
+                    onShowFull = onShowFullContent,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                )
+            }
             BodyContent(
                 article = article,
                 isFetchingContent = isFetchingContent,
@@ -227,10 +273,20 @@ internal fun ReadingBody(
                 onTranslationDisplayChange = onTranslationDisplayChange,
                 onTitleMeasured = onTitleMeasured,
             )
-            // 正文不完整提示（ADR-0012）：抓到了内容但没过完整性校验（过短/无段落/JS 渲染/
-            // 付费墙）。如实告知，不假装这就是全文，也不静默给个空白页。
-            if (article.article.contentIncomplete && translationUi == null) {
-                IncompleteContentBanner(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+            // 抓取结果（不完整 / 失败 + 重试）：抓到了什么、为什么没有，如实说。
+            // 译文态下不显示——那时读者看的是译文，正文来源不是关注点。
+            if (translationUi == null) {
+                FetchStateBanner(
+                    state = contentFetchState,
+                    onRetry = onRetryFetch,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                )
+                if (resolvedPlan.summaryMode) {
+                    SummaryModeBanner(
+                        onShowFull = onShowFullContent,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                    )
+                }
             }
             BodyContent(
                 article = article,
@@ -399,9 +455,118 @@ private fun ArticleHeader(
     }
 }
 
+/**
+ * 抓取结果横幅：把「为什么这篇没有正文」说给读者听（ReadYou 的 Error 态同款）。
+ *
+ * 以前失败原因只写进抓取日志，只有诊断页看得到，阅读页静默降级——
+ * 于是「我为什么只有摘要」成了无解的问题。这里把两种需要解释的结果摊到正文上方：
+ * - 失败：中文原因 + 重试按钮（原因来自 [FetchFailure.label]）；
+ * - 不完整：哪一类不完整（过短 / 脚本渲染 / 付费墙…），不假装这就是全文。
+ */
+@Composable
+private fun FetchStateBanner(
+    state: ContentFetchState,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when (state) {
+        is ContentFetchState.Failed ->
+            FetchFailedBanner(reason = state.reason, onRetry = onRetry, modifier = modifier)
+
+        is ContentFetchState.Incomplete ->
+            IncompleteContentBanner(issue = state.issue, modifier = modifier)
+
+        ContentFetchState.Idle, ContentFetchState.Loading, ContentFetchState.Ready -> Unit
+    }
+}
+
+@Composable
+private fun FetchFailedBanner(
+    reason: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = radarColors().surface2,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Lucide.CircleAlert,
+                contentDescription = null,
+                tint = radarColors().textTertiary,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "没能取到正文：$reason",
+                color = radarColors().textTertiary,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onRetry) {
+                Text(
+                    text = "重试",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = radarColors().accent,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 摘要态提示：读者手动切回订阅源摘要后常驻一行，说明「你现在看的不是全文」
+ * 并给出回退出口。没有这行，切过去的人隔天回来看见短正文只会以为是抓取坏了。
+ */
+@Composable
+private fun SummaryModeBanner(
+    onShowFull: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = radarColors().surface2,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Lucide.Type,
+                contentDescription = null,
+                tint = radarColors().textTertiary,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "当前显示订阅源摘要，不是全文",
+                color = radarColors().textTertiary,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onShowFull) {
+                Text(
+                    text = "看正文",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = radarColors().accent,
+                )
+            }
+        }
+    }
+}
+
 /** 无正文分支的兜底提示：正文被判「不完整」时挂在头部下方（ADR-0012）。 */
 @Composable
-private fun IncompleteContentBanner(modifier: Modifier = Modifier) {
+private fun IncompleteContentBanner(
+    issue: ExtractionIssue?,
+    modifier: Modifier = Modifier,
+) {
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = radarColors().surface2,
@@ -419,7 +584,7 @@ private fun IncompleteContentBanner(modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                text = "正文可能不完整（站点限制或动态加载），可查看原文",
+                text = "正文可能不完整（${issue?.label ?: "站点限制或动态加载"}），可查看原文",
                 color = radarColors().textTertiary,
                 style = MaterialTheme.typography.labelMedium,
             )

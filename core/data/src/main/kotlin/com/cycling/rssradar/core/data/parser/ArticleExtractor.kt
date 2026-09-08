@@ -24,6 +24,22 @@ enum class ExtractionIssue {
     PAYWALL,
     /** 正文够长但没有标题或时间（只告警，不算不完整）。 */
     METADATA_MISSING,
+    ;
+
+    /**
+     * 阅读页要说人话：诊断页看枚举名就够了，读者看不懂 `DYNAMIC_RENDER`。
+     * 与 [com.cycling.rssradar.core.data.parser.FetchFailure.label] 同源同类，
+     * 都属于「失败必须可见」那一类文案。
+     */
+    val label: String
+        get() = when (this) {
+            NONE -> "正文完整"
+            TOO_SHORT -> "正文过短"
+            NO_PARAGRAPH -> "没找到正文段落"
+            DYNAMIC_RENDER -> "页面由脚本动态渲染"
+            PAYWALL -> "疑似付费墙或登录墙"
+            METADATA_MISSING -> "缺少标题或发布时间"
+        }
 }
 
 data class ExtractionQuality(
@@ -125,6 +141,26 @@ object ArticleExtractor {
                 issue = diagnose(stats, doc, config),
             ),
         )
+    }
+
+    /**
+     * 删掉正文里与文章标题完全相同的标题行（ReadYou 同款处理）。
+     *
+     * 站点常在正文开头再塞一个 h1/h2，阅读页于是把标题显示两遍——头部已经有标题了。
+     * 只删文本**完全相同**的标题行：宁可漏删，也不误伤正文里恰好同名的小标题。
+     */
+    fun dropDuplicateTitle(html: String, title: String?): String {
+        val target = title?.trim().orEmpty()
+        if (target.isBlank() || html.isBlank()) return html
+        val doc = runCatching { Jsoup.parseBodyFragment(html) }.getOrNull() ?: return html
+        var removed = false
+        doc.select("h1, h2").forEach { heading ->
+            if (heading.text().trim() == target) {
+                heading.remove()
+                removed = true
+            }
+        }
+        return if (removed) doc.body().html() else html
     }
 
     // ———————————————————————————————————————————————

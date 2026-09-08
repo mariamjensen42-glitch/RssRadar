@@ -84,7 +84,7 @@
 | 18 | 粗体字符强调（类 Bionic Reading） | `ReadingBoldCharactersPreference.kt` |
 | 19 | 图片圆角、图片最大化、图片全屏查看页 | `ReadingImage*Preference.kt`、`ReaderImagePage.kt` |
 | 20 | 视频/iframe 嵌入播放（YouTube） | `ui/component/reader/VideoTagHunter.kt` |
-| 21 | TTS 朗读 | `ui/page/home/reading/tts/TtsButton.kt` |
+| 21 | TTS 朗读（**主动不做**，见文末不做清单） | `ui/page/home/reading/tts/TtsButton.kt` |
 | 22 | 沉浸模式（工具栏自动隐藏） | `ReadingAutoHideToolbarPreference.kt` |
 | 23 | 手势：下拉/上拉切换上/下篇、列表条目左右滑动自定义动作、下拉加载下一个 feed | `PullToSwitchArticlePreference.kt`、`ui/component/swipe/`、`PullToLoadNextFeedPreference.kt` |
 | 24 | 大屏/平板双栏自适应（列表+阅读同屏） | `ui/page/adaptive/` |
@@ -112,14 +112,23 @@
 > - **权限**：Android 13+ 的 POST_NOTIFICATIONS 在用户点开开关时才请求（不在进页面时打扰），被拒就关掉并如实说明。
 > - **图标**：状态栏图标必须是白色单色剪影，单独做了 `res/drawable/ic_stat_rssradar.xml`，不与彩色启动器图标共用。
 
-| # | 功能 | ReadYou 依据 |
-|---|------|--------------|
-| 31 | 新文章系统通知（含渠道分组、Feed 级开关）——RssRadar 零 notification 代码 | `infrastructure/android/NotificationHelper.kt` | ✅ 2026-09-01 |
-| 32 | 桌面小部件（文章卡片 + 列表两种，带配置页） | `ui/widget/ArticleCardWidget.kt`、`ArticleListWidget.kt` |
-| 33 | 应用内多语言切换 | `ui/page/settings/languages/` |
-| 34 | 系统分享/文本选择/翻译 intent 接入 | `AndroidManifest.xml`（SEND / PROCESS_TEXT / TRANSLATE） |
-| 35 | 应用内检查更新 | `NewVersionNumberPreference.kt`、`domain/service/AppService.kt` |
-| 36 | 崩溃报告页、使用提示/疑难解答页 | `CrashReportActivity`、`ui/page/settings/tips|troubleshooting/` |
+> 2026-09-08 实施记录（#34 外部入口，ADR-0016）：
+> - **只认链接**：`SharedText.extractUrl()` 从分享文本里取第一个 http(s) 地址并去掉尾随标点；
+>   挑不出就 Toast 明说「这段内容里没有链接」，不把整段文本塞进地址栏换一次必失败的探测。
+> - **两个入口**：`ACTION_SEND`（别的应用分享给 RssRadar）与 `ACTION_PROCESS_TEXT`（选中文字菜单），
+>   均 `text/plain`；命中后打开加订阅抽屉并把地址填进 `AddSubscriptionIntent.UrlChange`，复用既有校验链路。
+> - **状态放 Activity**：外部 intent 走 `onNewIntent` 时不重建 Activity，只有 Compose 状态能让
+>   已在前台的界面有反应；消费后立即清空，避免旋转屏幕重复填入。
+> - **TRANSLATE 不做**：需要独立的「翻译任意文本」界面并依赖 AI Key，成本与价值不匹配。
+
+| # | 功能 | ReadYou 依据 | 状态 |
+|---|------|--------------|------|
+| 31 | 新文章系统通知（含渠道分组、Feed 级开关） | `infrastructure/android/NotificationHelper.kt` | ✅ 2026-09-01 |
+| 32 | 桌面小部件（文章卡片 + 列表两种，带配置页） | `ui/widget/ArticleCardWidget.kt`、`ArticleListWidget.kt` | — |
+| 33 | 应用内多语言切换 | `ui/page/settings/languages/` | — |
+| 34 | 系统分享/文本选择 intent 接入（SEND / PROCESS_TEXT；TRANSLATE 主动不做） | `AndroidManifest.xml`（SEND / PROCESS_TEXT / TRANSLATE） | ✅ 2026-09-08 |
+| 35 | 应用内检查更新 | `NewVersionNumberPreference.kt`、`domain/service/AppService.kt` | — |
+| 36 | 崩溃报告页、使用提示/疑难解答页 | `CrashReportActivity`、`ui/page/settings/tips|troubleshooting/` | — |
 
 ## 反向差距（RssRadar 独有，ReadYou 没有）
 
