@@ -180,6 +180,14 @@ data class ReadingPrefs(
      * 老用户升级后阅读页长相不变。
      */
     val readingTheme: ReadingTheme = ReadingTheme.FOLLOW,
+    /**
+     * 顶部下拉看上一篇 / 底部上拉看下一篇（ReadYou 差距表第 23 项）。
+     *
+     * 默认关：手势换掉正在读的东西是强感知改动，且和正常滚动共用一套手势——
+     * 不想要的人会觉得文章自己在跳。只在整页滚动模式生效（视口模式由 WebView
+     * 内部滚动，Compose 拿不到越界量）。
+     */
+    val pullToSwitchArticle: Boolean = false,
 )
 
 /**
@@ -217,6 +225,7 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
             .putBoolean(KEY_IMMERSIVE, next.immersive)
             .putBoolean(KEY_AUTO_HIDE_BARS, next.autoHideBars)
             .putString(KEY_READING_THEME, next.readingTheme.name)
+            .putBoolean(KEY_PULL_TO_SWITCH, next.pullToSwitchArticle)
             .apply()
         _state.value = next
     }
@@ -263,6 +272,7 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
         readingTheme = prefs.getString(KEY_READING_THEME, null)
             ?.let { runCatching { ReadingTheme.valueOf(it) }.getOrNull() }
             ?: ReadingTheme.FOLLOW,
+        pullToSwitchArticle = prefs.getBoolean(KEY_PULL_TO_SWITCH, false),
     )
 
     private fun coerce(prefs: ReadingPrefs): ReadingPrefs = prefs.copy(
@@ -293,5 +303,6 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
         const val KEY_IMMERSIVE = "reading_immersive"
         const val KEY_AUTO_HIDE_BARS = "reading_auto_hide_bars"
         const val KEY_READING_THEME = "reading_theme"
+        const val KEY_PULL_TO_SWITCH = "reading_pull_to_switch_article"
     }
 }

@@ -91,7 +91,7 @@
 | 20 | 视频/iframe 嵌入播放（YouTube）——原生路降级为「打开链接」卡片，WebView 路不渲染嵌入，均非嵌入播放 | `ui/component/reader/VideoTagHunter.kt` | — |
 | 21 | TTS 朗读（**主动不做**，见文末不做清单） | `ui/page/home/reading/tts/TtsButton.kt` |
 | 22 | 工具栏随滚动自动隐藏（RssRadar 叫「自动隐藏工具栏」——与第 93 项内容降噪的「沉浸阅读」分开，两者在 ReadYou 里都叫 immersive） | `ReadingAutoHideToolbarPreference.kt` | ✅ 2026-09-08 |
-| 23 | 手势：列表条目左右滑动自定义动作**已做**；下拉/上拉切换上/下篇、下拉加载下一个 feed **未做** | `PullToSwitchArticlePreference.kt`、`ui/component/swipe/`、`PullToLoadNextFeedPreference.kt` | ⚠️ 部分 |
+| 23 | 手势：列表条目左右滑动自定义动作**已做**；下拉/上拉切换上/下篇**已做**（默认关，只在整页滚动模式生效）；「下拉加载下一个 feed」**主动不做**——会悄悄换掉正在看的东西，是惊喜不是功能 | `PullToSwitchArticlePreference.kt`、`ui/component/swipe/`、`PullToLoadNextFeedPreference.kt` | ⚠️ 部分（2026-09-08） |
 | 24 | 大屏/平板双栏自适应（列表+阅读同屏） | `ui/page/adaptive/` | — |
 | 25 | 自定义字体导入（TTF） | `ui/ext/ExternalFonts.kt` | — |
 | 26 | 分享内容格式可配、链接打开方式可配（Custom Tabs/指定浏览器/询问） | `SharedContentPreference.kt`、`OpenLinkPreference.kt` | ⚠️ 部分（2026-09-01） |

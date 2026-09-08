@@ -322,7 +322,27 @@ private fun ArticleDetailBody(
             }
             return@Scaffold
         }
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                // 越界切篇（#23）：挂在滚动容器的祖先上，只观察不消费滚动量。
+                // 视口模式由 WebView 内部滚动，拿不到越界量，那里不生效。
+                .pullToSwitchArticle(
+                    enabled = readingPrefs.pullToSwitchArticle,
+                    atTop = { scrollState.value == 0 },
+                    atBottom = { scrollState.maxValue > 0 && scrollState.value >= scrollState.maxValue },
+                    hasPrev = neighbors.prevId != null,
+                    hasNext = neighbors.nextId != null,
+                    onSwitch = { target ->
+                        when (target) {
+                            PullTarget.PREVIOUS -> neighbors.prevId?.let(viewModel::load)
+                            PullTarget.NEXT -> neighbors.nextId?.let(viewModel::load)
+                            PullTarget.NONE -> Unit
+                        }
+                    },
+                ),
+        ) {
             ReadingBody(
                 article = current,
                 isFetchingContent = isFetchingContent,
@@ -417,6 +437,9 @@ private fun ArticleDetailBody(
             },
             onReadingTheme = { v ->
                 viewModel.updateReadingPrefs { it.copy(readingTheme = v) }
+            },
+            onPullToSwitch = { v ->
+                viewModel.updateReadingPrefs { it.copy(pullToSwitchArticle = v) }
             },
             // 正文/摘要：只在两者实质不同时给（canSwitchToSummary），否则点了等于没点
             canSwitchToSummary = canSwitchToSummary(
@@ -567,6 +590,8 @@ private fun ReadingStyleSheet(
     onAutoHideBars: (Boolean) -> Unit = {},
     /** 阅读主题（ReadYou 差距表 #16）：四档配色，只换背景/表面/文字。 */
     onReadingTheme: (ReadingTheme) -> Unit = {},
+    /** 越界切篇（ReadYou 差距表 #23）：顶部下拉看上一篇、底部上拉看下一篇。 */
+    onPullToSwitch: (Boolean) -> Unit = {},
     /** 本文能否在「正文 / 摘要」之间切（[canSwitchToSummary]）：不能切时整块不出现。 */
     canSwitchToSummary: Boolean = false,
     /** 当前是否切成摘要。 */
@@ -945,6 +970,36 @@ private fun ReadingStyleSheet(
                 Switch(
                     checked = autoHideBars,
                     onCheckedChange = onAutoHideBars,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = radarColors().onAccent,
+                        checkedTrackColor = radarColors().accent,
+                    ),
+                )
+            }
+
+            Spacer(Modifier.height(4.dp))
+            // 越界切篇（ReadYou 差距表 #23）。默认关：手势换掉正在读的东西是强感知改动。
+            // 只做「上/下篇切换」，ReadYou 那个「下拉加载下一个 feed」不做——
+            // 那会悄悄换掉你正在看的东西，是惊喜不是功能。
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "下拉 / 上拉切换上下篇",
+                        color = radarColors().textPrimary,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = "顶部下拉看上一篇，底部上拉看下一篇；只在整页滚动模式生效",
+                        color = radarColors().textTertiary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Switch(
+                    checked = prefs.pullToSwitchArticle,
+                    onCheckedChange = onPullToSwitch,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = radarColors().onAccent,
                         checkedTrackColor = radarColors().accent,
