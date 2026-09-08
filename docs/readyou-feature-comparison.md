@@ -85,7 +85,7 @@
 | 19 | 图片圆角、图片最大化、图片全屏查看页 | `ReadingImage*Preference.kt`、`ReaderImagePage.kt` |
 | 20 | 视频/iframe 嵌入播放（YouTube） | `ui/component/reader/VideoTagHunter.kt` |
 | 21 | TTS 朗读（**主动不做**，见文末不做清单） | `ui/page/home/reading/tts/TtsButton.kt` |
-| 22 | 沉浸模式（工具栏自动隐藏） | `ReadingAutoHideToolbarPreference.kt` |
+| 22 | 工具栏随滚动自动隐藏（RssRadar 叫「自动隐藏工具栏」——与第 93 项内容降噪的「沉浸阅读」分开，两者在 ReadYou 里都叫 immersive） | `ReadingAutoHideToolbarPreference.kt` | ✅ 2026-09-08 |
 | 23 | 手势：下拉/上拉切换上/下篇、列表条目左右滑动自定义动作、下拉加载下一个 feed | `PullToSwitchArticlePreference.kt`、`ui/component/swipe/`、`PullToLoadNextFeedPreference.kt` |
 | 24 | 大屏/平板双栏自适应（列表+阅读同屏） | `ui/page/adaptive/` |
 | 25 | 自定义字体导入（TTF） | `ui/ext/ExternalFonts.kt` |

@@ -119,6 +119,13 @@ data class ReadingPrefs(
      * 误伤有安全网兜底；不想要极简以外的行为时用户可关。
      */
     val immersive: Boolean = true,
+    /**
+     * 滚动时自动隐藏顶栏/底栏（ReadYou 差距表第 22 项）。
+     *
+     * **与 [immersive] 是两件事**：那是内容降噪，这是收起工具栏腾阅读空间。
+     * 默认关：这是「我的界面会动」的强感知改动，且少数人会把突然消失的底栏当成 bug。
+     */
+    val autoHideBars: Boolean = false,
 )
 
 /**
@@ -152,6 +159,7 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
             .putString(KEY_VIEW_MODE, next.translation.viewMode.name)
             .putString(KEY_BILINGUAL_LAYOUT, next.translation.bilingualLayout.name)
             .putBoolean(KEY_IMMERSIVE, next.immersive)
+            .putBoolean(KEY_AUTO_HIDE_BARS, next.autoHideBars)
             .apply()
         _state.value = next
     }
@@ -188,6 +196,7 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
                 ?: BilingualLayout.STACKED,
         ),
         immersive = prefs.getBoolean(KEY_IMMERSIVE, true),
+        autoHideBars = prefs.getBoolean(KEY_AUTO_HIDE_BARS, false),
     )
 
     private fun coerce(prefs: ReadingPrefs): ReadingPrefs = prefs.copy(
@@ -213,5 +222,6 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
         const val KEY_VIEW_MODE = "translation_view_mode"
         const val KEY_BILINGUAL_LAYOUT = "translation_bilingual_layout"
         const val KEY_IMMERSIVE = "reading_immersive"
+        const val KEY_AUTO_HIDE_BARS = "reading_auto_hide_bars"
     }
 }

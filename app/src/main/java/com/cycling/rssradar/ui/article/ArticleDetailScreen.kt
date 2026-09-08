@@ -1,5 +1,12 @@
 package com.cycling.rssradar.ui.article
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -48,6 +55,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -69,6 +77,8 @@ import com.cycling.rssradar.core.data.store.coerceImageCornerRadius
 import com.cycling.rssradar.core.data.store.coerceLineHeight
 import com.cycling.rssradar.core.data.store.coercePadding
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
+import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
+import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.ui.components.shareArticle
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Bookmark
@@ -85,7 +95,6 @@ import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.Type
 import kotlin.math.roundToInt
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 
 /**
@@ -133,6 +142,27 @@ fun ArticleDetailScreen(
     // 标题完全滚出视口所需的滚动量（标题 top + 高度，onGloballyPositioned 量出）。
     // 初值 Int.MAX_VALUE = 未量出前顶栏不显标题。
     var titleHideOffset by remember { mutableStateOf(Int.MAX_VALUE) }
+    // 工具栏随滚动自动隐藏（ReadYou 差距表 #22）。两种滚动容器只有一个在动：
+    // 整页模式走 scrollState，视口模式走 WebView 内部滚动量 headerScrollY，
+    // 取二者较大值即当前真实滚动位置。
+    // 判据在 AutoHideBars.kt（纯函数，JVM 可测）；这里只负责采样与写状态，
+    // 且只在「显隐翻转」时更新——每帧都写会在滚动中引发无谓的重组。
+    val autoHideBars = readingPrefs.autoHideBars
+    var barsVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(autoHideBars) {
+        if (!autoHideBars) {
+            barsVisible = true
+            return@LaunchedEffect
+        }
+        var lastY = 0
+        snapshotFlow { maxOf(scrollState.value, headerScrollY) }
+            .collect { y ->
+                val next = nextBarsVisible(autoHideBars, lastY, y, barsVisible)
+                lastY = y
+                if (next != barsVisible) barsVisible = next
+            }
+    }
+    val reducedMotion = LocalReducedMotion.current
     LaunchedEffect(articleId) {
         viewModel.load(articleId)
         scrollState.scrollTo(0)
@@ -154,6 +184,22 @@ fun ArticleDetailScreen(
         containerColor = radarColors().bgRoot,
         snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
+            // 收起用 shrink/expand 而不是 slide：Scaffold 的 content padding 按这两个
+            // 槽位的实测高度算，只有高度真的动画到 0，正文区才平滑地吃掉这块空间；
+            // 用位移动画的话高度在动画结束瞬间突变，正文会"跳"一下。
+            AnimatedVisibility(
+                visible = barsVisible,
+                enter = if (reducedMotion) {
+                    EnterTransition.None
+                } else {
+                    fadeIn() + expandVertically(expandFrom = Alignment.Top)
+                },
+                exit = if (reducedMotion) {
+                    ExitTransition.None
+                } else {
+                    fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+                },
+            ) {
             ArticleDetailTopBar(
                 title = article?.article?.title,
                 // 两种模式任一把标题滚出视口都补位显示
@@ -179,8 +225,22 @@ fun ArticleDetailScreen(
                 aiSummaryState = aiSummaryState,
                 onGenerateSummary = { viewModel.onIntent(ArticleDetailIntent.GenerateSummary) },
             )
+            }
         },
         bottomBar = {
+            AnimatedVisibility(
+                visible = barsVisible,
+                enter = if (reducedMotion) {
+                    EnterTransition.None
+                } else {
+                    fadeIn() + expandVertically(expandFrom = Alignment.Bottom)
+                },
+                exit = if (reducedMotion) {
+                    ExitTransition.None
+                } else {
+                    fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom)
+                },
+            ) {
             article?.let { item ->
                 ArticleActionsBar(
                     isStarred = item.article.isStarred,
@@ -194,6 +254,7 @@ fun ArticleDetailScreen(
                     onOpenOriginal = { onOpenOriginal(item.article.link) },
                     onOpenAi = { showAiSheet = true },
                 )
+            }
             }
         },
     ) { padding ->
@@ -301,6 +362,10 @@ fun ArticleDetailScreen(
             },
             onImmersive = { v ->
                 viewModel.updateReadingPrefs { it.copy(immersive = v) }
+            },
+            autoHideBars = readingPrefs.autoHideBars,
+            onAutoHideBars = { v ->
+                viewModel.updateReadingPrefs { it.copy(autoHideBars = v) }
             },
             // 正文/摘要：只在两者实质不同时给（canSwitchToSummary），否则点了等于没点
             canSwitchToSummary = canSwitchToSummary(
@@ -444,6 +509,9 @@ private fun ReadingStyleSheet(
     onImageCornerRadius: (Int) -> Unit,
     onImageMaximize: (Boolean) -> Unit,
     onImmersive: (Boolean) -> Unit,
+    /** 滚动时自动隐藏工具栏（ReadYou 差距表 #22）；与 [onImmersive] 是两件事。 */
+    autoHideBars: Boolean = false,
+    onAutoHideBars: (Boolean) -> Unit = {},
     /** 本文能否在「正文 / 摘要」之间切（[canSwitchToSummary]）：不能切时整块不出现。 */
     canSwitchToSummary: Boolean = false,
     /** 当前是否切成摘要。 */
@@ -702,6 +770,36 @@ private fun ReadingStyleSheet(
                 Switch(
                     checked = prefs.immersive,
                     onCheckedChange = onImmersive,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = radarColors().onAccent,
+                        checkedTrackColor = radarColors().accent,
+                    ),
+                )
+            }
+
+            Spacer(Modifier.height(4.dp))
+            // 自动隐藏工具栏（ReadYou 差距表 #22）：**不是**上面那个沉浸模式——
+            // 那是砍内容噪声，这只是把顶栏/底栏收起来腾阅读空间。名字必须分开，
+            // 否则两个开关共用一个形容词，用户（和两周后的我们）分不清谁干啥。
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "滚动时自动隐藏工具栏",
+                        color = radarColors().textPrimary,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = "下滚收起顶栏与底栏，上滚或回到顶部时重新出现",
+                        color = radarColors().textTertiary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Switch(
+                    checked = autoHideBars,
+                    onCheckedChange = onAutoHideBars,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = radarColors().onAccent,
                         checkedTrackColor = radarColors().accent,

@@ -126,6 +126,23 @@ class ReadingPrefsStoreTest {
         assertEquals(BilingualLayout.STACKED, v.translation.bilingualLayout)
     }
 
+    @Test
+    fun `auto hide bars defaults to off and survives a restart`() {
+        val prefs = FakeSharedPreferences()
+        val s = ReadingPrefsStore(prefs)
+        // 默认关：工具栏会自己消失是强感知改动，且容易被当成 bug
+        assertFalse(s.state.value.autoHideBars)
+        // 与 immersive 是两件事，别互相带动
+        assertTrue(s.state.value.immersive)
+
+        s.update { it.copy(autoHideBars = true) }
+        assertTrue(ReadingPrefsStore(prefs).state.value.autoHideBars)
+        // 关掉沉浸阅读不该把自动隐藏也带走
+        ReadingPrefsStore(prefs).update { it.copy(immersive = false) }
+        assertTrue(ReadingPrefsStore(prefs).state.value.autoHideBars)
+        assertFalse(ReadingPrefsStore(prefs).state.value.immersive)
+    }
+
     // ---- 各组互不干扰 ----
 
     @Test
