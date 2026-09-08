@@ -144,6 +144,24 @@ class ReadingPrefsStoreTest {
     }
 
     @Test
+    fun `reading theme defaults to following the app and survives a restart`() {
+        val prefs = FakeSharedPreferences()
+        val s = ReadingPrefsStore(prefs)
+        // 默认跟随应用：老用户升级后阅读页长相不变
+        assertEquals(ReadingTheme.FOLLOW, s.state.value.readingTheme)
+
+        s.update { it.copy(readingTheme = ReadingTheme.PAPER) }
+        assertEquals(ReadingTheme.PAPER, ReadingPrefsStore(prefs).state.value.readingTheme)
+    }
+
+    @Test
+    fun `unknown reading theme name falls back to FOLLOW`() {
+        val prefs = FakeSharedPreferences()
+        prefs.edit().putString("reading_theme", "SEPIA").apply()
+        assertEquals(ReadingTheme.FOLLOW, ReadingPrefsStore(prefs).state.value.readingTheme)
+    }
+
+    @Test
     fun `letter spacing and text align persist and are coerced`() {
         val prefs = FakeSharedPreferences()
         val s = ReadingPrefsStore(prefs)

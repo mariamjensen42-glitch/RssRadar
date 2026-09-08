@@ -131,6 +131,12 @@ data class RadarColors(
     }
 }
 
+/**
+ * 背景是否偏亮：系统栏图标该用深色还是浅色，按底色算而不是按「是不是深色模式」——
+ * 阅读主题可以让深色模式下出现米黄纸（#16），此时状态栏图标必须跟着翻。
+ */
+fun RadarColors.isLightBackground(): Boolean = relativeLuminance(bgRoot) >= 0.5f
+
 /** 全局色板注入点：由 [RssRadarTheme] 提供。 */
 val LocalRadarColors = staticCompositionLocalOf { RadarColors.Dark }
 

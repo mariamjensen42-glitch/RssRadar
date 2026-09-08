@@ -84,7 +84,7 @@
 | # | 功能 | ReadYou 依据 | 状态 |
 |---|------|--------------|------|
 | 15 | 双渲染器：WebView 或原生 Compose 二选一 | `ReadingRendererPreference.kt`、`ui/component/webview/`、`ui/component/reader/` | ✅ 补标（ADR-0009，默认原生） |
-| 16 | 4 种阅读主题：Material You / Reeder / Paper / 自定义 | `ReadingThemePreference.kt` |
+| 16 | 4 种阅读主题（RssRadar 版：跟随应用 / 纸张 / 淡灰 / 夜间灰）——ReadYou 的「自定义」档不做，自定义前景/背景会把对比度责任推给用户；#29 已经给了强调色自定义 | `ReadingThemePreference.kt` | ✅ 2026-09-08 |
 | 17 | 排版细项：标题/小标题对齐+加粗+大写、字间距、正文对齐（RssRadar 只有字号/行距/边距/字体族四项）——**已补字间距 + 正文对齐；标题大写对中文无意义，不做** | `ReadingText*Preference.kt`、`ReadingTitle*Preference.kt` | ⚠️ 部分（2026-09-08） |
 | 18 | 粗体字符强调（类 Bionic Reading）——**主动不做**：按「词首若干字符加粗」实现，中文没有词内结构，逐字加粗等于没加粗；WebView 路还得到正文 HTML 里插 `<b>`，有破坏标签的风险 | `ReadingBoldCharactersPreference.kt` | ⛔ 主动不做 |
 | 19 | 图片圆角、图片最大化、图片全屏查看页 | `ReadingImage*Preference.kt`、`ReaderImagePage.kt` | ✅ 补标（issue #60） |

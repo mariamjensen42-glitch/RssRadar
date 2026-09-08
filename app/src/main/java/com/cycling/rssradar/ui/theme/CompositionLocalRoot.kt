@@ -90,9 +90,14 @@ fun CompositionLocalRoot(content: @Composable () -> Unit) {
  *
  * 这里只补图标颜色，不重复设置 edge-to-edge（decorFitsSystemWindows 等一次性
  * 工作仍在 onCreate 做）。
+ *
+ * **阅读页也会调它**（阅读主题 #16 可以让深色模式下出现米黄纸），所以
+ * [onDispose] 必须按应用主题（[LocalDarkTheme]）还原——否则退出阅读页后
+ * 系统栏图标会停在上一页的配色上。
  */
 @Composable
-private fun ApplySystemBarIcons(darkTheme: Boolean) {
+fun ApplySystemBarIcons(darkTheme: Boolean) {
+    val appDarkTheme = LocalDarkTheme.current
     val view = LocalView.current
     DisposableEffect(darkTheme, view) {
         val window = view.context.findActivity()?.window
@@ -103,7 +108,15 @@ private fun ApplySystemBarIcons(darkTheme: Boolean) {
                 isAppearanceLightNavigationBars = !darkTheme
             }
         }
-        onDispose {}
+        onDispose {
+            val w = view.context.findActivity()?.window
+            if (w != null) {
+                WindowCompat.getInsetsController(w, view).apply {
+                    isAppearanceLightStatusBars = !appDarkTheme
+                    isAppearanceLightNavigationBars = !appDarkTheme
+                }
+            }
+        }
     }
 }
 

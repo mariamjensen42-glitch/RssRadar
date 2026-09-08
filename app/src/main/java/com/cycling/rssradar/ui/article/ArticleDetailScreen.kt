@@ -49,6 +49,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -73,6 +74,7 @@ import com.cycling.rssradar.core.data.store.ReadingPrefs
 import com.cycling.rssradar.core.data.store.ReadingRenderer
 import com.cycling.rssradar.core.data.store.ReadingStyleState
 import com.cycling.rssradar.core.data.store.ReadingTextAlign
+import com.cycling.rssradar.core.data.store.ReadingTheme
 import com.cycling.rssradar.core.data.store.coerceFontSize
 import com.cycling.rssradar.core.data.store.coerceLetterSpacing
 import com.cycling.rssradar.core.data.store.coerceImageCornerRadius
@@ -80,7 +82,10 @@ import com.cycling.rssradar.core.data.store.coerceLineHeight
 import com.cycling.rssradar.core.data.store.coercePadding
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
+import com.cycling.rssradar.core.ui.theme.LocalRadarColors
+import com.cycling.rssradar.core.ui.theme.isLightBackground
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.ui.theme.ApplySystemBarIcons
 import com.cycling.rssradar.ui.components.shareArticle
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Bookmark
@@ -105,8 +110,43 @@ import kotlin.math.roundToInt
  */
 private data class ImageViewer(val images: List<String>, val index: Int)
 
+/**
+ * 阅读页外壳：只负责把**阅读主题**（#16）装到 CompositionLocal 上。
+ *
+ * 为什么包在外面而不是逐处取色：阅读页有上百处 `radarColors()`（顶栏、底栏、
+ * 卡片、正文、WebView 注入的 CSS 全读它），逐处改必然漏。这里整页覆盖
+ * [LocalRadarColors]，下游零改动自动跟随；系统栏图标也跟着阅读页底色翻。
+ */
 @Composable
 fun ArticleDetailScreen(
+    viewModel: ArticleDetailViewModel,
+    articleId: Long,
+    onBack: () -> Unit,
+    onOpenOriginal: (String) -> Unit = {},
+    /** 相关阅读卡片点击跳转（AiFeature.RELATED）。 */
+    onOpenArticle: (Long) -> Unit = {},
+) {
+    val readingPrefs by viewModel.readingPrefs.collectAsState()
+    val appColors = radarColors()
+    val pageColors = remember(readingPrefs.readingTheme, appColors) {
+        readingPrefs.readingTheme.pageColors(appColors)
+    }
+    // 深色模式下开「纸张」时状态栏图标必须变深色，否则一片糊。
+    // 退出阅读页由 ApplySystemBarIcons 的 onDispose 还原成应用主题。
+    ApplySystemBarIcons(darkTheme = !pageColors.isLightBackground())
+    CompositionLocalProvider(LocalRadarColors provides pageColors) {
+        ArticleDetailBody(
+            viewModel = viewModel,
+            articleId = articleId,
+            onBack = onBack,
+            onOpenOriginal = onOpenOriginal,
+            onOpenArticle = onOpenArticle,
+        )
+    }
+}
+
+@Composable
+private fun ArticleDetailBody(
     viewModel: ArticleDetailViewModel,
     articleId: Long,
     onBack: () -> Unit,
@@ -375,6 +415,9 @@ fun ArticleDetailScreen(
             onAutoHideBars = { v ->
                 viewModel.updateReadingPrefs { it.copy(autoHideBars = v) }
             },
+            onReadingTheme = { v ->
+                viewModel.updateReadingPrefs { it.copy(readingTheme = v) }
+            },
             // 正文/摘要：只在两者实质不同时给（canSwitchToSummary），否则点了等于没点
             canSwitchToSummary = canSwitchToSummary(
                 content = article?.article?.content,
@@ -522,6 +565,8 @@ private fun ReadingStyleSheet(
     /** 滚动时自动隐藏工具栏（ReadYou 差距表 #22）；与 [onImmersive] 是两件事。 */
     autoHideBars: Boolean = false,
     onAutoHideBars: (Boolean) -> Unit = {},
+    /** 阅读主题（ReadYou 差距表 #16）：四档配色，只换背景/表面/文字。 */
+    onReadingTheme: (ReadingTheme) -> Unit = {},
     /** 本文能否在「正文 / 摘要」之间切（[canSwitchToSummary]）：不能切时整块不出现。 */
     canSwitchToSummary: Boolean = false,
     /** 当前是否切成摘要。 */
@@ -585,6 +630,43 @@ private fun ReadingStyleSheet(
                 )
                 Spacer(Modifier.height(12.dp))
             }
+
+            // 阅读主题（ReadYou 差距表 #16）：四档。只换「纸的颜色」——背景/表面/文字，
+            // 强调色仍跟随应用（含 #29 的自定义色），且不随系统深浅变化：挑「纸张」
+            // 就是为了在深色模式下也要米黄纸。
+            Text(
+                text = "阅读主题",
+                color = radarColors().textPrimary,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ReadingTheme.entries.forEach { theme ->
+                    val selected = theme == prefs.readingTheme
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (selected) radarColors().accent else radarColors().surface2,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onReadingTheme(theme) },
+                    ) {
+                        Text(
+                            text = theme.label,
+                            color = if (selected) radarColors().onAccent else radarColors().textSecondary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        )
+                    }
+                }
+            }
+            Text(
+                text = "只换背景与文字，强调色仍用应用配色；选定后固定，不随系统深浅变化。",
+                color = radarColors().textTertiary,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Spacer(Modifier.height(12.dp))
 
             // 正文渲染器：WebView / 原生 Compose 二选一（ADR-0009）。
             // 原生路对表格/视频/内联样式退化，仅建议被 WebView 滚动闪烁困扰时启用。

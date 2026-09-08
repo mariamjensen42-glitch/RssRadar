@@ -94,6 +94,29 @@ fun coerceImageCornerRadius(value: Int): Int =
     value.coerceIn(ReadingImageState.CORNER_RADIUS_MIN, ReadingImageState.CORNER_RADIUS_MAX)
 
 /**
+ * 阅读主题（ReadYou 差距表第 16 项）：阅读页专属配色。
+ *
+ * 只覆盖背景/表面/文字，**强调色仍跟随应用**——阅读主题是「纸的颜色」，
+ * 不是换一套品牌色；#29 自定义的强调色在这里照样生效。
+ *
+ * **各档固定、不随深色模式变**：挑「纸张」就是在深色模式下也要米黄纸，
+ * 若跟随系统深浅就失去了手动选它的意义。默认 [FOLLOW]，老用户升级视觉不变。
+ */
+enum class ReadingTheme(val label: String) {
+    /** 用应用当前色板（深色纯黑 / 浅色近白）。 */
+    FOLLOW("跟随应用"),
+
+    /** 米黄纸：长文最不刺眼的一档。 */
+    PAPER("纸张"),
+
+    /** 浅灰：Reeder 那种中性灰底。 */
+    GRAY("淡灰"),
+
+    /** 深灰（非纯黑）：OLED 上不发光，比纯黑柔和。 */
+    NIGHT("夜间灰"),
+}
+
+/**
  * 阅读页正文渲染器选择（原生双渲染器，ADR-0009）。
  *
  * 默认 WEBVIEW：原生路对表格/视频/内联样式明显退化（ADR-0009 已记录），
@@ -152,6 +175,11 @@ data class ReadingPrefs(
      * 默认关：这是「我的界面会动」的强感知改动，且少数人会把突然消失的底栏当成 bug。
      */
     val autoHideBars: Boolean = false,
+    /**
+     * 阅读主题（差距表第 16 项）：阅读页专属配色，四档。默认 [ReadingTheme.FOLLOW]，
+     * 老用户升级后阅读页长相不变。
+     */
+    val readingTheme: ReadingTheme = ReadingTheme.FOLLOW,
 )
 
 /**
@@ -188,6 +216,7 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
             .putString(KEY_BILINGUAL_LAYOUT, next.translation.bilingualLayout.name)
             .putBoolean(KEY_IMMERSIVE, next.immersive)
             .putBoolean(KEY_AUTO_HIDE_BARS, next.autoHideBars)
+            .putString(KEY_READING_THEME, next.readingTheme.name)
             .apply()
         _state.value = next
     }
@@ -231,6 +260,9 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
         ),
         immersive = prefs.getBoolean(KEY_IMMERSIVE, true),
         autoHideBars = prefs.getBoolean(KEY_AUTO_HIDE_BARS, false),
+        readingTheme = prefs.getString(KEY_READING_THEME, null)
+            ?.let { runCatching { ReadingTheme.valueOf(it) }.getOrNull() }
+            ?: ReadingTheme.FOLLOW,
     )
 
     private fun coerce(prefs: ReadingPrefs): ReadingPrefs = prefs.copy(
@@ -260,5 +292,6 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
         const val KEY_BILINGUAL_LAYOUT = "translation_bilingual_layout"
         const val KEY_IMMERSIVE = "reading_immersive"
         const val KEY_AUTO_HIDE_BARS = "reading_auto_hide_bars"
+        const val KEY_READING_THEME = "reading_theme"
     }
 }
