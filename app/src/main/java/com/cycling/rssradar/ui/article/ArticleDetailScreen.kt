@@ -72,7 +72,9 @@ import com.cycling.rssradar.core.data.store.ReadingImageState
 import com.cycling.rssradar.core.data.store.ReadingPrefs
 import com.cycling.rssradar.core.data.store.ReadingRenderer
 import com.cycling.rssradar.core.data.store.ReadingStyleState
+import com.cycling.rssradar.core.data.store.ReadingTextAlign
 import com.cycling.rssradar.core.data.store.coerceFontSize
+import com.cycling.rssradar.core.data.store.coerceLetterSpacing
 import com.cycling.rssradar.core.data.store.coerceImageCornerRadius
 import com.cycling.rssradar.core.data.store.coerceLineHeight
 import com.cycling.rssradar.core.data.store.coercePadding
@@ -354,6 +356,12 @@ fun ArticleDetailScreen(
             onFontFamily = { v ->
                 viewModel.updateReadingPrefs { it.copy(style = it.style.copy(fontFamily = v)) }
             },
+            onLetterSpacing = { v ->
+                viewModel.updateReadingPrefs { it.copy(style = it.style.copy(letterSpacing = v)) }
+            },
+            onTextAlign = { v ->
+                viewModel.updateReadingPrefs { it.copy(style = it.style.copy(textAlign = v)) }
+            },
             onImageCornerRadius = { v ->
                 viewModel.updateReadingPrefs { it.copy(image = it.image.copy(cornerRadius = v)) }
             },
@@ -505,6 +513,8 @@ private fun ReadingStyleSheet(
     onFontSize: (Int) -> Unit,
     onLineHeight: (Float) -> Unit,
     onPadding: (Int) -> Unit,
+    onLetterSpacing: (Float) -> Unit,
+    onTextAlign: (ReadingTextAlign) -> Unit,
     onFontFamily: (ReadingFontFamily) -> Unit,
     onImageCornerRadius: (Int) -> Unit,
     onImageMaximize: (Boolean) -> Unit,
@@ -676,6 +686,59 @@ private fun ReadingStyleSheet(
             }
 
             Spacer(Modifier.height(8.dp))
+            // 字间距（ReadYou 差距表 #17）：中文长段落拉开一点明显好读
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "字间距",
+                    color = radarColors().textPrimary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.width(72.dp),
+                )
+                Slider(
+                    value = style.letterSpacing,
+                    onValueChange = { onLetterSpacing(coerceLetterSpacing(it)) },
+                    valueRange = ReadingStyleState.LETTER_SPACING_MIN..ReadingStyleState.LETTER_SPACING_MAX,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "%.1f".format(style.letterSpacing),
+                    color = radarColors().textPrimary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(40.dp),
+                )
+            }
+
+            // 正文对齐（ReadYou 差距表 #17）：只作用于没有自带 align 声明的段落，
+            // 正文里写死的居中/右对齐是内容的一部分，不该被全局偏好盖掉。
+            Text(
+                text = "正文对齐",
+                color = radarColors().textPrimary,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ReadingTextAlign.entries.forEach { align ->
+                    val selected = align == style.textAlign
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (selected) radarColors().accent else radarColors().surface2,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onTextAlign(align) },
+                    ) {
+                        Text(
+                            text = align.label,
+                            color = if (selected) radarColors().onAccent else radarColors().textSecondary,
+                            style = MaterialTheme.typography.labelLarge,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+
             // 字体族：三选一
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ReadingFontFamily.entries.forEach { family ->

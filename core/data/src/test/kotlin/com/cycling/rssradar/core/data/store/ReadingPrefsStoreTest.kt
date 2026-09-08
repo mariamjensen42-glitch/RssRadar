@@ -143,6 +143,30 @@ class ReadingPrefsStoreTest {
         assertFalse(ReadingPrefsStore(prefs).state.value.immersive)
     }
 
+    @Test
+    fun `letter spacing and text align persist and are coerced`() {
+        val prefs = FakeSharedPreferences()
+        val s = ReadingPrefsStore(prefs)
+        // 默认 0 / 左对齐 = 引入前的排版，老用户升级视觉不变
+        assertEquals(ReadingStyleState.DEFAULT_LETTER_SPACING, s.state.value.style.letterSpacing)
+        assertEquals(ReadingTextAlign.START, s.state.value.style.textAlign)
+
+        s.update {
+            it.copy(
+                style = it.style.copy(letterSpacing = 1.5f, textAlign = ReadingTextAlign.JUSTIFY),
+            )
+        }
+        val reloaded = ReadingPrefsStore(prefs).state.value
+        assertEquals(1.5f, reloaded.style.letterSpacing)
+        assertEquals(ReadingTextAlign.JUSTIFY, reloaded.style.textAlign)
+
+        // 越界值写入前就被夹住：落盘值永远合法这一条不变量住在 Store 里
+        s.update { it.copy(style = it.style.copy(letterSpacing = 99f)) }
+        assertEquals(ReadingStyleState.LETTER_SPACING_MAX, s.state.value.style.letterSpacing)
+        s.update { it.copy(style = it.style.copy(letterSpacing = -2f)) }
+        assertEquals(ReadingStyleState.LETTER_SPACING_MIN, s.state.value.style.letterSpacing)
+    }
+
     // ---- 各组互不干扰 ----
 
     @Test

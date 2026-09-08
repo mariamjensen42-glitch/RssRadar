@@ -80,8 +80,8 @@
 |---|------|--------------|
 | 15 | 双渲染器：WebView 或原生 Compose 二选一（RssRadar 只有 styled-HTML 一条路） | `ReadingRendererPreference.kt`、`ui/component/webview/`、`ui/component/reader/` |
 | 16 | 4 种阅读主题：Material You / Reeder / Paper / 自定义 | `ReadingThemePreference.kt` |
-| 17 | 排版细项：标题/小标题对齐+加粗+大写、字间距、正文对齐（RssRadar 只有字号/行距/边距/字体族四项） | `ReadingText*Preference.kt`、`ReadingTitle*Preference.kt` |
-| 18 | 粗体字符强调（类 Bionic Reading） | `ReadingBoldCharactersPreference.kt` |
+| 17 | 排版细项：标题/小标题对齐+加粗+大写、字间距、正文对齐（RssRadar 只有字号/行距/边距/字体族四项）——**已补字间距 + 正文对齐；标题大写对中文无意义，不做** | `ReadingText*Preference.kt`、`ReadingTitle*Preference.kt` | ⚠️ 部分（2026-09-08） |
+| 18 | 粗体字符强调（类 Bionic Reading）——**主动不做**：按「词首若干字符加粗」实现，中文没有词内结构，逐字加粗等于没加粗；WebView 路还得到正文 HTML 里插 `<b>`，有破坏标签的风险 | `ReadingBoldCharactersPreference.kt` | ⛔ 主动不做 |
 | 19 | 图片圆角、图片最大化、图片全屏查看页 | `ReadingImage*Preference.kt`、`ReaderImagePage.kt` |
 | 20 | 视频/iframe 嵌入播放（YouTube） | `ui/component/reader/VideoTagHunter.kt` |
 | 21 | TTS 朗读（**主动不做**，见文末不做清单） | `ui/page/home/reading/tts/TtsButton.kt` |

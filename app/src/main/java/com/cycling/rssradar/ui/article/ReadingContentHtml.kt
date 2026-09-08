@@ -43,7 +43,8 @@ object ReadingContentHtml {
     <style>
         body { background:$bg; color:$fg; font-size:${style.fontSize}px; line-height:${style.lineHeight};
                padding:0 ${style.horizontalPadding}px; margin:0; word-break:break-word;
-               font-family:${style.fontFamily.cssStack}; }
+               font-family:${style.fontFamily.cssStack};
+               letter-spacing:${style.letterSpacing}px; text-align:${style.textAlign.css}; }
         img { max-width:100%; height:auto; border-radius:${imageCorners}px; }
         a { color:$link; text-decoration:underline; text-underline-offset:2px; }
         a.${ReadingImages.IMG_LINK_CLASS} { text-decoration:none; color:inherit; }

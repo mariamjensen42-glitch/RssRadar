@@ -15,17 +15,38 @@ enum class ReadingFontFamily(val label: String, val cssStack: String) {
     MONOSPACE("等宽", "Menlo,Consolas,'Courier New',monospace"),
 }
 
+/**
+ * 正文对齐（ReadYou 差距表第 17 项）。
+ *
+ * 只对**没有自带对齐声明**的段落生效：正文里 `<p align="center">` 这种显式声明
+ * 是内容的一部分，用户的全局偏好不该盖掉它（原生路靠 TextStyle 合并天然做到，
+ * WebView 路靠 CSS 选择器同样如此）。
+ */
+enum class ReadingTextAlign(val label: String, val css: String) {
+    START("左对齐", "left"),
+    JUSTIFY("两端对齐", "justify"),
+    CENTER("居中", "center"),
+    END("右对齐", "right"),
+}
+
 /** 阅读排版状态。纯数据类，无 Android 依赖，是 styled-HTML 构建缝的输入。 */
 data class ReadingStyleState(
     val fontSize: Int = DEFAULT_FONT_SIZE,
     val lineHeight: Float = DEFAULT_LINE_HEIGHT,
     val horizontalPadding: Int = DEFAULT_PADDING,
     val fontFamily: ReadingFontFamily = ReadingFontFamily.SYSTEM,
+    /**
+     * 字间距（sp，ReadYou 差距表第 17 项）。默认 0 = 引入前的排版，老用户升级视觉不变。
+     * 中文长段落拉开一点字距明显好读；上限 3sp 是再大就散架的经验值。
+     */
+    val letterSpacing: Float = DEFAULT_LETTER_SPACING,
+    val textAlign: ReadingTextAlign = ReadingTextAlign.START,
 ) {
     companion object {
         const val DEFAULT_FONT_SIZE = 17
         const val DEFAULT_LINE_HEIGHT = 1.0f
         const val DEFAULT_PADDING = 24
+        const val DEFAULT_LETTER_SPACING = 0f
 
         const val FONT_SIZE_MIN = 12
         const val FONT_SIZE_MAX = 28
@@ -33,6 +54,8 @@ data class ReadingStyleState(
         const val LINE_HEIGHT_MAX = 2.5f
         const val PADDING_MIN = 0
         const val PADDING_MAX = 48
+        const val LETTER_SPACING_MIN = 0f
+        const val LETTER_SPACING_MAX = 3f
     }
 }
 
@@ -45,6 +68,9 @@ fun coerceLineHeight(value: Float): Float =
 
 fun coercePadding(value: Int): Int =
     value.coerceIn(ReadingStyleState.PADDING_MIN, ReadingStyleState.PADDING_MAX)
+
+fun coerceLetterSpacing(value: Float): Float =
+    value.coerceIn(ReadingStyleState.LETTER_SPACING_MIN, ReadingStyleState.LETTER_SPACING_MAX)
 
 /**
  * 阅读页图片显示偏好（图片圆角 / 点击放大，ReadYou 差距表第 19 项）。
@@ -153,6 +179,8 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
             .putFloat(KEY_LINE_HEIGHT, next.style.lineHeight)
             .putInt(KEY_PADDING, next.style.horizontalPadding)
             .putString(KEY_FONT_FAMILY, next.style.fontFamily.name)
+            .putFloat(KEY_LETTER_SPACING, next.style.letterSpacing)
+            .putString(KEY_TEXT_ALIGN, next.style.textAlign.name)
             .putInt(KEY_CORNER_RADIUS, next.image.cornerRadius)
             .putBoolean(KEY_MAXIMIZE, next.image.maximizeOnTap)
             .putString(KEY_RENDERER, next.renderer.name)
@@ -177,6 +205,12 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
             fontFamily = prefs.getString(KEY_FONT_FAMILY, null)
                 ?.let { runCatching { ReadingFontFamily.valueOf(it) }.getOrNull() }
                 ?: ReadingFontFamily.SYSTEM,
+            letterSpacing = coerceLetterSpacing(
+                prefs.getFloat(KEY_LETTER_SPACING, ReadingStyleState.DEFAULT_LETTER_SPACING),
+            ),
+            textAlign = prefs.getString(KEY_TEXT_ALIGN, null)
+                ?.let { runCatching { ReadingTextAlign.valueOf(it) }.getOrNull() }
+                ?: ReadingTextAlign.START,
         ),
         image = ReadingImageState(
             cornerRadius = coerceImageCornerRadius(
@@ -204,6 +238,7 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
             fontSize = coerceFontSize(prefs.style.fontSize),
             lineHeight = coerceLineHeight(prefs.style.lineHeight),
             horizontalPadding = coercePadding(prefs.style.horizontalPadding),
+            letterSpacing = coerceLetterSpacing(prefs.style.letterSpacing),
         ),
         image = prefs.image.copy(
             cornerRadius = coerceImageCornerRadius(prefs.image.cornerRadius),
@@ -216,6 +251,8 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
         const val KEY_LINE_HEIGHT = "reading_line_height"
         const val KEY_PADDING = "reading_horizontal_padding"
         const val KEY_FONT_FAMILY = "reading_font_family"
+        const val KEY_LETTER_SPACING = "reading_letter_spacing"
+        const val KEY_TEXT_ALIGN = "reading_text_align"
         const val KEY_CORNER_RADIUS = "reading_image_corner_radius"
         const val KEY_MAXIMIZE = "reading_image_maximize_on_tap"
         const val KEY_RENDERER = "reading_renderer"
