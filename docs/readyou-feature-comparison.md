@@ -2,6 +2,11 @@
 
 > 对比对象：`D:\Programming\Kotlin\ReadYou-main`（重构后的新版结构）vs RssRadar。
 > 生成时间：2026-08-30。
+>
+> **2026-09-08 全表核查**：逐条对着代码核了一遍，补标了 5 条「功能早已落地但表里还挂着差距」
+> 的假条目（#3 / #12 / #13 / #14 / #15 / #19），并把 #23 #36 标为「部分」。
+> 状态列：**— = 确认的真差距**，✅ = 已落地，⚠️ = 部分，⛔ = 主动不做。
+> 核对状态以**代码为准**，不要以本文的初始描述为准——初始描述会过期。
 
 ## RssRadar 已有功能（不列入差距）
 
@@ -16,9 +21,9 @@
 
 | # | 功能 | ReadYou 依据 |
 |---|------|--------------|
-| 1 | Fever / Google Reader / FreshRSS 账号同步 | `domain/service/*RssService.kt`、`infrastructure/rss/provider/` |
-| 2 | 多账号支持（可添加多个不同类型账号） | `domain/service/AccountService.kt` |
-| 3 | 同步策略：间隔、仅 WiFi、仅充电、启动时同步、按 feed 屏蔽 | `infrastructure/preference/Sync*Preference.kt` |
+| 1 | Fever / Google Reader / FreshRSS 账号同步 | `domain/service/*RssService.kt`、`infrastructure/rss/provider/` | — |
+| 2 | 多账号支持（可添加多个不同类型账号） | `domain/service/AccountService.kt` | — |
+| 3 | 同步策略：间隔、仅 WiFi、仅充电、启动时同步、按 feed 屏蔽 | `infrastructure/preference/Sync*Preference.kt` | ✅ 补标（issue #58） |
 
 ### 二、订阅源管理
 
@@ -62,9 +67,9 @@
 |---|------|--------------|
 | 10 | 标记已读条件（1/3/7 天前或全部） | `domain/model/general/MarkAsReadConditions.kt` | ✅ 2026-09-01 |
 | 11 | 滚动时自动标记已读（可关） | `MarkAsReadOnScrollPreference.kt` | ✅ 2026-09-01 |
-| 12 | 列表显示项逐项可配：feed 图标/名称、日期、缩略图、描述、粘性日期头、已读进度指示 | `FlowArticleList*Preference.kt` |
-| 13 | 文章归档策略（保留天数） | `KeepArchivedPreference.kt` |
-| 14 | 未读排序方式可配 | `SortUnreadItemsPreference.kt` |
+| 12 | 列表显示项逐项可配：feed 图标/名称、日期、缩略图、描述、粘性日期头、已读进度指示 | `FlowArticleList*Preference.kt` | ✅ 补标（issue #56，ListDisplayStore 七项全有） |
+| 13 | 文章归档策略（保留天数） | `KeepArchivedPreference.kt` | ✅ 补标（ArchiveStore.KeepArchived） |
+| 14 | 未读排序方式可配 | `SortUnreadItemsPreference.kt` | ✅ 补标（FeedSortStore） |
 
 ### 四、阅读页（ReadYou 最重的部分）
 
@@ -76,19 +81,19 @@
 > - **Custom Tabs 暂缺**：需要引入 `androidx.browser:browser` 依赖（当前依赖表里没有），
 >   属构建配置变更，设置页已如实标注。
 
-| # | 功能 | ReadYou 依据 |
-|---|------|--------------|
-| 15 | 双渲染器：WebView 或原生 Compose 二选一（RssRadar 只有 styled-HTML 一条路） | `ReadingRendererPreference.kt`、`ui/component/webview/`、`ui/component/reader/` |
+| # | 功能 | ReadYou 依据 | 状态 |
+|---|------|--------------|------|
+| 15 | 双渲染器：WebView 或原生 Compose 二选一 | `ReadingRendererPreference.kt`、`ui/component/webview/`、`ui/component/reader/` | ✅ 补标（ADR-0009，默认原生） |
 | 16 | 4 种阅读主题：Material You / Reeder / Paper / 自定义 | `ReadingThemePreference.kt` |
 | 17 | 排版细项：标题/小标题对齐+加粗+大写、字间距、正文对齐（RssRadar 只有字号/行距/边距/字体族四项）——**已补字间距 + 正文对齐；标题大写对中文无意义，不做** | `ReadingText*Preference.kt`、`ReadingTitle*Preference.kt` | ⚠️ 部分（2026-09-08） |
 | 18 | 粗体字符强调（类 Bionic Reading）——**主动不做**：按「词首若干字符加粗」实现，中文没有词内结构，逐字加粗等于没加粗；WebView 路还得到正文 HTML 里插 `<b>`，有破坏标签的风险 | `ReadingBoldCharactersPreference.kt` | ⛔ 主动不做 |
-| 19 | 图片圆角、图片最大化、图片全屏查看页 | `ReadingImage*Preference.kt`、`ReaderImagePage.kt` |
-| 20 | 视频/iframe 嵌入播放（YouTube） | `ui/component/reader/VideoTagHunter.kt` |
+| 19 | 图片圆角、图片最大化、图片全屏查看页 | `ReadingImage*Preference.kt`、`ReaderImagePage.kt` | ✅ 补标（issue #60） |
+| 20 | 视频/iframe 嵌入播放（YouTube）——原生路降级为「打开链接」卡片，WebView 路不渲染嵌入，均非嵌入播放 | `ui/component/reader/VideoTagHunter.kt` | — |
 | 21 | TTS 朗读（**主动不做**，见文末不做清单） | `ui/page/home/reading/tts/TtsButton.kt` |
 | 22 | 工具栏随滚动自动隐藏（RssRadar 叫「自动隐藏工具栏」——与第 93 项内容降噪的「沉浸阅读」分开，两者在 ReadYou 里都叫 immersive） | `ReadingAutoHideToolbarPreference.kt` | ✅ 2026-09-08 |
-| 23 | 手势：下拉/上拉切换上/下篇、列表条目左右滑动自定义动作、下拉加载下一个 feed | `PullToSwitchArticlePreference.kt`、`ui/component/swipe/`、`PullToLoadNextFeedPreference.kt` |
-| 24 | 大屏/平板双栏自适应（列表+阅读同屏） | `ui/page/adaptive/` |
-| 25 | 自定义字体导入（TTF） | `ui/ext/ExternalFonts.kt` |
+| 23 | 手势：列表条目左右滑动自定义动作**已做**；下拉/上拉切换上/下篇、下拉加载下一个 feed **未做** | `PullToSwitchArticlePreference.kt`、`ui/component/swipe/`、`PullToLoadNextFeedPreference.kt` | ⚠️ 部分 |
+| 24 | 大屏/平板双栏自适应（列表+阅读同屏） | `ui/page/adaptive/` | — |
+| 25 | 自定义字体导入（TTF） | `ui/ext/ExternalFonts.kt` | — |
 | 26 | 分享内容格式可配、链接打开方式可配（Custom Tabs/指定浏览器/询问） | `SharedContentPreference.kt`、`OpenLinkPreference.kt` | ⚠️ 部分（2026-09-01） |
 
 ### 五、主题
@@ -128,7 +133,7 @@
 | 33 | 应用内多语言切换 | `ui/page/settings/languages/` | — |
 | 34 | 系统分享/文本选择 intent 接入（SEND / PROCESS_TEXT；TRANSLATE 主动不做） | `AndroidManifest.xml`（SEND / PROCESS_TEXT / TRANSLATE） | ✅ 2026-09-08 |
 | 35 | 应用内检查更新 | `NewVersionNumberPreference.kt`、`domain/service/AppService.kt` | — |
-| 36 | 崩溃报告页、使用提示/疑难解答页 | `CrashReportActivity`、`ui/page/settings/tips|troubleshooting/` | — |
+| 36 | 崩溃报告页**已做**（CrashLogScreen + CrashLogRoute）；使用提示/疑难解答页**未做** | `CrashReportActivity`、`ui/page/settings/tips|troubleshooting/` | ⚠️ 部分 |
 
 ## 反向差距（RssRadar 独有，ReadYou 没有）
 
@@ -144,7 +149,7 @@
 2. **Feed 自动发现**——手填 URL 抽屉里输入任何网址都该能探测出 feed，订阅体验的下限。
 3. **Favicon 自动抓取**——iconUrl 字段和 FeedIcon 组件都在，只差抓取链路。列表没图标像半成品。
 4. **标记已读条件**（1/3/7 天前/全部）——积累几天未读就刷不完的信息流，用户会弃用。
-5. **新文章通知 + Feed 级开关**——RSS 阅读器没有通知就只是个"偶尔打开看看的网页"（当前零 notification 代码，从 WorkManager + 通知渠道开始做）。
+5. **新文章通知 + Feed 级开关**——RSS 阅读器没有通知就只是个"偶尔打开看看的网页"。✅ 已做（#31）。
 
 这五项一个迭代能做完，全是"没有就不像一个正经 RSS 阅读器"的东西。
 
@@ -162,7 +167,8 @@ AI 摘要/翻译属于"语言组织"，不违反"数字必须真实"原则，且
 ### 明确不建议
 
 - 第三方同步生态（Fever / Google Reader / FreshRSS）——工程量巨大，且和"本地 + RSSHub"定位打架
-- 双渲染器、排版长尾设置（标题大写、字间距等）、双栏自适应、TTS、桌面小部件——设置平台化的坑，单人项目填不动
+- （已做，不再是坑）双渲染器：ADR-0009 落地，默认原生 Compose；字间距/正文对齐已补（#17）。
+- 排版长尾设置（标题大写等）、双栏自适应、TTS、桌面小部件——设置平台化的坑，单人项目填不动
 
 ### 一句话结论
 
