@@ -237,6 +237,12 @@ object AppModule {
     fun provideThemeStore(@ApplicationContext context: Context): ThemeStore =
         ThemeStore(SettingsPrefs.of(context))
 
+    /** 界面语言偏好（ADR-0017）。 */
+    @Provides
+    @Singleton
+    fun provideLanguageStore(@ApplicationContext context: Context): LanguageStore =
+        LanguageStore(SettingsPrefs.of(context))
+
     /**
      * 阅读偏好（排版 / 图片 / 渲染器 / 译文显示）合成一个模块：一份 state、一条 provide。
      * 此前四项各是一个 Store，每项都要重复 provides → EntryPoint → CompositionLocal
