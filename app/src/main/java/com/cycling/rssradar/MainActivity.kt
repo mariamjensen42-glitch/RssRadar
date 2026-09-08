@@ -110,6 +110,16 @@ class MainActivity : ComponentActivity() {
      */
     private var sharedUrl by mutableStateOf<String?>(null)
 
+    /** 界面语言覆盖（ADR-0017）：API 31/32 无系统 per-app locale，attach 时手动包一层。 */
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(
+            com.cycling.rssradar.i18n.AppLocales.wrapContext(
+                newBase,
+                com.cycling.rssradar.core.data.store.SettingsPrefs.of(newBase),
+            ),
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         consumeIncomingIntent(intent)

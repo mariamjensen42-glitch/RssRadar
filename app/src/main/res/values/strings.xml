@@ -2,4 +2,12 @@
     <string name="app_name">RssRadar</string>
     <!-- #34：分享单 / 选中文字菜单里本应用动作的名字 -->
     <string name="intent_subscribe">用 RssRadar 订阅</string>
+
+    <!-- ADR-0017 界面语言（i18n 批1 起，新文案一律进这里，英文进 values-en） -->
+    <string name="language">语言</string>
+    <string name="language_subtitle">界面显示语言，立即生效</string>
+    <string name="language_follow_system">跟随系统</string>
+    <string name="language_chinese">中文</string>
+    <string name="language_english">English</string>
+    <string name="language_applied">语言已切换，界面即将刷新</string>
 </resources>

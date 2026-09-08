@@ -65,6 +65,7 @@ import com.cycling.rssradar.core.domain.rss.HttpUrlFetcher
 import com.cycling.rssradar.core.domain.rsshub.HttpHealthzProber
 import com.cycling.rssradar.core.domain.rsshub.InstanceProber
 import com.cycling.rssradar.core.data.store.ThemeStore
+import com.cycling.rssradar.core.data.store.LanguageStore
 import com.cycling.rssradar.sync.AutoSync
 import dagger.Module
 import dagger.Provides
@@ -456,6 +457,7 @@ object AppModule {
 @InstallIn(SingletonComponent::class)
 interface AppEntryPoint {
     fun themeStore(): ThemeStore
+    fun languageStore(): LanguageStore
     fun readingPrefsStore(): ReadingPrefsStore
     fun listDisplayStore(): ListDisplayStore
     fun archiveStore(): ArchiveStore

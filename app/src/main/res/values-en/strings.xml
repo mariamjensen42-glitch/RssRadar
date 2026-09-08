@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">RssRadar</string>
+    <!-- #34: action name for share sheet / text selection menu -->
+    <string name="intent_subscribe">Subscribe with RssRadar</string>
+
+    <!-- ADR-0017 UI language (i18n batch 1) -->
+    <string name="language">Language</string>
+    <string name="language_subtitle">Display language of the interface, applied immediately</string>
+    <string name="language_follow_system">Follow system</string>
+    <string name="language_chinese">中文</string>
+    <string name="language_english">English</string>
+    <string name="language_applied">Language changed, refreshing interface</string>
+</resources>

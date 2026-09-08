@@ -55,6 +55,8 @@ import com.cycling.rssradar.core.data.store.SyncState
 import com.cycling.rssradar.core.data.store.SyncStore
 import com.cycling.rssradar.core.data.store.ThemeMode
 import com.cycling.rssradar.core.data.store.ThemeStore
+import com.cycling.rssradar.core.data.store.AppLanguage
+import com.cycling.rssradar.core.data.store.LanguageStore
 import com.cycling.rssradar.sync.SyncScheduler
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.composables.icons.lucide.Activity
@@ -84,6 +86,7 @@ data class RssHubSettingsUiState(
     val probeMessage: String? = null,
     /** 当前主题模式。 */
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     /** Material You 动态取色（#27）：开则强调色跟随系统壁纸，表面阶梯不变。 */
     val dynamicColor: Boolean = false,
     /** 自定义强调色 ARGB（#29）；null = 默认紫。与动态取色互斥。 */
@@ -133,6 +136,7 @@ class RssHubSettingsViewModel @Inject constructor(
     private val feedDao: com.cycling.rssradar.core.data.db.FeedDao,
     private val articleDao: com.cycling.rssradar.core.data.db.ArticleDao,
     private val themeStore: ThemeStore,
+    private val languageStore: LanguageStore,
     private val aiStore: AiStore,
     private val listDisplayStore: ListDisplayStore,
     private val archiveStore: ArchiveStore,
@@ -172,6 +176,12 @@ class RssHubSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             themeStore.mode.collect { mode ->
                 _state.value = _state.value.copy(themeMode = mode)
+            }
+        }
+        // 界面语言（ADR-0017）
+        viewModelScope.launch {
+            languageStore.language.collect { language ->
+                _state.value = _state.value.copy(appLanguage = language)
             }
         }
         // 动态取色（#27）
@@ -292,6 +302,11 @@ class RssHubSettingsViewModel @Inject constructor(
 
     fun setThemeMode(mode: ThemeMode) {
         themeStore.setMode(mode)
+    }
+
+    /** 界面语言（ADR-0017）：只持久化，locale 推送与重建由 UI 层调 AppLocales。 */
+    fun setAppLanguage(language: AppLanguage) {
+        languageStore.setLanguage(language)
     }
 
     /**

@@ -50,10 +50,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.cycling.rssradar.R
 import com.cycling.rssradar.core.model.rsshub.CatalogSource
 import com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.core.data.store.KeepArchived
+import com.cycling.rssradar.core.data.store.AppLanguage
 import com.cycling.rssradar.core.data.store.LinkOpenMode
 import com.cycling.rssradar.core.data.store.ListViewMode
 import com.cycling.rssradar.core.data.store.ShareContentFormat
@@ -82,7 +87,7 @@ import com.cycling.rssradar.core.ui.theme.toArgb
 
 /** 二级页骨架：返回顶栏 + 滚动内容，与 InterestProfileScreen 同款形态。 */
 @Composable
-private fun SettingsSubPage(
+internal fun SettingsSubPage(
     title: String,
     onBack: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
@@ -122,7 +127,7 @@ private fun SettingsSubPage(
 
 /** 分组小标题 + 说明文案（原长页同款）。 */
 @Composable
-private fun SectionHeader(title: String, description: String? = null) {
+internal fun SectionHeader(title: String, description: String? = null) {
     Text(
         text = title,
         color = radarColors().textSecondary,
@@ -428,7 +433,44 @@ fun SettingsGeneralScreen(
                         )
                     }
                 }
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(10.dp))
+                // 界面语言（ADR-0017）：选完即推 locale 并重建界面。
+                // 选项名不用 stringResource —— 「中文」「English」在任何语言下都应原样显示。
+                val context = LocalContext.current
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.language),
+                            color = radarColors().textPrimary,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = stringResource(R.string.language_subtitle),
+                            color = radarColors().textTertiary,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                    // label 是普通 lambda 不在组合作用域，stringResource 必须在这里先取好
+                    val languageLabels = mapOf(
+                        AppLanguage.SYSTEM to stringResource(R.string.language_follow_system),
+                        AppLanguage.CHINESE to stringResource(R.string.language_chinese),
+                        AppLanguage.ENGLISH to stringResource(R.string.language_english),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SegmentedChips(
+                            options = AppLanguage.entries.toList(),
+                            selected = state.appLanguage,
+                            label = { languageLabels.getValue(it) },
+                            onSelect = { language ->
+                                viewModel.setAppLanguage(language)
+                                if (com.cycling.rssradar.i18n.AppLocales.apply(context, language)) {
+                                    (context as? ComponentActivity)?.recreate()
+                                }
+                            },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
                 // 动态取色（#27）：只换强调色；Android 12 以下禁用并说明原因
                 val dynamicSupported = supportsDynamicColor()
                 SettingSwitchRow(
