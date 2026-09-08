@@ -98,12 +98,21 @@
 
 ### 五、主题
 
-| # | 功能 | ReadYou 依据 |
-|---|------|--------------|
-| 27 | Material You 动态取色（Monet） | `ui/theme/palette/` |
-| 28 | AMOLED 纯黑 | `AmoledDarkThemePreference.kt` |
-| 29 | 自定义主色 | `CustomPrimaryColorPreference.kt` |
-| 30 | Feeds/Flow/Reading 三区独立主题预览 | `ui/page/settings/color/` |
+> 2026-09-08 实施记录（#27 Material You 动态取色）：
+> - **只换强调色四件套**（accent / accentPressed / onAccent / link），表面阶梯与文字层级
+>   仍用自有 `RadarColors`——整盘换成 Monet 会让「RssRadar 长什么样」这件事消失，
+>   且已上线的紫调表面阶梯与新强调色不同源，混着用会脏。
+> - **默认关**：老用户升级不该被视觉突变砸到；要跟随壁纸的人显式开一次。
+> - **低于 Android 12 禁用并给出原因文案**（`supportsDynamicColor()`），不静默失效。
+> - M3 `colorScheme` 与 `RadarColors` 现在由同一份色板映射生成（`darkScheme`/`lightScheme`
+>   以 `RadarColors` 为入参），不会再出现 Local 换色而 M3 组件没换的走偏。
+
+| # | 功能 | ReadYou 依据 | 状态 |
+|---|------|--------------|------|
+| 27 | Material You 动态取色（Monet）——**只换强调色**，表面阶梯不变 | `ui/theme/palette/` | ✅ 2026-09-08 |
+| 28 | AMOLED 纯黑 | `AmoledDarkThemePreference.kt` | ✅ 补标（深色本来就是纯黑 `#000000`） |
+| 29 | 自定义主色 | `CustomPrimaryColorPreference.kt` | — |
+| 30 | Feeds/Flow/Reading 三区独立主题预览 | `ui/page/settings/color/` | — |
 
 ### 六、系统级
 
@@ -130,7 +139,7 @@
 |---|------|--------------|------|
 | 31 | 新文章系统通知（含渠道分组、Feed 级开关） | `infrastructure/android/NotificationHelper.kt` | ✅ 2026-09-01 |
 | 32 | 桌面小部件（文章卡片 + 列表两种，带配置页） | `ui/widget/ArticleCardWidget.kt`、`ArticleListWidget.kt` | — |
-| 33 | 应用内多语言切换 | `ui/page/settings/languages/` | — |
+| 33 | 应用内多语言切换——**阻塞**：全项目仅 2 条 string resource，硬编码中文文案 113 处 `text = "…"`（约 6900 个汉字）。加语言切换前必须先把全站文案资源化，一次几百处的重构，不混在本轮做 | `ui/page/settings/languages/` | ⛔ 阻塞（待文案资源化） |
 | 34 | 系统分享/文本选择 intent 接入（SEND / PROCESS_TEXT；TRANSLATE 主动不做） | `AndroidManifest.xml`（SEND / PROCESS_TEXT / TRANSLATE） | ✅ 2026-09-08 |
 | 35 | 应用内检查更新（只查 latest release，不自动下载安装——装包必须过用户） | `NewVersionNumberPreference.kt`、`domain/service/AppService.kt` | ✅ 2026-09-08 |
 | 36 | 崩溃报告页**已做**（CrashLogScreen + CrashLogRoute）；使用提示/疑难解答页**未做** | `CrashReportActivity`、`ui/page/settings/tips|troubleshooting/` | ⚠️ 部分 |

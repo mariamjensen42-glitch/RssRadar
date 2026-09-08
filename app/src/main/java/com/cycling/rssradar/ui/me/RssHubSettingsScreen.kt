@@ -84,6 +84,8 @@ data class RssHubSettingsUiState(
     val probeMessage: String? = null,
     /** 当前主题模式。 */
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    /** Material You 动态取色（#27）：开则强调色跟随系统壁纸，表面阶梯不变。 */
+    val dynamicColor: Boolean = false,
     /** DeepSeek API Key 输入（issue #44）。 */
     val aiKeyInput: String = "",
     /** 是否已配置 Key（用于状态展示，不回显完整 Key）。 */
@@ -168,6 +170,12 @@ class RssHubSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             themeStore.mode.collect { mode ->
                 _state.value = _state.value.copy(themeMode = mode)
+            }
+        }
+        // 动态取色（#27）
+        viewModelScope.launch {
+            themeStore.dynamicColor.collect { enabled ->
+                _state.value = _state.value.copy(dynamicColor = enabled)
             }
         }
         // 列表显示项跟随 ListDisplayStore 的 flow（issue #56）
@@ -276,6 +284,11 @@ class RssHubSettingsViewModel @Inject constructor(
 
     fun setThemeMode(mode: ThemeMode) {
         themeStore.setMode(mode)
+    }
+
+    /** Material You 动态取色（#27）。 */
+    fun setDynamicColor(enabled: Boolean) {
+        themeStore.setDynamicColor(enabled)
     }
 
     /** 归档保留档位（issue #57）。 */

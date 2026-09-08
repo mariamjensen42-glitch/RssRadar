@@ -50,6 +50,14 @@ _Avoid_: 沉浸模式、全屏阅读、无干扰模式
 大量源的 content 就是 summary 本身，此时给开关等于给一个点了没反应的按钮。
 _Avoid_: 全文/摘要偏好、仅看摘要、全局摘要开关
 
+**动态取色（Dynamic color）**:
+Material You（Monet）取色。本项目只换**强调色四件套**（accent / accentPressed / onAccent / link），
+表面阶梯与文字层级仍用自有 `RadarColors`——整套跟随壁纸会让产品视觉身份消失，
+且既有的紫调表面阶梯与系统给的新强调色不同源，混着用会脏。由 `RssRadarTheme` 一次性
+算出 `RadarColors` 再映射成 M3 `colorScheme`，两边不会走偏。Android 12 以下无系统色板，
+开关禁用并给出原因文案。默认关（升级不该被视觉突变砸到）。
+_Avoid_: 主题色（也可指自定义主色）、Monet 主题、跟随系统主题（与「跟随系统深浅色」不是一回事）
+
 **外部入口（External entry）**:
 从别的 App 进入 RssRadar 的通道：系统分享（ACTION_SEND）与选中文字菜单（ACTION_PROCESS_TEXT）。
 一律只认链接——挑出第一个 http(s) 地址，直接开加订阅抽屉并预填；挑不出就明说挑不出，

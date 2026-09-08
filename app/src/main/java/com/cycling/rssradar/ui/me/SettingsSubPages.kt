@@ -61,6 +61,7 @@ import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Eye
 import com.composables.icons.lucide.Lucide
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.theme.supportsDynamicColor
 
 /**
  * 设置二级页（原「我的」长页拆分）：通用 / 同步与清理 / RSSHub / AI 与诊断。
@@ -131,23 +132,43 @@ private fun SectionHeader(title: String, description: String? = null) {
     }
 }
 
+/**
+ * 开关行。[subtitle] 为说明文案；[enabled] 为 false 时整行置灰——
+ * UI 铁律：禁用必须配解释文案，所以两者成对出现，别只传 enabled。
+ */
 @Composable
-internal fun SettingSwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SettingSwitchRow(
+    label: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
+    subtitle: String? = null,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = label,
-            color = radarColors().textPrimary,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                color = if (enabled) radarColors().textPrimary else radarColors().textTertiary,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    color = radarColors().textTertiary,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
         Switch(
             checked = checked,
             onCheckedChange = onChange,
+            enabled = enabled,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = radarColors().onAccent,
                 checkedTrackColor = radarColors().accent,
@@ -299,6 +320,20 @@ fun SettingsGeneralScreen(
                         )
                     }
                 }
+                Spacer(Modifier.height(6.dp))
+                // 动态取色（#27）：只换强调色；Android 12 以下禁用并说明原因
+                val dynamicSupported = supportsDynamicColor()
+                SettingSwitchRow(
+                    label = "动态取色",
+                    checked = state.dynamicColor,
+                    onChange = { viewModel.setDynamicColor(it) },
+                    enabled = dynamicSupported,
+                    subtitle = if (dynamicSupported) {
+                        "强调色跟随系统壁纸，卡片与背景仍用 RssRadar 原配色。"
+                    } else {
+                        "系统动态取色需要 Android 12 及以上，当前设备不支持。"
+                    },
+                )
             }
         }
 
