@@ -1,5 +1,9 @@
 package com.cycling.rssradar.ui.article
 
+import androidx.compose.ui.res.stringResource
+
+import com.cycling.rssradar.R
+
 import android.content.ContentValues
 import android.content.Intent
 import android.graphics.Bitmap
@@ -135,7 +139,7 @@ fun ReaderImagePage(
                         contentColor = Color.White,
                     ),
                 ) {
-                    Icon(Lucide.X, contentDescription = "关闭")
+                    Icon(Lucide.X, contentDescription = stringResource(R.string.close))
                 }
                 Spacer(Modifier.weight(1f))
                 // 保存 / 分享（UI 审计 D3）：查看器只有关闭和页码时用户无法把图带走
@@ -182,7 +186,7 @@ fun ReaderImagePage(
                         savedUrl = url
                         Toast.makeText(
                             context,
-                            if (uri != null) "已保存到 图片/RssRadar" else "保存失败：图片下载或写入失败",
+                            if (uri != null) context.getString(R.string.saved_to_pictures) else context.getString(R.string.save_failed),
                             Toast.LENGTH_SHORT,
                         ).show()
                     }
@@ -198,7 +202,7 @@ fun ReaderImagePage(
                         }
                         busy = false
                         if (uri == null) {
-                            Toast.makeText(context, "分享失败：图片下载或写入失败", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.share_failed), Toast.LENGTH_SHORT).show()
                             return@launch
                         }
                         val send = Intent(Intent.ACTION_SEND).apply {
@@ -206,7 +210,7 @@ fun ReaderImagePage(
                             putExtra(Intent.EXTRA_STREAM, uri)
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
-                        context.startActivity(Intent.createChooser(send, "分享图片"))
+                        context.startActivity(Intent.createChooser(send, context.getString(R.string.share_image)))
                     }
                 }
 
@@ -222,7 +226,7 @@ fun ReaderImagePage(
                     if (busy) {
                         CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.padding(6.dp))
                     } else {
-                        Icon(Lucide.Download, contentDescription = "保存图片")
+                        Icon(Lucide.Download, contentDescription = stringResource(R.string.save_image))
                     }
                 }
                 IconButton(
@@ -233,7 +237,7 @@ fun ReaderImagePage(
                         contentColor = Color.White,
                     ),
                 ) {
-                    Icon(Lucide.Share2, contentDescription = "分享图片")
+                    Icon(Lucide.Share2, contentDescription = stringResource(R.string.share_image))
                 }
                 if (count > 1) {
                     Text(

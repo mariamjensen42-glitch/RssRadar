@@ -1,5 +1,9 @@
 package com.cycling.rssradar.ui.article
 
+import androidx.compose.ui.res.stringResource
+
+import com.cycling.rssradar.R
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -443,7 +447,7 @@ private fun RenderNode(
                             text = node.summaryRuns
                                 ?.let { runsToAnnotated(it, style) }
                                 ?.takeIf { it.text.isNotBlank() }
-                                ?: AnnotatedString("详情"),
+                                ?: AnnotatedString(stringResource(R.string.details)),
                             color = radarColors().textPrimary,
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyLarge.copy(

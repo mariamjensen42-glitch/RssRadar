@@ -56,7 +56,7 @@ sealed interface ContentFetchState {
     data class Incomplete(val issue: ExtractionIssue?) : ContentFetchState
 
     /** 没抓到：reason 是给读者看的中文原因（不是日志里的枚举名）。 */
-    data class Failed(val reason: String) : ContentFetchState
+    data class Failed(val reason: FetchFailReason) : ContentFetchState
 }
 
 /** 文章详情事件（候选 A，ADR-0003）。load 为生命周期，留 init，不进 Intent。 */
@@ -483,16 +483,16 @@ class ArticleDetailViewModel @Inject constructor(
     private fun OnDemandResult.toState(): ContentFetchState = when (this) {
         is OnDemandResult.AlreadyUsable -> ContentFetchState.Ready
         is OnDemandResult.FeedDisabled ->
-            ContentFetchState.Failed("该订阅源关闭了正文抓取，只显示订阅源自带内容")
+            ContentFetchState.Failed(FetchFailReason.FeedDisabled)
 
-        is OnDemandResult.Missing -> ContentFetchState.Failed("文章不存在或已被清理")
+        is OnDemandResult.Missing -> ContentFetchState.Failed(FetchFailReason.ArticleMissing)
         is OnDemandResult.Fetched ->
             if (incomplete) ContentFetchState.Incomplete(issue) else ContentFetchState.Ready
 
         is OnDemandResult.ShorterThanExisting ->
-            ContentFetchState.Failed("抓到的正文比现有内容还短（$got 字 < $existing 字），未覆盖")
+            ContentFetchState.Failed(FetchFailReason.ShorterThanExisting(got, existing))
 
-        is OnDemandResult.Failed -> ContentFetchState.Failed(kind.label)
+        is OnDemandResult.Failed -> ContentFetchState.Failed(FetchFailReason.FromFailure(kind))
     }
 
     /** 重新抓取正文（读者点重试）。正在抓取、或这篇已有正文时无动作。 */
@@ -617,3 +617,14 @@ class ArticleDetailViewModel @Inject constructor(
         }
     }
 }
+
+/** 抓取失败的结构化原因：VM 不产文案，翻译在 UI 层（ADR-0017 §3）。 */
+sealed interface FetchFailReason {
+    data class FromFailure(val failure: FetchFailure) : FetchFailReason
+    data object FeedDisabled : FetchFailReason
+    data object ArticleMissing : FetchFailReason
+    data class ShorterThanExisting(val got: Int, val existing: Int) : FetchFailReason
+}
+
+/** 抓取失败的结构化原因：VM 不产文案，翻译在 UI 层（ADR-0017 §3）。 */
+

@@ -1,5 +1,11 @@
 package com.cycling.rssradar.ui.article
 
+import com.cycling.rssradar.core.data.parser.FetchFailure
+
+import androidx.compose.ui.res.stringResource
+
+import com.cycling.rssradar.R
+
 import android.text.format.DateUtils
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
@@ -407,7 +413,7 @@ private fun ArticleHeader(
             Text("·", color = radarColors().textTertiary)
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "阅读约 $minutes 分钟",
+                text = stringResource(R.string.article_reading_time, minutes),
                 color = radarColors().textTertiary,
                 style = MaterialTheme.typography.labelMedium,
             )
@@ -482,10 +488,18 @@ private fun FetchStateBanner(
 
 @Composable
 private fun FetchFailedBanner(
-    reason: String,
+    reason: FetchFailReason,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val message = when (reason) {
+        is FetchFailReason.FromFailure ->
+            stringResource(R.string.article_fetch_failed, stringResource(reason.failure.uiRes()))
+        FetchFailReason.FeedDisabled -> stringResource(R.string.article_fetch_feed_disabled)
+        FetchFailReason.ArticleMissing -> stringResource(R.string.article_not_found)
+        is FetchFailReason.ShorterThanExisting ->
+            stringResource(R.string.article_fetch_shorter, reason.got, reason.existing)
+    }
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = radarColors().surface2,
@@ -503,14 +517,14 @@ private fun FetchFailedBanner(
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                text = "没能取到正文：$reason",
+                text = message,
                 color = radarColors().textTertiary,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = onRetry) {
                 Text(
-                    text = "重试",
+                    text = stringResource(R.string.retry),
                     style = MaterialTheme.typography.labelMedium,
                     color = radarColors().accent,
                 )
@@ -545,14 +559,14 @@ private fun SummaryModeBanner(
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                text = "当前显示订阅源摘要，不是全文",
+                text = stringResource(R.string.summary_banner),
                 color = radarColors().textTertiary,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = onShowFull) {
                 Text(
-                    text = "看正文",
+                    text = stringResource(R.string.see_full),
                     style = MaterialTheme.typography.labelMedium,
                     color = radarColors().accent,
                 )
@@ -572,6 +586,11 @@ private fun IncompleteContentBanner(
         color = radarColors().surface2,
         modifier = modifier.fillMaxWidth(),
     ) {
+        // issue 的枚举先在组合作用域翻成当前语言，再喂给带占位符的资源
+        val issueText = when (val i = issue) {
+            null -> stringResource(R.string.issue_site_limit)
+            else -> stringResource(i.uiRes())
+        }
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -584,7 +603,7 @@ private fun IncompleteContentBanner(
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                text = "正文可能不完整（${issue?.label ?: "站点限制或动态加载"}），可查看原文",
+                text = stringResource(R.string.article_incomplete, issueText),
                 color = radarColors().textTertiary,
                 style = MaterialTheme.typography.labelMedium,
             )
@@ -600,7 +619,7 @@ private fun NoContentBody(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.padding(horizontal = 20.dp)) {
-        BodyParagraph(text = summary ?: "本文没有可显示的正文，可查看原文。")
+        BodyParagraph(text = summary ?: stringResource(R.string.body_empty))
         if (isFetchingContent) {
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -611,7 +630,7 @@ private fun NoContentBody(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "正在获取全文…",
+                    text = stringResource(R.string.fetching_full),
                     color = radarColors().textTertiary,
                     style = MaterialTheme.typography.labelMedium,
                 )
@@ -650,7 +669,7 @@ private fun AiSummaryCard(
                 Icon(Lucide.Sparkles, contentDescription = null, tint = radarColors().accent, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = "AI 摘要",
+                    text = stringResource(R.string.ai_summary),
                     color = radarColors().textPrimary,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
@@ -663,14 +682,14 @@ private fun AiSummaryCard(
             when {
                 state is AiSummaryState.Generating -> {
                     Spacer(Modifier.height(8.dp))
-                    Text("正在生成摘要…", color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.generating_summary), color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
                 }
                 state is AiSummaryState.Failed -> {
                     Spacer(Modifier.height(8.dp))
                     Text(state.message, color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(6.dp))
                     TextButton(onClick = onGenerate) {
-                        Text(if (summary == null) "重试" else "重新生成", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                        Text(if (summary == null) stringResource(R.string.retry) else stringResource(R.string.regenerate), color = radarColors().accent, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 summary != null -> {
@@ -691,7 +710,7 @@ private fun AiSummaryCard(
                             modifier = Modifier.padding(top = 2.dp),
                         ) {
                             Text(
-                                text = if (expanded) "收起" else "展开全文",
+                                text = if (expanded) stringResource(R.string.collapse) else stringResource(R.string.expand_full),
                                 color = radarColors().accent,
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.SemiBold,
@@ -702,7 +721,7 @@ private fun AiSummaryCard(
                 else -> {
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = onGenerate) {
-                        Text("生成摘要", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.ai_gen_summary), color = radarColors().accent, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -734,9 +753,9 @@ private fun TranslationBanner(
         Spacer(Modifier.width(6.dp))
         Text(
             text = if (progressing) {
-                "翻译中 ${(state as TranslationState.Progressing).doneCount}/${state.total} 段"
+                stringResource(R.string.article_translating_progress, (state as TranslationState.Progressing).doneCount, state.total)
             } else {
-                "AI 译文（DeepSeek）"
+                stringResource(R.string.ai_translation_deepseek)
             },
             color = radarColors().textTertiary,
             style = MaterialTheme.typography.labelMedium,
@@ -760,7 +779,7 @@ private fun TranslationBanner(
                 contentPadding = PaddingValues(horizontal = 8.dp),
             ) {
                 Text(
-                    text = if (display.viewMode == TranslationViewMode.TRANSLATION_ONLY) "双语" else "纯译文",
+                    text = if (display.viewMode == TranslationViewMode.TRANSLATION_ONLY) stringResource(R.string.bilingual) else stringResource(R.string.translation_only),
                     color = radarColors().accent,
                     style = MaterialTheme.typography.labelMedium,
                 )
@@ -781,18 +800,18 @@ private fun TranslationBanner(
                     contentPadding = PaddingValues(horizontal = 8.dp),
                 ) {
                     Text(
-                        text = if (display.bilingualLayout == BilingualLayout.STACKED) "左右" else "上下",
+                        text = if (display.bilingualLayout == BilingualLayout.STACKED) stringResource(R.string.side_by_side) else stringResource(R.string.stacked),
                         color = radarColors().accent,
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
             }
             TextButton(onClick = onRetranslate, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                Text("重新翻译", color = radarColors().accent, style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.retranslate), color = radarColors().accent, style = MaterialTheme.typography.labelMedium)
             }
         }
         TextButton(onClick = onShowOriginal, contentPadding = PaddingValues(horizontal = 8.dp)) {
-            Text("切回原文", color = radarColors().textSecondary, style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.ai_back_to_original), color = radarColors().textSecondary, style = MaterialTheme.typography.labelMedium)
         }
     }
 }
@@ -818,5 +837,34 @@ private fun BodyParagraph(text: String) {
     )
 }
 
+@Composable
 private fun formatDate(ts: Long?): String =
-    ts?.let { DateUtils.getRelativeTimeSpanString(it).toString() } ?: "未知时间"
+    ts?.let { DateUtils.getRelativeTimeSpanString(it).toString() } ?: stringResource(R.string.unknown_time)
+
+/** ADR-0017：枚举只给身份，人话由 UI 层按当前语言翻译。 */
+@Composable
+private fun FetchFailure.uiRes(): Int = when (this) {
+    FetchFailure.INVALID_URL -> R.string.fetch_invalid_url
+    FetchFailure.TIMEOUT -> R.string.fetch_timeout
+    FetchFailure.NETWORK -> R.string.fetch_network
+    FetchFailure.HTTP_401 -> R.string.fetch_http_401
+    FetchFailure.HTTP_403 -> R.string.fetch_http_403
+    FetchFailure.HTTP_404 -> R.string.fetch_http_404
+    FetchFailure.HTTP_429 -> R.string.fetch_http_429
+    FetchFailure.HTTP_5XX -> R.string.fetch_http_5xx
+    FetchFailure.HTTP_OTHER -> R.string.fetch_http_other
+    FetchFailure.EMPTY_BODY -> R.string.fetch_empty_body
+    FetchFailure.DECODE_ERROR -> R.string.fetch_decode_error
+    FetchFailure.EXTRACT_FAILED -> R.string.fetch_extract_failed
+}
+
+@Composable
+private fun ExtractionIssue.uiRes(): Int = when (this) {
+    ExtractionIssue.NONE -> R.string.issue_site_limit
+    ExtractionIssue.TOO_SHORT -> R.string.issue_too_short
+    ExtractionIssue.NO_PARAGRAPH -> R.string.issue_no_paragraph
+    ExtractionIssue.DYNAMIC_RENDER -> R.string.issue_dynamic_render
+    ExtractionIssue.PAYWALL -> R.string.issue_paywall
+    ExtractionIssue.METADATA_MISSING -> R.string.issue_metadata_missing
+}
+
