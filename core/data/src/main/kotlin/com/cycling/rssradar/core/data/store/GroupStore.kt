@@ -5,6 +5,7 @@ import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.core.model.GROUP_TECH
 import com.cycling.rssradar.core.model.GROUP_DEV
 import com.cycling.rssradar.core.model.GROUP_DESIGN
+import androidx.core.content.edit
 
 
 /**
@@ -20,9 +21,14 @@ class GroupStore(private val prefs: SharedPreferences) {
     init {
         // 首次运行：写入默认分组，保证注册表非空、UI 总有分组可显示
         if (!prefs.contains(KEY_GROUPS)) {
-            prefs.edit()
-                .putString(KEY_GROUPS, listOf(DEFAULT_GROUP, GROUP_TECH, GROUP_DEV, GROUP_DESIGN).joinToString(GROUP_SEPARATOR))
-                .apply()
+            prefs.edit {
+                putString(
+                    KEY_GROUPS,
+                    listOf(DEFAULT_GROUP, GROUP_TECH, GROUP_DEV, GROUP_DESIGN).joinToString(
+                        GROUP_SEPARATOR
+                    )
+                )
+            }
         }
     }
 
@@ -33,7 +39,7 @@ class GroupStore(private val prefs: SharedPreferences) {
         val clean = name.trim()
         if (clean.isBlank() || getGroups().contains(clean)) return false
         val next = (getGroups() + clean).distinct()
-        prefs.edit().putString(KEY_GROUPS, next.joinToString(GROUP_SEPARATOR)).apply()
+        prefs.edit { putString(KEY_GROUPS, next.joinToString(GROUP_SEPARATOR)) }
         return true
     }
 
@@ -41,13 +47,13 @@ class GroupStore(private val prefs: SharedPreferences) {
         val clean = new.trim()
         if (clean.isBlank() || getGroups().contains(clean)) return false
         val next = getGroups().map { if (it == old) clean else it }
-        prefs.edit().putString(KEY_GROUPS, next.joinToString(GROUP_SEPARATOR)).apply()
+        prefs.edit { putString(KEY_GROUPS, next.joinToString(GROUP_SEPARATOR)) }
         return true
     }
 
     fun removeGroup(name: String) {
         val next = getGroups().filterNot { it == name }
-        prefs.edit().putString(KEY_GROUPS, next.joinToString(GROUP_SEPARATOR)).apply()
+        prefs.edit { putString(KEY_GROUPS, next.joinToString(GROUP_SEPARATOR)) }
     }
 
     companion object {

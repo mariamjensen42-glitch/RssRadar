@@ -294,6 +294,20 @@ _Avoid_: 事件、SideEffect
 驱动界面渲染的不可变快照。当前仅 AddSubscription / Search 已聚合为单一 `UiState`；其余 VM 仍是碎片 `StateFlow`，由候选 C 统一。
 _Avoid_: state、视图状态
 
+## Performance
+
+**重组（Recomposition）**:
+因状态变化而重新执行可组合函数的过程。重组范围由参数稳定性与 `key` 决定，是帧时间的主要来源之一。体检结论与逐条现状见 `docs/perf/compose-performance.md`。
+_Avoid_: 重绘（那是绘制阶段的事）、刷新、recompose（口语可用，正式写作不混用）
+
+**掉帧（Jank）**:
+单帧耗时超过 16.6 ms，用户感知为「卡顿」。本项目以 `dumpsys gfxinfo` 的 Janky frames 百分比为准，合格线 5%。
+_Avoid_: 卡顿（口语可用）、延迟、慢
+
+**基线配置（Baseline profile）**:
+预先编译关键代码路径的配置文件，用于降低首次运行的 JIT 开销。**本项目未采用**——生成它必须跑 Gradle 与插桩设备，与「开发机禁跑 gradle」的约束冲突。
+_Avoid_: baseline profile 以外的写法、启动优化（BP 只是启动优化的一种手段）
+
 ## Recommendation
 
 **推荐流（Recommendations feed）**:
