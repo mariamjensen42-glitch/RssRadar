@@ -236,4 +236,28 @@ class ArticleExtractorTest {
         assertEquals(null, ArticleExtractor.parseDateTime(""))
         assertEquals(null, ArticleExtractor.parseDateTime("不是日期"))
     }
+
+    // ———————————————————————————————————————————————
+    // 重复标题行（ADR-0015，ReadYou 同款）
+    // ———————————————————————————————————————————————
+
+    @Test
+    fun `drops heading that duplicates the article title only`() {
+        val html = "<h1>真实标题</h1><p>正文第一段</p><h2>小标题</h2><p>正文第二段</p>"
+
+        val out = ArticleExtractor.dropDuplicateTitle(html, "真实标题")
+
+        assertFalse(out.contains(">真实标题<"))
+        assertTrue(out.contains("小标题")) // 同名之外的小标题一律保留
+        assertTrue(out.contains("正文第一段"))
+    }
+
+    @Test
+    fun `keeps content untouched when no heading matches`() {
+        val html = "<h1>另一个标题</h1><p>正文</p>"
+
+        assertEquals(html, ArticleExtractor.dropDuplicateTitle(html, "真实标题"))
+        assertEquals(html, ArticleExtractor.dropDuplicateTitle(html, null))
+        assertEquals("", ArticleExtractor.dropDuplicateTitle("", "真实标题"))
+    }
 }

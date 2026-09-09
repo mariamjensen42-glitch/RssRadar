@@ -1,5 +1,12 @@
 package com.cycling.rssradar.ui.me
 
+import androidx.compose.ui.res.stringResource
+import com.cycling.rssradar.R
+import com.cycling.rssradar.i18n.descriptionRes
+import com.cycling.rssradar.i18n.presentationRes
+import com.cycling.rssradar.i18n.entryRes
+import com.cycling.rssradar.i18n.summaryRes
+import com.cycling.rssradar.i18n.labelRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -52,6 +60,7 @@ import com.cycling.rssradar.core.data.ai.AiTrigger
 import com.cycling.rssradar.core.data.store.AiBudgetState
 import com.cycling.rssradar.core.data.store.AiFeatureSettings
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
+import com.cycling.rssradar.i18n.resolve
 import com.cycling.rssradar.core.ui.theme.radarColors
 
 
@@ -80,11 +89,12 @@ fun AiFeaturesScreen(
     onOpenArtifacts: (Int?) -> Unit = { _ -> },
 ) {
     val state by viewModel.state.collectAsState()
+    val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(state.message) {
         val message = state.message ?: return@LaunchedEffect
-        snackbar.showSnackbar(message)
+        snackbar.showSnackbar(message.resolve(context))
         viewModel.onIntent(AiFeaturesIntent.ConsumeMessage)
     }
 
@@ -102,12 +112,12 @@ fun AiFeaturesScreen(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Lucide.ArrowLeft,
-                        contentDescription = "返回",
+                        contentDescription = stringResource(R.string.back),
                         tint = radarColors().textPrimary,
                     )
                 }
                 Text(
-                    text = "AI 智能功能",
+                    text = stringResource(R.string.ai_features_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = radarColors().textPrimary,
                     fontWeight = FontWeight.SemiBold,
@@ -131,7 +141,7 @@ fun AiFeaturesScreen(
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text = "查看结果",
+                            text = stringResource(R.string.view_results),
                             style = MaterialTheme.typography.bodySmall,
                             color = radarColors().onAccent,
                             fontWeight = FontWeight.SemiBold,
@@ -181,10 +191,10 @@ fun AiFeaturesScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     TextButton(onClick = { viewModel.onIntent(AiFeaturesIntent.ResetDefaults) }) {
-                        Text("恢复默认", color = radarColors().textSecondary)
+                        Text(stringResource(R.string.restore_defaults), color = radarColors().textSecondary)
                     }
                     TextButton(onClick = { viewModel.onIntent(AiFeaturesIntent.DisableAllPaid) }) {
-                        Text("全部关闭（省钱）", color = radarColors().textSecondary)
+                        Text(stringResource(R.string.disable_all_paid), color = radarColors().textSecondary)
                     }
                 }
             }
@@ -212,7 +222,7 @@ private fun UsageCard(budget: AiBudgetState) {
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "用量",
+                    stringResource(R.string.usage_title),
                     style = MaterialTheme.typography.titleSmall,
                     color = colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
@@ -220,8 +230,8 @@ private fun UsageCard(budget: AiBudgetState) {
             }
             Spacer(Modifier.height(12.dp))
 
-            val limitText = if (budget.dailyLimit <= 0) "不限" else budget.dailyLimit.toString()
-            UsageRow("今日调用", "${budget.usedToday} / $limitText")
+            val limitText = if (budget.dailyLimit <= 0) stringResource(R.string.unlimited) else budget.dailyLimit.toString()
+            UsageRow(stringResource(R.string.calls_today), "${budget.usedToday} / $limitText")
             if (budget.dailyLimit > 0) {
                 Spacer(Modifier.height(8.dp))
                 Box(
@@ -241,13 +251,13 @@ private fun UsageCard(budget: AiBudgetState) {
                 // 空进度条状态不明（UI 审计 M4）：0 时直接说明
                 if (budget.usedToday == 0) {
                     Spacer(Modifier.height(6.dp))
-                    Text("今日未使用", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
+                    Text(stringResource(R.string.not_used_today), style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
                 }
             }
             Spacer(Modifier.height(10.dp))
-            UsageRow("今日输入 / 输出", "${formatCount(budget.inputCharsToday)} / ${formatCount(budget.outputCharsToday)} 字")
-            UsageRow("累计调用", "${formatCount(budget.totalCalls)} 次")
-            UsageRow("累计失败", "${formatCount(budget.totalFailed)} 次")
+            UsageRow(stringResource(R.string.io_today), stringResource(R.string.io_today_chars, formatCount(budget.inputCharsToday), formatCount(budget.outputCharsToday)))
+            UsageRow(stringResource(R.string.calls_total), stringResource(R.string.calls_suffix, formatCount(budget.totalCalls)))
+            UsageRow(stringResource(R.string.failed_total), stringResource(R.string.calls_suffix, formatCount(budget.totalFailed)))
         }
     }
 }
@@ -268,6 +278,13 @@ private fun formatCount(value: Long): String = when {
     else -> value.toString()
 }
 
+/** 英文语境的计数缩写（K/M），与中文 万/亿 口径一致。 */
+private fun formatCountEn(value: Long): String = when {
+    value >= 1_000_000 -> String.format("%.1fM", value / 1_000_000.0)
+    value >= 10_000 -> String.format("%.1fK", value / 1_000.0)
+    else -> value.toString()
+}
+
 // ── 预算设置 ────────────────────────────────────────────────────────────────
 
 @Composable
@@ -279,29 +296,30 @@ private fun BudgetSection(
     Surface(shape = RoundedCornerShape(14.dp), color = colors.surface1) {
         Column(Modifier.padding(16.dp)) {
             Text(
-                "限流与预算",
+                stringResource(R.string.budget_section),
                 style = MaterialTheme.typography.titleSmall,
                 color = colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "上限到顶后当天不再发起请求，任务留在队列里等第二天。",
+                stringResource(R.string.budget_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.textTertiary,
             )
             Spacer(Modifier.height(12.dp))
 
+            val unlimitedLabel = stringResource(R.string.unlimited)
             ChipChoiceRow(
-                label = "每日上限",
+                label = stringResource(R.string.daily_limit),
                 options = listOf(0, 50, 100, 200, 500),
                 selected = budget.dailyLimit,
-                labelOf = { if (it == 0) "不限" else it.toString() },
+                labelOf = { if (it == 0) unlimitedLabel else it.toString() },
                 onSelect = { viewModel.onIntent(AiFeaturesIntent.SetDailyLimit(it)) },
             )
             Spacer(Modifier.height(10.dp))
             ChipChoiceRow(
-                label = "并发数",
+                label = stringResource(R.string.concurrency),
                 options = listOf(1, 2, 3, 4),
                 selected = budget.concurrentLimit,
                 labelOf = { it.toString() },
@@ -309,10 +327,10 @@ private fun BudgetSection(
             )
             Spacer(Modifier.height(10.dp))
             ChipChoiceRow(
-                label = "请求间隔",
+                label = stringResource(R.string.min_interval),
                 options = listOf(0L, 500L, 1_200L, 3_000L),
                 selected = budget.minIntervalMs,
-                labelOf = { if (it == 0L) "不限" else "${it}ms" },
+                labelOf = { if (it == 0L) unlimitedLabel else "${it}ms" },
                 onSelect = { viewModel.onIntent(AiFeaturesIntent.SetMinInterval(it)) },
             )
         }
@@ -365,17 +383,17 @@ private fun QueueSection(
     Surface(shape = RoundedCornerShape(14.dp), color = colors.surface1) {
         Column(Modifier.padding(16.dp)) {
             Text(
-                "任务队列",
+                stringResource(R.string.queue_title),
                 style = MaterialTheme.typography.titleSmall,
                 color = colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth()) {
-                QueueStat("待执行", queue.pending, colors.textPrimary)
-                QueueStat("进行中", queue.running, colors.accent)
-                QueueStat("已完成", queue.done, colors.textTertiary)
-                QueueStat("失败", queue.failed, colors.textTertiary)
+                QueueStat(stringResource(R.string.status_pending), queue.pending, colors.textPrimary)
+                QueueStat(stringResource(R.string.status_running), queue.running, colors.accent)
+                QueueStat(stringResource(R.string.status_done), queue.done, colors.textTertiary)
+                QueueStat(stringResource(R.string.status_failed), queue.failed, colors.textTertiary)
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -383,13 +401,13 @@ private fun QueueSection(
                     enabled = !running,
                     onClick = { viewModel.onIntent(AiFeaturesIntent.RunNow) },
                 ) {
-                    Text(if (running) "执行中…" else "立即执行", color = colors.accent)
+                    Text(if (running) stringResource(R.string.running_now) else stringResource(R.string.run_now), color = colors.accent)
                 }
                 TextButton(onClick = { viewModel.onIntent(AiFeaturesIntent.RetryFailed) }) {
-                    Text("重试失败", color = colors.textSecondary)
+                    Text(stringResource(R.string.retry_failed), color = colors.textSecondary)
                 }
                 TextButton(onClick = { confirmClearPending = true }) {
-                    Text("清空待执行", color = colors.textSecondary)
+                    Text(stringResource(R.string.clear_pending), color = colors.textSecondary)
                 }
             }
         }
@@ -400,19 +418,19 @@ private fun QueueSection(
             containerColor = colors.surface1,
             titleContentColor = colors.textPrimary,
             textContentColor = colors.textSecondary,
-            title = { Text("清空待执行", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
-            text = { Text("将丢弃队列中 ${queue.pending} 个待执行任务，此操作不可撤销。") },
+            title = { Text(stringResource(R.string.clear_pending), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
+            text = { Text(stringResource(R.string.clear_pending_warning, queue.pending)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmClearPending = false
                     viewModel.onIntent(AiFeaturesIntent.ClearPending)
                 }) {
-                    Text("清空", color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.clear), color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { confirmClearPending = false }) {
-                    Text("取消", color = colors.textTertiary)
+                    Text(stringResource(R.string.cancel), color = colors.textTertiary)
                 }
             },
         )
@@ -450,13 +468,13 @@ private fun CategoryHeader(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = "${category.label}  $enabledCount/${all.size}",
+                    text = "${stringResource(category.labelRes())}  $enabledCount/${all.size}",
                     style = MaterialTheme.typography.titleSmall,
                     color = colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = category.description,
+                    text = stringResource(category.descriptionRes()),
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.textTertiary,
                 )
@@ -469,7 +487,7 @@ private fun CategoryHeader(
                 }
             }) {
                 Text(
-                    text = if (settings.allIn(category)) "全部关闭" else "全部开启",
+                    text = if (settings.allIn(category)) stringResource(R.string.all_off) else stringResource(R.string.all_on),
                     color = colors.accent,
                 )
             }
@@ -481,19 +499,19 @@ private fun CategoryHeader(
             containerColor = colors.surface1,
             titleContentColor = colors.textPrimary,
             textContentColor = colors.textSecondary,
-            title = { Text("全部开启「${category.label}」", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
-            text = { Text("将开启 ${all.size} 项功能，可能产生 API 调用费用。") },
+            title = { Text(stringResource(R.string.enable_all_category, stringResource(category.labelRes())), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
+            text = { Text(stringResource(R.string.enable_all_warning, all.size)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmEnableAll = false
                     onSetAll(true)
                 }) {
-                    Text("开启", color = colors.accent, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.enable), color = colors.accent, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { confirmEnableAll = false }) {
-                    Text("取消", color = colors.textTertiary)
+                    Text(stringResource(R.string.cancel), color = colors.textTertiary)
                 }
             },
         )
@@ -521,14 +539,14 @@ private fun FeatureRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = feature.label,
+                        text = stringResource(feature.labelRes()),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.textPrimary,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        text = feature.summary,
+                        text = stringResource(feature.summaryRes()),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.textSecondary,
                     )
@@ -546,9 +564,9 @@ private fun FeatureRow(
 
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                TagChip(text = feature.trigger.label, tint = colors.accent)
+                TagChip(text = stringResource(feature.trigger.labelRes()), tint = colors.accent)
                 TagChip(
-                    text = if (feature.needsLlm) "调用模型" else "本地",
+                    text = if (feature.needsLlm) stringResource(R.string.needs_llm) else stringResource(R.string.local),
                     tint = if (feature.needsLlm) colors.textTertiary else colors.textSecondary,
                 )
             }
@@ -562,9 +580,9 @@ private fun FeatureRow(
                         .background(colors.surface2),
                 )
                 Spacer(Modifier.height(10.dp))
-                DetailLine("触发方式", feature.trigger.description)
-                DetailLine("交互入口", feature.entry)
-                DetailLine("结果展示", feature.presentation)
+                DetailLine(stringResource(R.string.trigger_label), stringResource(feature.trigger.descriptionRes()))
+                DetailLine(stringResource(R.string.entry_label), stringResource(feature.entryRes()))
+                DetailLine(stringResource(R.string.presentation_label), stringResource(feature.presentationRes()))
 
                 // 通用操作行：会落产物的功能给「查看结果」（产物中心预选本功能）；
                 // 批处理功能再给「立即运行」——不等每日任务，当场把结果跑出来。
@@ -580,7 +598,7 @@ private fun FeatureRow(
                                 onClick = onRun,
                             ) {
                                 Text(
-                                    if (running) "执行中…" else "立即运行",
+                                    if (running) stringResource(R.string.running_now) else stringResource(R.string.run_now),
                                     color = if (running) colors.textTertiary else colors.accent,
                                     fontWeight = FontWeight.SemiBold,
                                 )
@@ -588,7 +606,7 @@ private fun FeatureRow(
                         }
                         if (hasResults) {
                             TextButton(onClick = onOpenResults) {
-                                Text("查看结果", color = colors.textSecondary)
+                                Text(stringResource(R.string.view_results), color = colors.textSecondary)
                             }
                         }
                     }

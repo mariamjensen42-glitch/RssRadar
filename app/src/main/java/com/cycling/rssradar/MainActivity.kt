@@ -1,7 +1,9 @@
 package com.cycling.rssradar
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,7 +40,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.cycling.rssradar.ui.addsubscription.AddSubscriptionSheet
+import com.cycling.rssradar.ui.addsubscription.AddSubscriptionIntent
 import com.cycling.rssradar.ui.addsubscription.AddSubscriptionViewModel
+import com.cycling.rssradar.ui.intent.SharedText
+import com.cycling.rssradar.ui.intent.sharedText
 import com.cycling.rssradar.ui.me.AiArtifactsScreen
 import com.cycling.rssradar.ui.me.AiFeaturesScreen
 import com.cycling.rssradar.ui.me.AiFeaturesViewModel
@@ -97,27 +103,81 @@ import com.cycling.rssradar.core.ui.theme.radarColors
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    /**
+     * 外部送进来的链接（系统分享 / 选中文字，#34）。Compose 状态放在 Activity：
+     * 已在后台时系统走 [onNewIntent] 而不是重建，只有状态驱动才能让已在前台的
+     * Compose 树收到它——写进 savedInstanceState 的话用户在界面上看不到任何反应。
+     */
+    private var sharedUrl by mutableStateOf<String?>(null)
+
+    /** 界面语言覆盖（ADR-0017）：API 31/32 无系统 per-app locale，attach 时手动包一层。 */
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(
+            com.cycling.rssradar.i18n.AppLocales.wrapContext(
+                newBase,
+                com.cycling.rssradar.core.data.store.SettingsPrefs.of(newBase),
+            ),
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        consumeIncomingIntent(intent)
         enableEdgeToEdge()
         setContent {
             CompositionLocalRoot {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    RssRadarAppContent()
+                    RssRadarAppContent(
+                        sharedUrl = sharedUrl,
+                        onSharedUrlConsumed = { sharedUrl = null },
+                    )
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        consumeIncomingIntent(intent)
+    }
+
+    /**
+     * 只认链接：有文本但挑不出 URL 时如实告诉用户，而不是把整段话塞进地址栏
+     * （那只会换来一个必失败的探测和一句看不懂的错误）。
+     */
+    private fun consumeIncomingIntent(incoming: Intent?) {
+        val text = incoming?.sharedText() ?: return
+        val url = SharedText.extractUrl(text)
+        if (url == null) {
+            Toast.makeText(this, "这段内容里没有链接，RssRadar 只能订阅链接", Toast.LENGTH_LONG).show()
+            return
+        }
+        sharedUrl = url
     }
 }
 
 @SuppressLint("RestrictedApi")
 @Composable
-private fun RssRadarAppContent() {
+private fun RssRadarAppContent(
+    /** 系统分享/选中文字送进来的链接（#34），消费后由 [onSharedUrlConsumed] 清空。 */
+    sharedUrl: String? = null,
+    onSharedUrlConsumed: () -> Unit = {},
+) {
     val navController = rememberNavController()
     val context = LocalContext.current
 
     // 加订阅抽屉显隐：纯弹层，不入导航栈（无路由语义、不参与返回栈）。
     var showAddSheet by remember { mutableStateOf(false) }
+    // 加订阅 VM 提到抽屉外：外部 intent 要在抽屉还没打开时就往里填地址。
+    val addVm: AddSubscriptionViewModel = hiltViewModel()
+    // 外部链接 → 直接开加订阅抽屉并预填。清空 sharedUrl 是必须的：否则旋转屏幕
+    // 或任何一次重组都会把同一个地址再填一遍（还会打断用户已经改过的输入）。
+    LaunchedEffect(sharedUrl) {
+        val url = sharedUrl ?: return@LaunchedEffect
+        addVm.onIntent(AddSubscriptionIntent.UrlChange(url))
+        showAddSheet = true
+        onSharedUrlConsumed()
+    }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
@@ -318,7 +378,6 @@ private fun RssRadarAppContent() {
         // 加订阅抽屉：ModalBottomSheet 自带窗口级弹层与返回拦截（BackHandler），
         // 不需要 NavHost 承载。VM 挂在 Activity 作用域，关闭时手动重置流程状态。
         if (showAddSheet) {
-            val addVm: AddSubscriptionViewModel = hiltViewModel()
             AddSubscriptionSheet(
                 viewModel = addVm,
                 onDismiss = {

@@ -126,6 +126,65 @@ class ReadingPrefsStoreTest {
         assertEquals(BilingualLayout.STACKED, v.translation.bilingualLayout)
     }
 
+    @Test
+    fun `auto hide bars defaults to off and survives a restart`() {
+        val prefs = FakeSharedPreferences()
+        val s = ReadingPrefsStore(prefs)
+        // 默认关：工具栏会自己消失是强感知改动，且容易被当成 bug
+        assertFalse(s.state.value.autoHideBars)
+        // 与 immersive 是两件事，别互相带动
+        assertTrue(s.state.value.immersive)
+
+        s.update { it.copy(autoHideBars = true) }
+        assertTrue(ReadingPrefsStore(prefs).state.value.autoHideBars)
+        // 关掉沉浸阅读不该把自动隐藏也带走
+        ReadingPrefsStore(prefs).update { it.copy(immersive = false) }
+        assertTrue(ReadingPrefsStore(prefs).state.value.autoHideBars)
+        assertFalse(ReadingPrefsStore(prefs).state.value.immersive)
+    }
+
+    @Test
+    fun `reading theme defaults to following the app and survives a restart`() {
+        val prefs = FakeSharedPreferences()
+        val s = ReadingPrefsStore(prefs)
+        // 默认跟随应用：老用户升级后阅读页长相不变
+        assertEquals(ReadingTheme.FOLLOW, s.state.value.readingTheme)
+
+        s.update { it.copy(readingTheme = ReadingTheme.PAPER) }
+        assertEquals(ReadingTheme.PAPER, ReadingPrefsStore(prefs).state.value.readingTheme)
+    }
+
+    @Test
+    fun `unknown reading theme name falls back to FOLLOW`() {
+        val prefs = FakeSharedPreferences()
+        prefs.edit().putString("reading_theme", "SEPIA").apply()
+        assertEquals(ReadingTheme.FOLLOW, ReadingPrefsStore(prefs).state.value.readingTheme)
+    }
+
+    @Test
+    fun `letter spacing and text align persist and are coerced`() {
+        val prefs = FakeSharedPreferences()
+        val s = ReadingPrefsStore(prefs)
+        // 默认 0 / 左对齐 = 引入前的排版，老用户升级视觉不变
+        assertEquals(ReadingStyleState.DEFAULT_LETTER_SPACING, s.state.value.style.letterSpacing)
+        assertEquals(ReadingTextAlign.START, s.state.value.style.textAlign)
+
+        s.update {
+            it.copy(
+                style = it.style.copy(letterSpacing = 1.5f, textAlign = ReadingTextAlign.JUSTIFY),
+            )
+        }
+        val reloaded = ReadingPrefsStore(prefs).state.value
+        assertEquals(1.5f, reloaded.style.letterSpacing)
+        assertEquals(ReadingTextAlign.JUSTIFY, reloaded.style.textAlign)
+
+        // 越界值写入前就被夹住：落盘值永远合法这一条不变量住在 Store 里
+        s.update { it.copy(style = it.style.copy(letterSpacing = 99f)) }
+        assertEquals(ReadingStyleState.LETTER_SPACING_MAX, s.state.value.style.letterSpacing)
+        s.update { it.copy(style = it.style.copy(letterSpacing = -2f)) }
+        assertEquals(ReadingStyleState.LETTER_SPACING_MIN, s.state.value.style.letterSpacing)
+    }
+
     // ---- 各组互不干扰 ----
 
     @Test

@@ -84,6 +84,37 @@ adb shell dumpsys gfxinfo com.cycling.rssradar
 2. **文章卡片重组范围过大** —— 用 Layout Inspector 看单帧重组的 composable 数量。
 3. **封面图加载** —— Coil 异步加载，理论上不阻塞。若图片源慢，会看到图片一张张跳出来（视觉问题，不是掉帧）。
 
+### 测量陷阱（2026-09-09 实测教训）
+
+- **debug 包的数字不能用**。同一设备同一手法，debug 滚动 Janky 35.8% vs release **0.81%**。绝对值必须以 release 包为准，debug 只能做同包横向对比。
+- **先 `svc power stayon true`**。测试间隔屏幕一熄，锁屏会吃掉后续所有 `input` 命令，gfxinfo 抓到 0 帧。
+- **深链测「打开文章」会吹大 3 倍**。`am start -a VIEW -d rssradar://article/{id}` 会在已有任务上**重建 MainActivity**（trace 可见 performCreate + activityDestroy + 两次 relayoutWindow，约 60ms），把一次性成本算进帧时间。测真实路径用下面的点击法。
+- **后台同步会污染采样窗口**。同步刷列表期间，整个窗口每帧 18-20ms 均匀变慢（2026-09-09 RUN3 实录）。测打开/滚动前先确认状态栏没有同步流量，或接受该轮数字作废。
+
+---
+
+## 2.5 打开文章
+
+点开一篇文章到正文上屏，是 RSS 阅读器第二高频交互。**必须用真实点击路径**（深链有 Activity 重建伪影，见上）：
+
+```bash
+adb shell svc power stayon true          # 防熄屏
+adb shell am start -W com.cycling.rssradar/.MainActivity   # 回到 App
+adb shell input tap 133 2285             # 点底栏「文章」Tab 确定落在列表
+adb shell dumpsys gfxinfo com.cycling.rssradar reset
+adb shell input tap 540 700              # 点第一张卡片（坐标按实际分辨率调）
+# （手动或脚本等 2.5 秒）
+adb shell dumpsys gfxinfo com.cycling.rssradar
+```
+
+| 指标 | 合格 | 需要查 |
+|---|---|---|
+| Janky frames | < 5% | > 15% |
+
+**2026-09-09 release 基线**（Redmi Note 10 Pro / Android 13 / feeds 618 / articles 3197，中位数）：冷启动 286ms，滚动 Janky 0.81%，点击打开 Janky 5.8%（p95 = 13ms），122KB 长文内部滚动 Janky 0.29%，PSS 145MB。深链法会测出 ~150ms 伪影，勿采信。
+
+打开帧的构成（atrace 分解，release）：最重 traversal 帧 ~47ms + 后台 young GC ~65ms 交叠，**与文章大小弱相关**（5KB 与 122KB 同量级）。可感知但一次性，未达修复门槛——动它之前先看这条注释。
+
 ---
 
 ## 3. 数据库查询
@@ -174,14 +205,15 @@ adb shell dumpsys meminfo com.cycling.rssradar
 测完把结果填到这里，注明设备和规模。没有数字的性能结论等于没结论。
 
 ```
-设备：
-Android 版本：
-feeds / articles 规模：
-日期：
+设备：Redmi Note 10 Pro（chopin）
+Android 版本：13
+feeds / articles 规模：618 / 3197（未达 1000/30000 门槛，数字仅参考）
+日期：2026-09-09（release 包）
 
-冷启动 TotalTime（3 次中位数）：     ms
-滚动 Janky frames：                  %
-OFFSET 0 / 300 / 3000 查询耗时：     /     /     ms
-EXPLAIN QUERY PLAN 是否走索引：      是 / 否
-滚动 5 分钟后 TOTAL PSS：            MB
+冷启动 TotalTime（3 次中位数）：     286 ms
+滚动 Janky frames：                  0.81 %
+点击打开文章 Janky frames：          5.8 %（p95 = 13 ms）
+OFFSET 0 / 300 / 3000 查询耗时：     未测
+EXPLAIN QUERY PLAN 是否走索引：      未测
+滚动 5 分钟后 TOTAL PSS：            145 MB（未做回落复测）
 ```

@@ -16,20 +16,55 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
  */
 class ThemeStore(private val prefs: SharedPreferences) {
 
-    private val _mode = MutableStateFlow(readPersisted())
+    private val _mode = MutableStateFlow(readPersistedMode())
     val mode: StateFlow<ThemeMode> = _mode.asStateFlow()
+
+    /**
+     * Material You 动态取色（对照表 #27）：**只换强调色**，表面阶梯仍用自有色板。
+     * 默认关：整套换成 Monet 会让「RssRadar 长什么样」这件事消失，且老用户升级
+     * 视觉突变。要跟随壁纸的人显式开一次即可。
+     */
+    private val _dynamicColor = MutableStateFlow(prefs.getBoolean(KEY_DYNAMIC_COLOR, false))
+    val dynamicColor: StateFlow<Boolean> = _dynamicColor.asStateFlow()
+
+    /**
+     * 自定义强调色 ARGB（对照表 #29）；null = 用默认紫。
+     * 与 [dynamicColor] 互斥：自定义优先，两个来源同时存在时「到底哪个生效」无法解释。
+     */
+    private val _customAccent = MutableStateFlow(readPersistedAccent())
+    val customAccent: StateFlow<Long?> = _customAccent.asStateFlow()
 
     fun setMode(mode: ThemeMode) {
         prefs.edit().putString(KEY_THEME_MODE, mode.name).apply()
         _mode.value = mode
     }
 
-    private fun readPersisted(): ThemeMode {
+    fun setDynamicColor(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_DYNAMIC_COLOR, enabled).apply()
+        _dynamicColor.value = enabled
+    }
+
+    /** 传 null 表示回到默认紫。 */
+    fun setCustomAccent(argb: Long?) {
+        val editor = prefs.edit()
+        if (argb == null) editor.remove(KEY_CUSTOM_ACCENT) else editor.putLong(KEY_CUSTOM_ACCENT, argb)
+        editor.apply()
+        _customAccent.value = argb
+    }
+
+    private fun readPersistedMode(): ThemeMode {
         val name = prefs.getString(KEY_THEME_MODE, null) ?: return ThemeMode.SYSTEM
         return runCatching { ThemeMode.valueOf(name) }.getOrDefault(ThemeMode.SYSTEM)
     }
 
+    private fun readPersistedAccent(): Long? {
+        if (!prefs.contains(KEY_CUSTOM_ACCENT)) return null
+        return prefs.getLong(KEY_CUSTOM_ACCENT, 0L)
+    }
+
     companion object {
         private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_DYNAMIC_COLOR = "theme_dynamic_color"
+        private const val KEY_CUSTOM_ACCENT = "theme_custom_accent"
     }
 }

@@ -311,4 +311,45 @@ class OnDemandFetchTest {
         assertEquals(0, fetched)
         assertEquals(0, mem.logs.size)
     }
+
+    // ---- 结果可见（ADR-0015）：阅读页要能说清「为什么没有正文」 ----
+
+    @Test
+    fun `result names the reason when there is no content`() = runBlocking {
+        // 源关闭全文抓取：不联网，但原因要说出来（旧实现只是静默 return false）
+        val disabled = Mem(feed = Mem.defaultFeed(fullContentEnabled = false))
+        val m1 = module(disabled) { success("随便什么") }
+        assertEquals(OnDemandResult.FeedDisabled, m1.fetchWithResult(articleId))
+
+        // 反爬：原因直达 UI（FetchFailure.label 由 UI 层取）
+        val blocked = Mem()
+        val m2 = module(blocked) { failure(FetchFailure.HTTP_403) }
+        assertEquals(OnDemandResult.Failed(FetchFailure.HTTP_403), m2.fetchWithResult(articleId))
+
+        // 抓到的比现有还短：放弃写入，并说明为什么没变长
+        val hasSummary = Mem(
+            article = Mem.defaultArticle(
+                content = "<p>摘要</p>",
+                contentText = "很长很长很长的一段现有内容",
+                contentSource = ArticleEntity.CONTENT_SOURCE_NONE,
+            ),
+        )
+        val m3 = module(hasSummary) { success("短") }
+        val shorter = m3.fetchWithResult(articleId)
+        assertTrue(shorter is OnDemandResult.ShorterThanExisting)
+        assertEquals("很长很长很长的一段现有内容", hasSummary.article.contentText) // 没被越抓越短
+    }
+
+    @Test
+    fun `incomplete result carries the issue for the reader`() = runBlocking {
+        val mem = Mem()
+        val m = module(mem) { success("很短", issue = ExtractionIssue.DYNAMIC_RENDER) }
+
+        val result = m.fetchWithResult(articleId)
+
+        assertTrue(result is OnDemandResult.Fetched)
+        val fetched = result as OnDemandResult.Fetched
+        assertTrue(fetched.incomplete)
+        assertEquals(ExtractionIssue.DYNAMIC_RENDER, fetched.issue)
+    }
 }

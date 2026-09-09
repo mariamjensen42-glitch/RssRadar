@@ -58,12 +58,14 @@ import com.cycling.rssradar.core.data.db.MIGRATION_15_16
 import com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.core.data.parser.RssParser
 import com.cycling.rssradar.core.data.rss.BestIconFinder
+import com.cycling.rssradar.core.data.update.UpdateChecker
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import com.cycling.rssradar.core.domain.rss.ConditionalHttpFetcher
 import com.cycling.rssradar.core.domain.rss.HttpUrlFetcher
 import com.cycling.rssradar.core.domain.rsshub.HttpHealthzProber
 import com.cycling.rssradar.core.domain.rsshub.InstanceProber
 import com.cycling.rssradar.core.data.store.ThemeStore
+import com.cycling.rssradar.core.data.store.LanguageStore
 import com.cycling.rssradar.sync.AutoSync
 import dagger.Module
 import dagger.Provides
@@ -131,6 +133,11 @@ object AppModule {
     @Provides
     @Singleton
     fun provideConditionalHttpFetcher(): ConditionalHttpFetcher = HttpUrlFetcher()
+
+    /** 检查更新（#35）：复用同一条抓取缝，超时与 UA 与 feed 抓取一致。 */
+    @Provides
+    @Singleton
+    fun provideUpdateChecker(http: HttpFetcher): UpdateChecker = UpdateChecker(http)
 
     /** 真 Room 事务；JVM 测试用 DirectTransactionRunner 直跑。 */
     @Provides
@@ -229,6 +236,12 @@ object AppModule {
     @Singleton
     fun provideThemeStore(@ApplicationContext context: Context): ThemeStore =
         ThemeStore(SettingsPrefs.of(context))
+
+    /** 界面语言偏好（ADR-0017）。 */
+    @Provides
+    @Singleton
+    fun provideLanguageStore(@ApplicationContext context: Context): LanguageStore =
+        LanguageStore(SettingsPrefs.of(context))
 
     /**
      * 阅读偏好（排版 / 图片 / 渲染器 / 译文显示）合成一个模块：一份 state、一条 provide。
@@ -450,6 +463,7 @@ object AppModule {
 @InstallIn(SingletonComponent::class)
 interface AppEntryPoint {
     fun themeStore(): ThemeStore
+    fun languageStore(): LanguageStore
     fun readingPrefsStore(): ReadingPrefsStore
     fun listDisplayStore(): ListDisplayStore
     fun archiveStore(): ArchiveStore

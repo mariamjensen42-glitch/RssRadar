@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ADR-0017：声明支持的 per-app locale，系统语言设置里才能出现 RssRadar 的语言选项 -->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="zh-CN" />
+    <locale android:name="en" />
+</locale-config>

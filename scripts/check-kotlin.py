@@ -218,6 +218,74 @@ def sources(root: pathlib.Path) -> list[str]:
     return [str(p) for p in sorted(root.rglob("*.kt"))]
 
 
+def generate_r_stub(out_dir: pathlib.Path) -> str | None:
+    """从 app res 生成 R.java，javac 编成 jar 挂 classpath，解析 R.string.* 引用。
+
+    背景：项目 i18n 化（ADR-0017）后源码开始引用 R.string.*，但本脚本不过 gradle，
+    没人生成 R 类，全部引用都会假报 unresolved。真实 R 由 gradle 生成，这里只需要
+    「名字存在」即可通过编译诊断——字段值随便给（非 final 即可，真实值运行时才有意义）。
+    试过 kotlinc 的 -Xjava-source-roots（K2 下静默无效），javac 成 jar 是可靠路径。
+    返回生成的 jar 路径（调用方加进 classpath）。
+    """
+    res_dir = ROOT / "app/src/main/res"
+    if not res_dir.is_dir():
+        return None
+
+    # 嵌套类 -> 名字集合。values XML 里的逐个解析，文件型资源按子目录收集。
+    names: dict[str, set[str]] = {
+        "string": set(), "plurals": set(), "array": set(),
+        "drawable": set(), "mipmap": set(), "xml": set(), "raw": set(),
+    }
+    values_tags = {"string": "string", "plurals": "plurals",
+                   "string-array": "array", "integer-array": "array"}
+    for values_xml in res_dir.glob("values*/**/*.xml"):
+        text = values_xml.read_text(encoding="utf-8", errors="replace")
+        for match in re.finditer(r'<(string|plurals|string-array|integer-array)\b[^>]*\bname="([^"]+)"', text):
+            kind = values_tags.get(match.group(1))
+            if kind:
+                names[kind].add(match.group(2))
+    for kind in ("drawable", "mipmap", "xml", "raw"):
+        sub = res_dir / kind
+        if sub.is_dir():
+            for p in sub.rglob("*"):
+                if p.is_file():
+                    names[kind].add(p.stem)
+
+    # 包名从 manifest namespace 读不到（不解析 gradle），写死——模块结构变了再改这里
+    lines = ["package com.cycling.rssradar;", "public final class R {"]
+    for kind, values in names.items():
+        if not values:
+            continue
+        lines.append(f"  public static final class {kind} {{")
+        for i, name in enumerate(sorted(values)):
+            lines.append(f"    public static int {name} = 0x7f{len(kind):02x}{i:04x};")
+        lines.append("  }")
+    lines.append("}")
+    if len(lines) <= 4:
+        return None
+    java_root = out_dir / "rstub"
+    java_file = java_root / "com" / "cycling" / "rssradar" / "R.java"
+    java_file.parent.mkdir(parents=True, exist_ok=True)
+    java_file.write_text("\n".join(lines), encoding="utf-8")
+
+    # javac 编译成 jar；源码没变就复用，避免每次全量跑 javac
+    jar_path = out_dir / "rstub.jar"
+    stamp = java_root / ".built"
+    if stamp.exists() and stamp.read_text(encoding="utf-8") == "\n".join(lines):
+        return str(jar_path)
+    classes_dir = out_dir / "rstub_classes"
+    shutil.rmtree(classes_dir, ignore_errors=True)
+    subprocess.run(
+        ["javac", "-d", str(classes_dir), str(java_file)],
+        check=True, capture_output=True, text=True,
+    )
+    with zipfile.ZipFile(jar_path, "w") as zf:
+        for p in sorted(classes_dir.rglob("*.class")):
+            zf.write(p, p.relative_to(classes_dir).as_posix())
+    stamp.write_text("\n".join(lines), encoding="utf-8")
+    return str(jar_path)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--main-only", action="store_true", help="只编译主源码，跳过 test 源码")
@@ -270,6 +338,10 @@ def main() -> int:
     ]
     for plugin in plugins:
         kotlinc_args += [f"-Xplugin={plugin}"]
+    # R 桩（ADR-0017）：javac 预编成 jar，kotlinc 从 classpath 解析 R.string.*
+    r_jar = generate_r_stub(WORK)
+    if r_jar:
+        classpath.append(r_jar)
     kotlinc_args += ["-classpath", os.pathsep.join(classpath)]
     kotlinc_args += files
     argfile = out / "kotlinc-args.txt"

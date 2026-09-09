@@ -1,5 +1,9 @@
 package com.cycling.rssradar.ui.article
 
+import androidx.compose.ui.res.stringResource
+
+import com.cycling.rssradar.R
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,7 +21,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -59,6 +65,7 @@ import coil3.size.Size
 import com.cycling.rssradar.core.data.store.ReadingFontFamily
 import com.cycling.rssradar.core.data.store.ReadingImageState
 import com.cycling.rssradar.core.data.store.ReadingStyleState
+import com.cycling.rssradar.core.data.store.ReadingTextAlign
 import com.cycling.rssradar.ui.theme.LocalReadingPrefs
 import kotlin.math.sqrt
 import com.cycling.rssradar.core.ui.components.ShimmerOverlay
@@ -92,12 +99,23 @@ internal fun ArticleNativeReader(
     modifier: Modifier = Modifier,
 ) {
     val style = LocalReadingPrefs.current.style
-    NativeNodesColumn(
-        nodes = nodes,
-        onLinkClick = onLinkClick,
-        onImageClick = onImageClick,
-        modifier = modifier.padding(horizontal = style.horizontalPadding.dp),
-    )
+    // 字间距与正文对齐靠 ProvideTextStyle 下发，而不是挨个改 RenderNode 里的 TextStyle：
+    // Compose 的 Text 会把显式 style 与 LocalTextStyle 合并，未指定的字段继承这里的值。
+    // 于是「节点自带 align」仍然优先（那是内容的一部分），没有声明的段落才吃全局偏好——
+    // 与 WebView 路 CSS 的表现一致。改一个地方胜过改九处 TextStyle。
+    ProvideTextStyle(
+        LocalTextStyle.current.copy(
+            letterSpacing = style.letterSpacing.sp,
+            textAlign = style.textAlign.toComposeAlign(),
+        ),
+    ) {
+        NativeNodesColumn(
+            nodes = nodes,
+            onLinkClick = onLinkClick,
+            onImageClick = onImageClick,
+            modifier = modifier.padding(horizontal = style.horizontalPadding.dp),
+        )
+    }
 }
 
 /**
@@ -429,7 +447,7 @@ private fun RenderNode(
                             text = node.summaryRuns
                                 ?.let { runsToAnnotated(it, style) }
                                 ?.takeIf { it.text.isNotBlank() }
-                                ?: AnnotatedString("详情"),
+                                ?: AnnotatedString(stringResource(R.string.details)),
                             color = radarColors().textPrimary,
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyLarge.copy(
@@ -693,6 +711,13 @@ private const val SMALL_SIZE_FACTOR = 0.85f
 private val MarkHighlight = Color(0x66FFC107)
 
 /** 解析端的段落对齐枚举 → Compose TextAlign。 */
+private fun ReadingTextAlign.toComposeAlign(): TextAlign = when (this) {
+    ReadingTextAlign.START -> TextAlign.Start
+    ReadingTextAlign.JUSTIFY -> TextAlign.Justify
+    ReadingTextAlign.CENTER -> TextAlign.Center
+    ReadingTextAlign.END -> TextAlign.End
+}
+
 private fun ParagraphAlign?.toCompose(): TextAlign? = when (this) {
     ParagraphAlign.LEFT -> TextAlign.Left
     ParagraphAlign.CENTER -> TextAlign.Center

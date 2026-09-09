@@ -3,7 +3,10 @@ package com.cycling.rssradar.ui.me
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cycling.rssradar.R
 import com.cycling.rssradar.ai.AiTaskScheduler
+import com.cycling.rssradar.i18n.UiText
+import com.cycling.rssradar.i18n.labelRes
 import com.cycling.rssradar.core.data.ai.AiArtifactRepository
 import com.cycling.rssradar.core.data.ai.AiBatchProcessor
 import com.cycling.rssradar.core.data.ai.AiCategory
@@ -33,7 +36,7 @@ data class AiFeaturesUiState(
     val queue: AiQueueSnapshot = AiQueueSnapshot(),
     /** 正在跑批处理的标记，避免用户连点「立即执行」。 */
     val running: Boolean = false,
-    val message: String? = null,
+    val message: UiText? = null,
 )
 
 
@@ -98,13 +101,13 @@ class AiFeaturesViewModel @Inject constructor(
             AiFeaturesIntent.ResetDefaults -> {
                 featureStore.reset()
                 reschedule()
-                say("已恢复默认设置")
+                say(UiText.res(R.string.aimsg_reset_done))
             }
 
             AiFeaturesIntent.DisableAllPaid -> {
                 featureStore.disableAllPaid()
                 reschedule()
-                say("已关闭全部会调用模型的功能")
+                say(UiText.res(R.string.aimsg_paid_disabled))
             }
 
             is AiFeaturesIntent.SetDailyLimit -> budgetStore.setDailyLimit(intent.limit)
@@ -117,7 +120,10 @@ class AiFeaturesViewModel @Inject constructor(
                 viewModelScope.launch {
                     val n = queue.retryFailed()
                     refreshQueue()
-                    say(if (n == 0) "没有失败任务" else "已重新排队 $n 个任务")
+                    say(
+                        if (n == 0) UiText.res(R.string.aimsg_no_failed)
+                        else UiText.res(R.string.aimsg_requeued, "$n"),
+                    )
                 }
             }
 
@@ -125,7 +131,7 @@ class AiFeaturesViewModel @Inject constructor(
                 viewModelScope.launch {
                     queue.clearPending()
                     refreshQueue()
-                    say("已清空待执行任务")
+                    say(UiText.res(R.string.aimsg_pending_cleared))
                 }
             }
 
@@ -134,7 +140,12 @@ class AiFeaturesViewModel @Inject constructor(
             is AiFeaturesIntent.ClearArtifacts -> {
                 viewModelScope.launch {
                     artifacts.clearFeature(intent.feature)
-                    say("已清除「${intent.feature.label}」的全部产物")
+                    say(
+                        UiText.res(
+                            R.string.aimsg_artifacts_cleared,
+                            UiText.Res(intent.feature.labelRes()),
+                        ),
+                    )
                 }
             }
 
@@ -175,7 +186,7 @@ class AiFeaturesViewModel @Inject constructor(
         // 没有任何批处理功能开启时，排程会得出 0 个任务——
         // 此时再显示"已在后台开始执行"就是一句空话，用户会对着空气等结果。
         if (AiFeature.BATCH_FEATURES.none { it in featureStore.state.value.enabled }) {
-            say("还没有开启任何后台功能，先在下面打开几项再执行")
+            say(UiText.res(R.string.aimsg_no_background))
             return
         }
         _state.update { it.copy(running = true) }
@@ -186,7 +197,7 @@ class AiFeaturesViewModel @Inject constructor(
             _state.update { it.copy(running = false) }
             refreshQueue()
         }
-        say("已在后台开始执行，进度见队列")
+        say(UiText.res(R.string.aimsg_started_background))
     }
 
     private fun refreshQueue() {
@@ -211,7 +222,12 @@ class AiFeaturesViewModel @Inject constructor(
     private fun runFeature(feature: AiFeature) {
         if (_state.value.running) return
         if (!featureStore.isEnabled(feature)) {
-            say("先打开「${feature.label}」的开关再运行")
+            say(
+                UiText.res(
+                    R.string.aimsg_need_toggle,
+                    UiText.Res(feature.labelRes()),
+                ),
+            )
             return
         }
         _state.update { it.copy(running = true) }
@@ -220,15 +236,28 @@ class AiFeaturesViewModel @Inject constructor(
                 withContext(Dispatchers.IO) {
                     val enqueued = processor.scheduleDaily(only = feature)
                     if (enqueued == 0) {
-                        "没有需要处理的内容（近期没有候选，或已有产物）"
+                        UiText.res(R.string.aimsg_nothing_to_process)
                     } else {
                         val report = processor.drain()
                         when {
-                            report.isEmpty() -> "任务已入队但没有可执行的（今日额度可能已用完）"
-                            else -> buildString {
-                                append("本次执行 ${report.processed} 项：成功 ${report.succeeded}")
-                                if (report.failed > 0) append("，失败 ${report.failed}")
-                                if (report.outOfBudget) append("（今日额度已用完，余下任务明天继续）")
+                            report.isEmpty() -> UiText.res(R.string.aimsg_no_executable)
+                            else -> when {
+                                report.failed > 0 && report.outOfBudget -> UiText.res(
+                                    R.string.aimsg_report_fail_budget,
+                                    "${report.processed}", "${report.succeeded}", "${report.failed}",
+                                )
+                                report.failed > 0 -> UiText.res(
+                                    R.string.aimsg_report_fail,
+                                    "${report.processed}", "${report.succeeded}", "${report.failed}",
+                                )
+                                report.outOfBudget -> UiText.res(
+                                    R.string.aimsg_report_ok_budget,
+                                    "${report.processed}", "${report.succeeded}",
+                                )
+                                else -> UiText.res(
+                                    R.string.aimsg_report_ok,
+                                    "${report.processed}", "${report.succeeded}",
+                                )
                             }
                         }
                     }
@@ -236,7 +265,7 @@ class AiFeaturesViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                "执行失败，请稍后重试（失败详情见任务队列）"
+                UiText.res(R.string.aimsg_run_error)
             }
             _state.update { it.copy(running = false, message = message) }
             refreshQueue()
@@ -247,5 +276,5 @@ class AiFeaturesViewModel @Inject constructor(
         AiTaskScheduler.reschedule(app, featureStore.state.value.enabled)
     }
 
-    private fun say(message: String) = _state.update { it.copy(message = message) }
+    private fun say(message: UiText) = _state.update { it.copy(message = message) }
 }

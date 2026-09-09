@@ -15,6 +15,7 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:localeConfig="@xml/locale_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.RssRadar">
@@ -28,6 +29,22 @@
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- 系统分享（#34）：别的 App 分享链接/文字时，RssRadar 出现在分享单里 -->
+            <intent-filter android:label="@string/intent_subscribe">
+                <action android:name="android.intent.action.SEND" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <!-- 选中文字的浮动菜单（#34）：选中的文本里有链接就能直接订阅 -->
+            <intent-filter android:label="@string/intent_subscribe">
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="text/plain" />
             </intent-filter>
             <!-- 外部直达：rssradar://article/{id} → NavHost 解析落到 ArticleDetailRoute（issue #32） -->
             <intent-filter>

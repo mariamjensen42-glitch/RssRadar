@@ -6,7 +6,11 @@ Android RSS 阅读器（Jetpack Compose + Material 3，RSSHub 为核心数据源
 
 ### Issue tracker
 
-Issues live in this repo's GitHub Issues, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues live as local markdown files under `.scratch/` (not a remote tracker). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Roles are recorded as a `Status:` line in each issue file; default five-role vocabulary. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 

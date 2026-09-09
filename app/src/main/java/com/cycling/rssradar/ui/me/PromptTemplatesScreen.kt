@@ -1,6 +1,11 @@
 package com.cycling.rssradar.ui.me
 
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.res.stringResource
+import com.cycling.rssradar.R
+import com.cycling.rssradar.core.ui.components.AppSnackbarHost
+import com.cycling.rssradar.i18n.UiText
+import com.cycling.rssradar.i18n.resolve
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,9 +36,12 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -78,7 +86,7 @@ data class PromptTemplatesUiState(
     /** 全部订阅源（新增覆盖时选择用）。 */
     val feeds: List<FeedPickOption> = emptyList(),
     val loading: Boolean = true,
-    val message: String? = null,
+    val message: UiText? = null,
 )
 
 sealed interface PromptTemplatesIntent {
@@ -128,7 +136,7 @@ class PromptTemplatesViewModel @Inject constructor(
                 it.copy(
                     loading = false,
                     overrides = profiles
-                        .map { p -> FeedPromptOverride(p.feedId, titleOf[p.feedId] ?: "已删除的源", p.summaryPrompt.orEmpty()) }
+                        .map { p -> FeedPromptOverride(p.feedId, titleOf[p.feedId].orEmpty(), p.summaryPrompt.orEmpty()) }
                         .sortedBy { it.feedTitle },
                     feeds = feeds,
                 )
@@ -149,7 +157,11 @@ class PromptTemplatesViewModel @Inject constructor(
             }
             _state.update {
                 it.copy(
-                    message = if (normalized == null) "已改用内置摘要提示词" else "已保存该订阅源的摘要提示词",
+                    message = if (normalized == null) {
+                        UiText.res(R.string.aimsg_prompt_builtin)
+                    } else {
+                        UiText.res(R.string.aimsg_prompt_saved)
+                    },
                 )
             }
             refresh()
@@ -180,9 +192,19 @@ fun PromptTemplatesScreen(
     var editing by remember { mutableStateOf<FeedPromptOverride?>(null) }
     var adding by remember { mutableStateOf(false) }
     val colors = radarColors()
+    val context = LocalContext.current
+    val snackbar = remember { SnackbarHostState() }
+
+    // message 之前只置位不显示（反馈黑洞）；补 snackbar 消费（ADR-0017 顺带修复）
+    LaunchedEffect(state.message) {
+        val message = state.message ?: return@LaunchedEffect
+        snackbar.showSnackbar(message.resolve(context))
+        viewModel.onIntent(PromptTemplatesIntent.ConsumeMessage)
+    }
 
     Scaffold(
         containerColor = colors.bgRoot,
+        snackbarHost = { AppSnackbarHost(snackbar) },
         topBar = {
             Row(
                 modifier = Modifier
@@ -192,10 +214,10 @@ fun PromptTemplatesScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = colors.textPrimary)
+                    Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.back), tint = colors.textPrimary)
                 }
                 Text(
-                    text = "提示词模板",
+                    text = stringResource(R.string.prompt_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
@@ -204,7 +226,7 @@ fun PromptTemplatesScreen(
                 TextButton(onClick = { adding = true }) {
                     Icon(Lucide.Plus, contentDescription = null, tint = colors.accent, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("新增覆盖", color = colors.accent, style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.prompt_add), color = colors.accent, style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
@@ -223,14 +245,14 @@ fun PromptTemplatesScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             Text(
-                text = "目前支持订阅源级摘要提示词覆盖。${AiPrompts.summaryVariableHelp()}",
+                text = stringResource(R.string.prompt_page_desc, AiPrompts.summaryVariables().joinToString("，")),
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.textTertiary,
                 modifier = Modifier.padding(vertical = 8.dp),
             )
 
             Text(
-                text = "自定义覆盖 · ${state.overrides.size}",
+                text = stringResource(R.string.prompt_overrides_count, state.overrides.size),
                 style = MaterialTheme.typography.titleSmall,
                 color = colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
@@ -239,7 +261,7 @@ fun PromptTemplatesScreen(
             if (state.overrides.isEmpty()) {
                 Surface(shape = RoundedCornerShape(12.dp), color = colors.surface1) {
                     Text(
-                        text = "还没有订阅源自定义提示词。所有订阅源目前使用下方内置模板；点右上角「新增覆盖」为单个源定制。",
+                        text = stringResource(R.string.prompt_empty),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.textSecondary,
                         modifier = Modifier.padding(14.dp),
@@ -257,7 +279,7 @@ fun PromptTemplatesScreen(
                     ) {
                         Column(Modifier.padding(14.dp)) {
                             Text(
-                                text = item.feedTitle,
+                                text = item.feedTitle.ifEmpty { stringResource(R.string.deleted_feed) },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = colors.textPrimary,
                                 fontWeight = FontWeight.SemiBold,
@@ -278,7 +300,7 @@ fun PromptTemplatesScreen(
             }
 
             Text(
-                text = "内置摘要模板",
+                text = stringResource(R.string.prompt_builtin_tpl),
                 style = MaterialTheme.typography.titleSmall,
                 color = colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
@@ -358,7 +380,7 @@ private fun PromptEditSheet(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = AiPrompts.summaryVariableHelp(),
+                text = stringResource(R.string.prompt_variable_help, AiPrompts.summaryVariables().joinToString("，")),
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.textTertiary,
             )
@@ -367,7 +389,7 @@ private fun PromptEditSheet(
                 value = text,
                 onValueChange = { text = it },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
-                placeholder = { Text("留空保存即改用内置模板", color = colors.textTertiary, style = MaterialTheme.typography.bodyMedium) },
+                placeholder = { Text(stringResource(R.string.prompt_save_hint), color = colors.textTertiary, style = MaterialTheme.typography.bodyMedium) },
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = colors.surface2,
@@ -382,11 +404,11 @@ private fun PromptEditSheet(
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (initial.isNotBlank()) {
-                    TextButton(onClick = onClear) { Text("清除覆盖", color = colors.textTertiary) }
+                    TextButton(onClick = onClear) { Text(stringResource(R.string.prompt_clear), color = colors.textTertiary) }
                 }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { onSave(text) }) {
-                    Text("保存", color = colors.accent, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.save), color = colors.accent, fontWeight = FontWeight.SemiBold)
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -414,7 +436,7 @@ private fun FeedPickSheet(
                 .padding(horizontal = 20.dp),
         ) {
             Text(
-                text = "选择订阅源",
+                text = stringResource(R.string.prompt_pick_feed),
                 style = MaterialTheme.typography.titleMedium,
                 color = colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
@@ -424,7 +446,7 @@ private fun FeedPickSheet(
                 value = query,
                 onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("搜索订阅源", color = colors.textTertiary, style = MaterialTheme.typography.bodyMedium) },
+                placeholder = { Text(stringResource(R.string.prompt_search_feed), color = colors.textTertiary, style = MaterialTheme.typography.bodyMedium) },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(

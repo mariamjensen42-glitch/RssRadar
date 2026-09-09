@@ -1,5 +1,8 @@
 package com.cycling.rssradar.ui.me
 
+import androidx.compose.ui.res.stringResource
+import com.cycling.rssradar.R
+import com.cycling.rssradar.i18n.labelRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,6 +69,7 @@ import com.cycling.rssradar.core.data.ai.AiPayloadLine
 import com.cycling.rssradar.core.data.ai.AiPayloadText
 import com.cycling.rssradar.core.data.ai.AiScope
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
+import com.cycling.rssradar.i18n.resolve
 import com.cycling.rssradar.core.ui.components.EmptyState
 import com.cycling.rssradar.core.ui.theme.radarColors
 import java.text.SimpleDateFormat
@@ -105,6 +110,7 @@ fun AiArtifactsScreen(
     initialFeatureDbValue: Int? = null,
 ) {
     val state by viewModel.state.collectAsState()
+    val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     val timeFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
@@ -116,7 +122,7 @@ fun AiArtifactsScreen(
 
     LaunchedEffect(state.message) {
         val message = state.message ?: return@LaunchedEffect
-        snackbar.showSnackbar(message)
+        snackbar.showSnackbar(message.resolve(context))
         viewModel.onIntent(AiArtifactsIntent.ConsumeMessage)
     }
 
@@ -134,12 +140,12 @@ fun AiArtifactsScreen(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Lucide.ArrowLeft,
-                        contentDescription = "返回",
+                        contentDescription = stringResource(R.string.back),
                         tint = radarColors().textPrimary,
                     )
                 }
                 Text(
-                    text = "AI 结果",
+                    text = stringResource(R.string.ai_results_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = radarColors().textPrimary,
                     fontWeight = FontWeight.SemiBold,
@@ -148,7 +154,7 @@ fun AiArtifactsScreen(
                 IconButton(onClick = { viewModel.onIntent(AiArtifactsIntent.Refresh) }) {
                     Icon(
                         imageVector = Lucide.RotateCw,
-                        contentDescription = "刷新",
+                        contentDescription = stringResource(R.string.refresh),
                         tint = radarColors().textSecondary,
                     )
                 }
@@ -184,11 +190,11 @@ fun AiArtifactsScreen(
 
                 state.items.isEmpty() -> EmptyState(
                     icon = Lucide.Sparkles,
-                    message = if (state.groups.isEmpty()) "还没有任何 AI 产物" else "这项功能还没有产物",
+                    message = if (state.groups.isEmpty()) stringResource(R.string.artifacts_empty_none) else stringResource(R.string.artifacts_empty_feature),
                     hint = if (state.groups.isEmpty()) {
-                        "开启几项 AI 功能后，跑出来的结果会集中显示在这里"
+                        stringResource(R.string.artifacts_empty_hint)
                     } else {
-                        "功能已开启但还没跑出结果？去「AI 智能功能」页的任务队列看看"
+                        stringResource(R.string.artifacts_empty_queue_hint)
                     },
                     // 同理必须给权重：EmptyState 内部是 fillMaxSize，不给权重会顶掉剩余空间。
                     modifier = Modifier.weight(1f),
@@ -224,13 +230,13 @@ fun AiArtifactsScreen(
 private fun OverviewRow(total: Int, featureCount: Int, outputChars: Long) {
     val colors = radarColors()
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        OverviewCell(label = "产物", value = total.toString(), modifier = Modifier.weight(1f))
-        OverviewCell(label = "功能", value = featureCount.toString(), modifier = Modifier.weight(1f))
-        OverviewCell(label = "模型输出", value = "${formatCount(outputChars)} 字", modifier = Modifier.weight(1f))
+        OverviewCell(label = stringResource(R.string.tab_artifacts), value = total.toString(), modifier = Modifier.weight(1f))
+        OverviewCell(label = stringResource(R.string.tab_features), value = featureCount.toString(), modifier = Modifier.weight(1f))
+        OverviewCell(label = stringResource(R.string.model_output), value = stringResource(R.string.chars_suffix, formatCount(outputChars)), modifier = Modifier.weight(1f))
     }
     Spacer(Modifier.height(6.dp))
     Text(
-        text = "全部 AI 功能的生成结果都在这里，按功能筛选后查看。数字来自本地产物表。",
+        text = stringResource(R.string.artifacts_page_desc),
         style = MaterialTheme.typography.bodySmall,
         color = colors.textTertiary,
     )
@@ -267,13 +273,13 @@ private fun FeatureFilterRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         FilterChip(
-            text = "全部",
+            text = stringResource(R.string.filter_all),
             selected = selected == null,
             onClick = { onSelect(null) },
         )
         groups.forEach { group ->
             FilterChip(
-                text = "${group.feature.label} ${group.total}",
+                text = "${stringResource(group.feature.labelRes())} ${group.total}",
                 selected = selected == group.feature.dbValue,
                 onClick = { onSelect(group.feature.dbValue) },
             )
@@ -322,7 +328,7 @@ private fun ArtifactList(
             stickyHeader(key = "h-${feature.dbValue}") {
                 Surface(color = colors.bgRoot) {
                     Text(
-                        text = "${feature.label} · ${list.size} 条",
+                        text = stringResource(R.string.artifacts_feature_count, stringResource(feature.labelRes()), list.size),
                         style = MaterialTheme.typography.labelMedium,
                         color = colors.accent,
                         fontWeight = FontWeight.SemiBold,
@@ -357,7 +363,7 @@ private fun ArtifactRow(
         Column(Modifier.padding(horizontal = 14.dp, vertical = 11.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = item.feature.label,
+                    text = stringResource(item.feature.labelRes()),
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.accent,
                     fontWeight = FontWeight.SemiBold,
@@ -392,10 +398,11 @@ private fun ArtifactRow(
 }
 
 /** 条目上的主体名。查不到标题时不留空——给「文章 #id」比一片空白好定位。 */
+@Composable
 private fun subjectLabel(item: AiArtifactItem): String = when (item.scope) {
-    AiScope.ARTICLE -> item.subjectTitle ?: "文章 #${item.subjectId}"
-    AiScope.FEED -> item.subjectTitle ?: "订阅源 #${item.subjectId}"
-    AiScope.GLOBAL -> "全局 · ${item.subjectId}"
+    AiScope.ARTICLE -> item.subjectTitle ?: stringResource(R.string.subject_article, item.subjectId)
+    AiScope.FEED -> item.subjectTitle ?: stringResource(R.string.subject_feed, item.subjectId)
+    AiScope.GLOBAL -> stringResource(R.string.subject_global, item.subjectId)
 }
 
 /** 列表预览：取渲染结果的第一行有意义文本，省得用户为了看一句结论点开每一条。 */
@@ -437,7 +444,7 @@ private fun AiArtifactDetailSheet(
                 .padding(horizontal = 20.dp),
         ) {
             Text(
-                text = item.feature.label,
+                text = stringResource(item.feature.labelRes()),
                 style = MaterialTheme.typography.titleMedium,
                 color = colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
@@ -453,8 +460,8 @@ private fun AiArtifactDetailSheet(
                 text = listOf(
                     item.model,
                     timeFormat.format(Date(item.createdAt)),
-                    "输入 ${formatCount(item.inputChars.toLong())} 字",
-                    "输出 ${formatCount(item.outputChars.toLong())} 字",
+                    stringResource(R.string.artifacts_input_chars, formatCount(item.inputChars.toLong())),
+                    stringResource(R.string.artifacts_output_chars, formatCount(item.outputChars.toLong())),
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.textTertiary,
@@ -471,7 +478,7 @@ private fun AiArtifactDetailSheet(
             ) {
                 if (detail.lines.isEmpty()) {
                     Text(
-                        text = "这条产物没有可解析的内容",
+                        text = stringResource(R.string.artifact_unparseable),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.textSecondary,
                     )
@@ -486,7 +493,7 @@ private fun AiArtifactDetailSheet(
 
             TextButton(onClick = { showRaw = !showRaw }) {
                 Text(
-                    text = if (showRaw) "收起模型原文" else "查看模型原文",
+                    text = if (showRaw) stringResource(R.string.collapse_raw) else stringResource(R.string.view_raw),
                     color = colors.accent,
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
@@ -514,7 +521,7 @@ private fun AiArtifactDetailSheet(
                         modifier = Modifier.size(14.dp),
                     )
                     Spacer(Modifier.width(6.dp))
-                    Text("复制原文", color = colors.textSecondary, style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.copy_raw), color = colors.textSecondary, style = MaterialTheme.typography.bodySmall)
                 }
             }
 
@@ -523,12 +530,12 @@ private fun AiArtifactDetailSheet(
                 // 跳转按钮只在有落点时出现：点一个没接线的按钮，用户只会以为又坏了。
                 if (item.scope == AiScope.ARTICLE) {
                     TextButton(onClick = { onOpenArticle(item.subjectId) }) {
-                        Text("打开文章", color = colors.accent, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.open_article), color = colors.accent, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 if (item.scope == AiScope.FEED) {
                     TextButton(onClick = { onOpenFeed(item.subjectId) }) {
-                        Text("打开订阅源", color = colors.accent, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.open_feed), color = colors.accent, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 Spacer(Modifier.weight(1f))
@@ -540,7 +547,7 @@ private fun AiArtifactDetailSheet(
                         modifier = Modifier.size(14.dp),
                     )
                     Spacer(Modifier.width(6.dp))
-                    Text("删除", color = colors.textTertiary)
+                    Text(stringResource(R.string.delete), color = colors.textTertiary)
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -579,5 +586,12 @@ private fun PayloadLineRow(line: AiPayloadLine) {
 private fun formatCount(value: Long): String = when {
     value >= 100_000_000 -> String.format("%.1f亿", value / 100_000_000.0)
     value >= 10_000 -> String.format("%.1f万", value / 10_000.0)
+    else -> value.toString()
+}
+
+/** 英文语境的计数缩写（K/M），与中文 万/亿 口径一致。 */
+private fun formatCountEn(value: Long): String = when {
+    value >= 1_000_000 -> String.format("%.1fM", value / 1_000_000.0)
+    value >= 10_000 -> String.format("%.1fK", value / 1_000.0)
     else -> value.toString()
 }

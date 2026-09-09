@@ -28,6 +28,8 @@ object ReadingContentHtml {
         link: String,
         imageUrls: Set<String> = emptySet(),
         imageCorners: Int = ReadingImageState.DEFAULT_CORNER_RADIUS,
+        /** 沉浸阅读（issue #93）：注入降噪 CSS，隐藏分享/推荐/评论区等杂乱元素。 */
+        immersive: Boolean = false,
     ): String {
         val body = if (imageUrls.isEmpty()) {
             contentHtml
@@ -41,7 +43,8 @@ object ReadingContentHtml {
     <style>
         body { background:$bg; color:$fg; font-size:${style.fontSize}px; line-height:${style.lineHeight};
                padding:0 ${style.horizontalPadding}px; margin:0; word-break:break-word;
-               font-family:${style.fontFamily.cssStack}; }
+               font-family:${style.fontFamily.cssStack};
+               letter-spacing:${style.letterSpacing}px; text-align:${style.textAlign.css}; }
         img { max-width:100%; height:auto; border-radius:${imageCorners}px; }
         a { color:$link; text-decoration:underline; text-underline-offset:2px; }
         a.${ReadingImages.IMG_LINK_CLASS} { text-decoration:none; color:inherit; }
@@ -69,8 +72,26 @@ object ReadingContentHtml {
         .media-card { display:flex; align-items:center; gap:8px; background:$codeBg; border:1px solid $border;
                       border-radius:8px; padding:12px; margin:0 0 1em 0; color:$fg; text-decoration:none; font-size:0.9em; }
         .media-card span { color:$link; }
+        ${if (immersive) DENOISE_CSS else ""}
     </style></head>
     <body>$body</body></html>
 """.trimIndent()
     }
+
+    /**
+     * 降噪 CSS（沉浸阅读，issue #93）：WebView 路拿不到中间树，只能按选择器隐藏。
+     * 与 [com.cycling.rssradar.core.data.parser.ArticleExtractor] 的噪声选择器同一批
+     * 目标（导航/分享/推荐/评论/广告位）；只 display:none 不删节点，正文零风险。
+     */
+    private const val DENOISE_CSS = """
+        nav, aside, form, footer, [role=navigation], [role=complementary], [role=search],
+        .share, .sharing, .social, .social-share, .share-buttons, .shareto,
+        .related, .related-posts, .related-read, .recommend, .recommended, .reads,
+        .comment, .comments, #comments, .comment-box, #disqus_thread,
+        .breadcrumb, .breadcrumbs, .pagination, .pager, .page-nav,
+        .newsletter, .subscribe-box, .promo, .sponsor, .sponsored, .advert, .ads,
+        .sidebar, .widget, .author-bio, .copyright, .topbar, .toolbar,
+        .ds-like, .zan, .praise, [class*=advert], [class*=sponsor], [id*=advert],
+        ins.adsbygoogle { display:none !important; }
+    """
 }

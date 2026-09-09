@@ -1,5 +1,9 @@
 package com.cycling.rssradar.ui.article
 
+import androidx.compose.ui.res.stringResource
+
+import com.cycling.rssradar.R
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -109,7 +113,7 @@ fun AiArticleSheet(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "AI 分析",
+                    text = stringResource(R.string.ai_analysis),
                     style = MaterialTheme.typography.titleMedium,
                     color = radarColors().textPrimary,
                     fontWeight = FontWeight.SemiBold,
@@ -117,7 +121,7 @@ fun AiArticleSheet(
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "按需生成，生成后保存在本地，刷新不会覆盖。",
+                text = stringResource(R.string.ai_on_demand_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = radarColors().textTertiary,
             )
@@ -193,7 +197,7 @@ fun AiArticleSheet(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        "还没有生成任何分析，点上面的按钮试试",
+                        stringResource(R.string.ai_empty),
                         style = MaterialTheme.typography.bodyMedium,
                         color = radarColors().textTertiary,
                     )
@@ -268,7 +272,7 @@ private fun FeatureButtonGrid(
                         text = when {
                             ready -> "${feature.label} ✓"
                             on -> feature.label
-                            else -> "${feature.label} · 未开启"
+                            else -> stringResource(R.string.ai_feature_disabled, feature.label)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = fg,
@@ -286,14 +290,14 @@ private fun NoKeyBanner() {
     Surface(shape = RoundedCornerShape(12.dp), color = colors.surface2) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
             Text(
-                text = "未配置 API Key",
+                text = stringResource(R.string.ai_key_missing),
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "AI 功能需要你自己的 DeepSeek Key。到「我的 → AI 与诊断」里填入后即可使用。",
+                text = stringResource(R.string.ai_key_needed_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.textSecondary,
             )
@@ -326,7 +330,7 @@ private fun QuestionBar(
             onValueChange = onValueChange,
             modifier = Modifier.weight(1f).heightIn(min = 52.dp),
             placeholder = {
-                Text("问这篇文章…", color = colors.textTertiary, style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.ai_ask_hint), color = colors.textTertiary, style = MaterialTheme.typography.bodyMedium)
             },
             maxLines = 3,
             shape = RoundedCornerShape(12.dp),
@@ -343,7 +347,7 @@ private fun QuestionBar(
         Spacer(Modifier.width(8.dp))
         TextButton(enabled = !askRunning, onClick = onAsk) {
             Text(
-                text = if (askRunning) "思考中" else "提问",
+                text = if (askRunning) stringResource(R.string.ai_thinking) else stringResource(R.string.ai_ask),
                 color = if (askEnabled) colors.accent else colors.textTertiary,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -352,14 +356,14 @@ private fun QuestionBar(
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "也可以输入一个术语，解释它在本文中的含义",
+                text = stringResource(R.string.ai_term_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.textTertiary,
                 modifier = Modifier.weight(1f),
             )
             TextButton(enabled = !explainRunning, onClick = onExplain) {
                 Text(
-                    text = if (explainRunning) "查证中" else "解释术语",
+                    text = if (explainRunning) stringResource(R.string.ai_verifying) else stringResource(R.string.ai_explain_term),
                     color = if (explainEnabled) colors.accent else colors.textTertiary,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -435,10 +439,10 @@ private fun ChipFlow(items: List<String>) {
 @Composable
 private fun ClassifyBody(payload: AiClassifyPayload) {
     val colors = radarColors()
-    Text("${payload.topic}  ·  置信度 ${(payload.confidence * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+    Text(stringResource(R.string.ai_topic_confidence, payload.topic, (payload.confidence * 100).toInt()), style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
     if (payload.alternatives.isNotEmpty()) {
         Spacer(Modifier.height(6.dp))
-        Text("也可能是：${payload.alternatives.joinToString(" / ")}", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
+        Text(stringResource(R.string.ai_alternatives, payload.alternatives.joinToString(" / ")), style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
     }
 }
 
@@ -446,11 +450,11 @@ private fun ClassifyBody(payload: AiClassifyPayload) {
 private fun SentimentBody(payload: AiSentimentPayload) {
     val colors = radarColors()
     val label = when (payload.polarity) {
-        "POSITIVE" -> "偏正面"
-        "NEGATIVE" -> "偏负面"
-        else -> "中性"
+        "POSITIVE" -> stringResource(R.string.ai_sentiment_positive)
+        "NEGATIVE" -> stringResource(R.string.ai_sentiment_negative)
+        else -> stringResource(R.string.ai_sentiment_neutral)
     }
-    Text("$label  ·  强度 ${(payload.score * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+    Text(stringResource(R.string.ai_sentiment_score, label, (payload.score * 100).toInt()), style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
     if (payload.reason.isNotBlank()) {
         Spacer(Modifier.height(6.dp))
         Text(payload.reason, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
@@ -460,13 +464,13 @@ private fun SentimentBody(payload: AiSentimentPayload) {
 @Composable
 private fun QualityBody(payload: AiQualityPayload) {
     val colors = radarColors()
-    Text("综合 ${payload.overall} / 100", style = MaterialTheme.typography.titleSmall, color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
+    Text(stringResource(R.string.ai_overall, payload.overall), style = MaterialTheme.typography.titleSmall, color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
     Spacer(Modifier.height(8.dp))
-    ScoreBar("信息密度", payload.density)
-    ScoreBar("原创性", payload.originality)
-    ScoreBar("证据充分性", payload.evidence)
+    ScoreBar(stringResource(R.string.ai_info_density), payload.density)
+    ScoreBar(stringResource(R.string.ai_originality), payload.originality)
+    ScoreBar(stringResource(R.string.ai_evidence), payload.evidence)
     // 标题党是**反向指标**：越高越糟，这里用倒置后的长度显示，避免"条越长越好"的误读。
-    ScoreBar("标题党程度", payload.clickbait, inverted = true)
+    ScoreBar(stringResource(R.string.ai_clickbait), payload.clickbait, inverted = true)
     if (payload.note.isNotBlank()) {
         Spacer(Modifier.height(8.dp))
         Text(payload.note, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
@@ -502,17 +506,17 @@ private fun ScoreBar(label: String, value: Int, inverted: Boolean = false) {
 @Composable
 private fun NoiseBody(payload: AiNoisePayload) {
     val colors = radarColors()
-    Text("信息价值 ${payload.value} / 100", style = MaterialTheme.typography.titleSmall, color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
+    Text(stringResource(R.string.ai_value, payload.value), style = MaterialTheme.typography.titleSmall, color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
     if (payload.isNoise && payload.reasons.isNotEmpty()) {
         Spacer(Modifier.height(8.dp))
-        Text("噪声信号", style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
+        Text(stringResource(R.string.ai_noise), style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
         payload.reasons.forEach { reason ->
             Text("· $reason", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
         }
     }
     if (payload.keptPoints.isNotEmpty()) {
         Spacer(Modifier.height(8.dp))
-        Text("实质要点", style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
+        Text(stringResource(R.string.ai_key_points), style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
         payload.keptPoints.forEach { point ->
             Text("· $point", style = MaterialTheme.typography.bodySmall, color = colors.textPrimary)
         }
@@ -550,9 +554,9 @@ private fun OpinionBody(payload: AiOpinionPayload) {
     val colors = radarColors()
     payload.claims.forEach { claim ->
         val kind = when (claim.kind) {
-            "FACT" -> "事实"
-            "DATA" -> "数据"
-            else -> "观点"
+            "FACT" -> stringResource(R.string.ai_fact)
+            "DATA" -> stringResource(R.string.ai_data)
+            else -> stringResource(R.string.ai_opinion)
         }
         Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -573,7 +577,7 @@ private fun OpinionBody(payload: AiOpinionPayload) {
                 )
             }
             if (claim.basis.isNotBlank()) {
-                Text("依据：${claim.basis}", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
+                Text(stringResource(R.string.ai_claim_basis, claim.basis), style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
             }
         }
     }
@@ -583,10 +587,10 @@ private fun OpinionBody(payload: AiOpinionPayload) {
 private fun CredibilityBody(payload: AiCredibilityPayload) {
     val colors = radarColors()
     val label = when (payload.level) {
-        "HIGH" -> "信号较强"
-        "MEDIUM" -> "信号一般"
-        "LOW" -> "信号较弱"
-        else -> "信息不足"
+        "HIGH" -> stringResource(R.string.ai_signal_strong)
+        "MEDIUM" -> stringResource(R.string.ai_signal_medium)
+        "LOW" -> stringResource(R.string.ai_signal_weak)
+        else -> stringResource(R.string.ai_signal_insufficient)
     }
     Text(label, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
     if (payload.signals.isNotEmpty()) {
@@ -595,7 +599,7 @@ private fun CredibilityBody(payload: AiCredibilityPayload) {
     }
     if (payload.doubts.isNotEmpty()) {
         Spacer(Modifier.height(6.dp))
-        Text("存疑点：${payload.doubts.joinToString("；")}", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+        Text(stringResource(R.string.ai_doubts, payload.doubts.joinToString("；")), style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
     }
 }
 
@@ -604,9 +608,9 @@ private fun ShareBody(payload: AiSharePayload) {
     val colors = radarColors()
     payload.variants.forEach { variant ->
         val label = when (variant.style) {
-            "THREAD" -> "长推"
-            "BULLET" -> "要点体"
-            else -> "短评"
+            "THREAD" -> stringResource(R.string.ai_style_long)
+            "BULLET" -> stringResource(R.string.ai_style_bullets)
+            else -> stringResource(R.string.ai_style_short)
         }
         Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
             Text(label, style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
@@ -622,14 +626,14 @@ private fun QaBody(payload: AiQaPayload) {
     Text(payload.answer, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
     if (payload.quotes.isNotEmpty()) {
         Spacer(Modifier.height(8.dp))
-        Text("依据", style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
+        Text(stringResource(R.string.ai_basis), style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
         payload.quotes.forEach { quote ->
             Text("「$quote」", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
         }
     }
     if (payload.notFound) {
         Spacer(Modifier.height(6.dp))
-        Text("文中未提及", style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
+        Text(stringResource(R.string.ai_not_in_article), style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
     }
 }
 
@@ -657,14 +661,14 @@ private fun FulltextBody(payload: AiFulltextPayload) {
     val colors = radarColors()
     if (!payload.ok) {
         Text(
-            payload.note.ifBlank { "未能从该页面提取到正文" },
+            payload.note.ifBlank { stringResource(R.string.ai_no_content) },
             style = MaterialTheme.typography.bodySmall,
             color = colors.textSecondary,
         )
         return
     }
     Text(
-        "已提取 ${payload.html.length} 字并写入正文，向上滚动即可阅读",
+        stringResource(R.string.ai_fulltext_done, payload.html.length),
         style = MaterialTheme.typography.bodySmall,
         color = colors.textPrimary,
     )

@@ -1,5 +1,16 @@
 package com.cycling.rssradar.ui.article
 
+import androidx.compose.ui.res.stringResource
+
+import com.cycling.rssradar.R
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,12 +53,14 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -64,11 +77,19 @@ import com.cycling.rssradar.core.data.store.ReadingImageState
 import com.cycling.rssradar.core.data.store.ReadingPrefs
 import com.cycling.rssradar.core.data.store.ReadingRenderer
 import com.cycling.rssradar.core.data.store.ReadingStyleState
+import com.cycling.rssradar.core.data.store.ReadingTextAlign
+import com.cycling.rssradar.core.data.store.ReadingTheme
 import com.cycling.rssradar.core.data.store.coerceFontSize
+import com.cycling.rssradar.core.data.store.coerceLetterSpacing
 import com.cycling.rssradar.core.data.store.coerceImageCornerRadius
 import com.cycling.rssradar.core.data.store.coerceLineHeight
 import com.cycling.rssradar.core.data.store.coercePadding
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
+import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
+import com.cycling.rssradar.core.ui.theme.LocalRadarColors
+import com.cycling.rssradar.core.ui.theme.isLightBackground
+import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.ui.theme.ApplySystemBarIcons
 import com.cycling.rssradar.ui.components.shareArticle
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Bookmark
@@ -85,7 +106,6 @@ import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.Type
 import kotlin.math.roundToInt
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 
 /**
@@ -94,8 +114,43 @@ import com.cycling.rssradar.core.ui.theme.radarColors
  */
 private data class ImageViewer(val images: List<String>, val index: Int)
 
+/**
+ * 阅读页外壳：只负责把**阅读主题**（#16）装到 CompositionLocal 上。
+ *
+ * 为什么包在外面而不是逐处取色：阅读页有上百处 `radarColors()`（顶栏、底栏、
+ * 卡片、正文、WebView 注入的 CSS 全读它），逐处改必然漏。这里整页覆盖
+ * [LocalRadarColors]，下游零改动自动跟随；系统栏图标也跟着阅读页底色翻。
+ */
 @Composable
 fun ArticleDetailScreen(
+    viewModel: ArticleDetailViewModel,
+    articleId: Long,
+    onBack: () -> Unit,
+    onOpenOriginal: (String) -> Unit = {},
+    /** 相关阅读卡片点击跳转（AiFeature.RELATED）。 */
+    onOpenArticle: (Long) -> Unit = {},
+) {
+    val readingPrefs by viewModel.readingPrefs.collectAsState()
+    val appColors = radarColors()
+    val pageColors = remember(readingPrefs.readingTheme, appColors) {
+        readingPrefs.readingTheme.pageColors(appColors)
+    }
+    // 深色模式下开「纸张」时状态栏图标必须变深色，否则一片糊。
+    // 退出阅读页由 ApplySystemBarIcons 的 onDispose 还原成应用主题。
+    ApplySystemBarIcons(darkTheme = !pageColors.isLightBackground())
+    CompositionLocalProvider(LocalRadarColors provides pageColors) {
+        ArticleDetailBody(
+            viewModel = viewModel,
+            articleId = articleId,
+            onBack = onBack,
+            onOpenOriginal = onOpenOriginal,
+            onOpenArticle = onOpenArticle,
+        )
+    }
+}
+
+@Composable
+private fun ArticleDetailBody(
     viewModel: ArticleDetailViewModel,
     articleId: Long,
     onBack: () -> Unit,
@@ -106,6 +161,8 @@ fun ArticleDetailScreen(
     val article by viewModel.article.collectAsState()
     val initialLoadDone by viewModel.initialLoadDone.collectAsState()
     val isFetchingContent by viewModel.isFetchingContent.collectAsState()
+    val contentFetchState by viewModel.contentFetch.collectAsState()
+    val preferSummary by viewModel.preferSummary.collectAsState()
     val aiSummaryState by viewModel.aiSummaryState.collectAsState()
     val translationState by viewModel.translationState.collectAsState()
     val neighbors by viewModel.neighbors.collectAsState()
@@ -131,6 +188,27 @@ fun ArticleDetailScreen(
     // 标题完全滚出视口所需的滚动量（标题 top + 高度，onGloballyPositioned 量出）。
     // 初值 Int.MAX_VALUE = 未量出前顶栏不显标题。
     var titleHideOffset by remember { mutableStateOf(Int.MAX_VALUE) }
+    // 工具栏随滚动自动隐藏（ReadYou 差距表 #22）。两种滚动容器只有一个在动：
+    // 整页模式走 scrollState，视口模式走 WebView 内部滚动量 headerScrollY，
+    // 取二者较大值即当前真实滚动位置。
+    // 判据在 AutoHideBars.kt（纯函数，JVM 可测）；这里只负责采样与写状态，
+    // 且只在「显隐翻转」时更新——每帧都写会在滚动中引发无谓的重组。
+    val autoHideBars = readingPrefs.autoHideBars
+    var barsVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(autoHideBars) {
+        if (!autoHideBars) {
+            barsVisible = true
+            return@LaunchedEffect
+        }
+        var lastY = 0
+        snapshotFlow { maxOf(scrollState.value, headerScrollY) }
+            .collect { y ->
+                val next = nextBarsVisible(autoHideBars, lastY, y, barsVisible)
+                lastY = y
+                if (next != barsVisible) barsVisible = next
+            }
+    }
+    val reducedMotion = LocalReducedMotion.current
     LaunchedEffect(articleId) {
         viewModel.load(articleId)
         scrollState.scrollTo(0)
@@ -152,6 +230,22 @@ fun ArticleDetailScreen(
         containerColor = radarColors().bgRoot,
         snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
+            // 收起用 shrink/expand 而不是 slide：Scaffold 的 content padding 按这两个
+            // 槽位的实测高度算，只有高度真的动画到 0，正文区才平滑地吃掉这块空间；
+            // 用位移动画的话高度在动画结束瞬间突变，正文会"跳"一下。
+            AnimatedVisibility(
+                visible = barsVisible,
+                enter = if (reducedMotion) {
+                    EnterTransition.None
+                } else {
+                    fadeIn() + expandVertically(expandFrom = Alignment.Top)
+                },
+                exit = if (reducedMotion) {
+                    ExitTransition.None
+                } else {
+                    fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+                },
+            ) {
             ArticleDetailTopBar(
                 title = article?.article?.title,
                 // 两种模式任一把标题滚出视口都补位显示
@@ -177,8 +271,22 @@ fun ArticleDetailScreen(
                 aiSummaryState = aiSummaryState,
                 onGenerateSummary = { viewModel.onIntent(ArticleDetailIntent.GenerateSummary) },
             )
+            }
         },
         bottomBar = {
+            AnimatedVisibility(
+                visible = barsVisible,
+                enter = if (reducedMotion) {
+                    EnterTransition.None
+                } else {
+                    fadeIn() + expandVertically(expandFrom = Alignment.Bottom)
+                },
+                exit = if (reducedMotion) {
+                    ExitTransition.None
+                } else {
+                    fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom)
+                },
+            ) {
             article?.let { item ->
                 ArticleActionsBar(
                     isStarred = item.article.isStarred,
@@ -193,6 +301,7 @@ fun ArticleDetailScreen(
                     onOpenAi = { showAiSheet = true },
                 )
             }
+            }
         },
     ) { padding ->
         val current = article
@@ -205,7 +314,7 @@ fun ArticleDetailScreen(
             ) {
                 if (initialLoadDone) {
                     // 查过了、确实没有，才可以说「文章不存在」
-                    Text("文章不存在", color = radarColors().textSecondary)
+                    Text(stringResource(R.string.article_not_found), color = radarColors().textSecondary)
                 } else {
                     // 首查进行中（issue #73）：此前的 null 会闪一帧「文章不存在」
                     CircularProgressIndicator(
@@ -217,10 +326,36 @@ fun ArticleDetailScreen(
             }
             return@Scaffold
         }
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                // 越界切篇（#23）：挂在滚动容器的祖先上，只观察不消费滚动量。
+                // 视口模式由 WebView 内部滚动，拿不到越界量，那里不生效。
+                .pullToSwitchArticle(
+                    enabled = readingPrefs.pullToSwitchArticle,
+                    atTop = { scrollState.value == 0 },
+                    atBottom = { scrollState.maxValue > 0 && scrollState.value >= scrollState.maxValue },
+                    hasPrev = neighbors.prevId != null,
+                    hasNext = neighbors.nextId != null,
+                    onSwitch = { target ->
+                        when (target) {
+                            PullTarget.PREVIOUS -> neighbors.prevId?.let(viewModel::load)
+                            PullTarget.NEXT -> neighbors.nextId?.let(viewModel::load)
+                            PullTarget.NONE -> Unit
+                        }
+                    },
+                ),
+        ) {
             ReadingBody(
                 article = current,
                 isFetchingContent = isFetchingContent,
+                contentFetchState = contentFetchState,
+                onRetryFetch = { viewModel.onIntent(ArticleDetailIntent.RetryFetch) },
+                preferSummary = preferSummary,
+                onShowFullContent = {
+                    viewModel.onIntent(ArticleDetailIntent.SetPreferSummary(false))
+                },
                 aiSummaryState = aiSummaryState,
                 translationState = translationState,
                 scrollState = scrollState,
@@ -285,11 +420,39 @@ fun ArticleDetailScreen(
             onFontFamily = { v ->
                 viewModel.updateReadingPrefs { it.copy(style = it.style.copy(fontFamily = v)) }
             },
+            onLetterSpacing = { v ->
+                viewModel.updateReadingPrefs { it.copy(style = it.style.copy(letterSpacing = v)) }
+            },
+            onTextAlign = { v ->
+                viewModel.updateReadingPrefs { it.copy(style = it.style.copy(textAlign = v)) }
+            },
             onImageCornerRadius = { v ->
                 viewModel.updateReadingPrefs { it.copy(image = it.image.copy(cornerRadius = v)) }
             },
             onImageMaximize = { v ->
                 viewModel.updateReadingPrefs { it.copy(image = it.image.copy(maximizeOnTap = v)) }
+            },
+            onImmersive = { v ->
+                viewModel.updateReadingPrefs { it.copy(immersive = v) }
+            },
+            autoHideBars = readingPrefs.autoHideBars,
+            onAutoHideBars = { v ->
+                viewModel.updateReadingPrefs { it.copy(autoHideBars = v) }
+            },
+            onReadingTheme = { v ->
+                viewModel.updateReadingPrefs { it.copy(readingTheme = v) }
+            },
+            onPullToSwitch = { v ->
+                viewModel.updateReadingPrefs { it.copy(pullToSwitchArticle = v) }
+            },
+            // 正文/摘要：只在两者实质不同时给（canSwitchToSummary），否则点了等于没点
+            canSwitchToSummary = canSwitchToSummary(
+                content = article?.article?.content,
+                summary = article?.article?.summary,
+            ),
+            preferSummary = preferSummary,
+            onPreferSummary = { v ->
+                viewModel.onIntent(ArticleDetailIntent.SetPreferSummary(v))
             },
             onDismiss = { showStyleSheet = false },
         )
@@ -332,7 +495,7 @@ private fun ArticleDetailTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onBack) {
-            Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = radarColors().textPrimary)
+            Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.nav_back), tint = radarColors().textPrimary)
         }
         // 标题滚出视口后顶栏补位显示（用户反馈）；阅读中隐藏，不占阅读注意力
         Box(modifier = Modifier.weight(1f)) {
@@ -360,7 +523,7 @@ private fun ArticleDetailTopBar(
                 IconButton(onClick = onGenerateSummary) {
                     Icon(
                         Lucide.Sparkles,
-                        contentDescription = "生成 AI 摘要",
+                        contentDescription = stringResource(R.string.ai_gen_summary),
                         tint = if (aiSummaryState is AiSummaryState.Failed) radarColors().accent else radarColors().textPrimary,
                     )
                 }
@@ -370,7 +533,7 @@ private fun ArticleDetailTopBar(
         IconButton(onClick = onToggleTranslation, enabled = !isGeneratingTranslation) {
             Icon(
                 Lucide.Languages,
-                contentDescription = if (isShowingTranslation) "切回原文" else "AI 翻译",
+                contentDescription = if (isShowingTranslation) stringResource(R.string.ai_back_to_original) else stringResource(R.string.ai_translate),
                 tint = if (isShowingTranslation || isGeneratingTranslation) radarColors().accent else radarColors().textPrimary,
             )
         }
@@ -378,14 +541,14 @@ private fun ArticleDetailTopBar(
         Box {
             var menuExpanded by remember { mutableStateOf(false) }
             IconButton(onClick = { menuExpanded = true }) {
-                Icon(Lucide.EllipsisVertical, contentDescription = "更多操作", tint = radarColors().textPrimary)
+                Icon(Lucide.EllipsisVertical, contentDescription = stringResource(R.string.more_actions), tint = radarColors().textPrimary)
             }
             DropdownMenu(
                 expanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false },
             ) {
                 DropdownMenuItem(
-                    text = { Text("分享") },
+                    text = { Text(stringResource(R.string.share)) },
                     leadingIcon = { Icon(Lucide.Share2, contentDescription = null) },
                     onClick = {
                         menuExpanded = false
@@ -393,7 +556,7 @@ private fun ArticleDetailTopBar(
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("排版设置") },
+                    text = { Text(stringResource(R.string.typography_settings)) },
                     leadingIcon = { Icon(Lucide.Type, contentDescription = null) },
                     onClick = {
                         menuExpanded = false
@@ -420,9 +583,24 @@ private fun ReadingStyleSheet(
     onFontSize: (Int) -> Unit,
     onLineHeight: (Float) -> Unit,
     onPadding: (Int) -> Unit,
+    onLetterSpacing: (Float) -> Unit,
+    onTextAlign: (ReadingTextAlign) -> Unit,
     onFontFamily: (ReadingFontFamily) -> Unit,
     onImageCornerRadius: (Int) -> Unit,
     onImageMaximize: (Boolean) -> Unit,
+    onImmersive: (Boolean) -> Unit,
+    /** 滚动时自动隐藏工具栏（ReadYou 差距表 #22）；与 [onImmersive] 是两件事。 */
+    autoHideBars: Boolean = false,
+    onAutoHideBars: (Boolean) -> Unit = {},
+    /** 阅读主题（ReadYou 差距表 #16）：四档配色，只换背景/表面/文字。 */
+    onReadingTheme: (ReadingTheme) -> Unit = {},
+    /** 越界切篇（ReadYou 差距表 #23）：顶部下拉看上一篇、底部上拉看下一篇。 */
+    onPullToSwitch: (Boolean) -> Unit = {},
+    /** 本文能否在「正文 / 摘要」之间切（[canSwitchToSummary]）：不能切时整块不出现。 */
+    canSwitchToSummary: Boolean = false,
+    /** 当前是否切成摘要。 */
+    preferSummary: Boolean = false,
+    onPreferSummary: (Boolean) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     val style = prefs.style
@@ -435,17 +613,94 @@ private fun ReadingStyleSheet(
                 .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
         ) {
             Text(
-                text = "排版设置",
+                text = stringResource(R.string.typography_settings),
                 color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(8.dp))
 
+            // 本文：正文 / 摘要（ReadYou 的 renderFullContent/renderDescriptionContent 同款）。
+            // 只在两者实质不同时给这一块：ADR-0001 入库时取 description 与 content 的较长者，
+            // 大量源的 content 就是 summary——那时给个开关，点下去屏幕纹丝不动。
+            // 没有意义的按钮不该存在，所以不成立时整块不渲染。
+            if (canSwitchToSummary) {
+                Text(
+                    text = stringResource(R.string.body_section),
+                    color = radarColors().textPrimary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(false to stringResource(R.string.body_full), true to stringResource(R.string.body_summary)).forEach { (isSummary, label) ->
+                        val selected = isSummary == preferSummary
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = if (selected) radarColors().accent else radarColors().surface2,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onPreferSummary(isSummary) },
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (selected) radarColors().onAccent else radarColors().textSecondary,
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp),
+                            )
+                        }
+                    }
+                }
+                Text(
+                    text = stringResource(R.string.summary_hint),
+                    color = radarColors().textTertiary,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+
+            // 阅读主题（ReadYou 差距表 #16）：四档。只换「纸的颜色」——背景/表面/文字，
+            // 强调色仍跟随应用（含 #29 的自定义色），且不随系统深浅变化：挑「纸张」
+            // 就是为了在深色模式下也要米黄纸。
+            Text(
+                text = stringResource(R.string.reading_theme),
+                color = radarColors().textPrimary,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ReadingTheme.entries.forEach { theme ->
+                    val selected = theme == prefs.readingTheme
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (selected) radarColors().accent else radarColors().surface2,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onReadingTheme(theme) },
+                    ) {
+                        Text(
+                            text = theme.label,
+                            color = if (selected) radarColors().onAccent else radarColors().textSecondary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        )
+                    }
+                }
+            }
+            Text(
+                text = stringResource(R.string.reading_theme_hint),
+                color = radarColors().textTertiary,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Spacer(Modifier.height(12.dp))
+
             // 正文渲染器：WebView / 原生 Compose 二选一（ADR-0009）。
             // 原生路对表格/视频/内联样式退化，仅建议被 WebView 滚动闪烁困扰时启用。
             Text(
-                text = "正文渲染器",
+                text = stringResource(R.string.body_renderer),
                 color = radarColors().textPrimary,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(bottom = 4.dp),
@@ -475,13 +730,13 @@ private fun ReadingStyleSheet(
             // 字号：步进
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "字号",
+                    text = stringResource(R.string.font_size),
                     color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = { onFontSize(coerceFontSize(style.fontSize - 1)) }) {
-                    Icon(Lucide.Minus, contentDescription = "减小字号", tint = radarColors().textPrimary, modifier = Modifier.size(18.dp))
+                    Icon(Lucide.Minus, contentDescription = stringResource(R.string.font_decrease), tint = radarColors().textPrimary, modifier = Modifier.size(18.dp))
                 }
                 Text(
                     text = "${style.fontSize}",
@@ -491,14 +746,14 @@ private fun ReadingStyleSheet(
                     modifier = Modifier.width(40.dp),
                 )
                 IconButton(onClick = { onFontSize(coerceFontSize(style.fontSize + 1)) }) {
-                    Icon(Lucide.Plus, contentDescription = "增大字号", tint = radarColors().textPrimary, modifier = Modifier.size(18.dp))
+                    Icon(Lucide.Plus, contentDescription = stringResource(R.string.font_increase), tint = radarColors().textPrimary, modifier = Modifier.size(18.dp))
                 }
             }
 
             // 行距：滑杆（0.8–2.5）
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "行距",
+                    text = stringResource(R.string.line_height),
                     color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.width(72.dp),
@@ -521,7 +776,7 @@ private fun ReadingStyleSheet(
             // 边距：滑杆（0–48dp）
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "边距",
+                    text = stringResource(R.string.margin),
                     color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.width(72.dp),
@@ -542,6 +797,59 @@ private fun ReadingStyleSheet(
             }
 
             Spacer(Modifier.height(8.dp))
+            // 字间距（ReadYou 差距表 #17）：中文长段落拉开一点明显好读
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.letter_spacing),
+                    color = radarColors().textPrimary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.width(72.dp),
+                )
+                Slider(
+                    value = style.letterSpacing,
+                    onValueChange = { onLetterSpacing(coerceLetterSpacing(it)) },
+                    valueRange = ReadingStyleState.LETTER_SPACING_MIN..ReadingStyleState.LETTER_SPACING_MAX,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "%.1f".format(style.letterSpacing),
+                    color = radarColors().textPrimary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(40.dp),
+                )
+            }
+
+            // 正文对齐（ReadYou 差距表 #17）：只作用于没有自带 align 声明的段落，
+            // 正文里写死的居中/右对齐是内容的一部分，不该被全局偏好盖掉。
+            Text(
+                text = stringResource(R.string.text_align),
+                color = radarColors().textPrimary,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ReadingTextAlign.entries.forEach { align ->
+                    val selected = align == style.textAlign
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (selected) radarColors().accent else radarColors().surface2,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onTextAlign(align) },
+                    ) {
+                        Text(
+                            text = align.label,
+                            color = if (selected) radarColors().onAccent else radarColors().textSecondary,
+                            style = MaterialTheme.typography.labelLarge,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+
             // 字体族：三选一
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ReadingFontFamily.entries.forEach { family ->
@@ -569,14 +877,14 @@ private fun ReadingStyleSheet(
             // 图片（issue #60）：圆角直接改 CSS/Compose 形状；点击放大关掉后，
             // 正文不再把 <img> 包成链接，点图在 WebView 里自然无反应。
             Text(
-                text = "图片",
+                text = stringResource(R.string.images),
                 color = radarColors().textPrimary,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "圆角",
+                    text = stringResource(R.string.corner_radius),
                     color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.width(72.dp),
@@ -601,7 +909,7 @@ private fun ReadingStyleSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "点击放大",
+                    text = stringResource(R.string.tap_to_zoom),
                     color = radarColors().textPrimary,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f),
@@ -609,6 +917,93 @@ private fun ReadingStyleSheet(
                 Switch(
                     checked = image.maximizeOnTap,
                     onCheckedChange = onImageMaximize,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = radarColors().onAccent,
+                        checkedTrackColor = radarColors().accent,
+                    ),
+                )
+            }
+
+            // 沉浸模式（issue #93）：只留正文与图片，剥掉分享/推荐/评论等网页杂乱元素
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.immersive_mode),
+                        color = radarColors().textPrimary,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = stringResource(R.string.immersive_hint),
+                        color = radarColors().textTertiary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Switch(
+                    checked = prefs.immersive,
+                    onCheckedChange = onImmersive,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = radarColors().onAccent,
+                        checkedTrackColor = radarColors().accent,
+                    ),
+                )
+            }
+
+            Spacer(Modifier.height(4.dp))
+            // 自动隐藏工具栏（ReadYou 差距表 #22）：**不是**上面那个沉浸模式——
+            // 那是砍内容噪声，这只是把顶栏/底栏收起来腾阅读空间。名字必须分开，
+            // 否则两个开关共用一个形容词，用户（和两周后的我们）分不清谁干啥。
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.auto_hide_bars),
+                        color = radarColors().textPrimary,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = stringResource(R.string.auto_hide_hint),
+                        color = radarColors().textTertiary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Switch(
+                    checked = autoHideBars,
+                    onCheckedChange = onAutoHideBars,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = radarColors().onAccent,
+                        checkedTrackColor = radarColors().accent,
+                    ),
+                )
+            }
+
+            Spacer(Modifier.height(4.dp))
+            // 越界切篇（ReadYou 差距表 #23）。默认关：手势换掉正在读的东西是强感知改动。
+            // 只做「上/下篇切换」，ReadYou 那个「下拉加载下一个 feed」不做——
+            // 那会悄悄换掉你正在看的东西，是惊喜不是功能。
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.pull_switch),
+                        color = radarColors().textPrimary,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = stringResource(R.string.pull_switch_hint),
+                        color = radarColors().textTertiary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Switch(
+                    checked = prefs.pullToSwitchArticle,
+                    onCheckedChange = onPullToSwitch,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = radarColors().onAccent,
                         checkedTrackColor = radarColors().accent,
@@ -648,7 +1043,7 @@ private fun ArticleActionsBar(
             ActionIcon(
                 icon = Lucide.ChevronLeft,
                 checked = false,
-                contentDescription = "上一篇",
+                contentDescription = stringResource(R.string.prev_article),
                 enabled = hasPrev,
                 size = 40.dp,
                 onClick = onPrev,
@@ -657,20 +1052,20 @@ private fun ArticleActionsBar(
             ActionIcon(
                 icon = Lucide.ChevronRight,
                 checked = false,
-                contentDescription = "下一篇",
+                contentDescription = stringResource(R.string.next_article),
                 enabled = hasNext,
                 size = 40.dp,
                 onClick = onNext,
             )
             Spacer(Modifier.weight(1f))
-            ActionIcon(icon = Lucide.Star, checked = isStarred, contentDescription = "收藏", size = 40.dp, onClick = onStar)
+            ActionIcon(icon = Lucide.Star, checked = isStarred, contentDescription = stringResource(R.string.star), size = 40.dp, onClick = onStar)
             Spacer(Modifier.width(8.dp))
-            ActionIcon(icon = Lucide.Bookmark, checked = isBookmarked, contentDescription = "稍后读", size = 40.dp, onClick = onBookmark)
+            ActionIcon(icon = Lucide.Bookmark, checked = isBookmarked, contentDescription = stringResource(R.string.read_later), size = 40.dp, onClick = onBookmark)
             Spacer(Modifier.width(8.dp))
             ActionIcon(
                 icon = Lucide.Sparkles,
                 checked = false,
-                contentDescription = "AI 分析",
+                contentDescription = stringResource(R.string.ai_analysis),
                 size = 40.dp,
                 onClick = onOpenAi,
             )
@@ -678,7 +1073,7 @@ private fun ArticleActionsBar(
             ActionIcon(
                 icon = Lucide.ExternalLink,
                 checked = true,
-                contentDescription = "查看原文",
+                contentDescription = stringResource(R.string.view_original),
                 size = 40.dp,
                 onClick = onOpenOriginal,
             )
@@ -739,7 +1134,7 @@ private fun RelatedArticlesStrip(
     val colors = radarColors()
     Column(Modifier.fillMaxWidth()) {
         Text(
-            text = "相关阅读",
+            text = stringResource(R.string.related_reads),
             style = MaterialTheme.typography.labelMedium,
             color = colors.textTertiary,
             fontWeight = FontWeight.SemiBold,

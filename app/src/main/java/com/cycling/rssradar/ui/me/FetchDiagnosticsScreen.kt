@@ -1,5 +1,12 @@
 package com.cycling.rssradar.ui.me
 
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.cycling.rssradar.R
+import com.cycling.rssradar.i18n.UiText
+import com.cycling.rssradar.ui.article.uiRes
+import com.cycling.rssradar.i18n.resolve
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -102,10 +109,10 @@ fun FetchDiagnosticsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = radarColors().textPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.back), tint = radarColors().textPrimary)
             }
             Text(
-                text = "全文抓取诊断",
+                text = stringResource(R.string.diag_title),
                 color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
@@ -113,7 +120,7 @@ fun FetchDiagnosticsScreen(
             )
             if (problems.isNotEmpty()) {
                 IconButton(onClick = viewModel::clear) {
-                    Icon(Lucide.Trash, contentDescription = "清空记录", tint = radarColors().textSecondary)
+                    Icon(Lucide.Trash, contentDescription = stringResource(R.string.diag_clear), tint = radarColors().textSecondary)
                 }
             }
         }
@@ -125,10 +132,10 @@ fun FetchDiagnosticsScreen(
                     .padding(horizontal = 20.dp, vertical = 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("暂无失败或不完整的抓取记录", color = radarColors().textSecondary, style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.diag_empty), color = radarColors().textSecondary, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "打开一篇摘要型文章并触发全文抓取后，这里会出现记录",
+                    stringResource(R.string.diag_empty_hint),
                     color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -136,7 +143,7 @@ fun FetchDiagnosticsScreen(
         } else {
 
         // ---- 按站点归因 ----
-        SectionTitle("按站点")
+        SectionTitle(stringResource(R.string.by_site))
         Surface(
             shape = RoundedCornerShape(14.dp),
             color = radarColors().surface1,
@@ -153,16 +160,16 @@ fun FetchDiagnosticsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = stat.host.ifBlank { "（未知站点）" },
+                            text = stat.host.ifBlank { stringResource(R.string.unknown_site) },
                             color = radarColors().textPrimary,
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
-                        StatChip(label = "失败 ${stat.failures}", danger = stat.failures > 0)
+                        StatChip(label = stringResource(R.string.diag_failures, stat.failures), danger = stat.failures > 0)
                         Spacer(Modifier.size(6.dp))
-                        StatChip(label = "不完整 ${stat.incomplete}", danger = false)
+                        StatChip(label = stringResource(R.string.diag_incomplete, stat.incomplete), danger = false)
                     }
                 }
             }
@@ -170,7 +177,7 @@ fun FetchDiagnosticsScreen(
 
         // ---- 明细清单 ----
         Spacer(Modifier.height(16.dp))
-        SectionTitle("明细（${problems.size} 条）")
+        SectionTitle(stringResource(R.string.diag_detail_count, problems.size))
         problems.forEach { log ->
             ProblemRow(log)
             Spacer(Modifier.height(8.dp))
@@ -204,7 +211,8 @@ private fun StatChip(label: String, danger: Boolean) {
 
 @Composable
 private fun ProblemRow(log: ContentFetchLogEntity) {
-    val (title, detail) = describe(log)
+    val context = LocalContext.current
+    val (title, detail) = describe(log, context)
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = radarColors().surface1,
@@ -257,29 +265,32 @@ private fun ProblemRow(log: ContentFetchLogEntity) {
 }
 
 /** 原因 → 中文文案；未知枚举值（老版本写入的）如实显示原始值，不编造。 */
-private fun describe(log: ContentFetchLogEntity): Pair<String, String> {
+private fun describe(log: ContentFetchLogEntity, context: Context): Pair<String, String> {
     if (!log.ok) {
         val failure = runCatching { FetchFailure.valueOf(log.failure.orEmpty()) }.getOrNull()
-        return (failure?.label ?: (log.failure ?: "失败")) to facts(log)
+        val label = failure?.uiRes()?.let { UiText.res(it) }
+            ?: (log.failure?.let { UiText.Raw(it) } ?: UiText.res(R.string.failure_label))
+        return label.resolve(context) to facts(log, context)
     }
     val issue = runCatching { ExtractionIssue.valueOf(log.issue.orEmpty()) }.getOrNull()
     val label = when (issue) {
-        ExtractionIssue.TOO_SHORT -> "正文过短"
-        ExtractionIssue.NO_PARAGRAPH -> "未找到正文段落"
-        ExtractionIssue.DYNAMIC_RENDER -> "疑似 JS 动态渲染"
-        ExtractionIssue.PAYWALL -> "疑似付费墙/登录墙"
-        ExtractionIssue.METADATA_MISSING -> "缺标题或时间"
-        else -> "正文不完整"
+        ExtractionIssue.TOO_SHORT -> UiText.res(R.string.issue_too_short)
+        ExtractionIssue.NO_PARAGRAPH -> UiText.res(R.string.issue_no_paragraph)
+        ExtractionIssue.DYNAMIC_RENDER -> UiText.res(R.string.issue_js_render)
+        ExtractionIssue.PAYWALL -> UiText.res(R.string.issue_paywall)
+        ExtractionIssue.METADATA_MISSING -> UiText.res(R.string.issue_missing_meta)
+        else -> UiText.res(R.string.issue_incomplete)
     }
-    return label to facts(log)
+    return label.resolve(context) to facts(log, context)
 }
 
-private fun facts(log: ContentFetchLogEntity): String = buildString {
-    append("重试 ${log.attempts} 次")
-    log.statusCode?.let { append(" · HTTP $it") }
-    if (log.pages > 1) append(" · ${log.pages} 页")
-    append(" · ${log.contentChars} 字")
-    append(" · ${log.durationMs} ms")
+private fun facts(log: ContentFetchLogEntity, context: Context): String {
+    val parts = mutableListOf<UiText>(UiText.res(R.string.diag_retries, "${log.attempts}"))
+    log.statusCode?.let { parts += UiText.Raw("HTTP $it") }
+    if (log.pages > 1) parts += UiText.res(R.string.diag_pages, "${log.pages}")
+    parts += UiText.res(R.string.diag_chars, "${log.contentChars}")
+    parts += UiText.Raw("${log.durationMs} ms")
+    return parts.joinToString(" · ") { it.resolve(context) }
 }
 
 private fun formatTime(millis: Long): String =

@@ -69,6 +69,9 @@ object AiPrompts {
     fun summaryVariableHelp(): String =
         "可用变量：${SUMMARY_VARIABLES.joinToString("、")}；留空则使用内置摘要提示词。"
 
+    /** 变量名列表（i18n：包装文案由 UI 层按当前语言渲染，变量本身不可翻译）。 */
+    fun summaryVariables(): List<String> = SUMMARY_VARIABLES
+
     /** 内置摘要提示词原文（提示词管理页预览用）。与 [summary] 实际生效的是同一份。 */
     fun builtInSummaryPrompt(): String = DEFAULT_SUMMARY_SYSTEM
 

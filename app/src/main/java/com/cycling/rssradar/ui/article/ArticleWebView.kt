@@ -1,5 +1,9 @@
 package com.cycling.rssradar.ui.article
 
+import androidx.compose.ui.res.stringResource
+
+import com.cycling.rssradar.R
+
 import android.view.MotionEvent
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -49,9 +53,10 @@ internal fun ArticleWebView(
     val link = toCssColor(radarColors().link)
     val style = LocalReadingPrefs.current.style
     val image = LocalReadingPrefs.current.image
+    val immersive = LocalReadingPrefs.current.immersive
     // 关闭"点击放大"就传空集合：正文不包链接，图片点击在 WebView 里自然无反应。
     val linkedImages = if (image.maximizeOnTap) imageUrls.toSet() else emptySet()
-    val styledHtml = remember(html, style, image, linkedImages, bg, fg, muted, codeBg, border, link) {
+    val styledHtml = remember(html, style, image, linkedImages, bg, fg, muted, codeBg, border, link, immersive) {
         ReadingContentHtml.build(
             contentHtml = html,
             style = style,
@@ -63,6 +68,7 @@ internal fun ArticleWebView(
             link = link,
             imageUrls = linkedImages,
             imageCorners = image.cornerRadius,
+            immersive = immersive,
         )
     }
     // factory 只跑一次，回调经 updated 引用保持最新
@@ -121,7 +127,7 @@ internal fun ArticleWebView(
                 settings.javaScriptEnabled = false
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 // 链接接管（视口模式生效；整页模式触摸穿透点不到，见 ADR-0007）：
-                // 一律不进 WebView 导航，http(s) 外链交系统浏览器（与"查看原文"一致），
+                // 一律不进 WebView 导航，http(s) 外链交系统浏览器（与stringResource(R.string.view_original)一致），
                 // 其余 scheme 静默丢弃——顺带消灭"原地导航把正文顶掉"的默认行为。
                 webViewClient = object : WebViewClient() {
                     override fun shouldOverrideUrlLoading(

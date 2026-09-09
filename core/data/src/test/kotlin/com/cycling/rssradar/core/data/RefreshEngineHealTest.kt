@@ -12,6 +12,7 @@ import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.lang.reflect.Proxy
+import java.util.Collections
 
 /**
  * 失效源自愈（连续解析失败后 autodiscovery 换地址）的行为契约。
@@ -61,8 +62,12 @@ class RefreshEngineHealTest {
         private val candidateBody: (String) -> String = { rss },
         private val feedCount: Int = 1,
     ) {
-        val urlUpdates = mutableListOf<Pair<Long, String>>()
-        val heals = mutableListOf<Triple<Long, String, String>>()
+        // 必须是同步容器：refreshAll 走 Semaphore(32) 并发，下面的回调会被多路协程同时
+        // 调用。普通 ArrayList 并发 add 会丢元素、甚至抛 ArrayIndexOutOfBounds——
+        // 而生产代码把 updateUrl 的异常当成「撞唯一索引」吞掉换下一个候选，
+        // 于是测试表现成「自愈数量随机少几个」这种隔三差五红一次的假故障。
+        val urlUpdates = Collections.synchronizedList(mutableListOf<Pair<Long, String>>())
+        val heals = Collections.synchronizedList(mutableListOf<Triple<Long, String, String>>())
 
         val feedDao: FeedDao = daoProxy { name, args ->
             when (name) {

@@ -1,5 +1,11 @@
 package com.cycling.rssradar.ui.article
 
+import com.cycling.rssradar.core.data.parser.FetchFailure
+
+import androidx.compose.ui.res.stringResource
+
+import com.cycling.rssradar.R
+
 import android.text.format.DateUtils
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
@@ -45,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.parser.ExtractionIssue
 import com.cycling.rssradar.core.data.store.BilingualLayout
 import com.cycling.rssradar.core.data.store.ReadingFontFamily
 import com.cycling.rssradar.core.data.store.ReadingStyleState
@@ -57,6 +64,7 @@ import com.composables.icons.lucide.CircleAlert
 import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
+import com.composables.icons.lucide.Type
 import kotlin.math.roundToInt
 import com.cycling.rssradar.core.ui.theme.radarColors
 
@@ -76,6 +84,17 @@ import com.cycling.rssradar.core.ui.theme.radarColors
 internal fun ReadingBody(
     article: ArticleWithFeed,
     isFetchingContent: Boolean,
+    /**
+     * 按需抓取的可见状态：失败要给出原因，不完整要说明是哪一类（ReadYou 的 Error 态同款）。
+     * 此前这些原因只有诊断页看得到，读者只看到「正在获取全文…」然后什么都没有。
+     */
+    contentFetchState: ContentFetchState,
+    /** 抓取失败后的重试出口（[ContentFetchState.Failed] 才出现）。 */
+    onRetryFetch: () -> Unit,
+    /** 读者手动切回订阅源摘要（[canSwitchToSummary] 为真时才有意义）。 */
+    preferSummary: Boolean = false,
+    /** 摘要态下「看正文」的回退出口：切换是单篇瞬时决定，必须有反向出口。 */
+    onShowFullContent: () -> Unit = {},
     aiSummaryState: AiSummaryState,
     translationState: TranslationState,
     scrollState: ScrollState,
@@ -111,16 +130,33 @@ internal fun ReadingBody(
         else -> emptyList()
     }
     val renderer = LocalReadingPrefs.current.renderer
+    val immersive = LocalReadingPrefs.current.immersive
     // 渲染模式与它所需的产物一次算清：判据本身要解析 HTML 才能知道"解析一无所获"，
     // 分开算就是同一份 HTML 解析两遍。纯函数，见 BodyMode.kt（可 JVM 单测）。
     // 导航丝滑（用户反馈）：长文 HTML 解析 + 图片正则提取是几十毫秒级的主线程阻塞，
     // 以前在 remember 里同步跑，正好砸在导航动画的帧上——表现为动画期间空白卡顿、
     // 正文"加载完才蹦出来"。改为后台线程计算，头部（源名/标题）立即渲染，解析完
     // 正文无缝接上；null = 还在算，正文区暂时留白。
-    var plan by remember(translationUi, translationSegments, article.article.content, article.article.summary, renderer) {
+    var plan by remember(
+        translationUi,
+        translationSegments,
+        article.article.content,
+        article.article.summary,
+        renderer,
+        immersive,
+        preferSummary,
+    ) {
         mutableStateOf<BodyPlan?>(null)
     }
-    LaunchedEffect(translationUi, translationSegments, article.article.content, article.article.summary, renderer) {
+    LaunchedEffect(
+        translationUi,
+        translationSegments,
+        article.article.content,
+        article.article.summary,
+        renderer,
+        immersive,
+        preferSummary,
+    ) {
         plan = withContext(Dispatchers.Default) {
             resolveBodyPlan(
                 translationActive = translationUi != null,
@@ -128,6 +164,8 @@ internal fun ReadingBody(
                 content = article.article.content,
                 summary = article.article.summary,
                 renderer = renderer,
+                preferSummary = preferSummary,
+                immersive = immersive,
             )
         }
     }
@@ -151,17 +189,20 @@ internal fun ReadingBody(
     // OOM 防线（闪退诊断）：整页包高的 WebView 会被 Chromium 视为全部内容可见，
     // 有图文章的所有图片同时解码进 Java 堆，图多必 OOM（256MB 堆几十秒吃满）。
     // 只有含图的 WebView 路受限，原生路与译文路没有这个约束。
-    val viewport = shouldUseViewport(resolvedPlan.mode, article.article.content)
+    // 摘要模式下「当前正文」是 summary 而不是 content：视口判定与图片列表都得换源，
+    // 否则会出现「按 content 判定无图 → 整页 WebView，实际渲染的是带图的摘要」这种错位。
+    val bodyHtml = if (resolvedPlan.summaryMode) article.article.summary else article.article.content
+    val viewport = shouldUseViewport(resolvedPlan.mode, bodyHtml)
     // 全屏查看页的多图列表与点击分流共用这一份；只有 WebView 路需要（译文路与原生路
     // 由 Compose 直接处理图片点击）。空串/无图正文 → 空集合，自动静默。
     // 与 plan 同批后台算：同为主线程正则，同样会卡导航动画的帧。
-    var imageUrls by remember(resolvedPlan.mode, article.article.content) {
+    var imageUrls by remember(resolvedPlan.mode, bodyHtml) {
         mutableStateOf(emptyList<String>())
     }
-    LaunchedEffect(resolvedPlan.mode, article.article.content) {
+    LaunchedEffect(resolvedPlan.mode, bodyHtml) {
         if (resolvedPlan.mode == BodyMode.WEBVIEW) {
             imageUrls = withContext(Dispatchers.Default) {
-                article.article.content?.let { ReadingImages.extract(it) } ?: emptyList()
+                bodyHtml?.let { ReadingImages.extract(it) } ?: emptyList()
             }
         } else {
             imageUrls = emptyList()
@@ -195,6 +236,19 @@ internal fun ReadingBody(
                     onTitleMeasured = onTitleMeasured,
                 )
             }
+            // 抓取结果横幅放在折叠区**之外**：viewport 模式下头部会随滚动折走，
+            // 失败原因不能跟着一起消失。
+            FetchStateBanner(
+                state = contentFetchState,
+                onRetry = onRetryFetch,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
+            if (resolvedPlan.summaryMode && translationUi == null) {
+                SummaryModeBanner(
+                    onShowFull = onShowFullContent,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                )
+            }
             BodyContent(
                 article = article,
                 isFetchingContent = isFetchingContent,
@@ -225,10 +279,20 @@ internal fun ReadingBody(
                 onTranslationDisplayChange = onTranslationDisplayChange,
                 onTitleMeasured = onTitleMeasured,
             )
-            // 正文不完整提示（ADR-0012）：抓到了内容但没过完整性校验（过短/无段落/JS 渲染/
-            // 付费墙）。如实告知，不假装这就是全文，也不静默给个空白页。
-            if (article.article.contentIncomplete && translationUi == null) {
-                IncompleteContentBanner(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+            // 抓取结果（不完整 / 失败 + 重试）：抓到了什么、为什么没有，如实说。
+            // 译文态下不显示——那时读者看的是译文，正文来源不是关注点。
+            if (translationUi == null) {
+                FetchStateBanner(
+                    state = contentFetchState,
+                    onRetry = onRetryFetch,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                )
+                if (resolvedPlan.summaryMode) {
+                    SummaryModeBanner(
+                        onShowFull = onShowFullContent,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                    )
+                }
             }
             BodyContent(
                 article = article,
@@ -349,7 +413,7 @@ private fun ArticleHeader(
             Text("·", color = radarColors().textTertiary)
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "阅读约 $minutes 分钟",
+                text = stringResource(R.string.article_reading_time, minutes),
                 color = radarColors().textTertiary,
                 style = MaterialTheme.typography.labelMedium,
             )
@@ -397,14 +461,136 @@ private fun ArticleHeader(
     }
 }
 
-/** 无正文分支的兜底提示：正文被判「不完整」时挂在头部下方（ADR-0012）。 */
+/**
+ * 抓取结果横幅：把「为什么这篇没有正文」说给读者听（ReadYou 的 Error 态同款）。
+ *
+ * 以前失败原因只写进抓取日志，只有诊断页看得到，阅读页静默降级——
+ * 于是「我为什么只有摘要」成了无解的问题。这里把两种需要解释的结果摊到正文上方：
+ * - 失败：中文原因 + 重试按钮（原因来自 [FetchFailure.label]）；
+ * - 不完整：哪一类不完整（过短 / 脚本渲染 / 付费墙…），不假装这就是全文。
+ */
 @Composable
-private fun IncompleteContentBanner(modifier: Modifier = Modifier) {
+private fun FetchStateBanner(
+    state: ContentFetchState,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when (state) {
+        is ContentFetchState.Failed ->
+            FetchFailedBanner(reason = state.reason, onRetry = onRetry, modifier = modifier)
+
+        is ContentFetchState.Incomplete ->
+            IncompleteContentBanner(issue = state.issue, modifier = modifier)
+
+        ContentFetchState.Idle, ContentFetchState.Loading, ContentFetchState.Ready -> Unit
+    }
+}
+
+@Composable
+private fun FetchFailedBanner(
+    reason: FetchFailReason,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val message = when (reason) {
+        is FetchFailReason.FromFailure ->
+            stringResource(R.string.article_fetch_failed, stringResource(reason.failure.uiRes()))
+        FetchFailReason.FeedDisabled -> stringResource(R.string.article_fetch_feed_disabled)
+        FetchFailReason.ArticleMissing -> stringResource(R.string.article_not_found)
+        is FetchFailReason.ShorterThanExisting ->
+            stringResource(R.string.article_fetch_shorter, reason.got, reason.existing)
+    }
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = radarColors().surface2,
         modifier = modifier.fillMaxWidth(),
     ) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Lucide.CircleAlert,
+                contentDescription = null,
+                tint = radarColors().textTertiary,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = message,
+                color = radarColors().textTertiary,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onRetry) {
+                Text(
+                    text = stringResource(R.string.retry),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = radarColors().accent,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 摘要态提示：读者手动切回订阅源摘要后常驻一行，说明「你现在看的不是全文」
+ * 并给出回退出口。没有这行，切过去的人隔天回来看见短正文只会以为是抓取坏了。
+ */
+@Composable
+private fun SummaryModeBanner(
+    onShowFull: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = radarColors().surface2,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Lucide.Type,
+                contentDescription = null,
+                tint = radarColors().textTertiary,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = stringResource(R.string.summary_banner),
+                color = radarColors().textTertiary,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onShowFull) {
+                Text(
+                    text = stringResource(R.string.see_full),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = radarColors().accent,
+                )
+            }
+        }
+    }
+}
+
+/** 无正文分支的兜底提示：正文被判「不完整」时挂在头部下方（ADR-0012）。 */
+@Composable
+private fun IncompleteContentBanner(
+    issue: ExtractionIssue?,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = radarColors().surface2,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        // issue 的枚举先在组合作用域翻成当前语言，再喂给带占位符的资源
+        val issueText = when (val i = issue) {
+            null -> stringResource(R.string.issue_site_limit)
+            else -> stringResource(i.uiRes())
+        }
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -417,7 +603,7 @@ private fun IncompleteContentBanner(modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                text = "正文可能不完整（站点限制或动态加载），可查看原文",
+                text = stringResource(R.string.article_incomplete, issueText),
                 color = radarColors().textTertiary,
                 style = MaterialTheme.typography.labelMedium,
             )
@@ -433,7 +619,7 @@ private fun NoContentBody(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.padding(horizontal = 20.dp)) {
-        BodyParagraph(text = summary ?: "本文没有可显示的正文，可查看原文。")
+        BodyParagraph(text = summary ?: stringResource(R.string.body_empty))
         if (isFetchingContent) {
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -444,7 +630,7 @@ private fun NoContentBody(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "正在获取全文…",
+                    text = stringResource(R.string.fetching_full),
                     color = radarColors().textTertiary,
                     style = MaterialTheme.typography.labelMedium,
                 )
@@ -483,7 +669,7 @@ private fun AiSummaryCard(
                 Icon(Lucide.Sparkles, contentDescription = null, tint = radarColors().accent, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = "AI 摘要",
+                    text = stringResource(R.string.ai_summary),
                     color = radarColors().textPrimary,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
@@ -496,14 +682,14 @@ private fun AiSummaryCard(
             when {
                 state is AiSummaryState.Generating -> {
                     Spacer(Modifier.height(8.dp))
-                    Text("正在生成摘要…", color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.generating_summary), color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
                 }
                 state is AiSummaryState.Failed -> {
                     Spacer(Modifier.height(8.dp))
                     Text(state.message, color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(6.dp))
                     TextButton(onClick = onGenerate) {
-                        Text(if (summary == null) "重试" else "重新生成", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                        Text(if (summary == null) stringResource(R.string.retry) else stringResource(R.string.regenerate), color = radarColors().accent, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 summary != null -> {
@@ -524,7 +710,7 @@ private fun AiSummaryCard(
                             modifier = Modifier.padding(top = 2.dp),
                         ) {
                             Text(
-                                text = if (expanded) "收起" else "展开全文",
+                                text = if (expanded) stringResource(R.string.collapse) else stringResource(R.string.expand_full),
                                 color = radarColors().accent,
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.SemiBold,
@@ -535,7 +721,7 @@ private fun AiSummaryCard(
                 else -> {
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = onGenerate) {
-                        Text("生成摘要", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.ai_gen_summary), color = radarColors().accent, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -567,9 +753,9 @@ private fun TranslationBanner(
         Spacer(Modifier.width(6.dp))
         Text(
             text = if (progressing) {
-                "翻译中 ${(state as TranslationState.Progressing).doneCount}/${state.total} 段"
+                stringResource(R.string.article_translating_progress, (state as TranslationState.Progressing).doneCount, state.total)
             } else {
-                "AI 译文（DeepSeek）"
+                stringResource(R.string.ai_translation_deepseek)
             },
             color = radarColors().textTertiary,
             style = MaterialTheme.typography.labelMedium,
@@ -593,7 +779,7 @@ private fun TranslationBanner(
                 contentPadding = PaddingValues(horizontal = 8.dp),
             ) {
                 Text(
-                    text = if (display.viewMode == TranslationViewMode.TRANSLATION_ONLY) "双语" else "纯译文",
+                    text = if (display.viewMode == TranslationViewMode.TRANSLATION_ONLY) stringResource(R.string.bilingual) else stringResource(R.string.translation_only),
                     color = radarColors().accent,
                     style = MaterialTheme.typography.labelMedium,
                 )
@@ -614,18 +800,18 @@ private fun TranslationBanner(
                     contentPadding = PaddingValues(horizontal = 8.dp),
                 ) {
                     Text(
-                        text = if (display.bilingualLayout == BilingualLayout.STACKED) "左右" else "上下",
+                        text = if (display.bilingualLayout == BilingualLayout.STACKED) stringResource(R.string.side_by_side) else stringResource(R.string.stacked),
                         color = radarColors().accent,
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
             }
             TextButton(onClick = onRetranslate, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                Text("重新翻译", color = radarColors().accent, style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.retranslate), color = radarColors().accent, style = MaterialTheme.typography.labelMedium)
             }
         }
         TextButton(onClick = onShowOriginal, contentPadding = PaddingValues(horizontal = 8.dp)) {
-            Text("切回原文", color = radarColors().textSecondary, style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.ai_back_to_original), color = radarColors().textSecondary, style = MaterialTheme.typography.labelMedium)
         }
     }
 }
@@ -651,5 +837,33 @@ private fun BodyParagraph(text: String) {
     )
 }
 
+@Composable
 private fun formatDate(ts: Long?): String =
-    ts?.let { DateUtils.getRelativeTimeSpanString(it).toString() } ?: "未知时间"
+    ts?.let { DateUtils.getRelativeTimeSpanString(it).toString() } ?: stringResource(R.string.unknown_time)
+
+/** ADR-0017：枚举只给身份，人话由 UI 层按当前语言翻译。 */
+internal fun FetchFailure.uiRes(): Int = when (this) {
+    FetchFailure.INVALID_URL -> R.string.fetch_invalid_url
+    FetchFailure.TIMEOUT -> R.string.fetch_timeout
+    FetchFailure.NETWORK -> R.string.fetch_network
+    FetchFailure.HTTP_401 -> R.string.fetch_http_401
+    FetchFailure.HTTP_403 -> R.string.fetch_http_403
+    FetchFailure.HTTP_404 -> R.string.fetch_http_404
+    FetchFailure.HTTP_429 -> R.string.fetch_http_429
+    FetchFailure.HTTP_5XX -> R.string.fetch_http_5xx
+    FetchFailure.HTTP_OTHER -> R.string.fetch_http_other
+    FetchFailure.EMPTY_BODY -> R.string.fetch_empty_body
+    FetchFailure.DECODE_ERROR -> R.string.fetch_decode_error
+    FetchFailure.EXTRACT_FAILED -> R.string.fetch_extract_failed
+}
+
+@Composable
+private fun ExtractionIssue.uiRes(): Int = when (this) {
+    ExtractionIssue.NONE -> R.string.issue_site_limit
+    ExtractionIssue.TOO_SHORT -> R.string.issue_too_short
+    ExtractionIssue.NO_PARAGRAPH -> R.string.issue_no_paragraph
+    ExtractionIssue.DYNAMIC_RENDER -> R.string.issue_dynamic_render
+    ExtractionIssue.PAYWALL -> R.string.issue_paywall
+    ExtractionIssue.METADATA_MISSING -> R.string.issue_metadata_missing
+}
+

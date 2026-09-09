@@ -41,6 +41,8 @@ internal data class BodyPlan(
     val nativeNodes: List<ReadingNode> = emptyList(),
     /** [BodyMode.TRANSLATION_FALLBACK] 的兜底 HTML；其余模式为 null。 */
     val fallbackHtml: String? = null,
+    /** 正文源被切成订阅源摘要（ReadYou 的 Description 态）。仅供 UI 标注当前看的是哪一路。 */
+    val summaryMode: Boolean = false,
 )
 
 /**
@@ -63,6 +65,10 @@ internal fun resolveBodyPlan(
     content: String?,
     summary: String?,
     renderer: ReadingRenderer,
+    /** 用户手动切回订阅源摘要（ReadYou 的 Description 态）。true 时正文源改用 [summary]。 */
+    preferSummary: Boolean = false,
+    /** 沉浸阅读（issue #93）：开则原生路对中间树做显示层降噪（[ReadingDenoise]）。 */
+    immersive: Boolean = false,
 ): BodyPlan {
     if (translationActive) {
         // 每个分段取「有译文用译文，否则原文」判断能不能渲染出东西
@@ -81,12 +87,44 @@ internal fun resolveBodyPlan(
             fallbackHtml = joined ?: content ?: summary,
         )
     }
-    if (content == null) return BodyPlan(BodyMode.NO_CONTENT)
+    // 摘要模式：只换正文源，渲染路径照旧（该走原生还走原生）。
+    // 摘要本身为空时保持原正文——「切过去是空白页」比「点了没反应」更糟。
+    val summaryMode = preferSummary && !summary.isNullOrBlank()
+    val body = if (summaryMode) summary else content
+    if (body == null) return BodyPlan(BodyMode.NO_CONTENT)
     if (renderer == ReadingRenderer.NATIVE) {
-        val nodes = ReadingNodes.parse(content)
-        if (nodes.isNotEmpty()) return BodyPlan(BodyMode.NATIVE, nativeNodes = nodes)
+        var nodes = ReadingNodes.parse(body)
+        // 沉浸阅读：剥掉分享/推荐/导航等杂乱块；安全网保证误伤时回退原文树
+        if (immersive && nodes.isNotEmpty()) nodes = ReadingDenoise.clean(nodes)
+        if (nodes.isNotEmpty()) {
+            return BodyPlan(BodyMode.NATIVE, nativeNodes = nodes, summaryMode = summaryMode)
+        }
     }
-    return BodyPlan(BodyMode.WEBVIEW)
+    return BodyPlan(BodyMode.WEBVIEW, summaryMode = summaryMode)
+}
+
+/** 切到摘要至少要"省下"这么多字，否则读者看不出切了什么。 */
+private const val SUMMARY_SWITCH_MIN_GAIN = 120
+
+private val HTML_TAG = Regex("<[^>]*>")
+private val WHITESPACE = Regex("\\s+")
+
+/** HTML 去标签后的可见字数（够用的估算：不解码实体，只用于长短比较）。 */
+internal fun plainTextLength(html: String): Int =
+    WHITESPACE.replace(HTML_TAG.replace(html, " "), " ").trim().length
+
+/**
+ * 值不值得给用户「正文 / 摘要」切换。
+ *
+ * 判据刻意保守：ADR-0001 入库时就取 description 与 content 的**较长者**，
+ * 于是大量源的 `content` 就是 `summary` 本身——这时给个切换开关，点下去屏幕
+ * 纹丝不动。按 UI 铁律（没有意义的按钮不该存在），只有两者实质不同才给。
+ */
+internal fun canSwitchToSummary(content: String?, summary: String?): Boolean {
+    if (content.isNullOrBlank() || summary.isNullOrBlank()) return false
+    val full = plainTextLength(content)
+    val brief = plainTextLength(summary)
+    return full >= (brief * 1.5f).toInt() && full - brief >= SUMMARY_SWITCH_MIN_GAIN
 }
 
 /**

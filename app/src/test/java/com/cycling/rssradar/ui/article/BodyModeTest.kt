@@ -27,7 +27,9 @@ class BodyModeTest {
         content: String? = null,
         summary: String? = null,
         renderer: ReadingRenderer = ReadingRenderer.WEBVIEW,
-    ) = resolveBodyPlan(translationActive, segments, content, summary, renderer)
+        preferSummary: Boolean = false,
+        immersive: Boolean = false,
+    ) = resolveBodyPlan(translationActive, segments, content, summary, renderer, preferSummary, immersive)
 
     // ---- 无正文 ----
 
@@ -179,5 +181,64 @@ class BodyModeTest {
         assertFalse(shouldUseViewport(BodyMode.NATIVE, "<img src='a'>"))
         assertFalse(shouldUseViewport(BodyMode.TRANSLATION, "<img src='a'>"))
         assertFalse(shouldUseViewport(BodyMode.NO_CONTENT, null))
+    }
+
+    // ---- 正文 / 摘要 切换（ReadYou 的 renderDescriptionContent 同款） ----
+
+    @Test
+    fun `summary switch is offered only when the two differ materially`() {
+        val full = "<p>" + "字".repeat(600) + "</p>"
+        val brief = "字".repeat(100)
+        assertTrue(canSwitchToSummary(full, brief))
+
+        // 正文就是摘要本身（ADR-0001「取较长者」的直接后果）：切了等于没切
+        assertFalse(canSwitchToSummary(brief, brief))
+        assertFalse(canSwitchToSummary(null, brief))
+        assertFalse(canSwitchToSummary(full, null))
+        assertFalse(canSwitchToSummary("", brief))
+        assertFalse(canSwitchToSummary(full, "   "))
+        // 差距不足 120 字，切过去读者看不出区别
+        assertFalse(canSwitchToSummary("字".repeat(200), "字".repeat(130)))
+    }
+
+    @Test
+    fun `preferring summary swaps the body source but keeps the render path`() {
+        val content = "<p>" + "字".repeat(600) + "</p>"
+        val summary = "<p>" + "摘".repeat(300) + "</p>"
+
+        val asSummary = plan(content = content, summary = summary, preferSummary = true)
+        assertEquals(BodyMode.WEBVIEW, asSummary.mode)
+        assertTrue(asSummary.summaryMode)
+
+        val asFull = plan(content = content, summary = summary)
+        assertEquals(BodyMode.WEBVIEW, asFull.mode)
+        assertFalse(asFull.summaryMode)
+    }
+
+    @Test
+    fun `preferring summary falls back to content when the summary is blank`() {
+        // 摘要为空还硬切过去 = 给读者一个空白页，比「点了没反应」更糟
+        val result = plan(content = "<p>正文</p>", summary = "   ", preferSummary = true)
+
+        assertEquals(BodyMode.WEBVIEW, result.mode)
+        assertFalse(result.summaryMode)
+    }
+
+    @Test
+    fun `summary mode also applies to the native renderer`() {
+        val content = "<p>" + "字".repeat(600) + "</p>"
+        val summary = "<p>摘要一句话</p>"
+
+        val result = plan(
+            content = content,
+            summary = summary,
+            renderer = ReadingRenderer.NATIVE,
+            preferSummary = true,
+        )
+
+        assertEquals(BodyMode.NATIVE, result.mode)
+        assertTrue(result.summaryMode)
+        // 渲染的是摘要那棵树，不是正文的
+        assertEquals(1, result.nativeNodes.size)
     }
 }
