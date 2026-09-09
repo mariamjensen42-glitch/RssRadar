@@ -1,5 +1,9 @@
 package com.cycling.rssradar.ui.feed
 
+import com.cycling.rssradar.R
+import androidx.compose.ui.platform.LocalContext
+import com.cycling.rssradar.i18n.resolve
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -50,11 +54,12 @@ fun FeedArticlesScreen(
     onOpenArticle: (Long) -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
     val message = viewModel.uiMessage
 
     LaunchedEffect(message) {
         message?.let {
-            snackbarHostState.showSnackbar(it)
+            snackbarHostState.showSnackbar(it.resolve(context))
             viewModel.onIntent(FeedArticlesIntent.ConsumeMessage)
         }
     }
@@ -66,7 +71,7 @@ fun FeedArticlesScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = viewModel.feed?.title ?: "订阅源",
+                        text = viewModel.feed?.title ?: stringResource(R.string.feed_articles_title),
                         color = radarColors().textPrimary,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -75,7 +80,7 @@ fun FeedArticlesScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Lucide.ArrowLeft, contentDescription = "返回", tint = radarColors().textPrimary)
+                        Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.back), tint = radarColors().textPrimary)
                     }
                 },
                 actions = {
@@ -88,7 +93,7 @@ fun FeedArticlesScreen(
                                 modifier = Modifier.size(18.dp),
                             )
                         } else {
-                            Icon(Lucide.RefreshCw, contentDescription = "刷新此源", tint = radarColors().textPrimary)
+                            Icon(Lucide.RefreshCw, contentDescription = stringResource(R.string.feed_articles_refresh), tint = radarColors().textPrimary)
                         }
                     }
                 },
@@ -105,13 +110,13 @@ fun FeedArticlesScreen(
             ) {
                 // 空态带 CTA（UI 审计 F3）：用户最快的下一步就是刷新
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("此订阅源还没有文章", color = radarColors().textSecondary)
+                    Text(stringResource(R.string.feed_articles_empty), color = radarColors().textSecondary)
                     Spacer(Modifier.height(12.dp))
                     FilledTonalButton(
                         onClick = { viewModel.onIntent(FeedArticlesIntent.Refresh) },
                         shape = RoundedCornerShape(12.dp),
                     ) {
-                        Text("立即刷新")
+                        Text(stringResource(R.string.feed_articles_refresh_now))
                     }
                 }
             }

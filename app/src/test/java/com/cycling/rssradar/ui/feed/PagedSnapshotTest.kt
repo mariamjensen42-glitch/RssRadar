@@ -113,7 +113,7 @@ class DayGroupsTest {
 
         val groups = dayGroups(
             listOf(article(1, day1b), article(2, day1a), article(3, day2)),
-            labelOf = { "D$it" },
+            TEST_DAY_LABELS,
         )
 
         assertEquals(2, groups.size)
@@ -125,7 +125,7 @@ class DayGroupsTest {
     fun `无日期文章沉底为独立组，且必须带日期头`() {
         val groups = dayGroups(
             listOf(article(1, 5_000_000L), article(2, null)),
-            labelOf = { "D" },
+            TEST_DAY_LABELS,
         )
 
         assertEquals(2, groups.size)
@@ -138,7 +138,7 @@ class DayGroupsTest {
 
     @Test
     fun `全部无日期则只有沉底组`() {
-        val groups = dayGroups(listOf(article(1, null), article(2, null)), labelOf = { "D" })
+        val groups = dayGroups(listOf(article(1, null), article(2, null)), TEST_DAY_LABELS)
         assertEquals(1, groups.size)
         assertEquals(UNDATED_DAY_KEY, groups[0].key)
     }
@@ -147,11 +147,26 @@ class DayGroupsTest {
     fun `每组都有非空标签——存在无头组就等于粘性头会卡住不动`() {
         val groups = dayGroups(
             listOf(article(1, 5_000_000L), article(2, null), article(3, 9_000_000L)),
+            TEST_DAY_LABELS,
         )
         assertTrue(groups.all { it.label.isNotBlank() })
         assertEquals(groups.size, groups.map { it.label }.distinct().size)
     }
 }
+
+
+/** 中文文案包夹具：主源码不再自带任何语言的文案，测试自己带（ADR-0017 §3）。 */
+private val TEST_DAY_LABELS = CalendarDayLabels(
+    today = "今天",
+    yesterday = "昨天",
+    twoDaysAgo = "前天",
+    unknown = "未知日期",
+    weekdays = listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日"),
+    months = (1..12).map { "${it}月" },
+    monthDay = "%1\$s%2\$s日",
+    monthDayWeekday = "%1\$s %2\$s",
+    yearMonthDay = "%1\$s年%2\$s%3\$s日",
+)
 
 /** 日期头文案：按日历日算，不按相对时长算（回归用例见「跨午夜」）。 */
 class CalendarDayLabelTest {
@@ -160,33 +175,33 @@ class CalendarDayLabelTest {
 
     @Test
     fun `最近三天给相对词`() {
-        assertEquals("今天", calendarDayLabel(today, today))
-        assertEquals("昨天", calendarDayLabel(today - 1, today))
-        assertEquals("前天", calendarDayLabel(today - 2, today))
+        assertEquals("今天", calendarDayLabel(today, today, TEST_DAY_LABELS))
+        assertEquals("昨天", calendarDayLabel(today - 1, today, TEST_DAY_LABELS))
+        assertEquals("前天", calendarDayLabel(today - 2, today, TEST_DAY_LABELS))
     }
 
     @Test
     fun `一周内带周几`() {
         // 2026-08-30 是周日
-        assertEquals("8月30日 周日", calendarDayLabel(LocalDate.of(2026, 8, 30).toEpochDay(), today))
+        assertEquals("8月30日 周日", calendarDayLabel(LocalDate.of(2026, 8, 30).toEpochDay(), today, TEST_DAY_LABELS))
     }
 
     @Test
     fun `超过一周只给日期，跨年补年份`() {
-        assertEquals("7月15日", calendarDayLabel(LocalDate.of(2026, 7, 15).toEpochDay(), today))
-        assertEquals("2025年12月1日", calendarDayLabel(LocalDate.of(2025, 12, 1).toEpochDay(), today))
+        assertEquals("7月15日", calendarDayLabel(LocalDate.of(2026, 7, 15).toEpochDay(), today, TEST_DAY_LABELS))
+        assertEquals("2025年12月1日", calendarDayLabel(LocalDate.of(2025, 12, 1).toEpochDay(), today, TEST_DAY_LABELS))
     }
 
     @Test
     fun `跨午夜的两个自然日标签必须不同——相对时长会撞车`() {
         // 昨天 23:50 与今天 00:10 只差 20 分钟，getRelativeTimeSpanString 会给同一句
         // 「N 小时前」；按日历日算则必然是「昨天」与「今天」。
-        val labels = listOf(today - 1, today).map { calendarDayLabel(it, today) }
+        val labels = listOf(today - 1, today).map { calendarDayLabel(it, today, TEST_DAY_LABELS) }
         assertEquals(listOf("昨天", "今天"), labels)
     }
 
     @Test
     fun `时间戳超前的文章不谎称明天，直接报日期`() {
-        assertEquals("9月3日", calendarDayLabel(today + 1, today))
+        assertEquals("9月3日", calendarDayLabel(today + 1, today, TEST_DAY_LABELS))
     }
 }

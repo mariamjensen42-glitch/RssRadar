@@ -1,5 +1,7 @@
 package com.cycling.rssradar.ui.feed
 
+import com.cycling.rssradar.R
+import com.cycling.rssradar.i18n.UiText
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -61,7 +63,7 @@ class FeedArticlesViewModel @Inject constructor(
     var isRefreshing by mutableStateOf(false)
         private set
 
-    var uiMessage by mutableStateOf<String?>(null)
+    var uiMessage by mutableStateOf<UiText?>(null)
         private set
 
     /** 最近删除的文章（与信息流一致的撤销语义）。 */
@@ -98,7 +100,7 @@ class FeedArticlesViewModel @Inject constructor(
             val ok = repository.refreshSingleFeed(feedId)
             loadFirstPage()
             isRefreshing = false
-            if (!ok) uiMessage = "刷新失败，展示的是上次内容"
+            if (!ok) uiMessage = UiText.res(R.string.feed_refresh_failed)
         }
     }
 

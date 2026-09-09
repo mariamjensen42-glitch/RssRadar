@@ -1,11 +1,17 @@
 package com.cycling.rssradar.ui.feed
 
+import com.cycling.rssradar.R
+import androidx.compose.ui.platform.LocalContext
 import android.text.format.DateUtils
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import com.cycling.rssradar.i18n.labelRes
+import com.cycling.rssradar.i18n.resolve
+import com.cycling.rssradar.i18n.UiText
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.clickable
@@ -159,11 +165,12 @@ fun FeedListScreen(
     var showViewModeSheet by remember { mutableStateOf(false) }
     /** 视图模式是全局显示偏好（ListDisplayStore → CompositionLocal），这里读，VM 写。 */
     val viewMode = LocalListDisplay.current.viewMode
+    val context = LocalContext.current
     val message = uiState.uiMessage
 
     LaunchedEffect(message) {
         message?.let {
-            snackbarHostState.showSnackbar(it)
+            snackbarHostState.showSnackbar(it.resolve(context))
             viewModel.onIntent(FeedListIntent.ConsumeMessage)
         }
     }
@@ -173,8 +180,8 @@ fun FeedListScreen(
     LaunchedEffect(pendingUndoReduce) {
         pendingUndoReduce?.let {
             val result = snackbarHostState.showSnackbar(
-                message = "已减少此订阅源的推荐",
-                actionLabel = "撤销",
+                message = context.getString(R.string.feed_reduce_such),
+                actionLabel = context.getString(R.string.undo),
                 duration = SnackbarDuration.Short,
             )
             when (result) {
@@ -189,8 +196,8 @@ fun FeedListScreen(
     LaunchedEffect(pendingUndo) {
         pendingUndo?.let { deleted ->
             val result = snackbarHostState.showSnackbar(
-                message = "已删除「${deleted.title}」",
-                actionLabel = "撤销",
+                message = context.getString(R.string.feed_deleted_article, deleted.title),
+                actionLabel = context.getString(R.string.undo),
                 duration = SnackbarDuration.Short,
             )
             when (result) {
@@ -339,19 +346,21 @@ fun FeedListScreen(
 
     // 列表视图模式（列表/卡片/杂志/网格）：全局偏好，切换后所有文章列表即改即见
     if (showViewModeSheet) {
+        val viewModeLabels = ListViewMode.entries.associateWith { stringResource(it.labelRes()) }
+        val viewModeSubtitles = ListViewMode.entries.associateWith {
+            when (it) {
+                ListViewMode.LIST -> stringResource(R.string.vm_list_desc)
+                ListViewMode.CARD -> stringResource(R.string.vm_card_desc)
+                ListViewMode.MAGAZINE -> stringResource(R.string.vm_magazine_desc)
+                ListViewMode.GRID -> stringResource(R.string.vm_grid_desc)
+            }
+        }
         OptionPickerSheet(
-            title = "视图模式",
+            title = stringResource(R.string.view_mode_title),
             options = ListViewMode.entries.toList(),
             selected = viewMode,
-            label = { it.label },
-            subtitle = { mode ->
-                when (mode) {
-                    ListViewMode.LIST -> "单列紧凑，标题 + 摘要"
-                    ListViewMode.CARD -> "卡片排版，右侧缩略图"
-                    ListViewMode.MAGAZINE -> "图文混排，首篇大图突出"
-                    ListViewMode.GRID -> "多列网格，按屏幕宽度自适应"
-                }
-            },
+            label = { viewModeLabels.getValue(it) },
+            subtitle = { viewModeSubtitles.getValue(it) },
             onSelect = { mode -> viewModel.onIntent(FeedListIntent.SetViewMode(mode)) },
             onDismiss = { showViewModeSheet = false },
         )
@@ -359,17 +368,20 @@ fun FeedListScreen(
 
     // 批量标记已读（#10）：选条件后一次性写库，数字由 DAO 的真实影响行数汇报
     if (showMarkReadSheet) {
+        val markReadLabels = MarkAsReadCondition.entries.associateWith { stringResource(it.labelRes()) }
+        val markReadSubtitles = MarkAsReadCondition.entries.associateWith {
+            if (it == MarkAsReadCondition.ALL) {
+                stringResource(R.string.mark_read_all_desc)
+            } else {
+                stringResource(R.string.mark_read_before_desc, markReadLabels.getValue(it))
+            }
+        }
         OptionPickerSheet(
-            title = "标记已读",
+            title = stringResource(R.string.mark_read_title),
             options = MarkAsReadCondition.entries.toList(),
             selected = null,
-            label = { it.label },
-            subtitle = { condition ->
-                when (condition) {
-                    MarkAsReadCondition.ALL -> "把全部文章标为已读"
-                    else -> "把 ${condition.label}发布的未读文章标为已读"
-                }
-            },
+            label = { markReadLabels.getValue(it) },
+            subtitle = { markReadSubtitles.getValue(it) },
             onSelect = { condition -> viewModel.onIntent(FeedListIntent.MarkAllRead(condition)) },
             onDismiss = { showMarkReadSheet = false },
         )
@@ -403,18 +415,18 @@ private fun FeedListTopBar(
             modifier = Modifier.weight(1f),
         )
         IconButton(onClick = onOpenSearch) {
-            Icon(Lucide.Search, contentDescription = "搜索", tint = radarColors().textPrimary)
+            Icon(Lucide.Search, contentDescription = stringResource(R.string.action_search), tint = radarColors().textPrimary)
         }
         Box {
             IconButton(onClick = { menuExpanded = true }) {
-                Icon(Lucide.EllipsisVertical, contentDescription = "更多操作", tint = radarColors().textPrimary)
+                Icon(Lucide.EllipsisVertical, contentDescription = stringResource(R.string.more_actions), tint = radarColors().textPrimary)
             }
             DropdownMenu(
                 expanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false },
             ) {
                 DropdownMenuItem(
-                    text = { Text("标记已读") },
+                    text = { Text(stringResource(R.string.mark_read_title)) },
                     leadingIcon = { Icon(Lucide.CheckCheck, contentDescription = null) },
                     onClick = {
                         menuExpanded = false
@@ -424,17 +436,10 @@ private fun FeedListTopBar(
                 DropdownMenuItem(
                     text = {
                         Text(
-                            buildString {
-                                append("视图模式 · ")
-                                append(
-                                    when (viewMode) {
-                                        ListViewMode.LIST -> "列表"
-                                        ListViewMode.CARD -> "卡片"
-                                        ListViewMode.MAGAZINE -> "杂志"
-                                        ListViewMode.GRID -> "网格"
-                                    },
-                                )
-                            },
+                            stringResource(
+                                R.string.view_mode_value,
+                                stringResource(viewMode.labelRes()),
+                            ),
                         )
                     },
                     leadingIcon = { Icon(Lucide.LayoutGrid, contentDescription = null) },
@@ -444,7 +449,7 @@ private fun FeedListTopBar(
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text(if (filterActive) "分组筛选 · 已启用" else "分组筛选") },
+                    text = { Text(if (filterActive) stringResource(R.string.group_filter_active) else stringResource(R.string.group_filter)) },
                     leadingIcon = { Icon(Lucide.SlidersHorizontal, contentDescription = null) },
                     onClick = {
                         menuExpanded = false
@@ -477,11 +482,11 @@ private fun FeedListTabRow(
         ) {
             tabs.forEach { tab ->
                 val label = when (tab) {
-                    FeedTab.All -> "全部"
-                    FeedTab.Unread -> "未读 $unreadCount"
-                    FeedTab.Starred -> "收藏"
-                    FeedTab.Bookmarked -> "稍后读"
-                    FeedTab.Recommended -> "推荐"
+                    FeedTab.All -> stringResource(R.string.filter_all)
+                    FeedTab.Unread -> stringResource(R.string.tab_unread_count, unreadCount)
+                    FeedTab.Starred -> stringResource(R.string.tab_starred)
+                    FeedTab.Bookmarked -> stringResource(R.string.tab_read_later)
+                    FeedTab.Recommended -> stringResource(R.string.tab_recommended)
                 }
                 FilterChip(
                     label = label,
@@ -543,7 +548,7 @@ private fun GroupFilterSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = radarColors().surface1) {
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
             Text(
-                text = "筛选",
+                text = stringResource(R.string.filter_title),
                 color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
@@ -552,7 +557,7 @@ private fun GroupFilterSheet(
             // 内容类型：一排轻量 chip，即时生效且不关弹层（与分组列表「选中即关」区分：
             // 这里是多选前的快速试切，关弹层交给用户下滑手势）
             Text(
-                text = "内容类型",
+                text = stringResource(R.string.content_type),
                 color = radarColors().textSecondary,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
@@ -564,16 +569,17 @@ private fun GroupFilterSheet(
                     .padding(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                val ctypeLabels = ContentTypeFilter.entries.associateWith { stringResource(it.labelRes()) }
                 ContentTypeFilter.entries.forEach { type ->
                     FilterChip(
-                        label = type.label,
+                        label = ctypeLabels.getValue(type),
                         selected = type == contentType,
                         onClick = { onSelectContentType(type) },
                     )
                 }
             }
             Text(
-                text = "分组",
+                text = stringResource(R.string.group_title),
                 color = radarColors().textSecondary,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
@@ -581,7 +587,7 @@ private fun GroupFilterSheet(
             LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
                 item {
                     GroupOption(
-                        label = "全部",
+                        label = stringResource(R.string.filter_all),
                         selected = selected == null,
                         onClick = { onSelect(null) },
                     )
@@ -618,7 +624,7 @@ private fun GroupOption(label: String, selected: Boolean, onClick: () -> Unit) {
         if (selected) {
             Icon(
                 imageVector = Lucide.Check,
-                contentDescription = "已选",
+                contentDescription = stringResource(R.string.cd_selected),
                 tint = radarColors().accent,
                 modifier = Modifier.size(18.dp),
             )
@@ -704,8 +710,26 @@ fun ArticleCardList(
     }
     // 分组必须在 LazyColumn builder 外算：builder lambda 不是 composable 上下文，
     // remember 放里面编不过。不开启粘性头时不算，零开销。
+    val dayLabels = CalendarDayLabels(
+        today = stringResource(R.string.day_today),
+        yesterday = stringResource(R.string.day_yesterday),
+        twoDaysAgo = stringResource(R.string.day_2ago),
+        unknown = stringResource(R.string.day_unknown),
+        weekdays = listOf(
+            R.string.weekday_1, R.string.weekday_2, R.string.weekday_3, R.string.weekday_4,
+            R.string.weekday_5, R.string.weekday_6, R.string.weekday_7,
+        ).map { stringResource(it) },
+        months = listOf(
+            R.string.month_1, R.string.month_2, R.string.month_3, R.string.month_4,
+            R.string.month_5, R.string.month_6, R.string.month_7, R.string.month_8,
+            R.string.month_9, R.string.month_10, R.string.month_11, R.string.month_12,
+        ).map { stringResource(it) },
+        monthDay = stringResource(R.string.day_monthday),
+        monthDayWeekday = stringResource(R.string.day_monthday_weekday),
+        yearMonthDay = stringResource(R.string.day_yearmonthday),
+    )
     val dayGroups = if (display.stickyDateHeader) {
-        remember(articles) { dayGroups(articles) }
+        remember(articles, dayLabels) { dayGroups(articles, dayLabels) }
     } else {
         emptyList()
     }
@@ -1037,9 +1061,9 @@ private fun MagazineCard(
                     )
                     when (item.article.mediaKind) {
                         ArticleEntity.MEDIA_KIND_VIDEO ->
-                            MediaBadge(Lucide.Play, "视频", Modifier.align(Alignment.BottomEnd).padding(6.dp))
+                            MediaBadge(Lucide.Play, stringResource(R.string.ctype_video), Modifier.align(Alignment.BottomEnd).padding(6.dp))
                         ArticleEntity.MEDIA_KIND_AUDIO ->
-                            MediaBadge(Lucide.Music, "音频", Modifier.align(Alignment.BottomEnd).padding(6.dp))
+                            MediaBadge(Lucide.Music, stringResource(R.string.ctype_audio), Modifier.align(Alignment.BottomEnd).padding(6.dp))
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -1198,9 +1222,9 @@ private fun GridArticleCard(
                 }
                 when (item.article.mediaKind) {
                     ArticleEntity.MEDIA_KIND_VIDEO ->
-                        MediaBadge(Lucide.Play, "视频", Modifier.align(Alignment.BottomEnd).padding(6.dp))
+                        MediaBadge(Lucide.Play, stringResource(R.string.ctype_video), Modifier.align(Alignment.BottomEnd).padding(6.dp))
                     ArticleEntity.MEDIA_KIND_AUDIO ->
-                        MediaBadge(Lucide.Music, "音频", Modifier.align(Alignment.BottomEnd).padding(6.dp))
+                        MediaBadge(Lucide.Music, stringResource(R.string.ctype_audio), Modifier.align(Alignment.BottomEnd).padding(6.dp))
                 }
             }
             Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
@@ -1417,14 +1441,14 @@ private fun SwipeActionBackground(
     val (label, icon, tint) = when (direction) {
         SwipeDirection.RIGHT ->
             Triple(
-                if (isStarred) "取消收藏" else "收藏",
+                if (isStarred) stringResource(R.string.star_off) else stringResource(R.string.star_on),
                 Lucide.Star,
                 radarColors().accent,
             )
 
         SwipeDirection.LEFT ->
             Triple(
-                if (isRead) "标未读" else "标已读",
+                if (isRead) stringResource(R.string.mark_unread) else stringResource(R.string.mark_read),
                 Lucide.Check,
                 radarColors().textSecondary,
             )
@@ -1621,7 +1645,7 @@ private fun CoverThumb(url: String?, mediaKind: Int = ArticleEntity.MEDIA_KIND_N
             if (url != null) {
                 RadarImage(
                     url = url,
-                    contentDescription = "封面缩略图",
+                    contentDescription = stringResource(R.string.cd_cover),
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
@@ -1631,9 +1655,9 @@ private fun CoverThumb(url: String?, mediaKind: Int = ArticleEntity.MEDIA_KIND_N
         }
         when (mediaKind) {
             ArticleEntity.MEDIA_KIND_VIDEO ->
-                MediaBadge(Lucide.Play, "视频", Modifier.align(Alignment.BottomEnd).padding(4.dp))
+                MediaBadge(Lucide.Play, stringResource(R.string.ctype_video), Modifier.align(Alignment.BottomEnd).padding(4.dp))
             ArticleEntity.MEDIA_KIND_AUDIO ->
-                MediaBadge(Lucide.Music, "音频", Modifier.align(Alignment.BottomEnd).padding(4.dp))
+                MediaBadge(Lucide.Music, stringResource(R.string.ctype_audio), Modifier.align(Alignment.BottomEnd).padding(4.dp))
         }
     }
 }
@@ -1659,8 +1683,8 @@ private fun MediaBadge(icon: ImageVector, label: String, modifier: Modifier = Mo
 @Composable
 private fun MediaKindChip(kind: Int) {
     val (icon, label) = when (kind) {
-        ArticleEntity.MEDIA_KIND_VIDEO -> Lucide.Play to "视频"
-        else -> Lucide.Music to "音频"
+        ArticleEntity.MEDIA_KIND_VIDEO -> Lucide.Play to stringResource(R.string.ctype_video)
+        else -> Lucide.Music to stringResource(R.string.ctype_audio)
     }
     Surface(shape = RoundedCornerShape(50), color = radarColors().surface2) {
         Row(
@@ -1788,15 +1812,27 @@ private fun EmptyState(
     // 分区空态（issue #75）优先：有源没文章走原 tab 空态，无源才走分区引导——
     // 如实区分两种空。chip 行仍在上方，用户随时可切回「全部」，不阻塞。
     val (title, hint) = if (partitionEmpty && selectedContentType != ContentTypeFilter.All) {
-        selectedContentType.emptyCopy()
+        val typeName = stringResource(selectedContentType.labelRes())
+        stringResource(R.string.ctype_empty_title, typeName) to
+            stringResource(R.string.ctype_empty_desc, typeName)
     } else {
         when (selectedTab) {
-            FeedTab.All -> "还没有订阅" to "去订阅页添加你的第一个 RSS / Atom 源"
-            FeedTab.Unread -> "没有未读文章" to "所有文章都看完了，休息一下"
-            FeedTab.Starred -> "还没有收藏" to "阅读时点击星标，把好文章留下来"
-            FeedTab.Bookmarked -> "暂无稍后读" to "阅读时点击书签，稍后再看"
+            FeedTab.All ->
+                stringResource(R.string.feed_empty_no_feeds) to
+                    stringResource(R.string.feed_empty_no_feeds_desc)
+            FeedTab.Unread ->
+                stringResource(R.string.feed_empty_unread) to
+                    stringResource(R.string.feed_empty_unread_desc)
+            FeedTab.Starred ->
+                stringResource(R.string.feed_empty_starred) to
+                    stringResource(R.string.feed_empty_starred_desc)
+            FeedTab.Bookmarked ->
+                stringResource(R.string.feed_empty_readlater) to
+                    stringResource(R.string.feed_empty_readlater_desc)
             // 推荐流空态（ADR-0013）：候选池 = 未读 + 14 天窗，读完就没了——如实说，不编内容
-            FeedTab.Recommended -> "暂无推荐" to "最近未读都读完了，或还没有订阅源"
+            FeedTab.Recommended ->
+                stringResource(R.string.feed_empty_recommended) to
+                    stringResource(R.string.feed_empty_recommended_desc)
         }
     }
     // verticalScroll 让空态页也能响应下拉刷新手势
@@ -1833,7 +1869,7 @@ private fun EmptyState(
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("添加订阅源")
+                Text(stringResource(R.string.feed_empty_add))
             }
             Spacer(Modifier.height(10.dp))
             FilledTonalButton(onClick = onOpenSubscriptions) {
@@ -1843,7 +1879,7 @@ private fun EmptyState(
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("导入 OPML 订阅")
+                Text(stringResource(R.string.feed_empty_import_opml))
             }
         }
     }
@@ -1859,7 +1895,7 @@ private fun RecommendationLoading(modifier: Modifier = Modifier) {
     ) {
         CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
         Spacer(Modifier.height(10.dp))
-        Text("正在按你的阅读偏好排序…", color = radarColors().textSecondary, style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.feed_ranking), color = radarColors().textSecondary, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

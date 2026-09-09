@@ -1,4 +1,8 @@
 package com.cycling.rssradar.ui.feed
+import com.cycling.rssradar.R
+import com.cycling.rssradar.i18n.emptyDescRes
+import com.cycling.rssradar.i18n.emptyTitleRes
+import com.cycling.rssradar.i18n.labelRes
 
 import com.cycling.rssradar.core.data.filterRankedIdsByContentType
 import com.cycling.rssradar.core.data.db.FeedEntity
@@ -51,13 +55,13 @@ class ContentTypePartitionTest {
 
     @Test
     fun `空分区文案按类型区分`() {
-        val imageCopy = ContentTypeFilter.Image.emptyCopy()
-        assertTrue(imageCopy.first.contains("图片"))
-        assertTrue(imageCopy.second.contains("图片"))
-        val audioCopy = ContentTypeFilter.Audio.emptyCopy()
-        assertTrue(audioCopy.first.contains("音频"))
-        // 「全部」为空沿用 All tab 现有口径
-        assertEquals("还没有订阅", ContentTypeFilter.All.emptyCopy().first)
+        // 文案已资源化（ADR-0017）：枚举不再自带任何语言的字符串，
+        // 这里守住「非全部走分区专用资源、且四项资源互不相同」这条结构约束。
+        val titles = ContentTypeFilter.entries.map { it.emptyTitleRes() }
+        assertTrue(ContentTypeFilter.Image.emptyTitleRes() != R.string.feed_empty_no_feeds)
+        assertEquals(ContentTypeFilter.Image.emptyTitleRes(), ContentTypeFilter.Audio.emptyTitleRes())
+        assertEquals(4, ContentTypeFilter.entries.map { it.labelRes() }.distinct().size)
+        assertTrue(titles.all { it != 0 })
     }
 
     // ———— 以下为 QA 补充边界（#75 验证清单第 4 项） ————
@@ -91,15 +95,13 @@ class ContentTypePartitionTest {
     @Test
     fun `分区枚举恰好四个且无文章chip`() {
         assertEquals(4, ContentTypeFilter.entries.size)
-        assertEquals(listOf("全部", "图片", "视频", "音频"), ContentTypeFilter.entries.map { it.label })
         assertTrue(ContentTypeFilter.entries.none { it.dbValue == FeedEntity.CONTENT_TYPE_ARTICLE })
     }
 
     /** Video 的空分区文案分支（原测试未覆盖）。 */
     @Test
     fun `视频分区空文案`() {
-        val videoCopy = ContentTypeFilter.Video.emptyCopy()
-        assertTrue(videoCopy.first.contains("视频"))
-        assertTrue(videoCopy.second.contains("视频"))
+        assertEquals(ContentTypeFilter.Image.emptyTitleRes(), ContentTypeFilter.Video.emptyTitleRes())
+        assertEquals(ContentTypeFilter.Image.emptyDescRes(), ContentTypeFilter.Video.emptyDescRes())
     }
 }

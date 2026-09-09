@@ -1,5 +1,7 @@
 package com.cycling.rssradar.ui.feed
 
+import com.cycling.rssradar.R
+import com.cycling.rssradar.i18n.UiText
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.AddFeedResult
@@ -73,7 +75,7 @@ data class FeedListUiState(
     val refreshTotal: Int = 0,
     val isAddingFeed: Boolean = false,
     /** 一次性提示消息（Snackbar），消费后置空。 */
-    val uiMessage: String? = null,
+    val uiMessage: UiText? = null,
     /** 最近删除的文章（issue #46 撤销删除）：Snackbar 撤销期内暂存，带原 id 可完整插回。 */
     val pendingUndoDelete: ArticleEntity? = null,
     /** 推荐流首次加载中（打分在内存里做，不是一瞬间）。 */
@@ -210,7 +212,8 @@ class FeedListViewModel @Inject constructor(
                     articles = it.articles.map { item ->
                         if (item.article.isRead) item else item.copy(article = item.article.copy(isRead = true))
                     },
-                    uiMessage = if (count > 0) "已标记 $count 篇为已读" else "没有需要标记的文章",
+                    uiMessage = if (count > 0) UiText.res(R.string.feed_marked_read, count)
+                    else UiText.res(R.string.feed_nothing_to_mark),
                 )
             }
         }
@@ -372,8 +375,8 @@ class FeedListViewModel @Inject constructor(
                     refreshDone = 0,
                     refreshTotal = 0,
                     uiMessage = when {
-                        hasFeeds && successCount == 0 -> "刷新失败，展示的是上次内容"
-                        successCount > 0 -> "已更新 $successCount 个订阅源"
+                        hasFeeds && successCount == 0 -> UiText.res(R.string.feed_refresh_failed)
+                        successCount > 0 -> UiText.res(R.string.feed_refreshed, successCount)
                         else -> it.uiMessage
                     },
                 )
@@ -521,10 +524,10 @@ class FeedListViewModel @Inject constructor(
         viewModelScope.launch {
             update { it.copy(isAddingFeed = true) }
             val message = when (subscriptionFlow.addFeed(rawUrl, groupName)) {
-                AddFeedResult.Success -> "订阅成功"
-                AddFeedResult.Duplicate -> "该源已订阅"
-                AddFeedResult.InvalidFeed -> "不是有效的 RSS/Atom 源"
-                AddFeedResult.NetworkError -> "网络错误，请检查链接后重试"
+                AddFeedResult.Success -> UiText.res(R.string.add_feed_success)
+                AddFeedResult.Duplicate -> UiText.res(R.string.add_feed_duplicate)
+                AddFeedResult.InvalidFeed -> UiText.res(R.string.add_feed_invalid)
+                AddFeedResult.NetworkError -> UiText.res(R.string.add_feed_network)
             }
             update { it.copy(isAddingFeed = false, uiMessage = message) }
             // 订阅成功后新源文章可能出现在首屏，重载第一页让列表可见

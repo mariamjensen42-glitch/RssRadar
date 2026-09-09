@@ -46,6 +46,11 @@ def classpath() -> str:
         )
     ]
     entries.append(str(android_jar()))
+    # R 桩（check-kotlin 生成的 res → R.java → jar）：UI 层测试会在运行时读
+    # R.string.*（i18n 枚举映射，ADR-0017 §3），缺了它直接 NoClassDefFoundError。
+    r_stub = WORK / "rstub.jar"
+    if r_stub.exists():
+        entries.append(str(r_stub))
     return ";".join(entries)
 
 
