@@ -465,7 +465,13 @@ fun SettingsGeneralScreen(
                             onSelect = { language ->
                                 viewModel.setAppLanguage(language)
                                 if (com.cycling.rssradar.i18n.AppLocales.apply(context, language)) {
-                                    (context as? ComponentActivity)?.recreate()
+                                    (context as? ComponentActivity)?.let { activity ->
+                                        activity.recreate()
+                                        // Android 12+ 的 relaunch 过渡会让旧/新窗口间隙透出桌面；
+                                        // 屏蔽动画后间隙不可见（API 34+ 改用 overrideActivityTransition）。
+                                        @Suppress("DEPRECATION")
+                                        activity.overridePendingTransition(0, 0)
+                                    }
                                 }
                             },
                         )
