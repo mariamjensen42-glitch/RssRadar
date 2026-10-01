@@ -42,6 +42,16 @@ jobs:
     permissions:
       contents: read
       security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: app
+            label: app
+          - module: core/data
+            label: core-data
+          - module: core/ui
+            label: core-ui
 
     steps:
       - name: Check out source
@@ -58,20 +68,20 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Run Android Lint
-        run: ./gradlew :app:lintDebug :core:data:lintDebug :core:ui:lintDebug --stacktrace
+        run: ./gradlew :${{ matrix.module }}:lintDebug --stacktrace
 
       - name: Upload lint reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lint-reports
+          name: lint-${{ matrix.label }}
           if-no-files-found: warn
-          path: "**/build/reports/lint-results-debug.*"
+          path: ${{ matrix.module }}/build/reports/lint-results-debug.*
 
       - name: Upload SARIF to code scanning
         if: always()
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: "**/build/reports/lint-results-debug.sarif"
-          category: lint
+          sarif_file: ${{ matrix.module }}/build/reports/lint-results-debug.sarif
+          category: lint-${{ matrix.label }}
