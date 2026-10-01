@@ -51,7 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.cycling.rssradar.core.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.parser.ExtractionIssue
 import com.cycling.rssradar.core.data.store.BilingualLayout
 import com.cycling.rssradar.core.data.store.ReadingFontFamily

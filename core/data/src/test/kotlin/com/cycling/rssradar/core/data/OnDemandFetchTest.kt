@@ -1,12 +1,12 @@
 package com.cycling.rssradar.core.data
 
-import com.cycling.rssradar.core.data.db.ArticleDao
-import com.cycling.rssradar.core.data.db.ArticleEntity
-import com.cycling.rssradar.core.data.db.ArticleWithFeed
-import com.cycling.rssradar.core.data.db.ContentFetchLogDao
-import com.cycling.rssradar.core.data.db.ContentFetchLogEntity
-import com.cycling.rssradar.core.data.db.FeedDao
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.dao.ArticleDao
+import com.cycling.rssradar.core.data.db.entity.ArticleEntity
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import com.cycling.rssradar.core.data.db.dao.ContentFetchLogDao
+import com.cycling.rssradar.core.data.db.entity.ContentFetchLogEntity
+import com.cycling.rssradar.core.data.db.dao.FeedDao
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.parser.ExtractionIssue
 import com.cycling.rssradar.core.data.parser.Extractor
 import com.cycling.rssradar.core.data.parser.FetchFailure

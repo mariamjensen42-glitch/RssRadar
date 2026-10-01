@@ -7,10 +7,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import com.cycling.rssradar.core.data.db.AppDatabase
-import com.cycling.rssradar.core.data.db.ArticleEntity
-import com.cycling.rssradar.core.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.db.entity.ArticleEntity
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.filter.FilterRuleApplier
 import com.cycling.rssradar.core.data.store.KeepArchived
 import com.cycling.rssradar.core.domain.filter.FilterRuleEngine

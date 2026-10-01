@@ -8,7 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.ClearArticlesResult
 import com.cycling.rssradar.core.data.FeedRepository
 import com.cycling.rssradar.core.data.SubscriptionFlow

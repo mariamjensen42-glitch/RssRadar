@@ -83,6 +83,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.cycling.rssradar.core.data.db.dao.ArticleDao
+import com.cycling.rssradar.core.data.db.dao.FeedDao
 import com.cycling.rssradar.core.ui.theme.radarColors
 
 
@@ -143,8 +145,8 @@ data class RssHubSettingsUiState(
 class RssHubSettingsViewModel @Inject constructor(
     private val store: RssHubInstanceStore,
     /** 统计条数据源：订阅源计数与未读计数直接读 DAO，不经中间层（只读、无业务规则）。 */
-    private val feedDao: com.cycling.rssradar.core.data.db.FeedDao,
-    private val articleDao: com.cycling.rssradar.core.data.db.ArticleDao,
+    private val feedDao: FeedDao,
+    private val articleDao: ArticleDao,
     private val themeStore: ThemeStore,
     private val languageStore: LanguageStore,
     private val aiStore: AiStore,

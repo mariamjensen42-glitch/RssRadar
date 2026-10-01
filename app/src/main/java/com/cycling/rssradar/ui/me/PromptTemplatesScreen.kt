@@ -64,7 +64,7 @@ import com.cycling.rssradar.core.data.ai.AiFeature
 import com.cycling.rssradar.core.data.ai.AiPrompts
 import com.cycling.rssradar.core.data.db.FeedAiProfileDao
 import com.cycling.rssradar.core.data.db.FeedAiProfileEntity
-import com.cycling.rssradar.core.data.db.FeedDao
+import com.cycling.rssradar.core.data.db.dao.FeedDao
 import com.cycling.rssradar.core.ui.theme.radarColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow

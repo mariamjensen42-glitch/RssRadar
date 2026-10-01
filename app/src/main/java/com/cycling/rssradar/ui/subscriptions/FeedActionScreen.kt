@@ -40,7 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.ui.theme.Danger
 import com.composables.icons.lucide.Eraser
 import com.composables.icons.lucide.Lucide

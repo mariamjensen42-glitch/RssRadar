@@ -75,8 +75,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.core.data.db.ArticleEntity
-import com.cycling.rssradar.core.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.db.entity.ArticleEntity
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.store.ReadingFontFamily
 import com.cycling.rssradar.core.data.store.ReadingImageState
 import com.cycling.rssradar.core.data.store.ReadingPrefs

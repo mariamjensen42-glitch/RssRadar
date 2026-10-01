@@ -3,7 +3,7 @@ package com.cycling.rssradar.core.data.ai
 import com.cycling.rssradar.core.data.db.AiArtifactDao
 import com.cycling.rssradar.core.data.db.AiArtifactEntity
 import com.cycling.rssradar.core.data.db.AiSupportDao
-import com.cycling.rssradar.core.data.db.FeedDao
+import com.cycling.rssradar.core.data.db.dao.FeedDao
 import com.cycling.rssradar.core.data.store.AiFeatureSettings
 
 

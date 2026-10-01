@@ -1,6 +1,6 @@
 package com.cycling.rssradar.core.data
 
-import com.cycling.rssradar.core.data.db.ArticleEntity
+import com.cycling.rssradar.core.data.db.entity.ArticleEntity
 import com.cycling.rssradar.core.data.parser.RssParser
 
 /**

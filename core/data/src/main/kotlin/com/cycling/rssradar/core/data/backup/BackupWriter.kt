@@ -3,9 +3,9 @@ package com.cycling.rssradar.core.data.backup
 import com.cycling.rssradar.core.data.db.AiArtifactEntity
 import com.cycling.rssradar.core.data.db.AppDatabase
 import com.cycling.rssradar.core.data.db.ArticleAnnotationEntity
-import com.cycling.rssradar.core.data.db.ArticleEntity
+import com.cycling.rssradar.core.data.db.entity.ArticleEntity
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.db.FilterRuleEntity
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers

@@ -66,8 +66,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.R
-import com.cycling.rssradar.core.data.db.ArticleWithFeed
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.model.library.LibraryRange
 import com.cycling.rssradar.i18n.labelRes
 import com.cycling.rssradar.ui.components.ArticleContextMenu

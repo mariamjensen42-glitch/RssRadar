@@ -38,24 +38,25 @@ import com.cycling.rssradar.core.data.notify.NewArticleSummary
 import com.cycling.rssradar.core.data.notify.NotificationHelper
 import com.cycling.rssradar.core.data.store.NotificationStore
 import com.cycling.rssradar.core.data.store.SyncStore
-import com.cycling.rssradar.core.data.db.MIGRATION_1_2
-import com.cycling.rssradar.core.data.db.MIGRATION_2_3
-import com.cycling.rssradar.core.data.db.MIGRATION_3_4
-import com.cycling.rssradar.core.data.db.MIGRATION_4_5
-import com.cycling.rssradar.core.data.db.MIGRATION_5_6
-import com.cycling.rssradar.core.data.db.MIGRATION_6_7
-import com.cycling.rssradar.core.data.db.MIGRATION_7_8
-import com.cycling.rssradar.core.data.db.MIGRATION_8_9
-import com.cycling.rssradar.core.data.db.MIGRATION_9_10
-import com.cycling.rssradar.core.data.db.MIGRATION_10_11
-import com.cycling.rssradar.core.data.db.MIGRATION_11_12
-import com.cycling.rssradar.core.data.db.MIGRATION_12_13
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_1_2
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_2_3
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_3_4
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_4_5
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_5_6
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_6_7
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_7_8
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_8_9
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_9_10
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_10_11
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_11_12
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_12_13
 import com.cycling.rssradar.core.data.db.FeedAiProfileDao
-import com.cycling.rssradar.core.data.db.FeedDao
-import com.cycling.rssradar.core.data.db.MIGRATION_13_14
-import com.cycling.rssradar.core.data.db.MIGRATION_14_15
-import com.cycling.rssradar.core.data.db.MIGRATION_15_16
-import com.cycling.rssradar.core.data.db.MIGRATION_16_17
+import com.cycling.rssradar.core.data.db.dao.ArticleDao
+import com.cycling.rssradar.core.data.db.dao.FeedDao
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_13_14
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_14_15
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_15_16
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_16_17
 import com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.core.data.parser.RssParser
 import com.cycling.rssradar.core.data.rss.BestIconFinder
@@ -342,7 +343,7 @@ object AppModule {
     /** 文章 DAO（「我的」页统计条直接读未读计数）。 */
     @Provides
     @Singleton
-    fun provideArticleDao(db: AppDatabase): com.cycling.rssradar.core.data.db.ArticleDao = db.articleDao()
+    fun provideArticleDao(db: AppDatabase): ArticleDao = db.articleDao()
 
     /** 35 项功能的独立开关。 */
     @Provides

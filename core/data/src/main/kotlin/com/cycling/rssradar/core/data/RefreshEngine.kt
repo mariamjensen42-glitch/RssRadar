@@ -1,10 +1,10 @@
 package com.cycling.rssradar.core.data
 
-import com.cycling.rssradar.core.data.db.ArticleDao
-import com.cycling.rssradar.core.data.db.ArticleEntity
+import com.cycling.rssradar.core.data.db.dao.ArticleDao
+import com.cycling.rssradar.core.data.db.entity.ArticleEntity
 import com.cycling.rssradar.core.data.db.ArticleFtsDao
-import com.cycling.rssradar.core.data.db.FeedDao
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.dao.FeedDao
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.parser.RssParser
 import com.cycling.rssradar.core.data.rss.BestIconFinder
 import com.cycling.rssradar.core.data.rss.FeedDiscovery

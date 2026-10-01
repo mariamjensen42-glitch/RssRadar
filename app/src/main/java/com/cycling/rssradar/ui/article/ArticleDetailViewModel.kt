@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.ContentQualification
-import com.cycling.rssradar.core.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.FeedRepository
 import com.cycling.rssradar.core.data.OnDemandFetch
 import com.cycling.rssradar.core.data.OnDemandResult

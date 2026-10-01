@@ -80,7 +80,7 @@ import com.composables.icons.lucide.Square
 import com.composables.icons.lucide.SquareCheckBig
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.X
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.ui.components.pressScale
 import com.cycling.rssradar.core.ui.theme.Danger
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion

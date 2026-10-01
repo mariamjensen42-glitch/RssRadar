@@ -7,7 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.AddFeedResult
 import com.cycling.rssradar.core.data.DiscoveredFeed
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.domain.rss.FeedProbeResult
 import com.cycling.rssradar.core.data.SubscriptionFlow
 import com.cycling.rssradar.core.model.GROUP_DESIGN

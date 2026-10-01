@@ -34,8 +34,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
-import com.cycling.rssradar.core.data.db.ArticleDao
-import com.cycling.rssradar.core.data.db.FeedOpenStat
+import com.cycling.rssradar.core.data.db.dao.ArticleDao
+import com.cycling.rssradar.core.data.db.projection.FeedOpenStat
 import com.cycling.rssradar.core.domain.stats.ReadingStatsDashboard
 import com.cycling.rssradar.core.ui.theme.radarColors
 import dagger.hilt.android.lifecycle.HiltViewModel

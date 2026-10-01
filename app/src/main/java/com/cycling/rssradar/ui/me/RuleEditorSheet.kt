@@ -31,7 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.R
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.domain.filter.FilterRule
 import com.cycling.rssradar.core.domain.filter.RuleAction
 import com.cycling.rssradar.core.domain.filter.RuleField

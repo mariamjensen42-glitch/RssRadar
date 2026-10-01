@@ -3,8 +3,8 @@ package com.cycling.rssradar.ui.library
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.FeedRepository
-import com.cycling.rssradar.core.data.db.ArticleWithFeed
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.store.LibraryStore
 import com.cycling.rssradar.core.model.library.LibraryRange
 import com.cycling.rssradar.core.model.library.LibrarySort

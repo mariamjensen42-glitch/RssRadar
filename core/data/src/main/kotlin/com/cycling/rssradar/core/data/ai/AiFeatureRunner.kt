@@ -1,9 +1,9 @@
 package com.cycling.rssradar.core.data.ai
 
-import com.cycling.rssradar.core.data.db.ArticleDao
+import com.cycling.rssradar.core.data.db.dao.ArticleDao
 import com.cycling.rssradar.core.data.db.AiSupportDao
 import com.cycling.rssradar.core.data.db.FeedAiProfileDao
-import com.cycling.rssradar.core.data.db.FeedDao
+import com.cycling.rssradar.core.data.db.dao.FeedDao
 import com.cycling.rssradar.core.data.store.AiFeatureStore
 import kotlinx.coroutines.CancellationException
 

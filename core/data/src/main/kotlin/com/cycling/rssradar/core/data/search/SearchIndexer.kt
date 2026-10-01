@@ -1,6 +1,7 @@
 package com.cycling.rssradar.core.data.search
 
 import com.cycling.rssradar.core.data.db.AppDatabase
+import com.cycling.rssradar.core.data.db.projection.ArticleSearchSourceRow
 import com.cycling.rssradar.core.domain.search.SearchTextBuilder
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -51,7 +52,7 @@ class SearchIndexer(
         return indexed
     }
 
-    private suspend fun indexRows(rows: List<com.cycling.rssradar.core.data.db.ArticleSearchSourceRow>) {
+    private suspend fun indexRows(rows: List<ArticleSearchSourceRow>) {
         rows.forEach { row ->
             val source = listOfNotNull(row.title, row.summary, row.contentText)
                 .filter { it.isNotBlank() }

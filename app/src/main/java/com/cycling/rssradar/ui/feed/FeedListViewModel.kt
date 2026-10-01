@@ -5,8 +5,8 @@ import com.cycling.rssradar.i18n.UiText
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.AddFeedResult
-import com.cycling.rssradar.core.data.db.ArticleEntity
-import com.cycling.rssradar.core.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.db.entity.ArticleEntity
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.core.data.FeedRepository
 import com.cycling.rssradar.core.data.SubscriptionFlow

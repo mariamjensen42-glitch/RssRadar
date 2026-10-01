@@ -105,8 +105,8 @@ import com.cycling.rssradar.core.ui.components.RadarImage
 import com.cycling.rssradar.core.ui.components.pressScale
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.MotionTokens
-import com.cycling.rssradar.core.data.db.ArticleEntity
-import com.cycling.rssradar.core.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.db.entity.ArticleEntity
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.store.ListDescMode
 import com.cycling.rssradar.core.data.store.ListDisplayState
 import com.cycling.rssradar.core.data.store.ListViewMode

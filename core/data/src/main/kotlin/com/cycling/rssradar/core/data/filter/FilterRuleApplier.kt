@@ -1,7 +1,7 @@
 package com.cycling.rssradar.core.data.filter
 
 import com.cycling.rssradar.core.data.ArticleCleaner
-import com.cycling.rssradar.core.data.db.ArticleDao
+import com.cycling.rssradar.core.data.db.dao.ArticleDao
 import com.cycling.rssradar.core.domain.filter.FilterRuleEngine
 import com.cycling.rssradar.core.domain.filter.RuleTarget
 

@@ -37,8 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.OnDemandFetch
-import com.cycling.rssradar.core.data.db.ContentFetchLogEntity
-import com.cycling.rssradar.core.data.db.FetchHostStat
+import com.cycling.rssradar.core.data.db.entity.ContentFetchLogEntity
+import com.cycling.rssradar.core.data.db.projection.FetchHostStat
 import com.cycling.rssradar.core.data.parser.ExtractionIssue
 import com.cycling.rssradar.core.data.parser.FetchFailure
 import com.cycling.rssradar.core.ui.theme.Danger

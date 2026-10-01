@@ -1,12 +1,12 @@
 package com.cycling.rssradar.core.data
 
-import com.cycling.rssradar.core.data.db.ArchivedArticleTombstoneEntity
-import com.cycling.rssradar.core.data.db.ArticleDao
-import com.cycling.rssradar.core.data.db.ArticleEntity
-import com.cycling.rssradar.core.data.db.ArticleFeedLink
-import com.cycling.rssradar.core.data.db.ArticleIdLink
-import com.cycling.rssradar.core.data.db.FeedDao
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.entity.ArchivedArticleTombstoneEntity
+import com.cycling.rssradar.core.data.db.dao.ArticleDao
+import com.cycling.rssradar.core.data.db.entity.ArticleEntity
+import com.cycling.rssradar.core.data.db.projection.ArticleFeedLink
+import com.cycling.rssradar.core.data.db.projection.ArticleIdLink
+import com.cycling.rssradar.core.data.db.dao.FeedDao
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.parser.RssParser
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import kotlinx.coroutines.runBlocking

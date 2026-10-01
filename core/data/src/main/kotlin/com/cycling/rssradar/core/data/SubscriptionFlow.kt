@@ -12,7 +12,7 @@ import com.cycling.rssradar.core.domain.rss.normalizeHttpUrl
 import com.cycling.rssradar.core.domain.rss.retryOnSlowResponse
 import com.cycling.rssradar.core.data.db.AppDatabase
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.opml.OpmlEntry
 import com.cycling.rssradar.core.data.opml.OpmlParser
 import com.cycling.rssradar.core.data.opml.OpmlWriter

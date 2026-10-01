@@ -1,6 +1,6 @@
 package com.cycling.rssradar.core.data
 
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 
 /**
  * 订阅时的内容类型预判（ADR-0014）：从订阅地址与标题的关键词猜 feed 的内容类型。

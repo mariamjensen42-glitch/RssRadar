@@ -5,7 +5,7 @@ import com.cycling.rssradar.i18n.emptyTitleRes
 import com.cycling.rssradar.i18n.labelRes
 
 import com.cycling.rssradar.core.data.filterRankedIdsByContentType
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

@@ -3,10 +3,10 @@ package com.cycling.rssradar.ui.me
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.R
-import com.cycling.rssradar.core.data.db.ArticleDao
+import com.cycling.rssradar.core.data.db.dao.ArticleDao
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
-import com.cycling.rssradar.core.data.db.FeedDao
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.dao.FeedDao
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.FeedRepository
 import com.cycling.rssradar.core.data.filter.FilterRuleRepository
 import com.cycling.rssradar.core.domain.filter.FilterRule

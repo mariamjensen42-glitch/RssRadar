@@ -6,9 +6,9 @@ import com.cycling.rssradar.core.domain.recommendation.RecommendationCandidate
 import com.cycling.rssradar.core.domain.recommendation.RelatedScoring
 import com.cycling.rssradar.core.domain.recommendation.RecommendationScoring
 import com.cycling.rssradar.core.data.db.AppDatabase
-import com.cycling.rssradar.core.data.db.ArticleWithFeed
-import com.cycling.rssradar.core.data.db.EngagementRow
-import com.cycling.rssradar.core.data.db.RecommendationFeedbackEntity
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import com.cycling.rssradar.core.data.db.projection.EngagementRow
+import com.cycling.rssradar.core.data.db.entity.RecommendationFeedbackEntity
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

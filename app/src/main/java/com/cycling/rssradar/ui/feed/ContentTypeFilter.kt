@@ -1,6 +1,6 @@
 package com.cycling.rssradar.ui.feed
 
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 
 /**
  * 主页内容分区 chip（issue #75，PRD 方案 C）：文章即默认态，不设「文章」chip
