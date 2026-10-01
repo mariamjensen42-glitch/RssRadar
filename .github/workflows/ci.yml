@@ -47,10 +47,13 @@ jobs:
       matrix:
         include:
           - module: app
+            task: ":app"
             label: app
           - module: core/data
+            task: ":core:data"
             label: core-data
           - module: core/ui
+            task: ":core:ui"
             label: core-ui
 
     steps:
@@ -68,7 +71,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Run Android Lint
-        run: ./gradlew :${{ matrix.module }}:lintDebug --stacktrace
+        run: ./gradlew ${{ matrix.task }}:lintDebug --stacktrace
 
       - name: Upload lint reports
         if: always()
