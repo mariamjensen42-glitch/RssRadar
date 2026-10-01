@@ -35,3 +35,38 @@ jobs:
 
       - name: Run unit tests
         run: ./gradlew :app:testDebugUnitTest :core:model:test :core:domain:test :core:data:testDebugUnitTest --stacktrace
+
+  lint:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ github.event_name != 'pull_request' }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Make Gradle executable
+        run: chmod +x ./gradlew
+
+      - name: Run Android Lint
+        run: ./gradlew :app:lintDebug :core:data:lintDebug :core:ui:lintDebug --stacktrace
+
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-reports
+          if-no-files-found: warn
+          path: |
+            app/build/reports/lint-results-debug.html
+            app/build/reports/lint-results-debug.xml
+            core/data/build/reports/lint-results-debug.html
+            core/data/build/reports/lint-results-debug.xml
+            core/ui/build/reports/lint-results-debug.html
+            core/ui/build/reports/lint-results-debug.xml
