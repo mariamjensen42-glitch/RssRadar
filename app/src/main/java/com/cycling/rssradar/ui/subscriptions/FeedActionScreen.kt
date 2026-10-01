@@ -23,7 +23,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -81,7 +82,11 @@ fun FeedActionScreen(
             containerColor = radarColors().surface1,
             // 单锚点：内容较高时默认的双锚点（半开/全开）拖动过渡会反复重算高度造成抖动，
             // skipPartiallyExpanded 直接全开，拖拽只做关闭手势
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            sheetState =
+                rememberBottomSheetState(
+                    initialValue = SheetValue.Hidden,
+                    enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+                ),
         ) {
             Column(
                 Modifier

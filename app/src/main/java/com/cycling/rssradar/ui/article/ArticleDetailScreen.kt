@@ -4,6 +4,9 @@ import androidx.compose.ui.res.stringResource
 
 import com.cycling.rssradar.R
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -34,6 +37,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.selection.rememberSelectionState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -45,7 +50,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -71,6 +75,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.cycling.rssradar.core.data.db.ArticleEntity
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
 import com.cycling.rssradar.core.data.store.ReadingFontFamily
 import com.cycling.rssradar.core.data.store.ReadingImageState
@@ -90,6 +95,7 @@ import com.cycling.rssradar.core.ui.theme.LocalRadarColors
 import com.cycling.rssradar.core.ui.theme.isLightBackground
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.ui.theme.ApplySystemBarIcons
+import com.cycling.rssradar.ui.components.SyncedSlider
 import com.cycling.rssradar.ui.components.shareArticle
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Bookmark
@@ -97,10 +103,13 @@ import com.composables.icons.lucide.ChevronLeft
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.ExternalLink
+import com.composables.icons.lucide.Headphones
+import com.composables.icons.lucide.Highlighter
 import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.Share2
 import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Star
@@ -129,6 +138,10 @@ fun ArticleDetailScreen(
     onOpenOriginal: (String) -> Unit = {},
     /** 相关阅读卡片点击跳转（AiFeature.RELATED）。 */
     onOpenArticle: (Long) -> Unit = {},
+    /** 标注列表页入口（顶栏溢出菜单）。 */
+    onOpenAnnotations: () -> Unit = {},
+    /** 打开音频播放页（有音频地址的文章才有入口）。 */
+    onOpenAudio: (Long) -> Unit = {},
 ) {
     val readingPrefs by viewModel.readingPrefs.collectAsState()
     val appColors = radarColors()
@@ -138,13 +151,19 @@ fun ArticleDetailScreen(
     // 深色模式下开「纸张」时状态栏图标必须变深色，否则一片糊。
     // 退出阅读页由 ApplySystemBarIcons 的 onDispose 还原成应用主题。
     ApplySystemBarIcons(darkTheme = !pageColors.isLightBackground())
-    CompositionLocalProvider(LocalRadarColors provides pageColors) {
+    val annotations by viewModel.annotations.collectAsState()
+    CompositionLocalProvider(
+        LocalRadarColors provides pageColors,
+        LocalReadingAnnotations provides annotations,
+    ) {
         ArticleDetailBody(
             viewModel = viewModel,
             articleId = articleId,
             onBack = onBack,
             onOpenOriginal = onOpenOriginal,
             onOpenArticle = onOpenArticle,
+            onOpenAnnotations = onOpenAnnotations,
+            onOpenAudio = onOpenAudio,
         )
     }
 }
@@ -157,6 +176,10 @@ private fun ArticleDetailBody(
     onOpenOriginal: (String) -> Unit = {},
     /** 相关阅读卡片点击跳转（AiFeature.RELATED）。 */
     onOpenArticle: (Long) -> Unit = {},
+    /** 标注列表页入口（顶栏溢出菜单）。 */
+    onOpenAnnotations: () -> Unit = {},
+    /** 打开音频播放页（有音频地址的文章才有入口）。 */
+    onOpenAudio: (Long) -> Unit = {},
 ) {
     val article by viewModel.article.collectAsState()
     val initialLoadDone by viewModel.initialLoadDone.collectAsState()
@@ -181,6 +204,18 @@ private fun ArticleDetailBody(
     var showAiSheet by remember { mutableStateOf(false) }
     // 全屏图片查看（issue #60）：瞬时 UI，不入路由、不占 back 栈
     var imageViewer by remember { mutableStateOf<ImageViewer?>(null) }
+    // 页内查找：瞬时 UI，同不进路由。query 一变游标就回到第一处。
+    var findActive by remember { mutableStateOf(false) }
+    var findQuery by remember { mutableStateOf("") }
+    var findCursor by remember { mutableStateOf(0) }
+    var findCount by remember { mutableStateOf(0) }
+    // 划词：[SelectionState] 暴露选中文本。选区偏移是 internal，但块内锚定本来就不依赖偏移，
+    // 只要有引文就能把它找回来。
+    val selectionState = rememberSelectionState()
+    val selectionTexts = selectionState.selectedTexts
+    val selectionBlocks = remember(selectionTexts) {
+        selectionTexts.map { it.text }.filter { it.isNotBlank() }
+    }
     // 整页滚动状态提升到 Screen：顶栏标题「滚出视口才出现」需要读滚动量
     val scrollState = rememberScrollState()
     // 视口模式（有图文章）的头部折叠量 = WebView 内部滚动量，同样驱动顶栏补位标题
@@ -215,6 +250,10 @@ private fun ArticleDetailBody(
         headerScrollY = 0
         titleHideOffset = Int.MAX_VALUE
         imageViewer = null
+        findActive = false
+        findQuery = ""
+        findCursor = 0
+        findCount = 0
     }
     // 翻译失败走 Snackbar（spec #44：正文保持原文，报错可重试）；按状态实例触发，不会重复弹
     LaunchedEffect(translationState) {
@@ -253,6 +292,8 @@ private fun ArticleDetailBody(
                     headerScrollY >= titleHideOffset,
                 onBack = onBack,
                 onOpenStyle = { showStyleSheet = true },
+                onOpenFind = { findActive = true },
+                onOpenAnnotations = onOpenAnnotations,
                 onShare = {
                     article?.let { item ->
                         context.shareArticle(
@@ -299,6 +340,11 @@ private fun ArticleDetailBody(
                     onBookmark = { viewModel.onIntent(ArticleDetailIntent.ToggleBookmarked) },
                     onOpenOriginal = { onOpenOriginal(item.article.link) },
                     onOpenAi = { showAiSheet = true },
+                    // 只有真的拿到音频地址才给入口：mediaKind 说有音频但地址没落库时，
+                    // 点了会进到"没有音频"的空页，不如不给
+                    onPlayAudio = item.article.mediaUrl
+                        ?.takeIf { it.isNotBlank() && item.article.mediaKind == ArticleEntity.MEDIA_KIND_AUDIO }
+                        ?.let { { onOpenAudio(item.article.id) } },
                 )
             }
             }
@@ -326,60 +372,125 @@ private fun ArticleDetailBody(
             }
             return@Scaffold
         }
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                // 越界切篇（#23）：挂在滚动容器的祖先上，只观察不消费滚动量。
-                // 视口模式由 WebView 内部滚动，拿不到越界量，那里不生效。
-                .pullToSwitchArticle(
-                    enabled = readingPrefs.pullToSwitchArticle,
-                    atTop = { scrollState.value == 0 },
-                    atBottom = { scrollState.maxValue > 0 && scrollState.value >= scrollState.maxValue },
-                    hasPrev = neighbors.prevId != null,
-                    hasNext = neighbors.nextId != null,
-                    onSwitch = { target ->
-                        when (target) {
-                            PullTarget.PREVIOUS -> neighbors.prevId?.let(viewModel::load)
-                            PullTarget.NEXT -> neighbors.nextId?.let(viewModel::load)
-                            PullTarget.NONE -> Unit
-                        }
-                    },
-                ),
-        ) {
-            ReadingBody(
-                article = current,
-                isFetchingContent = isFetchingContent,
-                contentFetchState = contentFetchState,
-                onRetryFetch = { viewModel.onIntent(ArticleDetailIntent.RetryFetch) },
-                preferSummary = preferSummary,
-                onShowFullContent = {
-                    viewModel.onIntent(ArticleDetailIntent.SetPreferSummary(false))
-                },
-                aiSummaryState = aiSummaryState,
-                translationState = translationState,
-                scrollState = scrollState,
-                headerScrollY = headerScrollY,
-                onHeaderScroll = { headerScrollY = it },
-                onTitleMeasured = { titleHideOffset = it },
-                onGenerateSummary = { viewModel.onIntent(ArticleDetailIntent.GenerateSummary) },
-                onRetranslate = { viewModel.onIntent(ArticleDetailIntent.RetranslateArticle) },
-                onShowOriginal = { viewModel.onIntent(ArticleDetailIntent.ToggleTranslation) },
-                onTranslationDisplayChange = { next ->
-                    viewModel.updateReadingPrefs { it.copy(translation = next) }
-                },
-                onImageClick = { url -> imageViewer = openImageViewer(current, url) },
+        // 查找的能力边界要如实标出：译文分段渲染没有接查找；整页 WebView（无图、由外层
+        // Compose 滚动）里平台的 findNext 带不动视口。两者都不该让「下一处」看起来能用。
+        val translationActive = translationState is TranslationState.Shown ||
+            translationState is TranslationState.Progressing
+        val viewportBody = shouldUseViewport(BodyMode.WEBVIEW, current.article.content)
+        val findLimit = when {
+            translationActive -> FindLimit.UNSUPPORTED
+            readingPrefs.renderer != ReadingRenderer.NATIVE && !viewportBody -> FindLimit.NO_AUTO_SCROLL
+            else -> FindLimit.NONE
+        }
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-            )
-            // 相关阅读（AiFeature.RELATED）：横滑卡片条，仅在有候选时出现——
-            // 空态不占高度，阅读区恢复满屏。
-            val related by viewModel.related.collectAsState()
-            if (related.isNotEmpty()) {
-                RelatedArticlesStrip(items = related, onOpen = onOpenArticle)
+                    .fillMaxSize()
+                    .padding(padding)
+                    // 越界切篇（#23）：挂在滚动容器的祖先上，只观察不消费滚动量。
+                    // 视口模式由 WebView 内部滚动，拿不到越界量，那里不生效。
+                    .pullToSwitchArticle(
+                        enabled = readingPrefs.pullToSwitchArticle,
+                        atTop = { scrollState.value == 0 },
+                        atBottom = { scrollState.maxValue > 0 && scrollState.value >= scrollState.maxValue },
+                        hasPrev = neighbors.prevId != null,
+                        hasNext = neighbors.nextId != null,
+                        onSwitch = { target ->
+                            when (target) {
+                                PullTarget.PREVIOUS -> neighbors.prevId?.let(viewModel::load)
+                                PullTarget.NEXT -> neighbors.nextId?.let(viewModel::load)
+                                PullTarget.NONE -> Unit
+                            }
+                        },
+                    ),
+            ) {
+                if (findActive) {
+                    ReaderFindBar(
+                        query = findQuery,
+                        onQueryChange = { value ->
+                            findQuery = value
+                            findCursor = 0
+                        },
+                        count = findCount,
+                        // 展示用 1 基：读者说「第 3 处」，不关心它是 0 基的下标
+                        cursor = if (findCount == 0) 0 else findCursor + 1,
+                        onPrevious = {
+                            if (findCount > 0) findCursor = (findCursor - 1 + findCount) % findCount
+                        },
+                        onNext = {
+                            if (findCount > 0) findCursor = (findCursor + 1) % findCount
+                        },
+                        onClose = {
+                            findActive = false
+                            findQuery = ""
+                            findCursor = 0
+                            findCount = 0
+                        },
+                        limit = findLimit,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                // 划词：SelectionContainer 只提供选择能力，选中后的动作在底部工具条。
+                // 它不含 lazy 布局的直接子级（相关阅读条在它外面），不触到未定义行为。
+                SelectionContainer(
+                    state = selectionState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                ) {
+                    ReadingBody(
+                        article = current,
+                        isFetchingContent = isFetchingContent,
+                        contentFetchState = contentFetchState,
+                        onRetryFetch = { viewModel.onIntent(ArticleDetailIntent.RetryFetch) },
+                        preferSummary = preferSummary,
+                        onShowFullContent = {
+                            viewModel.onIntent(ArticleDetailIntent.SetPreferSummary(false))
+                        },
+                        aiSummaryState = aiSummaryState,
+                        translationState = translationState,
+                        scrollState = scrollState,
+                        headerScrollY = headerScrollY,
+                        onHeaderScroll = { headerScrollY = it },
+                        onTitleMeasured = { titleHideOffset = it },
+                        onGenerateSummary = { viewModel.onIntent(ArticleDetailIntent.GenerateSummary) },
+                        onRetranslate = { viewModel.onIntent(ArticleDetailIntent.RetranslateArticle) },
+                        onShowOriginal = { viewModel.onIntent(ArticleDetailIntent.ToggleTranslation) },
+                        onTranslationDisplayChange = { next ->
+                            viewModel.updateReadingPrefs { it.copy(translation = next) }
+                        },
+                        onImageClick = { url -> imageViewer = openImageViewer(current, url) },
+                        findQuery = if (findActive) findQuery else "",
+                        findCursor = findCursor,
+                        onFindCount = { findCount = it },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                // 相关阅读（AiFeature.RELATED）：横滑卡片条，仅在有候选时出现——
+                // 空态不占高度，阅读区恢复满屏。
+                val related by viewModel.related.collectAsState()
+                if (related.isNotEmpty()) {
+                    RelatedArticlesStrip(items = related, onOpen = onOpenArticle)
+                }
             }
-        }    }
+            if (selectionBlocks.isNotEmpty()) {
+                ReaderSelectionBar(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 16.dp),
+                    onHighlight = { colorIndex, note ->
+                        viewModel.addAnnotations(selectionBlocks, colorIndex, note)
+                        selectionState.clear()
+                    },
+                    onCopy = {
+                        copyToClipboard(context, selectionBlocks.joinToString("\n"))
+                        selectionState.clear()
+                    },
+                    onDismiss = { selectionState.clear() },
+                )
+            }
+        }
+    }
 
     imageViewer?.let { viewer ->
         ReaderImagePage(
@@ -459,6 +570,12 @@ private fun ArticleDetailBody(
     }
 }
 
+/** 划词复制：写系统剪贴板，Android 13+ 会自带一条"已复制"的系统提示。 */
+private fun copyToClipboard(context: Context, text: String) {
+    val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    manager.setPrimaryClip(ClipData.newPlainText("annotation", text))
+}
+
 /**
  * 点图 → 全屏查看：现提取本文图片列表（jsoup 解析，只在点击时付代价）并定位下标。
  * 提取不到（例如地址来自 srcset、被 sanitize 改过）时退化成"只看这一张"。
@@ -478,6 +595,10 @@ private fun ArticleDetailTopBar(
     showTitle: Boolean,
     onBack: () -> Unit,
     onOpenStyle: () -> Unit,
+    /** 打开页内查找栏。 */
+    onOpenFind: () -> Unit,
+    /** 跳到标注列表页。 */
+    onOpenAnnotations: () -> Unit,
     /** 分享本文（#26）：内容格式由「我的」页偏好决定。 */
     onShare: () -> Unit,
     onToggleTranslation: () -> Unit,
@@ -547,6 +668,22 @@ private fun ArticleDetailTopBar(
                 expanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false },
             ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.find_in_page)) },
+                    leadingIcon = { Icon(Lucide.Search, contentDescription = null) },
+                    onClick = {
+                        menuExpanded = false
+                        onOpenFind()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.annotations_title)) },
+                    leadingIcon = { Icon(Lucide.Highlighter, contentDescription = null) },
+                    onClick = {
+                        menuExpanded = false
+                        onOpenAnnotations()
+                    },
+                )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.share)) },
                     leadingIcon = { Icon(Lucide.Share2, contentDescription = null) },
@@ -758,7 +895,7 @@ private fun ReadingStyleSheet(
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.width(72.dp),
                 )
-                Slider(
+                SyncedSlider(
                     value = style.lineHeight,
                     onValueChange = { onLineHeight(coerceLineHeight(it)) },
                     valueRange = ReadingStyleState.LINE_HEIGHT_MIN..ReadingStyleState.LINE_HEIGHT_MAX,
@@ -781,7 +918,7 @@ private fun ReadingStyleSheet(
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.width(72.dp),
                 )
-                Slider(
+                SyncedSlider(
                     value = style.horizontalPadding.toFloat(),
                     onValueChange = { onPadding(coercePadding(it.roundToInt())) },
                     valueRange = ReadingStyleState.PADDING_MIN.toFloat()..ReadingStyleState.PADDING_MAX.toFloat(),
@@ -805,7 +942,7 @@ private fun ReadingStyleSheet(
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.width(72.dp),
                 )
-                Slider(
+                SyncedSlider(
                     value = style.letterSpacing,
                     onValueChange = { onLetterSpacing(coerceLetterSpacing(it)) },
                     valueRange = ReadingStyleState.LETTER_SPACING_MIN..ReadingStyleState.LETTER_SPACING_MAX,
@@ -889,7 +1026,7 @@ private fun ReadingStyleSheet(
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.width(72.dp),
                 )
-                Slider(
+                SyncedSlider(
                     value = image.cornerRadius.toFloat(),
                     onValueChange = { onImageCornerRadius(coerceImageCornerRadius(it.roundToInt())) },
                     valueRange = ReadingImageState.CORNER_RADIUS_MIN.toFloat()..
@@ -1027,6 +1164,8 @@ private fun ArticleActionsBar(
     onOpenOriginal: () -> Unit,
     /** AI 智能功能面板（35 项里的文章级功能）。 */
     onOpenAi: () -> Unit = {},
+    /** 打开播放页；null = 这篇没有可播的音频（入口整个不出现，不留一个点不动的按钮）。 */
+    onPlayAudio: (() -> Unit)? = null,
 ) {
     val insets = WindowInsets.navigationBars.asPaddingValues()
     Surface(color = radarColors().bgRoot) {
@@ -1058,6 +1197,16 @@ private fun ArticleActionsBar(
                 onClick = onNext,
             )
             Spacer(Modifier.weight(1f))
+            onPlayAudio?.let { play ->
+                ActionIcon(
+                    icon = Lucide.Headphones,
+                    checked = false,
+                    contentDescription = stringResource(R.string.player_open),
+                    size = 40.dp,
+                    onClick = play,
+                )
+                Spacer(Modifier.width(8.dp))
+            }
             ActionIcon(icon = Lucide.Star, checked = isStarred, contentDescription = stringResource(R.string.star), size = 40.dp, onClick = onStar)
             Spacer(Modifier.width(8.dp))
             ActionIcon(icon = Lucide.Bookmark, checked = isBookmarked, contentDescription = stringResource(R.string.read_later), size = 40.dp, onClick = onBookmark)

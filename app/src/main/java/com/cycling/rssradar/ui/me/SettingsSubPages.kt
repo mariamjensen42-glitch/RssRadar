@@ -30,7 +30,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -67,6 +66,7 @@ import com.cycling.rssradar.core.data.store.ShareContentFormat
 import com.cycling.rssradar.core.data.store.SyncInterval
 import com.cycling.rssradar.core.data.store.ThemeMode
 import com.cycling.rssradar.core.ui.components.OptionPickerSheet
+import com.cycling.rssradar.ui.components.SyncedSlider
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Eye
@@ -288,13 +288,13 @@ private fun AccentSlider(
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.width(48.dp),
         )
-        Slider(value = value, onValueChange = onValue, valueRange = range, modifier = Modifier.weight(1f))
+        SyncedSlider(value = value, onValueChange = onValue, valueRange = range, modifier = Modifier.weight(1f))
     }
 }
 
 /** 「标签 + 当前值 + 箭头」的跳转行（归档保留期同款形态，链接/分享偏好复用）。 */
 @Composable
-private fun OptionRow(
+internal fun OptionRow(
     label: String,
     value: String,
     onClick: () -> Unit,
@@ -330,7 +330,7 @@ private fun OptionRow(
 
 /** 跳转行（无当前值），如「全文抓取诊断」「崩溃日志」。 */
 @Composable
-private fun NavigateRow(label: String, onClick: () -> Unit) {
+internal fun NavigateRow(label: String, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = radarColors().surface1,
@@ -373,7 +373,7 @@ private fun needsNotificationPermission(): Boolean =
 
 /** 通用分段选择器：胶囊 chip 一排，选中态 accent 填充。设置页三处共用，保证样式一致。 */
 @Composable
-private fun <T> SegmentedChips(
+internal fun <T> SegmentedChips(
     options: List<T>,
     selected: T,
     label: (T) -> String,

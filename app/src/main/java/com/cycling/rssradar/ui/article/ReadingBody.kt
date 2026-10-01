@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +58,8 @@ import com.cycling.rssradar.core.data.store.ReadingFontFamily
 import com.cycling.rssradar.core.data.store.ReadingStyleState
 import com.cycling.rssradar.core.data.store.TranslationDisplayState
 import com.cycling.rssradar.core.data.store.TranslationViewMode
+import com.cycling.rssradar.core.domain.reading.FindIndex
+import com.cycling.rssradar.core.domain.reading.ReadingTextMap
 import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.ui.components.openUrl
 import com.cycling.rssradar.ui.theme.LocalReadingPrefs
@@ -80,6 +83,17 @@ import com.cycling.rssradar.core.ui.theme.radarColors
  * 顶栏「标题滚出视口才补位」所需的折叠量与量测经 [onHeaderScroll]/[onTitleMeasured]
  * 上抛，滚动状态本身留在 Screen。
  */
+/**
+ * 页内查找在正文区的全部输入：一个打包参数，而不是四散五个。
+ * 原生路要 [highlight]（叠底色）与 [focus]（滚过去）；WebView 路只要 [query]/[cursor]。
+ */
+internal data class ReadingFind(
+    val query: String = "",
+    val cursor: Int = 0,
+    val highlight: FindHighlight? = null,
+    val focus: AnchorFocus? = null,
+)
+
 @Composable
 internal fun ReadingBody(
     article: ArticleWithFeed,
@@ -113,6 +127,12 @@ internal fun ReadingBody(
      * 两条路都收敛到这一个出口。
      */
     onImageClick: (String) -> Unit,
+    /** 页内查找的查询词；空串 = 未在查找（查找栏已关闭）。 */
+    findQuery: String = "",
+    /** 当前命中序号（0 基），用于把「下一处」滚进视口。 */
+    findCursor: Int = 0,
+    /** 命中总数上报：查找栏显示「n/N」，也用来判断「没有命中」。 */
+    onFindCount: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // 水平边距不放在外层：正文 WebView 的边距由排版设置的 CSS padding 控制（issue #42），
@@ -209,6 +229,42 @@ internal fun ReadingBody(
         }
     }
 
+    // 页内查找：把中间树展平成带坐标的全文（[ReadingTextMap]）在全文上定位命中，
+    // 再经 [TextBlock.anchor] 映射回「哪个顶层节点」用于滚动。
+    // 只在原生路有效；WebView 路交给它自己的 findNext 滚，命中数从那边上报。
+    val textBlocks = remember(resolvedPlan.nativeNodes) {
+        ReadingNodes.textBlocks(resolvedPlan.nativeNodes)
+    }
+    val findHits = remember(textBlocks, findQuery) {
+        if (resolvedPlan.mode != BodyMode.NATIVE || findQuery.isBlank()) {
+            emptyList()
+        } else {
+            FindIndex.find(ReadingTextMap.flatten(textBlocks.map { it.text }), findQuery)
+        }
+    }
+    LaunchedEffect(findHits.size, resolvedPlan.mode) {
+        if (resolvedPlan.mode == BodyMode.NATIVE) onFindCount(findHits.size)
+    }
+    val activeHit = findHits.getOrNull(findCursor)
+    val findHighlight = if (resolvedPlan.mode == BodyMode.NATIVE && findQuery.isNotBlank()) {
+        FindHighlight(
+            query = findQuery,
+            activeBlockText = activeHit?.let { textBlocks.getOrNull(it.blockIndex)?.text },
+            activeLocalStart = activeHit?.localStart ?: -1,
+        )
+    } else {
+        null
+    }
+    val anchorFocus = activeHit?.let { hit ->
+        textBlocks.getOrNull(hit.blockIndex)?.let { AnchorFocus(it.anchor, findCursor) }
+    }
+    val find = ReadingFind(
+        query = findQuery,
+        cursor = findCursor,
+        highlight = findHighlight,
+        focus = anchorFocus,
+    )
+
     if (viewport) {
         Column(modifier = modifier.padding(vertical = 8.dp)) {
             // 视口模式的"随滚"体验（与整页模式对齐）：WebView 内部滚动量驱动头部向上折叠。
@@ -259,6 +315,8 @@ internal fun ReadingBody(
                 onHeaderScroll = onHeaderScroll,
                 onImageClick = onImageClick,
                 modifier = Modifier.weight(1f),
+                find = find,
+                onFindCount = onFindCount,
             )
             Spacer(Modifier.height(12.dp)) // 避让底部操作栏
         }
@@ -304,6 +362,8 @@ internal fun ReadingBody(
                 onHeaderScroll = onHeaderScroll,
                 onImageClick = onImageClick,
                 modifier = Modifier.fillMaxWidth(),
+                find = find,
+                onFindCount = onFindCount,
             )
             Spacer(Modifier.height(12.dp)) // 避让底部操作栏
         }
@@ -329,6 +389,10 @@ private fun BodyContent(
     onHeaderScroll: (Int) -> Unit,
     onImageClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** 页内查找的活跃项：原生渲染器据此叠查找底色。 */
+    find: ReadingFind = ReadingFind(),
+    /** 命中总数上报（WebView 路自己算命中数，需要出口）。 */
+    onFindCount: (Int) -> Unit = {},
 ) {
     val context = LocalContext.current
     when (plan.mode) {
@@ -346,21 +410,30 @@ private fun BodyContent(
             passThroughTouch = !viewport,
             onScroll = if (viewport) onHeaderScroll else null,
             onImageClick = onImageClick,
+            findQuery = find.query,
+            findCursor = find.cursor,
+            onFindCount = onFindCount,
             modifier = modifier.fillMaxWidth(),
         )
         // 原生渲染器（ADR-0009）：中间树非空才走到这个模式
-        BodyMode.NATIVE -> ArticleNativeReader(
-            nodes = plan.nativeNodes,
-            onLinkClick = { context.openUrl(it) },
-            onImageClick = onImageClick,
-            modifier = modifier.fillMaxWidth(),
-        )
+        BodyMode.NATIVE -> CompositionLocalProvider(LocalFindHighlight provides find.highlight) {
+            ArticleNativeReader(
+                nodes = plan.nativeNodes,
+                onLinkClick = { context.openUrl(it) },
+                onImageClick = onImageClick,
+                modifier = modifier.fillMaxWidth(),
+                focus = find.focus,
+            )
+        }
         BodyMode.WEBVIEW -> ArticleWebView(
             html = article.article.content ?: article.article.summary.orEmpty(),
             imageUrls = imageUrls,
             passThroughTouch = !viewport,
             onScroll = if (viewport) onHeaderScroll else null,
             onImageClick = onImageClick,
+            findQuery = find.query,
+            findCursor = find.cursor,
+            onFindCount = onFindCount,
             modifier = modifier.fillMaxWidth(),
         )
         BodyMode.NO_CONTENT -> NoContentBody(

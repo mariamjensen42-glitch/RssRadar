@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,10 +44,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -54,16 +59,23 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.model.library.LibraryRange
+import com.cycling.rssradar.i18n.labelRes
 import com.cycling.rssradar.ui.components.ArticleContextMenu
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.components.pressScale
 import com.cycling.rssradar.ui.components.ArticleMenuActions
 import com.cycling.rssradar.ui.components.articleMenuOffset
+import com.cycling.rssradar.ui.me.SegmentedChips
 import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.composables.icons.lucide.ChevronRight
@@ -82,15 +94,18 @@ fun SearchScreen(
     onOpenSubscriptions: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
+    val feeds by viewModel.feeds.collectAsState()
     val focusRequester = remember { FocusRequester() }
     val snackbarHostState = remember { SnackbarHostState() }
+    // LaunchedEffect 不是组合作用域，文案只能经 context.getString 取（ADR-0017）
+    val context = LocalContext.current
 
     // 删除撤销（issue #46），与信息流一致
     LaunchedEffect(state.pendingUndoDelete) {
         state.pendingUndoDelete?.let { deleted ->
             val result = snackbarHostState.showSnackbar(
-                message = "已删除「${deleted.title}」",
-                actionLabel = "撤销",
+                message = context.getString(R.string.search_deleted, deleted.title),
+                actionLabel = context.getString(R.string.search_undo),
                 duration = SnackbarDuration.Short,
             )
             when (result) {
@@ -127,11 +142,14 @@ fun SearchScreen(
             } else {
                 SearchResults(
                     state = state,
+                    feeds = feeds,
                     onOpenArticle = onOpenArticle,
                     onToggleRead = { id, read -> viewModel.onIntent(SearchIntent.SetRead(id, read)) },
                     onToggleStarred = { id -> viewModel.onIntent(SearchIntent.ToggleStarred(id)) },
                     onToggleBookmarked = { id -> viewModel.onIntent(SearchIntent.ToggleBookmarked(id)) },
                     onDelete = { id -> viewModel.onIntent(SearchIntent.DeleteArticle(id)) },
+                    onIntent = viewModel::onIntent,
+                    onLoadMore = viewModel::loadMore,
                 )
             }
         }
@@ -157,7 +175,7 @@ private fun SearchBar(
         modifier = modifier.fillMaxWidth(),
         placeholder = {
             Text(
-                "搜索文章、来源或关键词",
+                stringResource(R.string.search_placeholder),
                 color = radarColors().textTertiary,
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -172,7 +190,7 @@ private fun SearchBar(
         trailingIcon = {
             if (query.isNotEmpty()) {
                 IconButton(onClick = onClear) {
-                    Icon(Lucide.X, contentDescription = "清空", tint = radarColors().textTertiary, modifier = Modifier.size(18.dp))
+                    Icon(Lucide.X, contentDescription = stringResource(R.string.search_clear), tint = radarColors().textTertiary, modifier = Modifier.size(18.dp))
                 }
             }
         },
@@ -199,7 +217,7 @@ private fun RecentSearches(
     Column(modifier = Modifier.padding(horizontal = 20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "最近搜索",
+                text = stringResource(R.string.search_recent),
                 color = radarColors().textPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
@@ -207,14 +225,18 @@ private fun RecentSearches(
             )
             if (history.isNotEmpty()) {
                 TextButton(onClick = onClear) {
-                    Text(text = "清空历史", color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = stringResource(R.string.search_clear_history),
+                        color = radarColors().textTertiary,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
             }
         }
         Spacer(Modifier.height(8.dp))
         if (history.isEmpty()) {
             Text(
-                text = "暂无搜索记录",
+                text = stringResource(R.string.search_no_history),
                 color = radarColors().textTertiary,
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -261,14 +283,14 @@ private fun IdleSuggestions(onOpenSubscriptions: () -> Unit) {
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = "浏览订阅源",
+                    text = stringResource(R.string.search_browse_feeds),
                     color = radarColors().textPrimary,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = "按分组查看已订阅的站点，再进入单个订阅源阅读",
+                    text = stringResource(R.string.search_browse_feeds_hint),
                     color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -301,7 +323,7 @@ private fun HistoryChip(term: String, onClick: () -> Unit, onDelete: (String) ->
             IconButton(onClick = { onDelete(term) }, modifier = Modifier.size(24.dp)) {
                 Icon(
                     Lucide.X,
-                    contentDescription = "删除「$term」",
+                    contentDescription = stringResource(R.string.search_delete_history_item, term),
                     tint = radarColors().textTertiary,
                     modifier = Modifier.size(12.dp),
                 )
@@ -313,53 +335,192 @@ private fun HistoryChip(term: String, onClick: () -> Unit, onDelete: (String) ->
 @Composable
 private fun SearchResults(
     state: SearchUiState,
+    feeds: List<FeedEntity>,
     onOpenArticle: (ArticleWithFeed) -> Unit,
     onToggleRead: (Long, Boolean) -> Unit,
     onToggleStarred: (Long) -> Unit,
     onToggleBookmarked: (Long) -> Unit,
     onDelete: (Long) -> Unit,
+    onIntent: (SearchIntent) -> Unit,
+    onLoadMore: () -> Unit,
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        // 底部让位悬浮 TabBar（含导航栏 inset）
-        contentPadding = PaddingValues(
-            start = 16.dp,
-            end = 16.dp,
-            top = 8.dp,
-            bottom = tabBarBottomClearance(),
-        ),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        item {
-            Text(
-                text = "找到 ${state.results.size} 条与「${state.query}」相关的结果",
-                color = radarColors().textTertiary,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+    val listState = rememberLazyListState()
+    // 触底加载下一页。ViewModel 内部自己判 loading / 到底，重复调用无害。
+    val reachedEnd by remember {
+        derivedStateOf {
+            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            last >= listState.layoutInfo.totalItemsCount - 3
         }
-        items(state.results, key = { it.article.id }) { article ->
-            SearchResultRow(
-                article = article,
-                query = state.query,
-                onClick = { onOpenArticle(article) },
-                onToggleRead = { onToggleRead(article.article.id, !article.article.isRead) },
-                onToggleStarred = { onToggleStarred(article.article.id) },
-                onToggleBookmarked = { onToggleBookmarked(article.article.id) },
-                onDelete = { onDelete(article.article.id) },
-            )
-        }
-        if (state.results.isEmpty()) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 32.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("暂无结果，试试其他关键词", color = radarColors().textTertiary)
+    }
+    LaunchedEffect(listState) {
+        snapshotFlow { reachedEnd }.collect { if (it) onLoadMore() }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        SearchFilterRow(state = state, feeds = feeds, onIntent = onIntent)
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            // 底部让位悬浮 TabBar（含导航栏 inset）
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = 8.dp,
+                bottom = tabBarBottomClearance(),
+            ),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item(key = "count") {
+                Text(
+                    // 报**总命中数**而不是已载入条数：分页下后者会随着滚动一直涨，不是结果规模
+                    text = stringResource(R.string.search_result_count, state.hits, state.query),
+                    color = radarColors().textTertiary,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            items(state.results, key = { it.article.id }) { article ->
+                SearchResultRow(
+                    article = article,
+                    query = state.query,
+                    onClick = { onOpenArticle(article) },
+                    onToggleRead = { onToggleRead(article.article.id, !article.article.isRead) },
+                    onToggleStarred = { onToggleStarred(article.article.id) },
+                    onToggleBookmarked = { onToggleBookmarked(article.article.id) },
+                    onDelete = { onDelete(article.article.id) },
+                )
+            }
+            if (state.results.isEmpty() && state.searched && !state.loading) {
+                item(key = "empty") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 32.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(stringResource(R.string.search_no_result), color = radarColors().textTertiary)
+                    }
+                }
+            }
+            if (state.results.size < state.hits) {
+                item(key = "more") {
+                    Text(
+                        text = stringResource(R.string.search_loading_more),
+                        color = radarColors().textTertiary,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 10.dp),
+                    )
                 }
             }
         }
+    }
+}
+
+/**
+ * 二次筛选条：时间范围 / 未读·收藏·稍后读 / 来源。
+ *
+ * 为什么必须有：FTS 只负责"哪几篇里有这个词"，而数万篇的库里这个词往往命中几百篇，
+ * 用户真正要的是"最近一周我还没读的那几篇"。没有二次筛选，搜索结果的可用性就只有一半。
+ */
+@Composable
+private fun SearchFilterRow(
+    state: SearchUiState,
+    feeds: List<FeedEntity>,
+    onIntent: (SearchIntent) -> Unit,
+) {
+    val rangeLabels = LibraryRange.entries.associateWith { stringResource(it.labelRes()) }
+    val feedLabels = buildMap {
+        put(null, stringResource(R.string.search_filter_all_feeds))
+        feeds.forEach { feed -> put(feed.id, feed.title) }
+    }
+    val feedOptions = remember(feeds) { listOf<Long?>(null) + feeds.map { it.id } }
+    // SegmentedChips / 自绘 chip 的文案都得先在组合作用域取好（label 是普通 lambda）
+    val unreadLabel = stringResource(R.string.search_filter_unread)
+    val starredLabel = stringResource(R.string.search_filter_starred)
+    val bookmarkedLabel = stringResource(R.string.search_filter_bookmarked)
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SegmentedChips(
+                options = LibraryRange.entries.toList(),
+                selected = state.range,
+                label = { range -> rangeLabels[range].orEmpty() },
+                onSelect = { onIntent(SearchIntent.SetRange(it)) },
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FilterToggle(
+                label = unreadLabel,
+                active = state.filters.unreadOnly,
+                onClick = { onIntent(SearchIntent.ToggleUnreadOnly) },
+            )
+            FilterToggle(
+                label = starredLabel,
+                active = state.filters.starredOnly,
+                onClick = { onIntent(SearchIntent.ToggleStarredOnly) },
+            )
+            FilterToggle(
+                label = bookmarkedLabel,
+                active = state.filters.bookmarkedOnly,
+                onClick = { onIntent(SearchIntent.ToggleBookmarkedOnly) },
+            )
+            if (!state.filters.isDefault) {
+                TextButton(onClick = { onIntent(SearchIntent.ClearFilters) }) {
+                    Text(
+                        text = stringResource(R.string.search_filter_clear),
+                        color = radarColors().textTertiary,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SegmentedChips(
+                options = feedOptions,
+                selected = state.filters.feedId,
+                label = { id -> feedLabels[id].orEmpty() },
+                onSelect = { onIntent(SearchIntent.SetFeedFilter(it)) },
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+    }
+}
+
+@Composable
+private fun FilterToggle(label: String, active: Boolean, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = if (active) radarColors().accent else radarColors().surface2,
+        modifier = Modifier.clickable(onClick = onClick),
+    ) {
+        Text(
+            text = label,
+            color = if (active) radarColors().onAccent else radarColors().textPrimary,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        )
     }
 }
 

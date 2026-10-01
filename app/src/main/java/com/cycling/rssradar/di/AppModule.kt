@@ -55,10 +55,21 @@ import com.cycling.rssradar.core.data.db.FeedDao
 import com.cycling.rssradar.core.data.db.MIGRATION_13_14
 import com.cycling.rssradar.core.data.db.MIGRATION_14_15
 import com.cycling.rssradar.core.data.db.MIGRATION_15_16
+import com.cycling.rssradar.core.data.db.MIGRATION_16_17
 import com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.core.data.parser.RssParser
 import com.cycling.rssradar.core.data.rss.BestIconFinder
 import com.cycling.rssradar.core.data.update.UpdateChecker
+import com.cycling.rssradar.core.data.annotation.AnnotationRepository
+import com.cycling.rssradar.core.data.backup.BackupReader
+import com.cycling.rssradar.core.data.backup.BackupWriter
+import com.cycling.rssradar.core.data.backup.SettingsSnapshot
+import com.cycling.rssradar.core.data.filter.FilterRuleRepository
+import com.cycling.rssradar.core.data.search.SearchIndexer
+import com.cycling.rssradar.core.data.store.LibraryStore
+import com.cycling.rssradar.core.domain.filter.RuleTarget
+import com.cycling.rssradar.core.domain.notify.DndWindow
+import com.cycling.rssradar.core.domain.notify.NotifyDecision
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import com.cycling.rssradar.core.domain.rss.ConditionalHttpFetcher
 import com.cycling.rssradar.core.domain.rss.HttpUrlFetcher
@@ -96,7 +107,7 @@ object AppModule {
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                 MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
                 MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
-                MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
+                MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
             )
             .build()
 
@@ -155,15 +166,19 @@ object AppModule {
         iconFinder: BestIconFinder,
         externalScope: CoroutineScope,
         conditionalHttp: ConditionalHttpFetcher,
+        filterRuleRepository: FilterRuleRepository,
     ): RefreshEngine = RefreshEngine(
         feedDao = db.feedDao(),
         articleDao = db.articleDao(),
+        articleFtsDao = db.articleFtsDao(),
         parser = parser,
         http = http,
         transactionRunner = transactionRunner,
         iconFinder = iconFinder,
         externalScope = externalScope,
         conditionalHttp = conditionalHttp,
+        // 过滤规则：新文章入库时判定（存量文章在规则保存时由 FeedRepository 重扫）
+        filterRules = { filterRuleRepository.engine() },
         // 自愈会静默改写订阅地址：至少落一条日志，否则用户反馈「这个源内容变了」
         // 时查无可查（UI 级提示要等通知模块，见 docs）。
         onHealed = { feedId, oldUrl, newUrl ->
@@ -412,12 +427,50 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideLibraryStore(@ApplicationContext context: Context): LibraryStore =
+        LibraryStore(SettingsPrefs.of(context))
+
+    @Provides
+    @Singleton
+    fun provideFilterRuleRepository(database: AppDatabase): FilterRuleRepository =
+        FilterRuleRepository(database.filterRuleDao())
+
+    @Provides
+    @Singleton
+    fun provideAnnotationRepository(database: AppDatabase): AnnotationRepository =
+        AnnotationRepository(database.annotationDao())
+
+    @Provides
+    @Singleton
+    fun provideSearchIndexer(database: AppDatabase): SearchIndexer = SearchIndexer(database)
+
+    @Provides
+    @Singleton
+    fun provideSettingsSnapshot(@ApplicationContext context: Context): SettingsSnapshot =
+        SettingsSnapshot(context)
+
+    @Provides
+    @Singleton
+    fun provideBackupWriter(
+        database: AppDatabase,
+        settingsSnapshot: SettingsSnapshot,
+    ): BackupWriter = BackupWriter(database, settingsSnapshot)
+
+    @Provides
+    @Singleton
+    fun provideBackupReader(
+        database: AppDatabase,
+        settingsSnapshot: SettingsSnapshot,
+    ): BackupReader = BackupReader(database, settingsSnapshot)
+
+    @Provides
+    @Singleton
     fun provideLinkStore(@ApplicationContext context: Context): LinkStore =
         LinkStore(SettingsPrefs.of(context))
 
     /**
-     * 新文章通知（#31）：把「查新文章 → 汇总文案 → 发通知」串成一个 suspend 函数注入 AutoSync。
-     * 全局开关关 / 没权限时静默不发；Feed 级开关在 SQL 查询里过滤。
+     * 新文章通知（#31）：查新文章 → 勿扰 / 关键词 / 过滤规则判定 → 汇总文案 → 发通知。
+     * 判定链统一走 NotifyDecision，避免"设置页一套、发送侧另一套"；Feed 级开关在 SQL 里过滤。
      */
     @Provides
     @Singleton
@@ -425,10 +478,32 @@ object AppModule {
         @ApplicationContext context: Context,
         notificationStore: NotificationStore,
         feedRepository: FeedRepository,
+        filterRuleRepository: FilterRuleRepository,
     ): NotifyNewArticles = NotifyNewArticles { since ->
-        if (!notificationStore.state.value) return@NotifyNewArticles
+        val prefs = notificationStore.state.value
+        if (!prefs.enabled) return@NotifyNewArticles
         val articles = feedRepository.newUnreadSince(since, NOTIFY_SAMPLE_LIMIT)
-        val summary = NewArticleSummary.build(articles) ?: return@NotifyNewArticles
+        val now = System.currentTimeMillis()
+        val nowMinute = DndWindow.minuteOfDay(now, java.util.TimeZone.getDefault().getOffset(now))
+        val engine = filterRuleRepository.engine()
+        val kept = articles.filter { item ->
+            NotifyDecision.shouldNotify(
+                prefs = prefs,
+                feedEnabled = true,
+                title = item.article.title,
+                summary = item.article.summary.orEmpty(),
+                nowMinute = nowMinute,
+                suppressedByRule = engine.suppressesNotify(
+                    RuleTarget(
+                        feedId = item.article.feedId,
+                        groupName = item.feedGroup,
+                        title = item.article.title,
+                        summary = item.article.summary.orEmpty(),
+                    ),
+                ),
+            )
+        }
+        val summary = NewArticleSummary.build(kept) ?: return@NotifyNewArticles
         NotificationHelper.postNewArticles(context, summary)
     }
 
@@ -482,6 +557,7 @@ interface AppEntryPoint {
     fun aiBatchProcessor(): AiBatchProcessor
     fun aiFeatureStore(): AiFeatureStore
     fun aiBudgetStore(): AiBudgetStore
+    fun searchIndexer(): SearchIndexer
 }
 
 /** 生产事务 adapter：委托 Room 的 withTransaction。 */

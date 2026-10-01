@@ -21,6 +21,8 @@ import com.cycling.rssradar.core.data.store.AiFeatureSettings
 import com.cycling.rssradar.core.data.store.AiFeatureStore
 import com.cycling.rssradar.core.data.store.AiStore
 import com.cycling.rssradar.core.data.store.LinkShareState
+import com.cycling.rssradar.core.data.annotation.AnnotationRepository
+import com.cycling.rssradar.core.data.db.ArticleAnnotationEntity
 import com.cycling.rssradar.core.data.store.LinkStore
 import com.cycling.rssradar.core.data.store.ReadingPrefs
 import com.cycling.rssradar.core.data.store.ReadingPrefsStore
@@ -182,10 +184,17 @@ class ArticleDetailViewModel @Inject constructor(
     private val featureStore: AiFeatureStore,
     /** 相关阅读（AiFeature.RELATED）：本地内容相似度，needsLlm=false。 */
     private val recommendation: Recommendation,
+    /** 正文高亮与笔记（DB v17）。 */
+    private val annotationRepository: AnnotationRepository,
 ) : ViewModel(), MviViewModel<ArticleDetailIntent> {
 
     private val _article = MutableStateFlow<ArticleWithFeed?>(null)
     val article: StateFlow<ArticleWithFeed?> = _article.asStateFlow()
+
+    private val _annotations = MutableStateFlow<List<ArticleAnnotationEntity>>(emptyList())
+    val annotations: StateFlow<List<ArticleAnnotationEntity>> = _annotations.asStateFlow()
+
+    private var annotationsJob: Job? = null
 
     /**
      * 首次详情查询是否已完成。初始 null ≠ 不存在——Room 查询是挂起调用，
@@ -300,6 +309,12 @@ class ArticleDetailViewModel @Inject constructor(
     fun load(articleId: Long) {
         val isNewArticle = articleId != currentArticleId
         currentArticleId = articleId
+        if (isNewArticle) {
+            annotationsJob?.cancel()
+            annotationsJob = viewModelScope.launch {
+                annotationRepository.observeOfArticle(articleId).collect { _annotations.value = it }
+            }
+        }
         if (isNewArticle) {
             // 译文/摘要缓存都按文章 id 键控，换文章必须清过程状态并取消进行中的翻译，
             // 否则旧译文/旧进度会顶在新文章上
@@ -637,6 +652,38 @@ class ArticleDetailViewModel @Inject constructor(
                 article = current.copy(isBookmarked = !current.isBookmarked),
             )
         }
+    }
+
+    /**
+     * 划词后落标注。跨块选择会给出多个引文（选择容器按文本 composable 切分），
+     * 每块各落一条——块内锚定是按块文本找回位置的，把两块粘成一条就再也找不回来。
+     */
+    fun addAnnotations(quotes: List<String>, colorIndex: Int, note: String? = null) {
+        val articleId = _article.value?.article?.id ?: return
+        val texts = quotes.map { it.trim() }.filter { it.isNotEmpty() }
+        if (texts.isEmpty()) return
+        val trimmedNote = note?.trim()?.takeUnless { it.isEmpty() }
+        viewModelScope.launch {
+            texts.forEach { text ->
+                annotationRepository.add(
+                    articleId = articleId,
+                    quote = text,
+                    prefix = "",
+                    suffix = "",
+                    startOffset = 0,
+                    endOffset = text.length,
+                    color = colorIndex,
+                    note = trimmedNote,
+                )
+            }
+        }
+    }
+
+    fun addAnnotation(quote: String, color: Int, note: String? = null) =
+        addAnnotations(listOf(quote), color, note)
+
+    fun deleteAnnotation(id: Long) {
+        viewModelScope.launch { annotationRepository.delete(id) }
     }
 }
 

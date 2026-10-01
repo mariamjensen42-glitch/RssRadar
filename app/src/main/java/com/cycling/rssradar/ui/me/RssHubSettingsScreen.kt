@@ -65,7 +65,12 @@ import com.cycling.rssradar.core.data.store.LanguageStore
 import com.cycling.rssradar.sync.SyncScheduler
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.composables.icons.lucide.Activity
+import com.composables.icons.lucide.Bell
+import com.composables.icons.lucide.Bookmark
 import com.composables.icons.lucide.Bot
+import com.composables.icons.lucide.HardDriveDownload
+import com.composables.icons.lucide.Highlighter
+import com.composables.icons.lucide.ListFilter
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Palette
@@ -158,7 +163,7 @@ class RssHubSettingsViewModel @Inject constructor(
             activeHost = store.currentOrDefault(),
             aiKeyInput = aiStore.apiKey.orEmpty(),
             linkShare = linkStore.state.value,
-            notifyEnabled = notificationStore.state.value,
+            notifyEnabled = notificationStore.state.value.enabled,
             recommendationEnabled = recommendationStore.state.value,
             notifyPermissionGranted = NotificationHelper.hasPermission(appContext),
             aiKeyConfigured = aiStore.hasKey(),
@@ -227,8 +232,8 @@ class RssHubSettingsViewModel @Inject constructor(
         }
         // 通知总开关（#31）
         viewModelScope.launch {
-            notificationStore.state.collect { enabled ->
-                _state.value = _state.value.copy(notifyEnabled = enabled)
+            notificationStore.state.collect { prefs ->
+                _state.value = _state.value.copy(notifyEnabled = prefs.enabled)
             }
         }
         // 推荐流开关（ADR-0013）
@@ -284,12 +289,12 @@ class RssHubSettingsViewModel @Inject constructor(
             notifyMessage = if (enabled && !granted) UiText.res(R.string.notify_permission_needed) else null,
         )
         if (enabled && !granted) return // 等权限结果回来（见 onNotifyPermissionResult）
-        notificationStore.set(enabled)
+        notificationStore.setEnabled(enabled)
     }
 
     /** 权限请求结果回填：给了就开开关，没给就关掉并如实说明。 */
     fun onNotifyPermissionResult(granted: Boolean) {
-        notificationStore.set(granted)
+        notificationStore.setEnabled(granted)
         _state.value = _state.value.copy(
             notifyPermissionGranted = granted,
             notifyMessage = if (granted) null else UiText.res(R.string.notify_permission_missing),
@@ -433,6 +438,11 @@ fun RssHubSettingsScreen(
     onOpenRssHub: () -> Unit = {},
     onOpenAiDiag: () -> Unit = {},
     onOpenReadingStats: () -> Unit = {},
+    onOpenFilterRules: () -> Unit = {},
+    onOpenBackup: () -> Unit = {},
+    onOpenNotification: () -> Unit = {},
+    onOpenAnnotations: () -> Unit = {},
+    onOpenLibrary: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -503,6 +513,41 @@ fun RssHubSettingsScreen(
             summary = if (state.aiKeyConfigured) stringResource(R.string.ai_configured) else stringResource(R.string.ai_not_configured),
             onClick = onOpenAiDiag,
         )
+        Spacer(Modifier.height(10.dp))
+        SettingsEntryCard(
+            icon = Lucide.ListFilter,
+            title = stringResource(R.string.rule_title),
+            summary = stringResource(R.string.rule_entry_summary),
+            onClick = onOpenFilterRules,
+        )
+        Spacer(Modifier.height(10.dp))
+        SettingsEntryCard(
+            icon = Lucide.HardDriveDownload,
+            title = stringResource(R.string.backup_title),
+            summary = stringResource(R.string.backup_entry_summary),
+            onClick = onOpenBackup,
+        )
+        Spacer(Modifier.height(10.dp))
+        SettingsEntryCard(
+            icon = Lucide.Bell,
+            title = stringResource(R.string.settings_notification),
+            summary = stringResource(R.string.notify_entry_summary),
+            onClick = onOpenNotification,
+        )
+        Spacer(Modifier.height(10.dp))
+        SettingsEntryCard(
+            icon = Lucide.Highlighter,
+            title = stringResource(R.string.annotations_title),
+            summary = stringResource(R.string.annotations_entry_summary),
+            onClick = onOpenAnnotations,
+        )
+        Spacer(Modifier.height(10.dp))
+        SettingsEntryCard(
+            icon = Lucide.Bookmark,
+            title = stringResource(R.string.library_title),
+            summary = stringResource(R.string.library_entry_summary),
+            onClick = onOpenLibrary,
+        )
         Spacer(Modifier.height(32.dp))
 
         // 版本 footer：用户反馈 / 应用商店评价时第一件事就是问版本号
@@ -548,7 +593,7 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
 
 /** 主页分组入口卡：图标 + 名称 + 当前值摘要 + 箭头。 */
 @Composable
-private fun SettingsEntryCard(
+internal fun SettingsEntryCard(
     icon: ImageVector,
     title: String,
     summary: String,

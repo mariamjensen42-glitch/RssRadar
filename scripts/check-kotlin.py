@@ -40,6 +40,13 @@ WORK = ROOT / "build/kotlinc"
 
 KOTLIN_VERSION = "2.2.10"
 
+# material3 1.5.0-alpha28 带来 Expressive 组件（ButtonGroup/FloatingToolbar/LoadingIndicator…），
+# 但它硬依赖 foundation 1.13.0-alpha01，后者又依赖 animation/runtime 1.13.0-alpha01——
+# 整个 compose 栈被连锁顶到 alpha 列车，这里必须显式锁死，否则脚本仍按稳定版 1.12.0 解析，
+# 与 gradle 实际结果不一致（material3 引用的新符号全报 unresolved 的假错误）。
+COMPOSE_VERSION = "1.13.0-alpha01"
+MATERIAL3_VERSION = "1.5.0-alpha28"
+
 # 编译期需要的依赖（group, artifact, 版本前缀）。版本前缀为空时取缓存里最大的版本；
 # 项目锁定的版本必须显式写出，否则会挑到缓存里别的项目留下的更高版本。
 DEPS = [
@@ -62,23 +69,29 @@ DEPS = [
     ("androidx.lifecycle", "lifecycle-viewmodel-savedstate-android", ""),
     ("androidx.lifecycle", "lifecycle-common", ""),
     ("androidx.lifecycle", "lifecycle-common-jvm", ""),
+    # media3-session 的 MediaSessionService 继承 LifecycleService（前台服务基类），
+    # 缺它编译期只报「cannot access LifecycleService」这种看不出根因的错
+    ("androidx.lifecycle", "lifecycle-service", "2.11"),
     ("androidx.savedstate", "savedstate-ktx", ""),
     ("androidx.savedstate", "savedstate-android", ""),
     ("androidx.activity", "activity-compose", ""),
     ("androidx.activity", "activity", ""),
-    ("androidx.compose.runtime", "runtime-android", ""),
-    ("androidx.compose.runtime", "runtime-saveable-android", ""),
-    ("androidx.compose.ui", "ui-android", ""),
-    ("androidx.compose.ui", "ui-geometry-android", ""),
-    ("androidx.compose.ui", "ui-graphics-android", ""),
-    ("androidx.compose.ui", "ui-text-android", ""),
-    ("androidx.compose.ui", "ui-unit-android", ""),
-    ("androidx.compose.ui", "ui-tooling-preview-android", ""),
-    ("androidx.compose.animation", "animation-android", ""),
-    ("androidx.compose.animation", "animation-core-android", ""),
-    ("androidx.compose.foundation", "foundation-android", ""),
-    ("androidx.compose.foundation", "foundation-layout-android", ""),
-    ("androidx.compose.material3", "material3-android", ""),
+    ("androidx.compose.runtime", "runtime-android", COMPOSE_VERSION),
+    ("androidx.compose.runtime", "runtime-retain-android", COMPOSE_VERSION),
+    ("androidx.compose.runtime", "runtime-saveable-android", COMPOSE_VERSION),
+    ("androidx.compose.ui", "ui-android", COMPOSE_VERSION),
+    ("androidx.compose.ui", "ui-geometry-android", COMPOSE_VERSION),
+    ("androidx.compose.ui", "ui-graphics-android", COMPOSE_VERSION),
+    ("androidx.compose.ui", "ui-text-android", COMPOSE_VERSION),
+    ("androidx.compose.ui", "ui-unit-android", COMPOSE_VERSION),
+    ("androidx.compose.ui", "ui-tooling-preview-android", COMPOSE_VERSION),
+    ("androidx.compose.animation", "animation-android", COMPOSE_VERSION),
+    ("androidx.compose.animation", "animation-core-android", COMPOSE_VERSION),
+    ("androidx.compose.foundation", "foundation-android", COMPOSE_VERSION),
+    ("androidx.compose.foundation", "foundation-layout-android", COMPOSE_VERSION),
+    ("androidx.compose.material3", "material3-android", MATERIAL3_VERSION),
+    # MaterialShapes 落在 graphics-shapes（material3 1.5 的新传递依赖）
+    ("androidx.graphics", "graphics-shapes-android", "1.0.1"),
     ("androidx.compose.material", "material-icons-core-android", ""),
     ("androidx.compose.animation", "animation-android", ""),
     ("androidx.navigation", "navigation-compose-android", ""),
@@ -120,6 +133,22 @@ DEPS = [
     ("io.coil-kt.coil3", "coil-network-okhttp", "3.3"),
     ("net.dankito.readability4j", "readability4j", ""),
     ("org.jetbrains", "annotations", ""),
+    # media3（音频/播客播放）：缓存里是 1.11.1，显式写出避免取到别处的高版本
+    ("androidx.media3", "media3-common", "1.11"),
+    ("androidx.media3", "media3-common-ktx", "1.11"),
+    ("androidx.media3", "media3-container", "1.11"),
+    ("androidx.media3", "media3-database", "1.11"),
+    ("androidx.media3", "media3-datasource", "1.11"),
+    ("androidx.media3", "media3-decoder", "1.11"),
+    ("androidx.media3", "media3-exoplayer", "1.11"),
+    ("androidx.media3", "media3-exoplayer-dash", "1.11"),
+    ("androidx.media3", "media3-exoplayer-hls", "1.11"),
+    ("androidx.media3", "media3-extractor", "1.11"),
+    ("androidx.media3", "media3-session", "1.11"),
+    ("androidx.media3", "media3-ui", "1.11"),
+    ("androidx.media3", "media3-ui-compose", "1.11"),
+    # media3-session 的消息总线用 ListenableFuture；Android 变体而不是 -jre
+    ("com.google.guava", "guava", "33.3.1-android"),
     ("junit", "junit", "4"),
     ("org.hamcrest", "hamcrest-core", "1.3"),
 ]
@@ -128,15 +157,30 @@ VERSION_DIR = re.compile(r"^\d+(\.\d+)*$")
 
 
 def version_key(name: str) -> tuple:
-    parts = name.split(".")
-    return tuple(int(p) if p.isdigit() else 0 for p in parts)
+    # 支持 1.13.0-alpha01 这类预发布名：先比数字段，稳定版（无后缀）排在同号预发布之后，
+    # 后缀里的数字（alpha28 > alpha22）作为末位比较键。
+    head, _, suffix = name.partition("-")
+    nums = tuple(int(p) if p.isdigit() else 0 for p in head.split("."))
+    tail = tuple(int(n) for n in re.findall(r"\d+", suffix))
+    return (nums, 0 if suffix else 1, tail)
 
 
 def newest_version_dir(artifact_dir: pathlib.Path, version_prefix: str = "") -> pathlib.Path | None:
-    candidates = [
-        d for d in artifact_dir.iterdir()
-        if d.is_dir() and VERSION_DIR.match(d.name) and d.name.startswith(version_prefix)
-    ]
+    """显式写了版本前缀时按前缀取（允许 -alpha 这类预发布目录）；空前缀只认稳定版。
+
+    空前缀必须继续排除预发布：缓存里 foundation-android 同时躺着 1.12.0 与 1.13.0-alpha01，
+    一旦让 alpha 参与「取最大」，所有 compose 底层都会被动升到 alpha，与 gradle 解析结果
+    不一致，产出大片假错误。只有 DEPS 里写死的版本才允许是预发布。
+    """
+    candidates: list[pathlib.Path] = []
+    for d in artifact_dir.iterdir():
+        if not d.is_dir():
+            continue
+        if version_prefix:
+            if d.name.startswith(version_prefix):
+                candidates.append(d)
+        elif VERSION_DIR.match(d.name):
+            candidates.append(d)
     if not candidates:
         return None
     return max(candidates, key=lambda d: version_key(d.name))
@@ -290,6 +334,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--main-only", action="store_true", help="只编译主源码，跳过 test 源码")
     parser.add_argument("--files", nargs="*", help="只编译指定文件（相对仓库根）")
+    parser.add_argument("--verbose", action="store_true", help="编译通过时也打印诊断行（看 deprecated/实验性 API 变更）")
     args = parser.parse_args()
 
     print("收集依赖 …")
@@ -361,6 +406,9 @@ def main() -> int:
 
     if result.returncode == 0 and not hard_errors:
         print(f"编译通过，0 error · {len(diagnostics)} warning" if diagnostics else "编译通过，0 error")
+        if args.verbose and diagnostics:
+            for line in diagnostics[:120]:
+                print("  " + line.strip())
         return 0
 
     print(f"退出码 {result.returncode} · {len(hard_errors)} error / {len(diagnostics)} 条诊断：")

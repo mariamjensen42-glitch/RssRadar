@@ -85,11 +85,11 @@ class ArchiveReinsertTest {
             }
             "insertAll" -> {
                 @Suppress("UNCHECKED_CAST")
-                (args[0] as List<ArticleEntity>).forEach { a ->
+                (args[0] as List<ArticleEntity>).map { a ->
                     val id = mem.nextId++
                     mem.articles[id] = a.copy(id = id)
+                    id
                 }
-                null
             }
             "updateContentState" -> {
                 val id = args[0] as Long

@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -28,7 +30,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -97,6 +101,8 @@ internal fun ArticleNativeReader(
     onLinkClick: (String) -> Unit,
     onImageClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** 页内查找的定位请求（「下一处」滚到命中所在的顶层节点）。 */
+    focus: AnchorFocus? = null,
 ) {
     val style = LocalReadingPrefs.current.style
     // 字间距与正文对齐靠 ProvideTextStyle 下发，而不是挨个改 RenderNode 里的 TextStyle：
@@ -114,14 +120,22 @@ internal fun ArticleNativeReader(
             onLinkClick = onLinkClick,
             onImageClick = onImageClick,
             modifier = modifier.padding(horizontal = style.horizontalPadding.dp),
+            focus = focus,
         )
     }
 }
 
 /**
+ * 页内查找的定位请求。[token] 是命中序号——同一条命中按两次「下一处」也要重新滚一次，
+ * 光看 [anchor] 不会触发重组。null = 不定位（未开查找或没有命中）。
+ */
+internal data class AnchorFocus(val anchor: Int, val token: Int)
+
+/**
  * 无自身边距的节点列渲染：供 [ArticleNativeReader] 与译文渲染区（TranslationReader，
  * 渐进/双语需要按段自由组合、外层统一控制边距与透明度）复用。
  * [dimmed] 整列压暗（graphicsLayer alpha），双语对照里原文列用它和译文区分层级。
+ * [focus] 有值时，命中的顶层节点会被滚进视口（页内查找的「下一处」）。
  */
 @Composable
 internal fun NativeNodesColumn(
@@ -130,6 +144,7 @@ internal fun NativeNodesColumn(
     onImageClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     dimmed: Boolean = false,
+    focus: AnchorFocus? = null,
 ) {
     val style = LocalReadingPrefs.current.style
     val image = LocalReadingPrefs.current.image
@@ -148,7 +163,22 @@ internal fun NativeNodesColumn(
                 .fillMaxWidth()
                 .graphicsLayer { this.alpha = alpha },
         ) {
-            nodes.forEach { node -> RenderNode(node, style, image, onLinkClick, onImageClick) }
+            nodes.forEachIndexed { index, node ->
+                // 只有被命中的那个顶层节点需要挂 requester。整页模式没有虚拟化
+                // （Column + verticalScroll），所有节点都已组合，滚过去就能落到实处。
+                if (focus != null && focus.anchor == index) {
+                    val requester = remember { BringIntoViewRequester() }
+                    // key 用 token 而非 anchor：同一条命中连按「下一处」也要重新滚
+                    key(focus.token) {
+                        LaunchedEffect(focus.token) { requester.bringIntoView() }
+                    }
+                    Box(modifier = Modifier.bringIntoViewRequester(requester)) {
+                        RenderNode(node, style, image, onLinkClick, onImageClick)
+                    }
+                } else {
+                    RenderNode(node, style, image, onLinkClick, onImageClick)
+                }
+            }
         }
     }
 }
@@ -637,14 +667,37 @@ private fun RenderList(
     }
 }
 
+/** 当前块内的标注与查找命中区间。三者任一变了才重算，滚动时零开销。 */
+@Composable
+private fun rememberBlockOverlays(runs: List<InlineRun>): List<ReadingAnnotations.Overlay> {
+    val annotations = LocalReadingAnnotations.current
+    val find = LocalFindHighlight.current
+    return remember(runs, annotations, find) {
+        val text = ReadingAnnotations.blockText(runs)
+        // 查找命中排在标注之后：同一区间重叠时，临时的查找态盖住持久的标注态
+        ReadingAnnotations.overlays(text, annotations) +
+            (find?.let { ReadingAnnotations.findOverlays(text, it) } ?: emptyList())
+    }
+}
+
 /**
  * 行内片段 → AnnotatedString。
  * 链接用 LinkAnnotation.Url，点击经 LocalUriHandler（见 [ArticleNativeReader]）统一走 onLinkClick。
  */
 @Composable
-private fun runsToAnnotated(runs: List<InlineRun>, style: ReadingStyleState): AnnotatedString =
-    buildAnnotatedString {
+private fun runsToAnnotated(runs: List<InlineRun>, style: ReadingStyleState): AnnotatedString {
+    val overlays = rememberBlockOverlays(runs)
+    return buildAnnotatedString {
         val baseFamily = style.fontFamily.toComposeFontFamily()
+        val builder = this
+        fun applyOverlays(from: Int, to: Int) {
+            if (overlays.isEmpty()) return
+            overlays.forEach { overlay ->
+                val start = maxOf(overlay.start, from)
+                val end = minOf(overlay.end, to)
+                if (start < end) builder.addStyle(SpanStyle(background = Color(overlay.color)), start, end)
+            }
+        }
         for (run in runs) {
             when (run) {
                 is InlineText -> {
@@ -680,8 +733,10 @@ private fun runsToAnnotated(runs: List<InlineRun>, style: ReadingStyleState): An
                             },
                         ),
                     )
+                    val runStart = length
                     append(run.text)
                     pop()
+                    applyOverlays(runStart, length)
                 }
                 is InlineMath -> mathSpans(run.spans, style)
                 is InlineLink -> {
@@ -700,6 +755,7 @@ private fun runsToAnnotated(runs: List<InlineRun>, style: ReadingStyleState): An
             }
         }
     }
+}
 
 /** 上下标相对正文的字号比例。 */
 private const val SCRIPT_SIZE_FACTOR = 0.75f

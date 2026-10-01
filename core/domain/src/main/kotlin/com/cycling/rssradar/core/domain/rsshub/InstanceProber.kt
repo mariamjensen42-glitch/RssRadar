@@ -1,10 +1,10 @@
 package com.cycling.rssradar.core.domain.rsshub
 
 import com.cycling.rssradar.core.domain.rss.RSSRADAR_USER_AGENT
+import com.cycling.rssradar.core.domain.rss.parseUrl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * RSSHub 实例探活缝：判定「这个 host 活着吗」，返回响应耗时（ms）或 null（不可达）。
@@ -31,7 +31,7 @@ class HttpHealthzProber(
         // 连接提升到 try 外，保证异常分支也能 disconnect（否则 gzip Inflater 靠 GC 兜底 end）。
         var connection: HttpURLConnection? = null
         try {
-            connection = URL(host.trimEnd('/') + "/healthz").openConnection() as HttpURLConnection
+            connection = parseUrl(host.trimEnd('/') + "/healthz").openConnection() as HttpURLConnection
             connection.connectTimeout = timeoutMs
             connection.readTimeout = timeoutMs
             connection.instanceFollowRedirects = true

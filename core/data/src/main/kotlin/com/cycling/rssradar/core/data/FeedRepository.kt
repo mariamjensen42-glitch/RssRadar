@@ -11,8 +11,13 @@ import com.cycling.rssradar.core.data.db.ArticleEntity
 import com.cycling.rssradar.core.data.db.ArticleWithFeed
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.filter.FilterRuleApplier
 import com.cycling.rssradar.core.data.store.KeepArchived
+import com.cycling.rssradar.core.domain.filter.FilterRuleEngine
+import com.cycling.rssradar.core.domain.search.SearchFilters
+import com.cycling.rssradar.core.domain.search.SearchQueryBuilder
 import com.cycling.rssradar.core.model.MarkAsReadCondition
+import com.cycling.rssradar.core.model.library.LibrarySort
 
 /**
  * 文章流仓库：观察文章流、用户状态标记、订阅源/分组管理。
@@ -39,7 +44,101 @@ class FeedRepository(
         },
     )
 
+    /** 过滤规则作用于存量文章：与 cleaner 共用同一套归档语义（含收藏/稍后读豁免）。 */
+    private val ruleApplier = FilterRuleApplier(articleDao, cleaner)
+
     fun search(query: String): Flow<List<ArticleWithFeed>> = articleDao.search("%$query%")
+
+    data class SearchPage(val hits: Int, val articles: List<ArticleWithFeed>)
+
+    /**
+     * 搜索一页 + 总命中数。查询串交给 [SearchQueryBuilder] 决定走 FTS 还是 LIKE 回退——
+     * 双字组索引无法表达单个汉字，那种输入只能退回 LIKE（见 SearchQueryBuilder 的取舍）。
+     */
+    suspend fun searchPage(
+        raw: String,
+        filters: SearchFilters,
+        limit: Int,
+        offset: Int,
+    ): SearchPage {
+        val query = SearchQueryBuilder.build(raw) ?: return SearchPage(0, emptyList())
+        return when (query) {
+            is SearchQueryBuilder.Query.Fts -> SearchPage(
+                hits = articleDao.countSearchFts(
+                    match = query.match,
+                    feedId = filters.feedId,
+                    fromMillis = filters.fromMillis,
+                    toMillis = filters.toMillis,
+                    unreadOnly = filters.unreadOnly,
+                    starredOnly = filters.starredOnly,
+                    bookmarkedOnly = filters.bookmarkedOnly,
+                ),
+                articles = articleDao.searchFts(
+                    match = query.match,
+                    feedId = filters.feedId,
+                    fromMillis = filters.fromMillis,
+                    toMillis = filters.toMillis,
+                    unreadOnly = filters.unreadOnly,
+                    starredOnly = filters.starredOnly,
+                    bookmarkedOnly = filters.bookmarkedOnly,
+                    limit = limit,
+                    offset = offset,
+                ),
+            )
+
+            is SearchQueryBuilder.Query.Like -> {
+                val pattern = "%${query.raw}%"
+                SearchPage(
+                    hits = articleDao.countSearchLike(
+                        pattern = pattern,
+                        feedId = filters.feedId,
+                        fromMillis = filters.fromMillis,
+                        toMillis = filters.toMillis,
+                        unreadOnly = filters.unreadOnly,
+                        starredOnly = filters.starredOnly,
+                        bookmarkedOnly = filters.bookmarkedOnly,
+                    ),
+                    articles = articleDao.searchLike(
+                        pattern = pattern,
+                        feedId = filters.feedId,
+                        fromMillis = filters.fromMillis,
+                        toMillis = filters.toMillis,
+                        unreadOnly = filters.unreadOnly,
+                        starredOnly = filters.starredOnly,
+                        bookmarkedOnly = filters.bookmarkedOnly,
+                        limit = limit,
+                        offset = offset,
+                    ),
+                )
+            }
+        }
+    }
+
+    suspend fun loadLibraryPage(
+        starred: Boolean,
+        sort: LibrarySort,
+        feedId: Long?,
+        fromMillis: Long?,
+        toMillis: Long?,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed> = when (sort) {
+        LibrarySort.STARRED_AT ->
+            articleDao.loadLibraryByAddedTime(starred, feedId, fromMillis, toMillis, limit, offset)
+
+        LibrarySort.PUBLISHED_AT ->
+            articleDao.loadLibraryByPublishedAt(starred, feedId, fromMillis, toMillis, limit, offset)
+
+        LibrarySort.FEED ->
+            articleDao.loadLibraryByFeed(starred, feedId, fromMillis, toMillis, limit, offset)
+    }
+
+    suspend fun countLibrary(
+        starred: Boolean,
+        feedId: Long?,
+        fromMillis: Long?,
+        toMillis: Long?,
+    ): Int = articleDao.countLibrary(starred, feedId, fromMillis, toMillis)
 
     // —— 信息流四个 tab 统一分页（规模：源 1000+、文章数万条，全量 observe 不可行） ——
 
@@ -186,8 +285,15 @@ class FeedRepository(
      * 只写 lastOpenedAt 一列，不碰已读/收藏/稍后读等用户状态。
      */
     suspend fun markOpened(id: Long) = articleDao.markOpened(id, System.currentTimeMillis())
-    suspend fun setStarred(id: Long, starred: Boolean) = articleDao.setStarred(id, starred)
-    suspend fun setBookmarked(id: Long, bookmarked: Boolean) = articleDao.setBookmarked(id, bookmarked)
+    suspend fun setStarred(id: Long, starred: Boolean) =
+        articleDao.setStarred(id, starred, System.currentTimeMillis())
+
+    suspend fun setBookmarked(id: Long, bookmarked: Boolean) =
+        articleDao.setBookmarked(id, bookmarked, System.currentTimeMillis())
+
+    suspend fun unstarBatch(ids: List<Long>): Int = articleDao.unstarBatch(ids)
+
+    suspend fun unbookmarkBatch(ids: List<Long>): Int = articleDao.unbookmarkBatch(ids)
     suspend fun markAllRead() = articleDao.markAllRead()
 
     /**
@@ -284,6 +390,21 @@ class FeedRepository(
 
     /** 同源文章 id（列表序：新→旧），详情页上一篇/下一篇导航用。 */
     suspend fun getFeedArticleIds(feedId: Long): List<Long> = articleDao.getFeedArticleIds(feedId)
+
+    /** 同源音频条目（含播放地址），新→旧：播客的连续播放队列按源组织。 */
+    suspend fun audioQueueOfFeed(feedId: Long): List<ArticleEntity> =
+        articleDao.audioOfFeed(feedId, ArticleEntity.MEDIA_KIND_AUDIO)
+
+    /**
+     * 把过滤规则作用于**存量文章**（新文章在刷新入库时判定）。
+     * 规则保存/启用后调用一次，用户配的「隐藏」才能立刻生效而不是等下一篇。
+     */
+    suspend fun applyFilterRules(engine: FilterRuleEngine): FilterRuleApplier.Result =
+        ruleApplier.apply(engine)
+
+    /** 只算不改：规则编辑时的「预计命中」。 */
+    suspend fun previewFilterRules(engine: FilterRuleEngine): FilterRuleApplier.Result =
+        ruleApplier.preview(engine)
 
     /**
      * 把 AI 提取出的正文回填到文章（AI 智能功能模块 · 自动提取全文）。

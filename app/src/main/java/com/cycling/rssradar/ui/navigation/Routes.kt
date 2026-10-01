@@ -70,3 +70,23 @@ import kotlinx.serialization.Serializable
     /** 打开时预选的功能（dbValue）；null = 全部。总览页「查看结果」按功能直达。 */
     val featureDbValue: Int? = null,
 )
+
+// —— 收藏整理 / 过滤规则 / 备份 / 通知细粒度（八项功能） ——
+
+/** 收藏整理：收藏与稍后读共用一套排序与筛选，页内切换。 */
+@Serializable data object LibraryRoute
+
+/** 本地关键词过滤规则管理。 */
+@Serializable data object FilterRulesRoute
+
+/** 通知细粒度：勿扰时段与关键词。 */
+@Serializable data object SettingsNotificationRoute
+
+/** 备份与恢复：全量导出 / 导入，不含 API Key。 */
+@Serializable data object BackupRoute
+
+/** 全库高亮与笔记列表（阅读页溢出菜单、「我的」页进入）。 */
+@Serializable data object AnnotationsRoute
+
+/** 音频播放器。feedId 非 0 时按该源构队列，articleId 非 0 时定位到该篇。 */
+@Serializable data class AudioPlayerRoute(val articleId: Long = 0L, val feedId: Long = 0L)

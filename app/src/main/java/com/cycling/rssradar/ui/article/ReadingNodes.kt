@@ -78,6 +78,59 @@ internal object ReadingNodes {
         return out
     }
 
+    /**
+     * 展平成「可查找文本块」：每块是一个实际渲染的行内文本单元，并带上它所属的**顶层节点下标**。
+     *
+     * 两个消费者各取所需：
+     * - 页内查找在 `text` 拼接出的全文上定位（[com.cycling.rssradar.core.domain.reading.FindIndex]）；
+     * - 定位滚动只需要 `anchor`——把 BringIntoViewRequester 挂在顶层节点上，滚到该节点即可，
+     *   不必给树里每个块都挂（那要改十几层渲染函数的签名）。
+     *
+     * **顺序必须与 [ArticleNativeReader] 里 runsToAnnotated 的调用顺序一致**，否则全文偏移
+     * 会落在错误的块上。容器（list/quote/group/details）穿透而不单独成块——渲染时它们本就
+     * 直接展开成子块，多一层会让其后所有偏移整体错位。纯函数，JVM 可测。
+     */
+    fun textBlocks(nodes: List<ReadingNode>): List<TextBlock> {
+        val out = ArrayList<TextBlock>()
+        nodes.forEachIndexed { index, node -> collectBlocks(node, index, out) }
+        return out
+    }
+
+    private fun collectBlocks(node: ReadingNode, anchor: Int, out: MutableList<TextBlock>) {
+        when (node) {
+            is NodeParagraph -> addBlock(node.runs, anchor, out)
+            is NodeHeading -> addBlock(node.runs, anchor, out)
+            is NodeCaption -> addBlock(node.runs, anchor, out)
+            is NodeCode -> node.code.takeIf { it.isNotBlank() }?.let { out += TextBlock(it, anchor) }
+            is NodeImage -> node.caption?.let { addBlock(it, anchor, out) }
+            is NodeList -> node.items.forEach { item ->
+                addBlock(item.runs, anchor, out)
+                item.nested?.let { collectBlocks(it, anchor, out) }
+            }
+            is NodeQuote -> node.blocks.forEach { collectBlocks(it, anchor, out) }
+            is NodeGroup -> node.nodes.forEach { collectBlocks(it, anchor, out) }
+            is NodeDetails -> {
+                node.summaryRuns?.let { addBlock(it, anchor, out) }
+                node.blocks.forEach { collectBlocks(it, anchor, out) }
+            }
+            is NodeTable -> node.rows.forEach { row -> row.cells.forEach { addBlock(it, anchor, out) } }
+            is NodeDefList -> node.items.forEach { item ->
+                addBlock(item.termRuns, anchor, out)
+                addBlock(item.descRuns, anchor, out)
+            }
+            is NodeMath, is NodeMediaCard, NodeRule -> Unit
+        }
+    }
+
+    private fun addBlock(runs: List<InlineRun>, anchor: Int, out: MutableList<TextBlock>) {
+        val text = runs.joinToString("") { it.text }
+        if (text.isNotBlank()) out += TextBlock(text, anchor)
+    }
+
+    private fun addBlock(text: String, anchor: Int, out: MutableList<TextBlock>) {
+        if (text.isNotBlank()) out += TextBlock(text, anchor)
+    }
+
     // ———————————————————————————————————————————————
     // 块级
     // ———————————————————————————————————————————————
@@ -581,6 +634,13 @@ internal object ReadingNodes {
 // ———————————————————————————————————————————————
 
 internal sealed interface ReadingNode
+
+/**
+ * 可查找文本块（[ReadingNodes.textBlocks] 的产物）。
+ *
+ * [anchor] 是它所属**顶层节点**的下标，用于把命中映射回一个可滚动的渲染单元。
+ */
+internal data class TextBlock(val text: String, val anchor: Int)
 
 /** 段落对齐（style text-align，白名单声明）。 */
 internal enum class ParagraphAlign { LEFT, CENTER, RIGHT, JUSTIFY }

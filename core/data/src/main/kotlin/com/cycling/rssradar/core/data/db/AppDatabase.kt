@@ -145,6 +145,11 @@ data class ArticleEntity(
      * 图文源里偶尔夹一条播客或视频，feed 级分类解释不了它。null/0=跟随 feed。
      */
     @ColumnInfo(defaultValue = "0") val mediaKind: Int = MEDIA_KIND_NONE,
+    val starredAt: Long? = null,
+    val bookmarkedAt: Long? = null,
+    val mediaUrl: String? = null,
+    /** 预分词后的检索语料，只服务 FTS 索引；不进列表查询（每篇可达数十 KB）。 */
+    val searchText: String? = null,
 ) {
     companion object {
         const val CONTENT_SOURCE_NONE = 0
@@ -165,6 +170,30 @@ data class ArticleWithFeed(
     val feedIconUrl: String?,
 )
 
+/** 重建检索索引的输入行：标题与摘要优先，正文用于补齐语料。 */
+data class ArticleSearchSourceRow(
+    val id: Long,
+    val title: String,
+    val summary: String?,
+    val contentText: String?,
+)
+
+/**
+ * 过滤规则扫描行：规则要判的字段（标题/摘要/正文/作者）+ 作用域所需的 feedId 与分组，
+ * 外加两个豁免标记（收藏与稍后读不吃 HIDE）。
+ */
+data class RuleScanRow(
+    val id: Long,
+    val feedId: Long,
+    val feedGroup: String,
+    val title: String,
+    val summary: String?,
+    val contentText: String?,
+    val author: String?,
+    val isStarred: Boolean,
+    val isBookmarked: Boolean,
+)
+
 /**
  * 列表流专用列清单：剔除 content / contentText 两列全文（每篇可达几十上百 KB）。
  * 列表卡片只用到 title/summary/coverUrl 等轻字段，全量物化几百篇会把 Java 堆吃满
@@ -181,7 +210,7 @@ private const val ARTICLE_LIST_COLUMNS =
         "articles.publishedAt, articles.fetchedAt, articles.author, articles.contentSource, " +
         "articles.isRead, articles.isStarred, articles.isBookmarked, articles.readingMinutes, " +
         "articles.coverUrl, articles.aiSummary, articles.contentIncomplete, articles.lastOpenedAt, " +
-        "articles.mediaKind"
+        "articles.mediaKind, articles.starredAt, articles.bookmarkedAt, articles.mediaUrl"
 
 /**
  * 分组筛选（issue #74，issue #75 升级为可空版）的 WHERE 片段：选中分组时按 feeds.groupName 过滤。
@@ -209,6 +238,28 @@ private const val GROUP_FILTER_PREDICATE_NULLABLE =
  */
 private const val CONTENT_TYPE_FILTER_PREDICATE =
     "(:contentType IS NULL OR feeds.contentType = :contentType)"
+
+/**
+ * 搜索的二次筛选谓词（源 / 时间范围 / 未读 / 收藏 / 稍后读）。
+ * 时间基准沿用 `COALESCE(publishedAt, fetchedAt)`，与归档清理、批量标已读一致——
+ * 否则无发布日期的文章会在筛选里凭空消失。
+ */
+private const val SEARCH_FILTER_PREDICATE =
+    "(:feedId IS NULL OR articles.feedId = :feedId) " +
+        "AND (:fromMillis IS NULL OR COALESCE(articles.publishedAt, articles.fetchedAt) >= :fromMillis) " +
+        "AND (:toMillis IS NULL OR COALESCE(articles.publishedAt, articles.fetchedAt) <= :toMillis) " +
+        "AND (:unreadOnly = 0 OR articles.isRead = 0) " +
+        "AND (:starredOnly = 0 OR articles.isStarred = 1) " +
+        "AND (:bookmarkedOnly = 0 OR articles.isBookmarked = 1)"
+
+/**
+ * 收藏页（收藏 / 稍后读同一套排序与筛选）的通用条件：:starred 选集合，时间范围与来源同搜索。
+ */
+private const val LIBRARY_CONDITION =
+    "(CASE WHEN :starred = 1 THEN articles.isStarred ELSE articles.isBookmarked END) = 1 " +
+        "AND (:feedId IS NULL OR articles.feedId = :feedId) " +
+        "AND (:fromMillis IS NULL OR COALESCE(articles.publishedAt, articles.fetchedAt) >= :fromMillis) " +
+        "AND (:toMillis IS NULL OR COALESCE(articles.publishedAt, articles.fetchedAt) <= :toMillis)"
 
 /**
  * 推荐画像的输入行（ADR-0013）：所有"用户真实表达过兴趣"的文章。
@@ -419,7 +470,7 @@ interface FeedDao {
 @Dao
 interface ArticleDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertAll(articles: List<ArticleEntity>)
+    suspend fun insertAll(articles: List<ArticleEntity>): List<Long>
 
     // —— 信息流列表：轻量投影 + LIMIT/OFFSET 分页，四个 tab 统一 ——
     // 规模现实：订阅源 1000+、文章数万条。任何"全表 observe 全量物化"的列表流
@@ -776,6 +827,219 @@ interface ArticleDao {
     @Suppress("QUERY_MISMATCH")
     fun search(query: String): Flow<List<ArticleWithFeed>>
 
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        JOIN articles_fts ON articles_fts.rowid = articles.id
+        WHERE articles_fts MATCH :match AND $SEARCH_FILTER_PREDICATE
+        ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun searchFts(
+        match: String,
+        feedId: Long?,
+        fromMillis: Long?,
+        toMillis: Long?,
+        unreadOnly: Boolean,
+        starredOnly: Boolean,
+        bookmarkedOnly: Boolean,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed>
+
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        JOIN articles_fts ON articles_fts.rowid = articles.id
+        WHERE articles_fts MATCH :match AND $SEARCH_FILTER_PREDICATE
+        """,
+    )
+    suspend fun countSearchFts(
+        match: String,
+        feedId: Long?,
+        fromMillis: Long?,
+        toMillis: Long?,
+        unreadOnly: Boolean,
+        starredOnly: Boolean,
+        bookmarkedOnly: Boolean,
+    ): Int
+
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE (articles.title LIKE :pattern ESCAPE '\' OR articles.summary LIKE :pattern ESCAPE '\'
+            OR articles.contentText LIKE :pattern ESCAPE '\' OR feeds.title LIKE :pattern ESCAPE '\')
+            AND $SEARCH_FILTER_PREDICATE
+        ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun searchLike(
+        pattern: String,
+        feedId: Long?,
+        fromMillis: Long?,
+        toMillis: Long?,
+        unreadOnly: Boolean,
+        starredOnly: Boolean,
+        bookmarkedOnly: Boolean,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed>
+
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE (articles.title LIKE :pattern ESCAPE '\' OR articles.summary LIKE :pattern ESCAPE '\'
+            OR articles.contentText LIKE :pattern ESCAPE '\' OR feeds.title LIKE :pattern ESCAPE '\')
+            AND $SEARCH_FILTER_PREDICATE
+        """,
+    )
+    suspend fun countSearchLike(
+        pattern: String,
+        feedId: Long?,
+        fromMillis: Long?,
+        toMillis: Long?,
+        unreadOnly: Boolean,
+        starredOnly: Boolean,
+        bookmarkedOnly: Boolean,
+    ): Int
+
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE $LIBRARY_CONDITION
+        ORDER BY CASE WHEN :starred = 1 THEN articles.starredAt ELSE articles.bookmarkedAt END DESC,
+                 articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun loadLibraryByAddedTime(
+        starred: Boolean,
+        feedId: Long?,
+        fromMillis: Long?,
+        toMillis: Long?,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed>
+
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE $LIBRARY_CONDITION
+        ORDER BY articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun loadLibraryByPublishedAt(
+        starred: Boolean,
+        feedId: Long?,
+        fromMillis: Long?,
+        toMillis: Long?,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed>
+
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        WHERE $LIBRARY_CONDITION
+        ORDER BY feeds.title ASC, articles.publishedAt DESC, articles.fetchedAt DESC
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun loadLibraryByFeed(
+        starred: Boolean,
+        feedId: Long?,
+        fromMillis: Long?,
+        toMillis: Long?,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed>
+
+    @Query("SELECT COUNT(*) FROM articles WHERE $LIBRARY_CONDITION")
+    suspend fun countLibrary(
+        starred: Boolean,
+        feedId: Long?,
+        fromMillis: Long?,
+        toMillis: Long?,
+    ): Int
+
+    @Query("SELECT id, title, summary, contentText FROM articles WHERE searchText IS NULL OR searchText = '' ORDER BY id ASC LIMIT :limit")
+    suspend fun articlesMissingSearchText(limit: Int): List<ArticleSearchSourceRow>
+
+    @Query("UPDATE articles SET searchText = :searchText WHERE id = :id")
+    suspend fun setSearchText(id: Long, searchText: String)
+
+    @Query("UPDATE articles SET searchText = NULL")
+    suspend fun clearSearchText()
+
+    @Query("SELECT COUNT(*) FROM articles WHERE searchText IS NOT NULL AND searchText != ''")
+    suspend fun countIndexed(): Int
+
+    @Query("SELECT COUNT(*) FROM articles")
+    suspend fun countAll(): Int
+
+    @Query("SELECT * FROM articles ORDER BY id ASC LIMIT :limit OFFSET :offset")
+    suspend fun pageAllArticles(limit: Int, offset: Int): List<ArticleEntity>
+
+    /**
+     * 同一订阅源的音频条目（含播放地址），新→旧。
+     *
+     * 播放队列按源而不是按全库：播客是一个节目一个队列，跨源串烧没有意义，
+     * 而"听完这集接着听这个节目的下一集"是播客的标准行为。
+     */
+    @Query(
+        "SELECT * FROM articles WHERE feedId = :feedId AND mediaKind = :mediaKind " +
+            "AND mediaUrl IS NOT NULL AND mediaUrl <> '' " +
+            "ORDER BY publishedAt DESC, id DESC",
+    )
+    suspend fun audioOfFeed(feedId: Long, mediaKind: Int): List<ArticleEntity>
+
+    /**
+     * 过滤规则扫描：按 id 游标推进（不是 OFFSET）。
+     *
+     * HIDE 会**真删行**，用 OFFSET 分页会跳过后面的文章；按 id 递增走则不受影响。
+     * 排序必须是裸列 `articles.id`——ORDER BY 里带表达式 Room 解析不了。
+     */
+    @Query(
+        "SELECT articles.id AS id, articles.feedId AS feedId, feeds.groupName AS feedGroup, " +
+            "articles.title AS title, articles.summary AS summary, articles.contentText AS contentText, " +
+            "articles.author AS author, articles.isStarred AS isStarred, " +
+            "articles.isBookmarked AS isBookmarked " +
+            "FROM articles JOIN feeds ON feeds.id = articles.feedId " +
+            "WHERE articles.id > :afterId ORDER BY articles.id ASC LIMIT :limit",
+    )
+    suspend fun scanForRules(afterId: Long, limit: Int): List<RuleScanRow>
+
+    @Query("SELECT id FROM articles WHERE feedId = :feedId AND link = :link LIMIT 1")
+    suspend fun findIdByFeedAndLink(feedId: Long, link: String): Long?
+
+    @Query(
+        "SELECT COUNT(*) FROM articles WHERE title LIKE :pattern ESCAPE '\\' " +
+            "OR summary LIKE :pattern ESCAPE '\\' OR contentText LIKE :pattern ESCAPE '\\'",
+    )
+    suspend fun countMatching(pattern: String): Int
+
     @Query("SELECT COUNT(*) FROM articles")
     fun observeCount(): Flow<Int>
 
@@ -831,7 +1095,7 @@ interface ArticleDao {
             title = :title, summary = :summary, content = :content, contentText = :contentText,
             author = :author, publishedAt = :publishedAt, coverUrl = :coverUrl,
             readingMinutes = :readingMinutes, contentSource = :contentSource, fetchedAt = :fetchedAt,
-            mediaKind = :mediaKind
+            mediaKind = :mediaKind, mediaUrl = :mediaUrl, searchText = :searchText
         WHERE id = :id
         """,
     )
@@ -848,6 +1112,8 @@ interface ArticleDao {
         contentSource: Int,
         fetchedAt: Long,
         mediaKind: Int,
+        mediaUrl: String?,
+        searchText: String?,
     )
 
     /**
@@ -925,11 +1191,32 @@ interface ArticleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun restore(article: ArticleEntity)
 
-    @Query("UPDATE articles SET isStarred = :starred WHERE id = :id")
-    suspend fun setStarred(id: Long, starred: Boolean)
+    @Query(
+        "UPDATE articles SET isStarred = :starred, " +
+            "starredAt = CASE WHEN :starred = 1 THEN :now ELSE NULL END WHERE id = :id",
+    )
+    suspend fun setStarred(id: Long, starred: Boolean, now: Long)
 
-    @Query("UPDATE articles SET isBookmarked = :bookmarked WHERE id = :id")
-    suspend fun setBookmarked(id: Long, bookmarked: Boolean)
+    @Query(
+        "UPDATE articles SET isBookmarked = :bookmarked, " +
+            "bookmarkedAt = CASE WHEN :bookmarked = 1 THEN :now ELSE NULL END WHERE id = :id",
+    )
+    suspend fun setBookmarked(id: Long, bookmarked: Boolean, now: Long)
+
+    @Query("UPDATE articles SET isStarred = 0, starredAt = NULL WHERE id IN (:ids)")
+    suspend fun unstarBatch(ids: List<Long>): Int
+
+    @Query("UPDATE articles SET isBookmarked = 0, bookmarkedAt = NULL WHERE id IN (:ids)")
+    suspend fun unbookmarkBatch(ids: List<Long>): Int
+
+    // 过滤规则的批量动作：加标记时同时写时间戳，与单篇操作的口径一致
+    // （「按收藏时间排序」依赖 starredAt 非空，规则加星却留空会让排序把它甩到最后）
+
+    @Query("UPDATE articles SET isStarred = 1, starredAt = :now WHERE id IN (:ids)")
+    suspend fun starBatch(ids: List<Long>, now: Long): Int
+
+    @Query("UPDATE articles SET isBookmarked = 1, bookmarkedAt = :now WHERE id IN (:ids)")
+    suspend fun bookmarkBatch(ids: List<Long>, now: Long): Int
 
     @Query("UPDATE articles SET isRead = 1")
     suspend fun markAllRead()
@@ -962,8 +1249,7 @@ interface ArticleDao {
     @Query(
         "SELECT feedId, link FROM articles WHERE feedId = :feedId " +
             "AND isStarred = 0 AND isBookmarked = 0",
-    )
-    suspend fun getArticleLinksByFeed(feedId: Long): List<ArticleFeedLink>
+    )    suspend fun getArticleLinksByFeed(feedId: Long): List<ArticleFeedLink>
 
     /** 清空分组前抓名单（豁免规则与 deleteByGroup 一致）。 */
     @Query(
@@ -971,6 +1257,17 @@ interface ArticleDao {
             "AND feedId IN (SELECT id FROM feeds WHERE groupName = :groupName)",
     )
     suspend fun getArticleLinksByGroup(groupName: String): List<ArticleFeedLink>
+
+    /**
+     * 按 id 抓归档名单（过滤规则的 HIDE 动作用）。豁免条件写在这里，
+     * 与 [deleteByIds] 保持**逐字一致**——两处不一致就会出现「写了墓碑但没删」
+     * 或「删了但没墓碑，下次刷新又复活」。
+     */
+    @Query("SELECT feedId, link FROM articles WHERE id IN (:ids) AND isStarred = 0 AND isBookmarked = 0")
+    suspend fun getArticleLinksByIds(ids: List<Long>): List<ArticleFeedLink>
+
+    @Query("DELETE FROM articles WHERE id IN (:ids) AND isStarred = 0 AND isBookmarked = 0")
+    suspend fun deleteByIds(ids: List<Long>): Int
 
     /** 写墓碑；同一篇重复删除时 IGNORE（保留首次时间，滚动清理按最早一笔算）。 */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -1286,6 +1583,84 @@ val MIGRATION_15_16 = object : Migration(15, 16) {
     }
 }
 
+/**
+ * v16 → v17：为四组新能力一次补齐 schema——收藏/稍后读时间戳与媒体地址、预分词检索语料、
+ * 本地过滤规则表、正文标注表、全文检索索引表。
+ *
+ * articles 的四个新列**一律不写 DEFAULT**：实体上没有 `@ColumnInfo(defaultValue=)`，
+ * Room 生成的建表语句也就没有 DEFAULT，迁移里多写一个 DEFAULT 会让 onValidateSchema
+ * 判定不符、老用户升级后一开 App 就崩。存量收藏/稍后读的时间戳用 fetchedAt 近似回填。
+ *
+ * articles_fts 用**独立 FTS4 表**而不是外部内容表（FTS4 的 content= 形式），因为后者要求
+ * 迁移里手写 Room 生成的那组 room_fts_content_sync_* 触发器，名字与语句必须与其 KSP 产物
+ * 逐字符一致，而本机跑不了 gradle、拿不到产物去核对——写错就是"搜索永远搜不到新文章"
+ * 且没有任何自动化能拦。独立表的同步改为写入路径显式维护（RefreshEngine + SearchIndexWorker 兜底）。
+ *
+ * 存疑点已实测排除：`FTS4(searchText, tokenize=unicode61)` 建出来的表，PRAGMA table_info
+ * 只返回 searchText（rowid 是隐式主键，不出现在列集合里），与 Room 对 @Fts4 实体的列期望一致。
+ */
+val MIGRATION_16_17 = object : Migration(16, 17) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE articles ADD COLUMN starredAt INTEGER")
+        db.execSQL("ALTER TABLE articles ADD COLUMN bookmarkedAt INTEGER")
+        db.execSQL("ALTER TABLE articles ADD COLUMN mediaUrl TEXT")
+        db.execSQL("ALTER TABLE articles ADD COLUMN searchText TEXT")
+
+        db.execSQL("UPDATE articles SET starredAt = fetchedAt WHERE isStarred = 1 AND starredAt IS NULL")
+        db.execSQL("UPDATE articles SET bookmarkedAt = fetchedAt WHERE isBookmarked = 1 AND bookmarkedAt IS NULL")
+
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `filter_rules` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `name` TEXT NOT NULL,
+                `enabled` INTEGER NOT NULL DEFAULT 1,
+                `priority` INTEGER NOT NULL DEFAULT 0,
+                `matchType` INTEGER NOT NULL DEFAULT 0,
+                `fieldMask` INTEGER NOT NULL DEFAULT 0,
+                `pattern` TEXT NOT NULL,
+                `caseSensitive` INTEGER NOT NULL DEFAULT 0,
+                `wholeWord` INTEGER NOT NULL DEFAULT 0,
+                `scopeType` INTEGER NOT NULL DEFAULT 0,
+                `scopeId` TEXT,
+                `action` INTEGER NOT NULL DEFAULT 0,
+                `createdAt` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_filter_rules_enabled` ON `filter_rules` (`enabled`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_filter_rules_priority` ON `filter_rules` (`priority`)")
+
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `article_annotations` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `articleId` INTEGER NOT NULL,
+                `kind` INTEGER NOT NULL DEFAULT 0,
+                `quote` TEXT NOT NULL,
+                `prefix` TEXT NOT NULL,
+                `suffix` TEXT NOT NULL,
+                `startOffset` INTEGER NOT NULL DEFAULT 0,
+                `endOffset` INTEGER NOT NULL DEFAULT 0,
+                `color` INTEGER NOT NULL DEFAULT 0,
+                `note` TEXT,
+                `contentHash` TEXT,
+                `createdAt` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_article_annotations_articleId` ON `article_annotations` (`articleId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_article_annotations_createdAt` ON `article_annotations` (`createdAt`)")
+
+        db.execSQL(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS `articles_fts` " +
+                "USING FTS4(`searchText`, tokenize=unicode61)",
+        )
+    }
+}
+
 @Database(
     entities = [
         FeedEntity::class,
@@ -1297,8 +1672,12 @@ val MIGRATION_15_16 = object : Migration(15, 16) {
         AiArtifactEntity::class,
         FeedAiProfileEntity::class,
         AiTaskEntity::class,
+        // v17：本地过滤规则 / 正文标注 / 全文检索索引。见 FilterSchema.kt 与 AnnotationSchema.kt。
+        FilterRuleEntity::class,
+        ArticleAnnotationEntity::class,
+        ArticleFtsEntity::class,
     ],
-    version = 16,
+    version = 17,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -1310,6 +1689,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun feedAiProfileDao(): FeedAiProfileDao
     abstract fun aiTaskDao(): AiTaskDao
     abstract fun aiSupportDao(): AiSupportDao
+    abstract fun filterRuleDao(): FilterRuleDao
+    abstract fun annotationDao(): ArticleAnnotationDao
+    abstract fun articleFtsDao(): ArticleFtsDao
 }
 
 /**

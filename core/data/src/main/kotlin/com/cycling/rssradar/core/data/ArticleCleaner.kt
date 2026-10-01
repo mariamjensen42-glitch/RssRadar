@@ -59,6 +59,24 @@ class ArticleCleaner(
     }
 
     /**
+     * 按 id 归档（过滤规则的 HIDE 动作用）：先写墓碑再真删，同一事务。
+     *
+     * 豁免口径与 [archiveExpired] 一致——**收藏与稍后读的文章不会被规则删掉**：
+     * 用户明确标记过的东西，不该因为一条正则而被悄悄清掉。调用方传入的 ids 可以
+     * 包含被豁免的，这里会自然漏掉它们（抓名单与删除用的是同一套条件）。
+     */
+    suspend fun archiveByIds(ids: List<Long>, now: Long): Int {
+        if (ids.isEmpty()) return 0
+        return transactionRunner.inTransaction {
+            articleDao.insertTombstones(
+                articleDao.getArticleLinksByIds(ids)
+                    .map { ArchivedArticleTombstoneEntity(it.feedId, it.link, now) },
+            )
+            articleDao.deleteByIds(ids)
+        }
+    }
+
+    /**
      * 清空单个订阅源的文章（issue #8 语义）：先写墓碑再删，返回删除条数。
      * kept（豁免统计）也在本类算：此前 kept 在 FeedRepository 数、deleted 在这里删，
      * 两条 SQL 的豁免口径隔文件人工对账、无单测锁死——现在口径一处定义。

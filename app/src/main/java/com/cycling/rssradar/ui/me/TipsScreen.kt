@@ -33,7 +33,7 @@ import com.cycling.rssradar.core.ui.theme.radarColors
  * 入口或 wrong 的默认开关状态，比没有这页更糟。每条都对应一个能点到的地方。
  */
 /** 条目只带资源 id；翻译在 UI 层按当前语言取（ADR-0017）。 */
-private data class HelpItem(@StringRes val titleRes: Int, @StringRes val bodyRes: Int)
+private data class HelpItem(@param:StringRes val titleRes: Int, @param:StringRes val bodyRes: Int)
 
 /** 先知道这几件事：不是故障，是设计如此。 */
 private val TIPS = listOf(

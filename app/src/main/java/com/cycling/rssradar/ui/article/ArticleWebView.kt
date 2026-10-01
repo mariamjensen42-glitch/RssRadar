@@ -20,6 +20,17 @@ import com.cycling.rssradar.ui.theme.LocalReadingPrefs
 import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
+ * 页内查找在 WebView 路的状态。刻意**不用 Compose State**——[AndroidView] 的 update
+ * 在组合期执行，往里写 State 会自激重组；这几个值只服务于"要不要再发一次 findNext"。
+ */
+private class WebViewFindState {
+    var query = ""
+    var ordinal = 0
+    var count = 0
+    var consumedCursor = -1
+}
+
+/**
  * 净化后的正文 HTML 用 WebView 渲染：排版参数与主题色注入 CSS（issue #42）。
  * 模板构建在 [ReadingContentHtml]（纯函数，JVM 单测覆盖）；本组合函数只负责
  * 从 radarColors() / LocalReadingPrefs 读实时值。
@@ -34,6 +45,11 @@ import com.cycling.rssradar.core.ui.theme.radarColors
  * build 阶段会把 <img> 包成指向自身的 <a class="img-link">，于是点击图片和点击链接
  * 走同一条 shouldOverrideUrlLoading 通道——地址命中本集合就交给 [onImageClick]
  * （全屏查看），否则照旧开浏览器。**全程不开 JS**（ADR-0007 不动，详见 ADR-0011）。
+ *
+ * [findQuery]/[findCursor]/[onFindCount]：页内查找。用的是平台的 find-in-page
+ * （`findAllAsync`/`findNext`/`clearMatches`），**同样不需要 JS**。
+ * 已知边界：整页模式（高度包内容、由外层 Compose 滚动）时 WebView 自己滚不动，
+ * 命中能高亮但「下一处」不会把视口带过去——这一条在查找栏里有如实说明。
  */
 @Composable
 internal fun ArticleWebView(
@@ -43,6 +59,9 @@ internal fun ArticleWebView(
     modifier: Modifier = Modifier,
     passThroughTouch: Boolean = true,
     onScroll: ((Int) -> Unit)? = null,
+    findQuery: String = "",
+    findCursor: Int = 0,
+    onFindCount: (Int) -> Unit = {},
 ) {
     // 颜色读自 radarColors()（CompositionLocal），主题切换自动重组
     val bg = toCssColor(radarColors().bgRoot)
@@ -75,6 +94,8 @@ internal fun ArticleWebView(
     val currentOnScroll by rememberUpdatedState(onScroll)
     val currentOnImageClick by rememberUpdatedState(onImageClick)
     val currentImageUrls by rememberUpdatedState(linkedImages)
+    val currentOnFindCount by rememberUpdatedState(onFindCount)
+    val findState = remember { WebViewFindState() }
     // 闪烁修复（用户反馈）：AndroidView 的 update 在每次父重组时都会跑，而 ArticleWebView
     // 的父（ReadingBody）会因顶栏 showTitle 翻转而重组 → 不加守卫就会每帧 reload 整页 HTML。
     // 用非 State 容器记住"已加载的 HTML 串"，只有内容真变才 reload。
@@ -145,12 +166,43 @@ internal fun ArticleWebView(
                         return true
                     }
                 }
+                // 平台自带 find-in-page：命中数由它算，我们只负责触发与上报（不开 JS）
+                setFindListener { activeMatchOrdinal, numberOfMatches, isDoneCounting ->
+                    findState.ordinal = activeMatchOrdinal
+                    findState.count = numberOfMatches
+                    if (isDoneCounting) currentOnFindCount(numberOfMatches)
+                }
             }
         },
         update = { webView ->
             if (lastLoaded[0] != styledHtml) {
                 webView.loadDataWithBaseURL(null, styledHtml, "text/html", "utf-8", null)
                 lastLoaded[0] = styledHtml
+            }
+            // 页内查找：query 变了重发 findAllAsync；cursor 变了 findNext 一次。
+            // consumedCursor 兜住「findNext 的结果异步回来之前 update 又被调一遍」的重复跳转。
+            val query = findQuery.trim()
+            when {
+                query.isEmpty() -> {
+                    if (findState.query.isNotEmpty()) {
+                        findState.query = ""
+                        findState.ordinal = 0
+                        findState.count = 0
+                        webView.clearMatches()
+                        currentOnFindCount(0)
+                    }
+                }
+                query != findState.query -> {
+                    findState.query = query
+                    // findAllAsync 落定即停在第一处，正好对应 cursor=0，不必再 findNext
+                    findState.consumedCursor = findCursor
+                    webView.findAllAsync(query)
+                }
+                findCursor != findState.consumedCursor -> {
+                    findState.consumedCursor = findCursor
+                    // ordinal 是 1 基，cursor 是 0 基：cursor >= ordinal 即往后走
+                    webView.findNext(findCursor >= findState.ordinal)
+                }
             }
         },
         modifier = modifier,

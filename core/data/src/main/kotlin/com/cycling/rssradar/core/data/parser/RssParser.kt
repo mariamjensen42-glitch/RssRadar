@@ -53,6 +53,8 @@ class RssParser {
          * 供列表卡片变形（跳原站播放）。数值与 ArticleEntity.MEDIA_KIND_* 对齐。
          */
         val mediaKind: Int = MEDIA_KIND_NONE,
+        /** 条目级媒体直链：音频/视频 enclosure 或 media:content 的 url，供播放器取源。 */
+        val mediaUrl: String? = null,
     )
 
     data class ParsedFeed(
@@ -233,7 +235,37 @@ class RssParser {
             publishedAt = sanitizePublishedAt(publishedDate?.time ?: updatedDate?.time),
             coverUrl = extractCover(this, coverSource, link),
             mediaKind = extractMediaKind(this),
+            mediaUrl = extractMediaUrl(this),
         )
+    }
+
+    /**
+     * 条目级媒体直链：enclosure 与 media 模块里第一条 audio/video 的 url。
+     * 只在真有地址时返回——列表上摆一个点不开的播放按钮，比不摆更糟。
+     */
+    private fun extractMediaUrl(entry: SyndEntry): String? {
+        entry.enclosures.orEmpty().forEach { enclosure ->
+            val type = enclosure.type.orEmpty().lowercase()
+            val url = enclosure.url
+            if ((type.startsWith("audio") || type.startsWith("video")) && !url.isNullOrBlank()) {
+                return url
+            }
+        }
+        val contents = (entry.getModule(MEDIA_MODULE_URI)
+            as? com.rometools.modules.mediarss.MediaEntryModule)
+            ?.mediaContents.orEmpty()
+            ?: return null
+        contents.forEach { content ->
+            val type = content.type.orEmpty().lowercase()
+            if (!type.startsWith("audio") && !type.startsWith("video")) return@forEach
+            val url = when (val reference = content.reference) {
+                is com.rometools.modules.mediarss.types.UrlReference -> reference.url?.toString()
+                is com.rometools.modules.mediarss.types.PlayerReference -> reference.url?.toString()
+                else -> null
+            }
+            if (!url.isNullOrBlank()) return url
+        }
+        return null
     }
 
     /**

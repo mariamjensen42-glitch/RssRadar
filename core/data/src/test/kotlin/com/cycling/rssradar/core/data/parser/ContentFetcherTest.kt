@@ -2,6 +2,7 @@ package com.cycling.rssradar.core.data.parser
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
+import kotlin.io.path.createTempDirectory
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -46,7 +47,7 @@ class ContentFetcherTest {
         server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.executor = Executors.newCachedThreadPool()
         server.start()
-        cacheDir = createTempDir(prefix = "rssradar-fetch-")
+        cacheDir = createTempDirectory(prefix = "rssradar-fetch-").toFile()
         logger = RecordingLogger()
     }
 

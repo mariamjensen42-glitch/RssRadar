@@ -162,6 +162,9 @@ data class AiTaskEntity(
 
 @Dao
 interface AiArtifactDao {
+    @Query("SELECT * FROM ai_artifacts WHERE subjectKind = 2 ORDER BY createdAt ASC")
+    suspend fun globalArtifacts(): List<AiArtifactEntity>
+
     @Query("SELECT * FROM ai_artifacts WHERE subjectKind = :subjectKind AND subjectId = :subjectId")
     suspend fun ofSubject(subjectKind: Int, subjectId: Long): List<AiArtifactEntity>
 

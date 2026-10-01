@@ -29,7 +29,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class RouteCatalogStore @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val http: HttpFetcher,
 ) {
 

@@ -50,6 +50,9 @@ import com.cycling.rssradar.ui.me.AiFeaturesViewModel
 import com.cycling.rssradar.ui.me.PromptTemplatesScreen
 import com.cycling.rssradar.ui.article.ArticleDetailScreen
 import com.cycling.rssradar.ui.article.ArticleDetailViewModel
+import com.cycling.rssradar.ui.annotations.AnnotationsScreen
+import com.cycling.rssradar.ui.library.LibraryScreen
+import com.cycling.rssradar.ui.player.AudioPlayerScreen
 import com.cycling.rssradar.ui.feed.FeedArticlesScreen
 import com.cycling.rssradar.ui.feed.FeedArticlesViewModel
 import com.cycling.rssradar.ui.feed.FeedListScreen
@@ -70,9 +73,12 @@ import com.cycling.rssradar.ui.subscriptions.SubscriptionsViewModel
 import com.cycling.rssradar.core.ui.components.FloatingBottomBar
 import com.cycling.rssradar.ui.components.openUrl
 import com.cycling.rssradar.ui.navigation.AiArtifactsRoute
+import com.cycling.rssradar.ui.navigation.AnnotationsRoute
+import com.cycling.rssradar.ui.navigation.LibraryRoute
 import com.cycling.rssradar.ui.navigation.PromptTemplatesRoute
 import com.cycling.rssradar.ui.navigation.AiFeaturesRoute
 import com.cycling.rssradar.ui.navigation.ArticleDetailRoute
+import com.cycling.rssradar.ui.navigation.AudioPlayerRoute
 import com.cycling.rssradar.ui.navigation.CrashLogRoute
 import com.cycling.rssradar.ui.navigation.FeedArticlesRoute
 import com.cycling.rssradar.ui.navigation.FeedRoute
@@ -90,6 +96,12 @@ import com.cycling.rssradar.ui.navigation.SettingsGeneralRoute
 import com.cycling.rssradar.ui.navigation.SettingsRssHubRoute
 import com.cycling.rssradar.ui.navigation.SettingsSyncRoute
 import com.cycling.rssradar.ui.navigation.SubscriptionsRoute
+import com.cycling.rssradar.ui.navigation.BackupRoute
+import com.cycling.rssradar.ui.navigation.FilterRulesRoute
+import com.cycling.rssradar.ui.navigation.SettingsNotificationRoute
+import com.cycling.rssradar.ui.me.BackupScreen
+import com.cycling.rssradar.ui.me.FilterRulesScreen
+import com.cycling.rssradar.ui.me.NotificationSettingsScreen
 import com.cycling.rssradar.ui.theme.CompositionLocalRoot
 import dagger.hilt.android.AndroidEntryPoint
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
@@ -280,6 +292,11 @@ private fun RssRadarAppContent(
                     onOpenRssHub = { navController.navigate(SettingsRssHubRoute) },
                     onOpenAiDiag = { navController.navigate(SettingsAiDiagRoute) },
                     onOpenReadingStats = { navController.navigate(ReadingStatsRoute) },
+                    onOpenFilterRules = { navController.navigate(FilterRulesRoute) },
+                    onOpenBackup = { navController.navigate(BackupRoute) },
+                    onOpenNotification = { navController.navigate(SettingsNotificationRoute) },
+                    onOpenAnnotations = { navController.navigate(AnnotationsRoute) },
+                    onOpenLibrary = { navController.navigate(LibraryRoute) },
                 )
             }
             // 阅读统计仪表盘（issue #83）：近 7 天阅读行为的真实数字
@@ -307,6 +324,30 @@ private fun RssRadarAppContent(
                     onOpenPromptTemplates = { navController.navigate(PromptTemplatesRoute) },
                     onOpenFetchDiagnostics = { navController.navigate(FetchDiagnosticsRoute) },
                     onOpenCrashLog = { navController.navigate(CrashLogRoute) },
+                )
+            }
+            // 八项功能新增的二级页：过滤规则 / 备份与恢复 / 通知细粒度
+            composable<FilterRulesRoute> {
+                FilterRulesScreen(onBack = { navController.popBackStack() })
+            }
+            composable<BackupRoute> {
+                BackupScreen(onBack = { navController.popBackStack() })
+            }
+            composable<SettingsNotificationRoute> {
+                NotificationSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            // 我的标注（全库高亮与笔记）：阅读页溢出菜单与「我的」页都能进
+            composable<AnnotationsRoute> {
+                AnnotationsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenArticle = { navController.navigate(ArticleDetailRoute(it)) },
+                )
+            }
+            // 收藏整理：收藏与稍后读共用一套排序/筛选/批量操作
+            composable<LibraryRoute> {
+                LibraryScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenArticle = { navController.navigate(ArticleDetailRoute(it)) },
                 )
             }
             // 兴趣画像（ADR-0013）：推荐流的可解释性出口
@@ -364,6 +405,15 @@ private fun RssRadarAppContent(
                     onBack = { navController.popBackStack() },
                     onOpenOriginal = { url -> context.openUrl(url) },
                     onOpenArticle = { navController.navigate(ArticleDetailRoute(it)) },
+                    onOpenAnnotations = { navController.navigate(AnnotationsRoute) },
+                    onOpenAudio = { navController.navigate(AudioPlayerRoute(articleId = it)) },
+                )
+            }
+            // 音频/播客播放页：播放器活在 PlaybackService 里，本页只是它的视图
+            composable<AudioPlayerRoute> { backStackEntry ->
+                AudioPlayerScreen(
+                    articleId = backStackEntry.toRoute<AudioPlayerRoute>().articleId,
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable<FeedArticlesRoute> { backStackEntry ->

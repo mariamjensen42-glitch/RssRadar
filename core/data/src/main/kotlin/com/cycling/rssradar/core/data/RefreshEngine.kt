@@ -2,6 +2,7 @@ package com.cycling.rssradar.core.data
 
 import com.cycling.rssradar.core.data.db.ArticleDao
 import com.cycling.rssradar.core.data.db.ArticleEntity
+import com.cycling.rssradar.core.data.db.ArticleFtsDao
 import com.cycling.rssradar.core.data.db.FeedDao
 import com.cycling.rssradar.core.data.db.FeedEntity
 import com.cycling.rssradar.core.data.parser.RssParser
@@ -13,6 +14,10 @@ import com.cycling.rssradar.core.domain.rss.FeedFailureCategory
 import com.cycling.rssradar.core.domain.rss.FeedProbeResult
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import com.cycling.rssradar.core.domain.rss.retryOnSlowResponse
+import com.cycling.rssradar.core.domain.filter.FilterRuleEngine
+import com.cycling.rssradar.core.domain.filter.RuleOutcome
+import com.cycling.rssradar.core.domain.filter.RuleTarget
+import com.cycling.rssradar.core.domain.search.SearchTextBuilder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +50,11 @@ import java.util.concurrent.atomic.AtomicInteger
 class RefreshEngine(
     private val feedDao: FeedDao,
     private val articleDao: ArticleDao,
+    /**
+     * 检索索引表的同步出口。null 时跳过同步（单测不关心索引）——生产装配必须传，
+     * 否则 FTS 表永远是空的、搜索一条都搜不到；出错也有 SearchIndexWorker 的行数自检兜底重建。
+     */
+    private val articleFtsDao: ArticleFtsDao? = null,
     private val parser: RssParser,
     private val http: HttpFetcher,
     private val transactionRunner: TransactionRunner = DirectTransactionRunner,
@@ -58,6 +68,11 @@ class RefreshEngine(
      * 非 null 时每源刷新先带凭证发 If-None-Match / If-Modified-Since，304 直接跳过。
      */
     private val conditionalHttp: ConditionalHttpFetcher? = null,
+    /**
+     * 过滤规则的取用出口。null 时不做过滤（单测不关心规则）。
+     * 整源刷新只取**一次**规则——每篇都查库是白费，而规则在一次刷新里的变化无意义。
+     */
+    private val filterRules: (suspend () -> FilterRuleEngine)? = null,
     /**
      * 自愈留痕缝：地址被自动改写时回调 (feedId, 旧地址, 新地址)。
      * 默认空实现——core/data 不依赖日志框架与 UI，由装配层决定「怎么让用户看见」。
@@ -327,10 +342,15 @@ class RefreshEngine(
             val existing = articleDao.getIdLinkPairsByFeed(feedId).associate { it.link to it.id }
             // 墓碑过滤（归档/清空真删的文章）：feed XML 还挂着它们，不跳过就会「删了又回来」
             val tombstoned = articleDao.getTombstonedLinks(feedId).toHashSet()
+            // 过滤规则只对新文章生效（已在库的文章不动用户状态），规则整源取一次
+            val engine = filterRules?.invoke()
+            val groupName = if (engine != null) feedDao.getById(feedId)?.groupName.orEmpty() else ""
             val newArticles = mutableListOf<ArticleEntity>()
+            val newSearchTexts = mutableListOf<String?>()
             articles.forEach { article ->
                 if (article.link in tombstoned) return@forEach
                 val readingMinutes = article.contentText?.let { estimateReadingMinutes(it) }
+                val searchText = buildSearchText(article)
                 // 摘要级内容不当正文：contentSource 记 NONE，详情页才会去抓原文
                 // （判定唯一落点：ContentQualification）
                 val contentSource = ContentQualification.contentSourceFor(
@@ -339,6 +359,20 @@ class RefreshEngine(
                 )
                 val existingId = existing[article.link]
                 if (existingId == null) {
+                    // 规则命中的动作在**入库时**一次落定：已读/加星/加稍后读直接写进实体，
+                    // 隐藏则整篇不入库。不写墓碑——规则是声明式的，删掉规则就该能正常入库，
+                    // 而墓碑是"已经归档过"的一次性事实，用它会让误配的规则永久污染数据。
+                    val outcome = engine?.evaluate(
+                        RuleTarget(
+                            feedId = feedId,
+                            groupName = groupName,
+                            title = article.title,
+                            summary = article.summary.orEmpty(),
+                            content = article.contentText.orEmpty(),
+                            author = article.author.orEmpty(),
+                        ),
+                    ) ?: RuleOutcome()
+                    if (outcome.hidden) return@forEach
                     newArticles += ArticleEntity(
                         feedId = feedId,
                         link = article.link,
@@ -353,7 +387,15 @@ class RefreshEngine(
                         readingMinutes = readingMinutes,
                         contentSource = contentSource,
                         mediaKind = article.mediaKind,
+                        mediaUrl = article.mediaUrl,
+                        searchText = searchText,
+                        isRead = outcome.markRead,
+                        isStarred = outcome.star,
+                        isBookmarked = outcome.bookmark,
+                        starredAt = if (outcome.star) now else null,
+                        bookmarkedAt = if (outcome.bookmark) now else null,
                     )
+                    newSearchTexts += searchText
                 } else {
                     articleDao.updateContentState(
                         id = existingId,
@@ -368,11 +410,37 @@ class RefreshEngine(
                         contentSource = contentSource,
                         fetchedAt = now,
                         mediaKind = article.mediaKind,
+                        mediaUrl = article.mediaUrl,
+                        searchText = searchText,
                     )
+                    syncSearchIndex(existingId, searchText)
                 }
             }
-            if (newArticles.isNotEmpty()) articleDao.insertAll(newArticles)
+            if (newArticles.isNotEmpty()) {
+                val ids = articleDao.insertAll(newArticles)
+                ids.forEachIndexed { index, id ->
+                    if (id > 0) syncSearchIndex(id, newSearchTexts.getOrNull(index))
+                }
+            }
         }
+    }
+
+    /**
+     * 检索语料的唯一构造点：标题、摘要、正文按此顺序拼接后整体分词——顺序即优先级，
+     * 截断发生在尾部，标题与摘要永远不会被截掉。见 SearchTextBuilder。
+     */
+    private fun buildSearchText(article: RssParser.ParsedArticle): String? {
+        val source = listOfNotNull(article.title, article.summary, article.contentText)
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
+        if (source.isBlank()) return null
+        return SearchTextBuilder.segment(source).takeIf { it.isNotEmpty() }
+    }
+
+    private suspend fun syncSearchIndex(articleId: Long, searchText: String?) {
+        val dao = articleFtsDao ?: return
+        dao.delete(articleId)
+        if (!searchText.isNullOrEmpty()) dao.insert(articleId, searchText)
     }
 }
 
