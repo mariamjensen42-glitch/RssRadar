@@ -13,6 +13,7 @@ import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.lang.reflect.Proxy
 import java.util.Collections
+import com.cycling.rssradar.core.data.refresh.RefreshEngine
 
 /**
  * 失效源自愈（连续解析失败后 autodiscovery 换地址）的行为契约。

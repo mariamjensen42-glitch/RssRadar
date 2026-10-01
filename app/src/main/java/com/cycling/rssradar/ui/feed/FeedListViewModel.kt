@@ -4,13 +4,13 @@ import com.cycling.rssradar.R
 import com.cycling.rssradar.i18n.UiText
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.core.data.AddFeedResult
+import com.cycling.rssradar.core.data.service.AddFeedResult
 import com.cycling.rssradar.core.data.db.entity.ArticleEntity
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
-import com.cycling.rssradar.core.data.FeedRepository
-import com.cycling.rssradar.core.data.SubscriptionFlow
-import com.cycling.rssradar.core.data.Recommendation
+import com.cycling.rssradar.core.data.repository.FeedRepository
+import com.cycling.rssradar.core.data.service.SubscriptionFlow
+import com.cycling.rssradar.core.data.recommend.Recommendation
 import com.cycling.rssradar.core.data.ai.AiRepository
 import com.cycling.rssradar.core.data.store.prefs.GroupStore
 import com.cycling.rssradar.core.data.store.prefs.ListDisplayStore

@@ -9,9 +9,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
-import com.cycling.rssradar.core.data.ClearArticlesResult
-import com.cycling.rssradar.core.data.FeedRepository
-import com.cycling.rssradar.core.data.SubscriptionFlow
+import com.cycling.rssradar.core.data.maintenance.ClearArticlesResult
+import com.cycling.rssradar.core.data.repository.FeedRepository
+import com.cycling.rssradar.core.data.service.SubscriptionFlow
 import com.cycling.rssradar.core.model.GROUP_DESIGN
 import com.cycling.rssradar.core.model.GROUP_DEV
 import com.cycling.rssradar.core.model.GROUP_TECH

@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data
+package com.cycling.rssradar.core.data.qualify
 
 import com.cycling.rssradar.core.data.db.entity.ArticleEntity
 import com.cycling.rssradar.core.data.parser.RssParser

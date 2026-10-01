@@ -36,7 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.core.data.OnDemandFetch
+import com.cycling.rssradar.core.data.service.OnDemandFetch
 import com.cycling.rssradar.core.data.db.entity.ContentFetchLogEntity
 import com.cycling.rssradar.core.data.db.projection.FetchHostStat
 import com.cycling.rssradar.core.data.parser.ExtractionIssue

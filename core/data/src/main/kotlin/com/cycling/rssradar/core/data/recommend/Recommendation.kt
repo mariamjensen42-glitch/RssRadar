@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data
+package com.cycling.rssradar.core.data.recommend
 
 import com.cycling.rssradar.core.domain.recommendation.EngagementSample
 import com.cycling.rssradar.core.domain.recommendation.InterestProfile

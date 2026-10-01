@@ -10,6 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.lang.reflect.Proxy
+import com.cycling.rssradar.core.data.refresh.RefreshEngine
 
 /**
  * 回归测试（真机反馈缺口，2026-09-05）：708 源全量刷新可达数十分钟，

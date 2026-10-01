@@ -14,7 +14,7 @@ import dagger.hilt.android.EntryPointAccessors
 /**
  * 检索语料补齐：把还没写 `searchText` / 未进 FTS 的文章补上。
  *
- * 为什么要有它：新文章的语料在刷新时同步写入（[com.cycling.rssradar.core.data.RefreshEngine]），
+ * 为什么要有它：新文章的语料在刷新时同步写入（[com.cycling.rssradar.core.data.refresh.RefreshEngine]），
  * 但**升级用户**的历史文章、以及刷新中途失败留下的空洞没有别的地方会补。
  * 缺了它，用户升级后搜不到旧文章——而"搜不到"会被当成"搜索坏了"。
  */

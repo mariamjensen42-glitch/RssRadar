@@ -11,7 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.db.entity.ArticleEntity
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
-import com.cycling.rssradar.core.data.FeedRepository
+import com.cycling.rssradar.core.data.repository.FeedRepository
 import com.cycling.rssradar.core.data.ai.AiRepository
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel

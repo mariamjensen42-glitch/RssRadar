@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data
+package com.cycling.rssradar.core.data.service
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -16,6 +16,8 @@ import com.cycling.rssradar.core.data.parser.ExtractionIssue
 import com.cycling.rssradar.core.data.parser.FetchFailure
 import com.cycling.rssradar.core.data.parser.FetchLogger
 import com.cycling.rssradar.core.data.parser.FetchOutcome
+import com.cycling.rssradar.core.data.qualify.ContentQualification
+import com.cycling.rssradar.core.data.refresh.estimateReadingMinutes
 
 /**
  * 一次按需抓取的结果。

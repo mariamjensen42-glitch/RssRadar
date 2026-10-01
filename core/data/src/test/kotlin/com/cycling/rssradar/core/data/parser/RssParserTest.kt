@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import com.cycling.rssradar.core.data.ContentQualification
+import com.cycling.rssradar.core.data.qualify.ContentQualification
 import com.cycling.rssradar.core.domain.rss.FeedProbeResult
 import java.io.ByteArrayInputStream
 

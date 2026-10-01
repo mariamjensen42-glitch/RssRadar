@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
  * 刷新会把 feed 里的旧文章重新 upsert 回来，与清理并发就是「删了又同步回来」
  * （issue #57 修订实测）。这条规则在此定案；各入口此前各自用注释复述的版本已废。
  *
- * 测试缝：刷新与归档以 suspend 函数注入（生产绑 [com.cycling.rssradar.core.data.FeedRepository]
+ * 测试缝：刷新与归档以 suspend 函数注入（生产绑 [com.cycling.rssradar.core.data.repository.FeedRepository]
  * 的对应方法），[clock] 可注入 fake，规则可纯 JVM 断言。
  */
 class AutoSync(

@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.db.entity.ArticleEntity
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
-import com.cycling.rssradar.core.data.FeedRepository
+import com.cycling.rssradar.core.data.repository.FeedRepository
 import com.cycling.rssradar.core.data.ai.AiRepository
 import com.cycling.rssradar.core.domain.search.SearchFilters
 import com.cycling.rssradar.core.model.library.LibraryRange
@@ -182,7 +182,7 @@ class SearchViewModel @Inject constructor(
     }
 
     /**
-     * 走 FTS 的搜索（[com.cycling.rssradar.core.data.FeedRepository.searchPage]），
+     * 走 FTS 的搜索（[com.cycling.rssradar.core.data.repository.FeedRepository.searchPage]），
      * 不再是 `LIKE %q%` 全表扫。250ms 防抖靠 job 取消实现——取消掉 delay 就等于去抖，
      * 不必再引入一条 flow 链。
      */

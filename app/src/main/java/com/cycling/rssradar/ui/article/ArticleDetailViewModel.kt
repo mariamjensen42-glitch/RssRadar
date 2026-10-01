@@ -3,12 +3,12 @@ package com.cycling.rssradar.ui.article
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.core.data.ContentQualification
+import com.cycling.rssradar.core.data.qualify.ContentQualification
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
-import com.cycling.rssradar.core.data.FeedRepository
-import com.cycling.rssradar.core.data.OnDemandFetch
-import com.cycling.rssradar.core.data.OnDemandResult
-import com.cycling.rssradar.core.data.Recommendation
+import com.cycling.rssradar.core.data.repository.FeedRepository
+import com.cycling.rssradar.core.data.service.OnDemandFetch
+import com.cycling.rssradar.core.data.service.OnDemandResult
+import com.cycling.rssradar.core.data.recommend.Recommendation
 import com.cycling.rssradar.core.data.parser.ExtractionIssue
 import com.cycling.rssradar.core.data.parser.FetchFailure
 import com.cycling.rssradar.core.data.ai.AiArtifactRepository

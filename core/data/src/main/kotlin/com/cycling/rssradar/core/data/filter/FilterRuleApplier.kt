@@ -1,12 +1,12 @@
 package com.cycling.rssradar.core.data.filter
 
-import com.cycling.rssradar.core.data.ArticleCleaner
+import com.cycling.rssradar.core.data.maintenance.ArticleCleaner
 import com.cycling.rssradar.core.data.db.dao.ArticleDao
 import com.cycling.rssradar.core.domain.filter.FilterRuleEngine
 import com.cycling.rssradar.core.domain.filter.RuleTarget
 
 /**
- * 把过滤规则作用到**存量文章**上（新文章在刷新入库时判定，见 [com.cycling.rssradar.core.data.RefreshEngine]）。
+ * 把过滤规则作用到**存量文章**上（新文章在刷新入库时判定，见 [com.cycling.rssradar.core.data.refresh.RefreshEngine]）。
  *
  * 为什么必须有这一半：用户配一条「标题含剧透就隐藏」，期待的是立刻生效，
  * 而不是"从下一条新闻开始生效"。少了它，规则页上的"预计命中 N 篇"就是个空承诺。

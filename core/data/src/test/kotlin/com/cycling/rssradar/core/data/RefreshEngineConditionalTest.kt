@@ -13,6 +13,7 @@ import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.lang.reflect.Proxy
+import com.cycling.rssradar.core.data.refresh.RefreshEngine
 
 /**
  * 增量刷新的源级捷径（HTTP 协商，v15）：304 直接算成功且零写库；

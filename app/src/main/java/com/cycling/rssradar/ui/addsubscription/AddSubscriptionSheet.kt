@@ -1,6 +1,6 @@
 package com.cycling.rssradar.ui.addsubscription
 
-import com.cycling.rssradar.core.data.DiscoveredFeed
+import com.cycling.rssradar.core.data.service.DiscoveredFeed
 import com.cycling.rssradar.core.ui.theme.radarColors
 
 import androidx.compose.foundation.background

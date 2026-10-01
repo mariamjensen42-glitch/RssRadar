@@ -20,6 +20,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.lang.reflect.Proxy
+import com.cycling.rssradar.core.data.service.OnDemandFetch
+import com.cycling.rssradar.core.data.service.OnDemandResult
 
 /**
  * 按需抓取模块三条写入规则的 JVM 证明（此前它们住在 FeedRepository 抽屉里，零测试）：

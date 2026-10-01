@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit
  * 与 [AiDailyWorker] 同一套路：不走 hilt-work，EntryPoint 取依赖。
  * 只探测有失败记录的源（consecutiveFailures > 0，FeedDao 层过滤）——
  * 健康源靠日常刷新自然维持计数，全量每日探测是纯浪费。
- * 复探走与常规刷新同一条 [com.cycling.rssradar.core.data.FeedRepository.refreshUnhealthyFeeds]：
+ * 复探走与常规刷新同一条 [com.cycling.rssradar.core.data.repository.FeedRepository.refreshUnhealthyFeeds]：
  * 成功即清零恢复，再失败计数继续累加，达到阈值即「失效」（判定在 core/domain FeedHealth）。
  */
 class FeedHealthWorker(

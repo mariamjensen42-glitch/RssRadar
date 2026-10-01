@@ -1,7 +1,9 @@
-package com.cycling.rssradar.core.data
+package com.cycling.rssradar.core.data.maintenance
 
 import com.cycling.rssradar.core.data.db.entity.ArchivedArticleTombstoneEntity
 import com.cycling.rssradar.core.data.db.dao.ArticleDao
+import com.cycling.rssradar.core.data.refresh.DirectTransactionRunner
+import com.cycling.rssradar.core.data.refresh.TransactionRunner
 
 /**
  * 清空文章结果（issue #8）：deleted = 真删条数，kept = 因收藏/稍后读豁免保留的条数。

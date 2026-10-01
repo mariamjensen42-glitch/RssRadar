@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data
+package com.cycling.rssradar.core.data.repository
 
 import androidx.room.withTransaction
 import kotlinx.coroutines.CoroutineDispatcher
@@ -18,6 +18,11 @@ import com.cycling.rssradar.core.domain.search.SearchFilters
 import com.cycling.rssradar.core.domain.search.SearchQueryBuilder
 import com.cycling.rssradar.core.model.MarkAsReadCondition
 import com.cycling.rssradar.core.model.library.LibrarySort
+import com.cycling.rssradar.core.data.maintenance.ArticleCleaner
+import com.cycling.rssradar.core.data.maintenance.ClearArticlesResult
+import com.cycling.rssradar.core.data.refresh.RefreshEngine
+import com.cycling.rssradar.core.data.refresh.TransactionRunner
+import com.cycling.rssradar.core.data.refresh.estimateReadingMinutes
 
 /**
  * 文章流仓库：观察文章流、用户状态标记、订阅源/分组管理。

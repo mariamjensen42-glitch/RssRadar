@@ -5,11 +5,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.core.data.AddFeedResult
-import com.cycling.rssradar.core.data.DiscoveredFeed
+import com.cycling.rssradar.core.data.service.AddFeedResult
+import com.cycling.rssradar.core.data.service.DiscoveredFeed
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.domain.rss.FeedProbeResult
-import com.cycling.rssradar.core.data.SubscriptionFlow
+import com.cycling.rssradar.core.data.service.SubscriptionFlow
 import com.cycling.rssradar.core.model.GROUP_DESIGN
 import com.cycling.rssradar.core.model.GROUP_DEV
 import com.cycling.rssradar.core.model.GROUP_TECH

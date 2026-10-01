@@ -18,6 +18,8 @@ import java.lang.reflect.Proxy
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME
+import com.cycling.rssradar.core.data.maintenance.ArticleCleaner
+import com.cycling.rssradar.core.data.refresh.RefreshEngine
 
 /**
  * 回归测试（issue「归档后刷新文章复活」）：

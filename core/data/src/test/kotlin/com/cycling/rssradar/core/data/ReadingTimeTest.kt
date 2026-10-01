@@ -2,6 +2,7 @@ package com.cycling.rssradar.core.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import com.cycling.rssradar.core.data.refresh.estimateReadingMinutes
 
 /** 阅读时长估算：来自真实正文字数，不虚构（产品核心原则）。 */
 class ReadingTimeTest {

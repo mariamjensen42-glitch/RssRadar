@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data
+package com.cycling.rssradar.core.data.refresh
 
 import com.cycling.rssradar.core.data.db.dao.ArticleDao
 import com.cycling.rssradar.core.data.db.entity.ArticleEntity
@@ -30,6 +30,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicInteger
+import com.cycling.rssradar.core.data.qualify.ContentQualification
 
 /**
  * 刷新子系统深模块（深化自原 FeedRepository）：订阅源刷新的全部规则都沉在这里，

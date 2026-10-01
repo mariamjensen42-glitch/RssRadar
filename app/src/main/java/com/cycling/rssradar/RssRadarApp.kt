@@ -1,7 +1,7 @@
 package com.cycling.rssradar
 
 import android.app.Application
-import com.cycling.rssradar.core.data.CrashLog
+import com.cycling.rssradar.core.data.maintenance.CrashLog
 import com.cycling.rssradar.sync.FeedHealthScheduler
 import com.cycling.rssradar.sync.SearchIndexScheduler
 import com.cycling.rssradar.sync.SyncScheduler

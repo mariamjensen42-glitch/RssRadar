@@ -2,7 +2,7 @@ package com.cycling.rssradar.ui.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.core.data.FeedRepository
+import com.cycling.rssradar.core.data.repository.FeedRepository
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.store.prefs.LibraryStore

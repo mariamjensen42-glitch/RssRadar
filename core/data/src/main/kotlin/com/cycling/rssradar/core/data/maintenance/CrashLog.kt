@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data
+package com.cycling.rssradar.core.data.maintenance
 
 import android.content.Context
 import android.content.pm.PackageManager

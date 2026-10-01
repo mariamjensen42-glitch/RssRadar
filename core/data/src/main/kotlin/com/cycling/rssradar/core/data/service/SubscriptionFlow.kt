@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data
+package com.cycling.rssradar.core.data.service
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +18,8 @@ import com.cycling.rssradar.core.data.opml.OpmlParser
 import com.cycling.rssradar.core.data.opml.OpmlWriter
 import com.cycling.rssradar.core.data.parser.RssParser
 import com.cycling.rssradar.core.data.rss.FeedDiscovery
+import com.cycling.rssradar.core.data.qualify.FeedContentTypeGuesser
+import com.cycling.rssradar.core.data.refresh.RefreshEngine
 
 /** 订阅结果，供 UI 层区分提示文案。 */
 sealed interface AddFeedResult {
