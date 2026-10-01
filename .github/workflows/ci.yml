@@ -39,6 +39,9 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     continue-on-error: ${{ github.event_name != 'pull_request' }}
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
       - name: Check out source
@@ -63,10 +66,12 @@ jobs:
         with:
           name: lint-reports
           if-no-files-found: warn
-          path: |
-            app/build/reports/lint-results-debug.html
-            app/build/reports/lint-results-debug.xml
-            core/data/build/reports/lint-results-debug.html
-            core/data/build/reports/lint-results-debug.xml
-            core/ui/build/reports/lint-results-debug.html
-            core/ui/build/reports/lint-results-debug.xml
+          path: "**/build/reports/lint-results-debug.*"
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: "**/build/reports/lint-results-debug.sarif"
+          category: lint
