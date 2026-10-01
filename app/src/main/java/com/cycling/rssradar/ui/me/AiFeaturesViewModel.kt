@@ -13,10 +13,10 @@ import com.cycling.rssradar.core.data.ai.AiCategory
 import com.cycling.rssradar.core.data.ai.AiFeature
 import com.cycling.rssradar.core.data.ai.AiQueueSnapshot
 import com.cycling.rssradar.core.data.ai.AiTaskQueue
-import com.cycling.rssradar.core.data.store.AiBudgetState
-import com.cycling.rssradar.core.data.store.AiBudgetStore
-import com.cycling.rssradar.core.data.store.AiFeatureSettings
-import com.cycling.rssradar.core.data.store.AiFeatureStore
+import com.cycling.rssradar.core.data.store.model.AiBudgetState
+import com.cycling.rssradar.core.data.store.prefs.AiBudgetStore
+import com.cycling.rssradar.core.data.store.model.AiFeatureSettings
+import com.cycling.rssradar.core.data.store.prefs.AiFeatureStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers

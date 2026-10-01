@@ -1,13 +1,10 @@
-package com.cycling.rssradar.core.data.store
+package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
+import com.cycling.rssradar.core.data.store.model.ThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-
-
-/** 主题偏好：跟随系统 / 强制浅色 / 强制深色。 */
-enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 /**
  * 主题偏好持久化 + 运行态共享。

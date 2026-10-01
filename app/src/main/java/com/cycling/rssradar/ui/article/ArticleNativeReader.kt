@@ -66,10 +66,10 @@ import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
 import coil3.size.Size
-import com.cycling.rssradar.core.data.store.ReadingFontFamily
-import com.cycling.rssradar.core.data.store.ReadingImageState
-import com.cycling.rssradar.core.data.store.ReadingStyleState
-import com.cycling.rssradar.core.data.store.ReadingTextAlign
+import com.cycling.rssradar.core.data.store.model.ReadingFontFamily
+import com.cycling.rssradar.core.data.store.model.ReadingImageState
+import com.cycling.rssradar.core.data.store.model.ReadingStyleState
+import com.cycling.rssradar.core.data.store.model.ReadingTextAlign
 import com.cycling.rssradar.ui.theme.LocalReadingPrefs
 import kotlin.math.sqrt
 import com.cycling.rssradar.core.ui.components.ShimmerOverlay

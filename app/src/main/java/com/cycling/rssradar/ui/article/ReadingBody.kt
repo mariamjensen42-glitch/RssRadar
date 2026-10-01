@@ -53,11 +53,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.parser.ExtractionIssue
-import com.cycling.rssradar.core.data.store.BilingualLayout
-import com.cycling.rssradar.core.data.store.ReadingFontFamily
-import com.cycling.rssradar.core.data.store.ReadingStyleState
-import com.cycling.rssradar.core.data.store.TranslationDisplayState
-import com.cycling.rssradar.core.data.store.TranslationViewMode
+import com.cycling.rssradar.core.data.store.model.BilingualLayout
+import com.cycling.rssradar.core.data.store.model.ReadingFontFamily
+import com.cycling.rssradar.core.data.store.model.ReadingStyleState
+import com.cycling.rssradar.core.data.store.model.TranslationDisplayState
+import com.cycling.rssradar.core.data.store.model.TranslationViewMode
 import com.cycling.rssradar.core.domain.reading.FindIndex
 import com.cycling.rssradar.core.domain.reading.ReadingTextMap
 import com.cycling.rssradar.core.ui.components.FeedIcon

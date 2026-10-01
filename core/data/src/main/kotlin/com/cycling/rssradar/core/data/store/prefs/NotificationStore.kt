@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data.store
+package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
 import com.cycling.rssradar.core.domain.notify.NotifyPrefs

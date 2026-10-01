@@ -58,13 +58,14 @@ import com.cycling.rssradar.i18n.labelRes
 import com.cycling.rssradar.i18n.resolve
 import com.cycling.rssradar.core.model.rsshub.CatalogSource
 import com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore
-import com.cycling.rssradar.core.data.store.KeepArchived
-import com.cycling.rssradar.core.data.store.AppLanguage
-import com.cycling.rssradar.core.data.store.LinkOpenMode
-import com.cycling.rssradar.core.data.store.ListViewMode
-import com.cycling.rssradar.core.data.store.ShareContentFormat
-import com.cycling.rssradar.core.data.store.SyncInterval
-import com.cycling.rssradar.core.data.store.ThemeMode
+import com.cycling.rssradar.core.data.store.model.KeepArchived
+import com.cycling.rssradar.core.data.store.model.AppLanguage
+import com.cycling.rssradar.core.data.store.model.LinkOpenMode
+import com.cycling.rssradar.core.data.store.model.ListDescMode
+import com.cycling.rssradar.core.data.store.model.ListViewMode
+import com.cycling.rssradar.core.data.store.model.ShareContentFormat
+import com.cycling.rssradar.core.data.store.model.SyncInterval
+import com.cycling.rssradar.core.data.store.model.ThemeMode
 import com.cycling.rssradar.core.ui.components.OptionPickerSheet
 import com.cycling.rssradar.ui.components.SyncedSlider
 import com.composables.icons.lucide.ArrowLeft
@@ -562,9 +563,9 @@ fun SettingsGeneralScreen(
                         modifier = Modifier.weight(1f),
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val descModeLabels = com.cycling.rssradar.core.data.store.ListDescMode.entries.associateWith { stringResource(it.labelRes()) }
+                        val descModeLabels = ListDescMode.entries.associateWith { stringResource(it.labelRes()) }
                         SegmentedChips(
-                            options = com.cycling.rssradar.core.data.store.ListDescMode.entries.toList(),
+                            options = ListDescMode.entries.toList(),
                             selected = display.descMode,
                             label = { descModeLabels.getValue(it) },
                             onSelect = { mode -> viewModel.updateListDisplay { it.copy(descMode = mode) } },

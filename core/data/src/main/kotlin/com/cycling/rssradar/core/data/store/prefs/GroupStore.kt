@@ -1,12 +1,11 @@
-package com.cycling.rssradar.core.data.store
+package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
-import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
-import com.cycling.rssradar.core.model.GROUP_TECH
-import com.cycling.rssradar.core.model.GROUP_DEV
-import com.cycling.rssradar.core.model.GROUP_DESIGN
 import androidx.core.content.edit
-
+import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
+import com.cycling.rssradar.core.model.GROUP_DESIGN
+import com.cycling.rssradar.core.model.GROUP_DEV
+import com.cycling.rssradar.core.model.GROUP_TECH
 
 /**
  * 分组注册表：分组名清单（SharedPreferences）。

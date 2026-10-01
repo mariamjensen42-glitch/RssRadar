@@ -1,17 +1,12 @@
-package com.cycling.rssradar.core.data.store
+package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
+import com.cycling.rssradar.core.data.store.model.LibraryState
 import com.cycling.rssradar.core.model.library.LibraryRange
 import com.cycling.rssradar.core.model.library.LibrarySort
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-
-data class LibraryState(
-    val showBookmarked: Boolean = false,
-    val sort: LibrarySort = LibrarySort.STARRED_AT,
-    val range: LibraryRange = LibraryRange.ALL,
-)
 
 class LibraryStore(private val prefs: SharedPreferences) {
 

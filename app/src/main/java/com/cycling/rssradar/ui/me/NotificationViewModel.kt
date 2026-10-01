@@ -1,7 +1,7 @@
 package com.cycling.rssradar.ui.me
 
 import androidx.lifecycle.ViewModel
-import com.cycling.rssradar.core.data.store.NotificationStore
+import com.cycling.rssradar.core.data.store.prefs.NotificationStore
 import com.cycling.rssradar.core.domain.notify.NotifyPrefs
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow

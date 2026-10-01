@@ -4,7 +4,7 @@ import com.cycling.rssradar.core.data.db.dao.ArticleDao
 import com.cycling.rssradar.core.data.db.AiSupportDao
 import com.cycling.rssradar.core.data.db.FeedAiProfileDao
 import com.cycling.rssradar.core.data.db.dao.FeedDao
-import com.cycling.rssradar.core.data.store.AiFeatureStore
+import com.cycling.rssradar.core.data.store.prefs.AiFeatureStore
 import kotlinx.coroutines.CancellationException
 
 

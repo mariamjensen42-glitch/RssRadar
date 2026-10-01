@@ -1,9 +1,4 @@
-package com.cycling.rssradar.core.data.store
-
-import android.content.SharedPreferences
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+package com.cycling.rssradar.core.data.store.model
 
 /**
  * 归档保留档位（issue #57）。days = 保留天数，0 表示永久保留。
@@ -32,27 +27,5 @@ enum class KeepArchived(val days: Long, val label: String) {
         /** 持久化名反查：未知值回落 ALWAYS（宁可不删，不可误删）。 */
         fun fromNameOrNull(name: String?): KeepArchived? =
             name?.let { n -> entries.firstOrNull { it.name == n } }
-    }
-}
-
-/**
- * 归档策略持久化 + 运行态共享（ListDisplayStore 同款模式，issue #57）。
- * 默认 ALWAYS：存量数据大，升级即删不可接受——清理必须 opt-in。
- */
-class ArchiveStore(private val prefs: SharedPreferences) {
-
-    private val _state = MutableStateFlow(readPersisted())
-    val state: StateFlow<KeepArchived> = _state.asStateFlow()
-
-    fun set(keep: KeepArchived) {
-        prefs.edit().putString(KEY_KEEP_ARCHIVED, keep.name).apply()
-        _state.value = keep
-    }
-
-    private fun readPersisted(): KeepArchived =
-        KeepArchived.fromNameOrNull(prefs.getString(KEY_KEEP_ARCHIVED, null)) ?: KeepArchived.ALWAYS
-
-    companion object {
-        private const val KEY_KEEP_ARCHIVED = "archive_keep_archived"
     }
 }

@@ -2,6 +2,11 @@ package com.cycling.rssradar.core.data.store
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import com.cycling.rssradar.core.data.store.model.ReadingFontFamily
+import com.cycling.rssradar.core.data.store.model.ReadingStyleState
+import com.cycling.rssradar.core.data.store.model.coerceFontSize
+import com.cycling.rssradar.core.data.store.model.coerceLineHeight
+import com.cycling.rssradar.core.data.store.model.coercePadding
 
 class ReadingStyleCoerceTest {
 

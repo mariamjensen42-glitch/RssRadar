@@ -1,7 +1,7 @@
 package com.cycling.rssradar.core.data.ai
 
 import com.cycling.rssradar.core.data.db.dao.ArticleDao
-import com.cycling.rssradar.core.data.store.AiFeatureStore
+import com.cycling.rssradar.core.data.store.prefs.AiFeatureStore
 import kotlinx.coroutines.CancellationException
 
 /** 译文缓存上限（篇）。 */

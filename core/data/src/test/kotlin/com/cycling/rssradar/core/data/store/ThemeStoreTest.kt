@@ -6,6 +6,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.cycling.rssradar.core.data.store.model.ThemeMode
+import com.cycling.rssradar.core.data.store.prefs.ThemeStore
 
 /**
  * ThemeStore：主题模式 + Material You 动态取色（#27）的持久化。

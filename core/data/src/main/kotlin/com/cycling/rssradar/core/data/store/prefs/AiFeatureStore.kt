@@ -1,28 +1,12 @@
-package com.cycling.rssradar.core.data.store
+package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
 import com.cycling.rssradar.core.data.ai.AiCategory
 import com.cycling.rssradar.core.data.ai.AiFeature
+import com.cycling.rssradar.core.data.store.model.AiFeatureSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-
-
-/** 当前开启的 AI 功能集合。用 Set 而不是 35 个布尔字段的数据类——增删功能不用改这里。 */
-data class AiFeatureSettings(
-    val enabled: Set<AiFeature> = AiFeature.DEFAULT_ENABLED,
-) {
-    fun isEnabled(feature: AiFeature): Boolean = feature in enabled
-
-    /** 某个分组里开了几项，设置页分组标题上显示「3 / 15」。 */
-    fun countIn(category: AiCategory): Int = AiFeature.ofCategory(category).count { it in enabled }
-
-    /** 该分组是否全开（用于分组一键开关的三态显示）。 */
-    fun allIn(category: AiCategory): Boolean = AiFeature.ofCategory(category).all { it in enabled }
-
-    companion object
-}
-
 
 /**
  * 35 项 AI 功能的独立开关。

@@ -2,7 +2,7 @@ package com.cycling.rssradar.core.data.backup
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.cycling.rssradar.core.data.store.SettingsPrefs
+import com.cycling.rssradar.core.data.store.prefs.SettingsPrefs
 
 /**
  * 设置的备份快照。只读 `SettingsPrefs.of`（rssradar_settings）——

@@ -15,9 +15,9 @@ import com.cycling.rssradar.core.data.SubscriptionFlow
 import com.cycling.rssradar.core.model.GROUP_DESIGN
 import com.cycling.rssradar.core.model.GROUP_DEV
 import com.cycling.rssradar.core.model.GROUP_TECH
-import com.cycling.rssradar.core.data.store.FeedSortMode
-import com.cycling.rssradar.core.data.store.FeedSortStore
-import com.cycling.rssradar.core.data.store.GroupStore
+import com.cycling.rssradar.core.data.store.model.FeedSortMode
+import com.cycling.rssradar.core.data.store.prefs.FeedSortStore
+import com.cycling.rssradar.core.data.store.prefs.GroupStore
 import com.cycling.rssradar.core.domain.rss.FeedFailureCategory
 import com.cycling.rssradar.core.domain.rss.FeedHealth
 import com.cycling.rssradar.ui.mvi.MviViewModel

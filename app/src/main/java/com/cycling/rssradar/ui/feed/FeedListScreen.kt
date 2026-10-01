@@ -107,9 +107,9 @@ import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.MotionTokens
 import com.cycling.rssradar.core.data.db.entity.ArticleEntity
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
-import com.cycling.rssradar.core.data.store.ListDescMode
-import com.cycling.rssradar.core.data.store.ListDisplayState
-import com.cycling.rssradar.core.data.store.ListViewMode
+import com.cycling.rssradar.core.data.store.model.ListDescMode
+import com.cycling.rssradar.core.data.store.model.ListDisplayState
+import com.cycling.rssradar.core.data.store.model.ListViewMode
 import com.cycling.rssradar.core.model.MarkAsReadCondition
 import com.cycling.rssradar.ui.theme.LocalListDisplay
 import com.cycling.rssradar.ui.components.ArticleContextMenu

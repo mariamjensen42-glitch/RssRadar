@@ -17,9 +17,9 @@ import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.rememberReducedMotion
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import com.cycling.rssradar.core.data.store.ListDisplayState
-import com.cycling.rssradar.core.data.store.ReadingPrefs
-import com.cycling.rssradar.core.data.store.ThemeMode
+import com.cycling.rssradar.core.data.store.model.ListDisplayState
+import com.cycling.rssradar.core.data.store.model.ReadingPrefs
+import com.cycling.rssradar.core.data.store.model.ThemeMode
 import com.cycling.rssradar.di.AppEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 

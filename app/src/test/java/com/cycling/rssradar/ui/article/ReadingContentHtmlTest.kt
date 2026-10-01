@@ -1,8 +1,8 @@
 package com.cycling.rssradar.ui.article
 
-import com.cycling.rssradar.core.data.store.ReadingImageState
-import com.cycling.rssradar.core.data.store.ReadingFontFamily
-import com.cycling.rssradar.core.data.store.ReadingStyleState
+import com.cycling.rssradar.core.data.store.model.ReadingImageState
+import com.cycling.rssradar.core.data.store.model.ReadingFontFamily
+import com.cycling.rssradar.core.data.store.model.ReadingStyleState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

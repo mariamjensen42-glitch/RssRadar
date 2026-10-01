@@ -12,7 +12,7 @@ import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.filter.FilterRuleApplier
-import com.cycling.rssradar.core.data.store.KeepArchived
+import com.cycling.rssradar.core.data.store.model.KeepArchived
 import com.cycling.rssradar.core.domain.filter.FilterRuleEngine
 import com.cycling.rssradar.core.domain.search.SearchFilters
 import com.cycling.rssradar.core.domain.search.SearchQueryBuilder

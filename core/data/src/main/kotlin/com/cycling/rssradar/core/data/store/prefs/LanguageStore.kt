@@ -1,13 +1,11 @@
-package com.cycling.rssradar.core.data.store
+package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import com.cycling.rssradar.core.data.store.model.AppLanguage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-
-/** 界面语言偏好：跟随系统 / 中文 / English。 */
-enum class AppLanguage { SYSTEM, CHINESE, ENGLISH }
 
 /**
  * 界面语言持久化 + 运行态共享（ADR-0017）。

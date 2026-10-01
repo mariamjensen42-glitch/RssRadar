@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.FeedRepository
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
-import com.cycling.rssradar.core.data.store.LibraryStore
+import com.cycling.rssradar.core.data.store.prefs.LibraryStore
 import com.cycling.rssradar.core.model.library.LibraryRange
 import com.cycling.rssradar.core.model.library.LibrarySort
 import com.cycling.rssradar.ui.feed.PagedSnapshot

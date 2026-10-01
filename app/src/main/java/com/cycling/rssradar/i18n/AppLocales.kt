@@ -5,8 +5,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.LocaleList
-import com.cycling.rssradar.core.data.store.AppLanguage
-import com.cycling.rssradar.core.data.store.SettingsPrefs
+import com.cycling.rssradar.core.data.store.model.AppLanguage
+import com.cycling.rssradar.core.data.store.prefs.SettingsPrefs
 import java.util.Locale
 
 /**

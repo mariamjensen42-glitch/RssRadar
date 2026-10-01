@@ -127,7 +127,7 @@ class MainActivity : ComponentActivity() {
         super.attachBaseContext(
             com.cycling.rssradar.i18n.AppLocales.wrapContext(
                 newBase,
-                com.cycling.rssradar.core.data.store.SettingsPrefs.of(newBase),
+                com.cycling.rssradar.core.data.store.prefs.SettingsPrefs.of(newBase),
             ),
         )
     }

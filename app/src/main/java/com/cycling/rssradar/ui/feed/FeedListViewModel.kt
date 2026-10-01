@@ -12,11 +12,11 @@ import com.cycling.rssradar.core.data.FeedRepository
 import com.cycling.rssradar.core.data.SubscriptionFlow
 import com.cycling.rssradar.core.data.Recommendation
 import com.cycling.rssradar.core.data.ai.AiRepository
-import com.cycling.rssradar.core.data.store.GroupStore
-import com.cycling.rssradar.core.data.store.ListDisplayStore
-import com.cycling.rssradar.core.data.store.ListViewMode
+import com.cycling.rssradar.core.data.store.prefs.GroupStore
+import com.cycling.rssradar.core.data.store.prefs.ListDisplayStore
+import com.cycling.rssradar.core.data.store.model.ListViewMode
 import com.cycling.rssradar.core.model.MarkAsReadCondition
-import com.cycling.rssradar.core.data.store.RecommendationStore
+import com.cycling.rssradar.core.data.store.prefs.RecommendationStore
 import com.cycling.rssradar.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject

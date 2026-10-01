@@ -58,8 +58,8 @@ import com.cycling.rssradar.core.data.ai.AiCategory
 import com.cycling.rssradar.core.data.ai.AiFeature
 import com.cycling.rssradar.core.data.ai.AiQueueSnapshot
 import com.cycling.rssradar.core.data.ai.AiTrigger
-import com.cycling.rssradar.core.data.store.AiBudgetState
-import com.cycling.rssradar.core.data.store.AiFeatureSettings
+import com.cycling.rssradar.core.data.store.model.AiBudgetState
+import com.cycling.rssradar.core.data.store.model.AiFeatureSettings
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.i18n.resolve
 import com.cycling.rssradar.core.ui.theme.radarColors
