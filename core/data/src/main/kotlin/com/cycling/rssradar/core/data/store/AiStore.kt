@@ -20,5 +20,18 @@ class AiStore(private val prefs: SharedPreferences) {
 
     companion object {
         private const val KEY_API_KEY = "deepseek_api_key"
+
+        /**
+         * 一次性迁移：Key 原先与普通设置共用 `rssradar_settings`，而那份文件会随
+         * Google 云备份上传。搬到独立的 secrets 文件后，旧文件里的值必须立即抹掉——
+         * 只在旧位置留着就等于没搬。
+         */
+        fun migrateFromLegacy(legacy: SharedPreferences, target: SharedPreferences) {
+            val old = legacy.getString(KEY_API_KEY, null)?.takeIf { it.isNotBlank() } ?: return
+            if (target.getString(KEY_API_KEY, null).isNullOrBlank()) {
+                target.edit().putString(KEY_API_KEY, old).apply()
+            }
+            legacy.edit().remove(KEY_API_KEY).apply()
+        }
     }
 }

@@ -87,6 +87,9 @@ class ListDisplayStore(private val prefs: SharedPreferences) {
         stickyDateHeader = prefs.getBoolean(KEY_STICKY_DATE, true),
         dimRead = prefs.getBoolean(KEY_DIM_READ, false),
         markReadOnScroll = prefs.getBoolean(KEY_MARK_READ_ON_SCROLL, false),
+        viewMode = prefs.getString(KEY_VIEW_MODE, null)
+            ?.let { name -> runCatching { ListViewMode.valueOf(name) }.getOrNull() }
+            ?: ListViewMode.CARD,
     )
 
     companion object {

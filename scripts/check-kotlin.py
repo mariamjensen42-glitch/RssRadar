@@ -321,6 +321,9 @@ def main() -> int:
             files += sources(ROOT / "core/domain/src/test")
 
     out = WORK / "out"
+    # 不清空 out：全量删除会触发沙箱的批量删除保护（2000+ 文件）。
+    # 源改名/删除后残留的旧 .class 由 run-tests.py 从**源文件**推导测试类来规避，
+    # 不再依赖 out 目录的干净程度。
     out.mkdir(parents=True, exist_ok=True)
 
     cmd = [
@@ -351,18 +354,20 @@ def main() -> int:
     print(f"编译 {len(files)} 个文件 …")
     result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     output = (result.stdout or "") + (result.stderr or "")
-    errors = [line for line in output.splitlines() if "error:" in line or "warning:" in line and "never used" not in line]
-    errors = [line for line in output.splitlines() if re.search(r"\berror\b|\bwarning\b", line)]
+    diagnostics = [line for line in output.splitlines() if re.search(r"\berror\b|\bwarning\b", line)]
+    # 只有 error 才判失败：warning（如 TipsScreen 的注解目标变更）不代表编译不过，
+    # 把它一起算失败会让 run-tests.py 的"退出码非零即编译失败"契约永远成立。
+    hard_errors = [line for line in diagnostics if re.search(r"\berror\b", line)]
 
-    if result.returncode == 0 and not errors:
-        print("编译通过，0 error")
+    if result.returncode == 0 and not hard_errors:
+        print(f"编译通过，0 error · {len(diagnostics)} warning" if diagnostics else "编译通过，0 error")
         return 0
 
-    print(f"退出码 {result.returncode} · {len(errors)} 条诊断：")
-    for line in errors[:120]:
+    print(f"退出码 {result.returncode} · {len(hard_errors)} error / {len(diagnostics)} 条诊断：")
+    for line in diagnostics[:120]:
         print("  " + line.strip())
-    if len(errors) > 120:
-        print(f"  … 还有 {len(errors) - 120} 条")
+    if len(diagnostics) > 120:
+        print(f"  … 还有 {len(diagnostics) - 120} 条")
     return 1
 
 

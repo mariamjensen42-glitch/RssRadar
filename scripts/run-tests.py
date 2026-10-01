@@ -28,6 +28,15 @@ OUT = WORK / "out"
 CP_DIR = WORK / "cp"
 SDK = pathlib.Path(r"E:\SoftWare\SDK")
 
+# 测试源根：与 check-kotlin.py 收的 test 源码保持一致。
+TEST_ROOTS = [
+    ROOT / "app/src/test/java",
+    ROOT / "core/data/src/test",
+    ROOT / "core/domain/src/test",
+]
+
+PACKAGE_RE = re.compile(r"^\s*package\s+([\w.]+)", re.M)
+
 
 def android_jar() -> pathlib.Path:
     jars = sorted(SDK.glob("platforms/android-3*/android.jar"), key=lambda p: p.parent.name)
@@ -75,13 +84,29 @@ def pick_newest(jars: list[pathlib.Path]) -> list[pathlib.Path]:
 
 
 def test_classes(keywords: list[str]) -> list[str]:
-    names = []
-    for path in OUT.rglob("*Test.class"):
-        rel = path.relative_to(OUT).with_suffix("")
-        fqcn = ".".join(rel.parts)
-        if not keywords or any(k in fqcn for k in keywords):
-            names.append(fqcn)
-    return sorted(names)
+    """从**源文件**推导测试类，而不是扫 out 目录里的 .class。
+
+    扫 .class 会把已改名/已删除的测试留下的陈旧产物一起跑起来——源码里早就没有它了，
+    那种"全绿"与当前代码无关（XxxTest.kt 改名后，旧 XxxTest.class 仍在 out 里，
+    测试照旧全部通过）。这里改为读源文件的 package 声明推导 FQCN，
+    并要求编译产物真实存在：产物缺失就显式告警，而不是静默少跑一个类。
+    """
+    names: list[str] = []
+    for root in TEST_ROOTS:
+        if not root.exists():
+            continue
+        for path in sorted(root.rglob("*Test.kt")):
+            m = PACKAGE_RE.search(path.read_text(encoding="utf-8", errors="replace"))
+            if not m:
+                print(f"  [warn] {path.relative_to(ROOT).as_posix()} 没有 package 声明，跳过")
+                continue
+            fqcn = f"{m.group(1)}.{path.stem}"
+            if not OUT.joinpath(*fqcn.split(".")).with_suffix(".class").exists():
+                print(f"  [warn] {fqcn} 没有编译产物——源已改名或编译未通过，跳过")
+                continue
+            if not keywords or any(k in fqcn for k in keywords):
+                names.append(fqcn)
+    return sorted(set(names))
 
 
 def main() -> int:
@@ -100,10 +125,15 @@ def main() -> int:
             errors="replace",
         )
         output = (result.stdout or "") + (result.stderr or "")
-        if re.search(r"^  app.*\berror\b", output, flags=re.M):
+        # 以退出码为准。原判定 `^  app.*\berror\b` 只认 app 模块，core:* 编不过时
+        # 一律放行 —— 于是测试跑的是上一次的旧字节码，结果"全绿"却与源码无关。
+        # check-kotlin.py 现已把 error 与 warning 分开，非零即真有编译错误。
+        if result.returncode != 0:
             print("编译有错，先修编译再跑测试：")
-            print("\n".join(l for l in output.splitlines() if "error" in l))
+            print("\n".join(l for l in output.splitlines() if re.search(r"\berror\b", l)))
             return 1
+    else:
+        print("[--no-build] 跳过编译：跑的是 out/ 里的既有产物，不代表当前源码状态")
 
     classes = test_classes(args.keywords)
     if not classes:

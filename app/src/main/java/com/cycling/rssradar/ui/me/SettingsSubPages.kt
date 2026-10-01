@@ -1000,7 +1000,7 @@ fun SettingsRssHubScreen(
                         modifier = Modifier.weight(1f),
                     )
                     Text(
-                        text = if (state.catalogRouteCount > 0) "${state.catalogRouteCount} 条" else stringResource(R.string.loading_ellipsis),
+                        text = if (state.catalogRouteCount > 0) stringResource(R.string.catalog_routes_count, state.catalogRouteCount) else stringResource(R.string.loading_ellipsis),
                         color = radarColors().textPrimary,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
@@ -1081,7 +1081,7 @@ fun SettingsAiDiagScreen(
                         modifier = Modifier.weight(1f),
                     )
                     Text(
-                        text = if (state.aiKeyConfigured) "已配置" else "未配置",
+                        text = stringResource(if (state.aiKeyConfigured) R.string.status_configured else R.string.status_not_configured),
                         color = if (state.aiKeyConfigured) radarColors().accent else radarColors().textTertiary,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,

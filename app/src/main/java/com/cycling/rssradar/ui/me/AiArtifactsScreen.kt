@@ -2,6 +2,7 @@ package com.cycling.rssradar.ui.me
 
 import androidx.compose.ui.res.stringResource
 import com.cycling.rssradar.R
+import com.cycling.rssradar.i18n.formatCount
 import com.cycling.rssradar.i18n.labelRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -583,15 +584,3 @@ private fun PayloadLineRow(line: AiPayloadLine) {
     }
 }
 
-private fun formatCount(value: Long): String = when {
-    value >= 100_000_000 -> String.format("%.1f亿", value / 100_000_000.0)
-    value >= 10_000 -> String.format("%.1f万", value / 10_000.0)
-    else -> value.toString()
-}
-
-/** 英文语境的计数缩写（K/M），与中文 万/亿 口径一致。 */
-private fun formatCountEn(value: Long): String = when {
-    value >= 1_000_000 -> String.format("%.1fM", value / 1_000_000.0)
-    value >= 10_000 -> String.format("%.1fK", value / 1_000.0)
-    else -> value.toString()
-}

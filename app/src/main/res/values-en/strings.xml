@@ -399,6 +399,11 @@
     <string name="stats_concentrated">Reading concentrated in a few feeds</string>
     <string name="stats_moderate">Moderately spread</string>
     <string name="stats_scattered">Widely spread</string>
+    <string name="stats_concentration">Source concentration %1$d%% — %2$s</string>
+    <string name="list_separator">, </string>
+    <string name="duration_hours_minutes">%1$dh %2$dm</string>
+    <string name="duration_hours">%1$dh</string>
+    <string name="duration_minutes">%1$dm</string>
     <string name="me_title">Me</string>
     <string name="me_feeds">Feeds</string>
     <string name="me_unread">Unread</string>
@@ -466,6 +471,7 @@
     <string name="route_catalog">Route catalog</string>
     <string name="catalog_desc">The full built-in RSSHub route set, searchable and filterable when adding feeds. Update online to pick up new official routes.</string>
     <string name="catalog_count_label">Routes</string>
+    <string name="catalog_routes_count">%1$d routes</string>
     <string name="loading_ellipsis">Loading…</string>
     <string name="data_time">Data as of</string>
     <string name="updated_suffix">(updated)</string>
@@ -474,6 +480,8 @@
     <string name="update_catalog">Update route catalog</string>
     <string name="ai_desc">Article AI summary and translation are powered by DeepSeek with your own API key — you control the cost and quota.</string>
     <string name="status_label">Status</string>
+    <string name="status_configured">Configured</string>
+    <string name="status_not_configured">Not configured</string>
     <string name="key_reveal_hint">Press to show the key, release to hide</string>
     <string name="save_key">Save key</string>
     <string name="ai_features_desc">35 AI features with individual switches: content, discovery and assist. Usage and the background task queue live here.</string>

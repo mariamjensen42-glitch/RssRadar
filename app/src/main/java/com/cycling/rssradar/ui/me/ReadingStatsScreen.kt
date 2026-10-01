@@ -200,7 +200,8 @@ fun ReadingStatsScreen(
                 StatsEmpty(stringResource(R.string.stats_insufficient))
             } else {
                 Text(
-                    text = state.activeHours.map { stringResource(R.string.stats_hour, it) }.joinToString("、"),
+                    text = state.activeHours.map { stringResource(R.string.stats_hour, it) }
+                        .joinToString(stringResource(R.string.list_separator)),
                     color = colors.textPrimary,
                     style = MaterialTheme.typography.bodyLarge,
                 )
@@ -245,14 +246,17 @@ fun ReadingStatsScreen(
                     }
                 }
                 val pct = (state.concentration * 100).toInt()
+                // 拼接翻译是 ADR-0017 明令禁止的：整句进资源，占比与档位文案都当参数传。
                 Text(
-                    text = "源集中度 $pct%——${
+                    text = stringResource(
+                        R.string.stats_concentration,
+                        pct,
                         when {
                             pct >= 60 -> stringResource(R.string.stats_concentrated)
                             pct >= 30 -> stringResource(R.string.stats_moderate)
                             else -> stringResource(R.string.stats_scattered)
-                        }
-                    }",
+                        },
+                    ),
                     color = colors.textTertiary,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(top = 8.dp),
@@ -302,6 +306,10 @@ private fun StatsEmpty(text: String) {
     Text(text = text, color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium)
 }
 
-/** 分钟数转人话：60 分钟以下显示「N 分钟」，以上折算小时（估值，别装精确）。 */
-private fun formatMinutes(minutes: Long): String =
-    if (minutes < 60) "$minutes" else "${minutes / 60}h${if (minutes % 60 > 0) " ${minutes % 60}m" else ""}"
+/** 分钟数转人话：不足一小时按分钟，整点按小时，其余按「X 小时 Y 分」（估值，别装精确）。 */
+@Composable
+private fun formatMinutes(minutes: Long): String = when {
+    minutes < 60 -> stringResource(R.string.duration_minutes, minutes)
+    minutes % 60 == 0L -> stringResource(R.string.duration_hours, minutes / 60)
+    else -> stringResource(R.string.duration_hours_minutes, minutes / 60, minutes % 60)
+}

@@ -399,6 +399,11 @@
     <string name="stats_concentrated">阅读集中在少数源</string>
     <string name="stats_moderate">分布适中</string>
     <string name="stats_scattered">阅读相当分散</string>
+    <string name="stats_concentration">源集中度 %1$d%%——%2$s</string>
+    <string name="list_separator">、</string>
+    <string name="duration_hours_minutes">%1$d 小时 %2$d 分</string>
+    <string name="duration_hours">%1$d 小时</string>
+    <string name="duration_minutes">%1$d 分钟</string>
     <string name="me_title">我的</string>
     <string name="me_feeds">订阅源</string>
     <string name="me_unread">未读文章</string>
@@ -466,6 +471,7 @@
     <string name="route_catalog">路由目录</string>
     <string name="catalog_desc">内置 RSSHub 全量路由，加订阅时可搜索与分类筛选。官方新增路由后联网更新目录即可同步。</string>
     <string name="catalog_count_label">收录路由</string>
+    <string name="catalog_routes_count">%1$d 条</string>
     <string name="loading_ellipsis">装载中…</string>
     <string name="data_time">数据时间</string>
     <string name="updated_suffix">（已更新）</string>
@@ -474,6 +480,8 @@
     <string name="update_catalog">更新路由目录</string>
     <string name="ai_desc">详情页的 AI 摘要与翻译由 DeepSeek 提供，使用你自己的 API Key，费用与额度由你掌控。</string>
     <string name="status_label">状态</string>
+    <string name="status_configured">已配置</string>
+    <string name="status_not_configured">未配置</string>
     <string name="key_reveal_hint">按住显示 Key，松手隐藏</string>
     <string name="save_key">保存 Key</string>
     <string name="ai_features_desc">35 项 AI 功能各自独立开关：内容处理、推荐发现、辅助推送。用量与后台任务队列在这里看。</string>

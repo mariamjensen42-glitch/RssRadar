@@ -372,7 +372,9 @@ class ArticleDetailViewModel @Inject constructor(
     private suspend fun applyExtractedContent(articleId: Long, html: String) {
         val plainText = stripHtmlTags(html)
         repository.applyExtractedContent(articleId, html, plainText)
-        _article.value = repository.getArticle(articleId)
+        // 只在用户仍停在这篇时才回写界面状态：否则一次后台完成的全文提取会把
+        // 已经切走的正文顶回屏幕上。
+        if (currentArticleId == articleId) _article.value = repository.getArticle(articleId)
     }
 
     /** 去标签取纯文本。够用即可——这里只为了生成 contentText，不是要做 HTML 解析器。 */
@@ -401,18 +403,30 @@ class ArticleDetailViewModel @Inject constructor(
                 when (val outcome = featureRunner.run(feature, articleId, question)) {
                     is AiFeatureRunner.Outcome.Success -> {
                         val parsed = runCatching { AiFeatureSpecs.parse(feature, outcome.payload) }.getOrNull()
-                        if (parsed != null) {
-                            _aiArtifacts.value = _aiArtifacts.value + (key to parsed)
-                        }
-                        // 全文提取的产物必须落回正文——只存进产物表等于用户什么都没看到。
+                        // 全文提取的产物落回**它自己那篇**文章的库，与用户此刻在看哪篇无关——
+                        // 这次调用已经付过费，DB 写入必须完成。
                         if (feature == AiFeature.FULLTEXT && parsed is AiFulltextPayload && parsed.ok) {
                             applyExtractedContent(articleId, parsed.html)
                         }
+                        // 界面状态只在用户还停在这篇时才写。这个协程不挂在 loadJob 下，
+                        // 切篇不会取消它：慢半拍回来的旧结果会直接盖在新文章上
+                        // （「AI 摘要是上一篇的」），是最典型的一类过期覆盖。
+                        if (currentArticleId == articleId && parsed != null) {
+                            _aiArtifacts.value = _aiArtifacts.value + (key to parsed)
+                        }
                     }
 
-                    is AiFeatureRunner.Outcome.Failed -> _aiMessage.value = outcome.message
-                    AiFeatureRunner.Outcome.OutOfBudget -> _aiMessage.value = "今日 AI 额度已用尽，明天再试"
-                    is AiFeatureRunner.Outcome.Skipped -> _aiMessage.value = outcome.reason
+                    is AiFeatureRunner.Outcome.Failed -> {
+                        if (currentArticleId == articleId) _aiMessage.value = outcome.message
+                    }
+
+                    AiFeatureRunner.Outcome.OutOfBudget -> {
+                        if (currentArticleId == articleId) _aiMessage.value = "今日 AI 额度已用尽，明天再试"
+                    }
+
+                    is AiFeatureRunner.Outcome.Skipped -> {
+                        if (currentArticleId == articleId) _aiMessage.value = outcome.reason
+                    }
                 }
             } catch (e: CancellationException) {
                 // 协程取消（切文章、退出页面）必须原样抛出，吞掉会破坏结构化并发。
@@ -420,9 +434,13 @@ class ArticleDetailViewModel @Inject constructor(
             } catch (e: Exception) {
                 // 兜底：任何漏网的异常都要把 loading 收掉并给出原因。
                 // 少这层 try，一次异常就会让按钮永久转圈，而用户无从得知发生了什么。
-                _aiMessage.value = "「${feature.label}」出错了：${e.message ?: e.javaClass.simpleName}"
+                if (currentArticleId == articleId) {
+                    _aiMessage.value = "「${feature.label}」出错了：${e.message ?: e.javaClass.simpleName}"
+                }
             } finally {
-                _aiRunning.value = _aiRunning.value - key
+                // 切篇时 load() 已把 _aiRunning 清空，此处再减会误伤新文章上同名功能的
+                // 运行标记（按钮提前恢复可点），所以要判归属。
+                if (currentArticleId == articleId) _aiRunning.value = _aiRunning.value - key
             }
         }
     }
@@ -539,6 +557,8 @@ class ArticleDetailViewModel @Inject constructor(
                 }
                 is AiRepository.SummaryOutcome.Failure ->
                     _aiSummaryState.value = AiSummaryState.Failed(outcome.userMessage)
+                AiRepository.SummaryOutcome.OutOfBudget ->
+                    _aiSummaryState.value = AiSummaryState.Failed("今日 AI 额度已用尽，明天再试")
             }
         }
     }
@@ -593,6 +613,8 @@ class ArticleDetailViewModel @Inject constructor(
                     _translationState.value = TranslationState.Failed("原文已是中文，无需翻译")
                 is AiRepository.TranslationOutcome.Failure ->
                     _translationState.value = TranslationState.Failed(outcome.userMessage)
+                AiRepository.TranslationOutcome.OutOfBudget ->
+                    _translationState.value = TranslationState.Failed("今日 AI 额度已用尽，明天再试")
             }
         }
     }

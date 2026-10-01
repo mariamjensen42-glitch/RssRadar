@@ -276,8 +276,12 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideAiStore(@ApplicationContext context: Context): AiStore =
-        AiStore(SettingsPrefs.of(context))
+    fun provideAiStore(@ApplicationContext context: Context): AiStore {
+        // API Key 存独立的 secrets 文件（已排除出云备份）；装配点顺带把老位置的值搬过来。
+        val secrets = SettingsPrefs.ofSecret(context)
+        AiStore.migrateFromLegacy(SettingsPrefs.of(context), secrets)
+        return AiStore(secrets)
+    }
 
     /** Key 经 provider 惰性读取，保证 AiStore 里改完 Key 后下一次调用即刻生效。 */
     @Provides
@@ -287,8 +291,12 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideAiRepository(db: AppDatabase, client: DeepSeekClient): AiRepository =
-        AiRepository(db.articleDao(), client)
+    fun provideAiRepository(
+        db: AppDatabase,
+        client: DeepSeekClient,
+        limiter: AiRateLimiter,
+        featureStore: AiFeatureStore,
+    ): AiRepository = AiRepository(db.articleDao(), client, limiter, featureStore)
 
     // ── AI 智能功能模块（35 项） ────────────────────────────────────────────
     // 装配顺序即依赖顺序：Store → 限流 → 产物 → 队列 → 执行器 → 编排器。

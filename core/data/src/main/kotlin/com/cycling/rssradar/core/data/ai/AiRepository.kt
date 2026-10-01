@@ -1,6 +1,8 @@
 package com.cycling.rssradar.core.data.ai
 
 import com.cycling.rssradar.core.data.db.ArticleDao
+import com.cycling.rssradar.core.data.store.AiFeatureStore
+import kotlinx.coroutines.CancellationException
 
 /** 译文缓存上限（篇）。 */
 private const val TRANSLATION_CACHE_MAX = 20
@@ -40,6 +42,8 @@ data class TranslationProgress(
 class AiRepository(
     private val articleDao: ArticleDao,
     private val client: DeepSeekClient,
+    private val limiter: AiRateLimiter,
+    private val featureStore: AiFeatureStore,
 ) {
 
     /**
@@ -59,6 +63,9 @@ class AiRepository(
     sealed interface SummaryOutcome {
         data class Success(val summary: String) : SummaryOutcome
         data class Failure(val userMessage: String) : SummaryOutcome
+
+        /** 今日额度用尽。**不是失败**：不重试，等明天。 */
+        data object OutOfBudget : SummaryOutcome
     }
 
     sealed interface TranslationOutcome {
@@ -66,26 +73,62 @@ class AiRepository(
         data object Success : TranslationOutcome
         data object AlreadyChinese : TranslationOutcome
         data class Failure(val userMessage: String) : TranslationOutcome
+
+        /** 今日额度用尽（翻译中途耗尽也算）：已完成段落已上屏，但不入缓存。 */
+        data object OutOfBudget : TranslationOutcome
     }
+
+    /**
+     * 走闸调用模型：**预算 / 最小间隔 / 记账**三件事收在这一处，与 [AiFeatureRunner] 同源。
+     *
+     * 这个类曾经直接 `client.chat(...)`，于是阅读页的摘要与翻译两条路径完全绕过了
+     * [AiRateLimiter]——额度用尽后还能无限调、用量页也看不见这些调用。所有真实付费调用
+     * 必须经此方法，不得再直连 [client]。
+     *
+     * @return 模型原文；null 表示今日额度用尽（未发起请求）。
+     */
+    private suspend fun chatGuarded(system: String, input: String, temperature: Double?): String? =
+        try {
+            when (val call = limiter.withPermit { client.chat(system, input, temperature) }) {
+                is AiCallResult.Ok -> {
+                    limiter.record(input.length, call.value.length, success = true)
+                    call.value
+                }
+
+                AiCallResult.OutOfBudget -> null
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // 失败的调用同样占额度——否则反复失败能把当天额度无限次烧穿。
+            limiter.record(input.length, 0, success = false)
+            throw e
+        }
 
     /**
      * 生成 AI 摘要并入库。来源优先正文纯文本、退回摘要；两者皆无则拒绝生成——不编造。
      */
     suspend fun generateSummary(articleId: Long): SummaryOutcome {
+        if (!featureStore.isEnabled(AiFeature.SUMMARY)) {
+            return SummaryOutcome.Failure("「AI 摘要」未开启，可在设置里打开")
+        }
         val article = articleDao.getWithFeed(articleId)?.article
             ?: return SummaryOutcome.Failure("文章不存在")
         val source = article.contentText?.takeIf { it.isNotBlank() }
             ?: article.summary?.takeIf { it.isNotBlank() }
             ?: return SummaryOutcome.Failure("本文没有可用于摘要的内容")
+        val (input, truncated) = AiText.truncateForPrompt(source)
         return try {
-            val (input, truncated) = AiText.truncateForPrompt(source)
             // 低 temperature 压发散：摘要要忠实原文，不要模型自由发挥
-            val text = client.chat(SUMMARY_SYSTEM, input, temperature = 0.4)
+            val text = chatGuarded(SUMMARY_SYSTEM, input, 0.4)
+                ?: return SummaryOutcome.OutOfBudget
             val summary = if (truncated) text + AiText.truncationNote(input.length) else text
             // 入库前截断（CursorWindow 防线）：列表流会连 aiSummary 一起查出，
             // 异常长的模型输出会把单行撑爆 2MB 窗口（数万行查询里一粒老鼠屎坏一锅粥）
             articleDao.updateAiSummary(articleId, summary.take(AI_SUMMARY_MAX_LENGTH))
             SummaryOutcome.Success(summary.take(AI_SUMMARY_MAX_LENGTH))
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: AiException) {
             SummaryOutcome.Failure(e.userMessage)
         } catch (e: Exception) {
@@ -105,6 +148,9 @@ class AiRepository(
         articleId: Long,
         onProgress: (TranslationProgress) -> Unit,
     ): TranslationOutcome {
+        if (!featureStore.isEnabled(AiFeature.TRANSLATE)) {
+            return TranslationOutcome.Failure("「文章翻译」未开启，可在设置里打开")
+        }
         val article = articleDao.getWithFeed(articleId)?.article
             ?: return TranslationOutcome.Failure("文章不存在")
         val html = article.content?.takeIf { it.isNotBlank() }
@@ -131,10 +177,10 @@ class AiRepository(
         return try {
             for (i in chunks.indices) {
                 val (input, _) = AiText.truncateForPrompt(chunks[i].html)
-                val out = client.chat(TRANSLATE_SYSTEM, input, temperature = 0.3)
-                    .takeIf { it.isNotBlank() }
-                    ?: chunks[i].html // 单段失败回退原文，不中断整篇
-                translated[i] = out
+                val raw = chatGuarded(TRANSLATE_SYSTEM, input, 0.3)
+                    ?: return TranslationOutcome.OutOfBudget
+                // 单段失败回退原文，不中断整篇
+                translated[i] = raw.takeIf { it.isNotBlank() } ?: chunks[i].html
                 onProgress(TranslationProgress(chunks, translated.toList()))
             }
             translationCache[articleId] = TranslationCacheEntry(
@@ -142,6 +188,8 @@ class AiRepository(
                 translated = translated.map { it.orEmpty() },
             )
             TranslationOutcome.Success
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: AiException) {
             TranslationOutcome.Failure(e.userMessage)
         } catch (e: Exception) {
