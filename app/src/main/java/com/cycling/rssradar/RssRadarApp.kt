@@ -2,9 +2,9 @@ package com.cycling.rssradar
 
 import android.app.Application
 import com.cycling.rssradar.core.data.maintenance.CrashLog
-import com.cycling.rssradar.sync.FeedHealthScheduler
-import com.cycling.rssradar.sync.SearchIndexScheduler
-import com.cycling.rssradar.sync.SyncScheduler
+import com.cycling.rssradar.core.data.sync.FeedHealthScheduler
+import com.cycling.rssradar.core.data.sync.SearchIndexScheduler
+import com.cycling.rssradar.core.data.sync.SyncScheduler
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import javax.inject.Inject

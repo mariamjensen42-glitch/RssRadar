@@ -62,7 +62,7 @@ import com.cycling.rssradar.ui.me.CrashLogViewModel
 import com.cycling.rssradar.ui.me.FetchDiagnosticsScreen
 import com.cycling.rssradar.ui.me.FetchDiagnosticsViewModel
 import com.cycling.rssradar.ui.me.InterestProfileScreen
-import com.cycling.rssradar.ui.me.RssHubSettingsScreen
+import com.cycling.rssradar.ui.settings.RssHubSettingsScreen
 import com.cycling.rssradar.ui.settings.RssHubSettingsViewModel
 import com.cycling.rssradar.ui.me.ReadingStatsScreen
 import com.cycling.rssradar.ui.me.ReadingStatsViewModel
@@ -71,7 +71,7 @@ import com.cycling.rssradar.ui.search.SearchViewModel
 import com.cycling.rssradar.ui.subscriptions.SubscriptionsScreen
 import com.cycling.rssradar.ui.subscriptions.SubscriptionsViewModel
 import com.cycling.rssradar.core.ui.components.FloatingBottomBar
-import com.cycling.rssradar.ui.components.openUrl
+import com.cycling.rssradar.core.data.platform.openUrl
 import com.cycling.rssradar.core.navigation.AiArtifactsRoute
 import com.cycling.rssradar.core.navigation.AnnotationsRoute
 import com.cycling.rssradar.core.navigation.LibraryRoute
@@ -100,8 +100,8 @@ import com.cycling.rssradar.core.navigation.BackupRoute
 import com.cycling.rssradar.core.navigation.FilterRulesRoute
 import com.cycling.rssradar.core.navigation.SettingsNotificationRoute
 import com.cycling.rssradar.ui.me.BackupScreen
-import com.cycling.rssradar.ui.me.FilterRulesScreen
-import com.cycling.rssradar.ui.me.NotificationSettingsScreen
+import com.cycling.rssradar.ui.settings.FilterRulesScreen
+import com.cycling.rssradar.ui.settings.NotificationSettingsScreen
 import com.cycling.rssradar.ui.theme.CompositionLocalRoot
 import dagger.hilt.android.AndroidEntryPoint
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion

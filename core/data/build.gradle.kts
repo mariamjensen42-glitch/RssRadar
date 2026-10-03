@@ -41,6 +41,9 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.androidx.core.ktx)
+    // sync/ 与 ai/AiDailyWorker 的 WorkManager 任务属数据层（spec Q4b）：
+    // 后台同步/索引/健康检查/每日 AI 批处理都挂在这里，不依赖 hilt-work（worker 内用 EntryPointAccessors 取依赖）。
+    implementation(libs.androidx.work.runtime.ktx)
     api(libs.androidx.room.runtime)
     api(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)

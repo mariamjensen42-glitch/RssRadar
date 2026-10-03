@@ -5,8 +5,14 @@
     <string name="enter">Open</string>
     <string name="delete">Delete</string>
     <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="action_confirm">Confirm</string>
     <string name="library_range_all">All time</string>
     <string name="library_range_week">Past week</string>
     <string name="library_range_month">Past month</string>
     <string name="library_range_year">Past year</string>
+    <string name="set_view_list">List</string>
+    <string name="set_view_card">Card</string>
+    <string name="set_view_magazine">Magazine</string>
+    <string name="set_view_grid">Grid</string>
 </resources>

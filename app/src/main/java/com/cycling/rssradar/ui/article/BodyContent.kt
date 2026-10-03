@@ -17,7 +17,7 @@ import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.parser.ExtractionIssue
 import com.cycling.rssradar.core.data.parser.FetchFailure
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.ui.components.openUrl
+import com.cycling.rssradar.core.data.platform.openUrl
 import com.cycling.rssradar.ui.theme.LocalReadingPrefs
 
 /**

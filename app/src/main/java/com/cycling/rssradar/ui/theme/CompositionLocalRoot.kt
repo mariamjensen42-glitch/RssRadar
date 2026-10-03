@@ -20,7 +20,7 @@ import androidx.core.view.WindowCompat
 import com.cycling.rssradar.core.model.ListDisplayState
 import com.cycling.rssradar.core.model.ReadingPrefs
 import com.cycling.rssradar.core.model.ThemeMode
-import com.cycling.rssradar.di.AppEntryPoint
+import com.cycling.rssradar.core.data.di.AppEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 
 /**

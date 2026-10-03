@@ -11,7 +11,7 @@ import com.cycling.rssradar.core.data.store.prefs.SyncStore
 import com.cycling.rssradar.core.domain.filter.RuleTarget
 import com.cycling.rssradar.core.domain.notify.DndWindow
 import com.cycling.rssradar.core.domain.notify.NotifyDecision
-import com.cycling.rssradar.sync.AutoSync
+import com.cycling.rssradar.core.data.sync.AutoSync
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

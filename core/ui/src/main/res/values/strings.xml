@@ -5,8 +5,14 @@
     <string name="enter">进入</string>
     <string name="delete">删除</string>
     <string name="cancel">取消</string>
+    <string name="save">保存</string>
+    <string name="action_confirm">确认</string>
     <string name="library_range_all">全部时间</string>
     <string name="library_range_week">近一周</string>
     <string name="library_range_month">近一月</string>
     <string name="library_range_year">近一年</string>
+    <string name="set_view_list">列表</string>
+    <string name="set_view_card">卡片</string>
+    <string name="set_view_magazine">杂志</string>
+    <string name="set_view_grid">网格</string>
 </resources>
