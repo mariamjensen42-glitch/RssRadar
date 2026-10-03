@@ -144,6 +144,12 @@ fun ReaderImagePage(
                 Spacer(Modifier.weight(1f))
                 // 保存 / 分享（UI 审计 D3）：查看器只有关闭和页码时用户无法把图带走
                 val context = LocalContext.current
+                // Toast 与分享文案在组合作用域预取：onSave/onShare 是普通局部函数、
+                // 不在组合作用域，用 context.getString 会被 lint 判为 configuration-unaware。
+                val savedToPicturesMessage = stringResource(R.string.saved_to_pictures)
+                val saveFailedMessage = stringResource(R.string.save_failed)
+                val shareFailedMessage = stringResource(R.string.share_failed)
+                val shareImageTitle = stringResource(R.string.share_image)
                 val scope = rememberCoroutineScope()
                 var busy by remember { mutableStateOf(false) }
                 // 已保存的 MediaStore uri 供分享复用，同一张图不重复落盘
@@ -186,7 +192,7 @@ fun ReaderImagePage(
                         savedUrl = url
                         Toast.makeText(
                             context,
-                            if (uri != null) context.getString(R.string.saved_to_pictures) else context.getString(R.string.save_failed),
+                            if (uri != null) savedToPicturesMessage else saveFailedMessage,
                             Toast.LENGTH_SHORT,
                         ).show()
                     }
@@ -202,7 +208,7 @@ fun ReaderImagePage(
                         }
                         busy = false
                         if (uri == null) {
-                            Toast.makeText(context, context.getString(R.string.share_failed), Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, shareFailedMessage, Toast.LENGTH_SHORT).show()
                             return@launch
                         }
                         val send = Intent(Intent.ACTION_SEND).apply {
@@ -210,7 +216,7 @@ fun ReaderImagePage(
                             putExtra(Intent.EXTRA_STREAM, uri)
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
-                        context.startActivity(Intent.createChooser(send, context.getString(R.string.share_image)))
+                        context.startActivity(Intent.createChooser(send, shareImageTitle))
                     }
                 }
 

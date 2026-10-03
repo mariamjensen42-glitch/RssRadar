@@ -79,12 +79,16 @@ fun FeedListScreen(
     }
 
     // 「减少此类」撤销（ADR-0013）：Snackbar 期内可撤销，超时自动丢弃（降权保留）
+    // 文案在组合作用域预取：LaunchedEffect 不是组合作用域，在里面用 context.getString
+    // 会被 lint 判为 configuration-unaware（切语言/配置变化时可能拿到旧文案）。
+    val undoLabel = stringResource(R.string.undo)
+    val reduceSuchMessage = stringResource(R.string.feed_reduce_such)
     val pendingUndoReduce = uiState.pendingUndoReduceFeedId
     LaunchedEffect(pendingUndoReduce) {
         pendingUndoReduce?.let {
             val result = snackbarHostState.showSnackbar(
-                message = context.getString(R.string.feed_reduce_such),
-                actionLabel = context.getString(R.string.undo),
+                message = reduceSuchMessage,
+                actionLabel = undoLabel,
                 duration = SnackbarDuration.Short,
             )
             when (result) {
@@ -96,11 +100,12 @@ fun FeedListScreen(
 
     // 删除撤销（issue #46）：Snackbar 期内可撤销，超时自动丢弃
     val pendingUndo = uiState.pendingUndoDelete
+    val deletedMessage = stringResource(R.string.feed_deleted_article, pendingUndo?.title.orEmpty())
     LaunchedEffect(pendingUndo) {
-        pendingUndo?.let { deleted ->
+        pendingUndo?.let {
             val result = snackbarHostState.showSnackbar(
-                message = context.getString(R.string.feed_deleted_article, deleted.title),
-                actionLabel = context.getString(R.string.undo),
+                message = deletedMessage,
+                actionLabel = undoLabel,
                 duration = SnackbarDuration.Short,
             )
             when (result) {

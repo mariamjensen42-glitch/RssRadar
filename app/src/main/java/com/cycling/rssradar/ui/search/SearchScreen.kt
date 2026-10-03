@@ -64,15 +64,18 @@ fun SearchScreen(
     val feeds by viewModel.feeds.collectAsState()
     val focusRequester = remember { FocusRequester() }
     val snackbarHostState = remember { SnackbarHostState() }
-    // LaunchedEffect 不是组合作用域，文案只能经 context.getString 取（ADR-0017）
     val context = LocalContext.current
 
     // 删除撤销（issue #46），与信息流一致
-    LaunchedEffect(state.pendingUndoDelete) {
-        state.pendingUndoDelete?.let { deleted ->
+    // 文案在组合作用域预取，避免 lint 的 LocalContextGetResourceValueCall（同 FeedListScreen）
+    val pendingUndo = state.pendingUndoDelete
+    val deletedMessage = stringResource(R.string.search_deleted, pendingUndo?.title.orEmpty())
+    val undoLabel = stringResource(R.string.search_undo)
+    LaunchedEffect(pendingUndo) {
+        pendingUndo?.let {
             val result = snackbarHostState.showSnackbar(
-                message = context.getString(R.string.search_deleted, deleted.title),
-                actionLabel = context.getString(R.string.search_undo),
+                message = deletedMessage,
+                actionLabel = undoLabel,
                 duration = SnackbarDuration.Short,
             )
             when (result) {

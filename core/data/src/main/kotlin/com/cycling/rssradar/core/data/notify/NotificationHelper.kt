@@ -1,6 +1,7 @@
 package com.cycling.rssradar.core.data.notify
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -61,7 +62,13 @@ object NotificationHelper {
             ?.createNotificationChannel(channel)
     }
 
-    /** 发一条汇总通知；无权限时静默跳过（返回 false）。 */
+    /**
+     * 发一条汇总通知；无权限时静默跳过（返回 false）。
+     *
+     * 权限已由本方法开头的 [hasPermission] 检查并提前返回，但 lint 的 MissingPermission
+     * 只认 checkSelfPermission 调用点，识别不出这条路径，故在此显式抑制。
+     */
+    @SuppressLint("MissingPermission")
     fun postNewArticles(context: Context, summary: NewArticleSummary.Summary): Boolean {
         if (!hasPermission(context)) return false
         createChannel(context)
