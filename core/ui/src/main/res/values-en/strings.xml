@@ -3,4 +3,6 @@
     <string name="back">Back</string>
     <string name="select">Select</string>
     <string name="enter">Open</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
 </resources>

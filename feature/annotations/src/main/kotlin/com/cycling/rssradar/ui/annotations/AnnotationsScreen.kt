@@ -36,12 +36,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import com.cycling.rssradar.R
+import com.cycling.rssradar.core.ui.R as UiR
 import com.cycling.rssradar.core.data.db.AnnotationWithArticle
 import com.cycling.rssradar.core.domain.annotation.AnnotationPalette
 import com.cycling.rssradar.core.ui.components.ConfirmDialog
 import com.cycling.rssradar.core.ui.components.EmptyState
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.ui.annotations.R
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Highlighter
 import com.composables.icons.lucide.Lucide
@@ -76,7 +77,7 @@ fun AnnotationsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.back), tint = colors.textPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = colors.textPrimary)
             }
             Text(
                 text = stringResource(R.string.annotations_title),
@@ -111,8 +112,8 @@ fun AnnotationsScreen(
         ConfirmDialog(
             title = stringResource(R.string.ann_delete_title),
             text = stringResource(R.string.ann_delete_message),
-            confirmText = stringResource(R.string.delete),
-            dismissText = stringResource(R.string.cancel),
+            confirmText = stringResource(UiR.string.delete),
+            dismissText = stringResource(UiR.string.cancel),
             destructive = true,
             onConfirm = viewModel::confirmDelete,
             onDismiss = viewModel::cancelDelete,
@@ -186,7 +187,7 @@ private fun AnnotationCard(
             IconButton(onClick = onDelete) {
                 Icon(
                     Lucide.Trash2,
-                    contentDescription = stringResource(R.string.delete),
+                    contentDescription = stringResource(UiR.string.delete),
                     tint = colors.textSecondary,
                 )
             }

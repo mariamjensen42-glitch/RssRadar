@@ -816,16 +816,11 @@
     <string name="find_no_auto_scroll">This article is rendered as a web page; matches are highlighted but the view cannot scroll to them automatically</string>
     <string name="find_unsupported">Find in page is not available in the translation view</string>
     <string name="annotations_title">My highlights</string>
-    <string name="annotations_empty">No highlights yet</string>
-    <string name="annotations_empty_hint">Select text in an article to highlight it or add a note</string>
     <string name="ann_note_action">Add note</string>
     <string name="ann_copy_action">Copy</string>
     <string name="ann_dismiss_action">Dismiss toolbar</string>
     <string name="ann_note_title">Add note</string>
     <string name="ann_note_hint">Write something (optional)</string>
-    <string name="ann_delete_title">Delete this highlight?</string>
-    <string name="ann_delete_message">This cannot be undone.</string>
-    <string name="ann_unknown_article">Article archived</string>
     <string name="annotations_entry_summary">Select text while reading to highlight it or add a note</string>
     <string name="library_title">Starred &amp; read later</string>
     <string name="library_tab_starred">Starred</string>

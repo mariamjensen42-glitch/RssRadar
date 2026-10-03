@@ -816,16 +816,11 @@
     <string name="find_no_auto_scroll">这段正文由网页渲染，命中已高亮，但无法自动滚到位置上</string>
     <string name="find_unsupported">译文视图下暂不支持页内查找</string>
     <string name="annotations_title">我的标注</string>
-    <string name="annotations_empty">还没有标注</string>
-    <string name="annotations_empty_hint">在正文里选中文字，就能高亮或记笔记</string>
     <string name="ann_note_action">记笔记</string>
     <string name="ann_copy_action">复制</string>
     <string name="ann_dismiss_action">收起工具条</string>
     <string name="ann_note_title">添加笔记</string>
     <string name="ann_note_hint">写点什么（可留空）</string>
-    <string name="ann_delete_title">删除这条标注？</string>
-    <string name="ann_delete_message">删除后无法恢复。</string>
-    <string name="ann_unknown_article">文章已归档</string>
     <string name="annotations_entry_summary">选中正文里的文字即可高亮或记笔记</string>
     <string name="library_title">收藏与稍后读</string>
     <string name="library_tab_starred">收藏</string>

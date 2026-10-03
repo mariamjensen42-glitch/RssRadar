@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="annotations_title">我的标注</string>
+    <string name="annotations_empty">还没有标注</string>
+    <string name="annotations_empty_hint">在正文里选中文字，就能高亮或记笔记</string>
+    <string name="ann_delete_title">删除这条标注？</string>
+    <string name="ann_delete_message">删除后无法恢复。</string>
+    <string name="ann_unknown_article">文章已归档</string>
+</resources>
