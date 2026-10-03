@@ -59,9 +59,9 @@ import com.cycling.rssradar.core.ui.components.FeedLetterTile
 import com.cycling.rssradar.core.ui.components.RadarImage
 import com.cycling.rssradar.core.ui.components.pressScale
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.ui.components.ArticleContextMenu
-import com.cycling.rssradar.ui.components.ArticleMenuActions
-import com.cycling.rssradar.ui.components.articleMenuOffset
+import com.cycling.rssradar.core.ui.components.ArticleContextMenu
+import com.cycling.rssradar.core.ui.components.ArticleMenuActions
+import com.cycling.rssradar.core.ui.components.articleMenuOffset
 
 @OptIn(ExperimentalFoundationApi::class)
 

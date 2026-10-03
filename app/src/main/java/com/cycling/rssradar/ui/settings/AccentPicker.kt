@@ -30,7 +30,7 @@ import com.cycling.rssradar.core.ui.theme.argbToHsl
 import com.cycling.rssradar.core.ui.theme.onAccentFor
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.toArgb
-import com.cycling.rssradar.ui.components.SyncedSlider
+import com.cycling.rssradar.core.ui.components.SyncedSlider
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 

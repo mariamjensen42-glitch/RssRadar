@@ -45,7 +45,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.cycling.rssradar.R
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.ui.components.SyncedSlider
+import com.cycling.rssradar.core.ui.components.SyncedSlider
 import com.cycling.rssradar.core.ui.components.SegmentedChips
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Headphones

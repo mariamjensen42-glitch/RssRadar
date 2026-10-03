@@ -1,4 +1,4 @@
-package com.cycling.rssradar.ui.components
+package com.cycling.rssradar.core.ui.components
 
 import android.content.ClipData
 import android.content.ClipboardManager

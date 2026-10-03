@@ -50,9 +50,9 @@ import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.core.ui.components.pressScale
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.ui.components.ArticleContextMenu
-import com.cycling.rssradar.ui.components.ArticleMenuActions
-import com.cycling.rssradar.ui.components.articleMenuOffset
+import com.cycling.rssradar.core.ui.components.ArticleContextMenu
+import com.cycling.rssradar.core.ui.components.ArticleMenuActions
+import com.cycling.rssradar.core.ui.components.articleMenuOffset
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 

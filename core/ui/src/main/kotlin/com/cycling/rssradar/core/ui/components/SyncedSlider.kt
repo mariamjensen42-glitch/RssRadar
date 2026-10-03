@@ -1,4 +1,4 @@
-package com.cycling.rssradar.ui.components
+package com.cycling.rssradar.core.ui.components
 
 import androidx.compose.material3.Slider
 import androidx.compose.material3.rememberSliderState
@@ -14,7 +14,7 @@ import androidx.compose.ui.Modifier
  * 这层同步收在这里一处，调用点的写法与旧重载保持一致。
  */
 @Composable
-internal fun SyncedSlider(
+fun SyncedSlider(
     value: Float,
     onValueChange: (Float) -> Unit,
     valueRange: ClosedFloatingPointRange<Float>,

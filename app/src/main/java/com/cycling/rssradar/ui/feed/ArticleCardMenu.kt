@@ -21,9 +21,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.ui.components.ArticleContextMenu
-import com.cycling.rssradar.ui.components.ArticleMenuActions
-import com.cycling.rssradar.ui.components.articleMenuOffset
+import com.cycling.rssradar.core.ui.components.ArticleContextMenu
+import com.cycling.rssradar.core.ui.components.ArticleMenuActions
+import com.cycling.rssradar.core.ui.components.articleMenuOffset
 
 /**
  * 杂志/网格卡的通用长按菜单容器：负责按压缩点定位与菜单弹出，

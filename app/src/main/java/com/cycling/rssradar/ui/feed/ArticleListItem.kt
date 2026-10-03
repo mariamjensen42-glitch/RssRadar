@@ -17,7 +17,7 @@ import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.store.model.ListDisplayState
 import com.cycling.rssradar.core.data.store.model.ListViewMode
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.ui.components.ArticleMenuActions
+import com.cycling.rssradar.core.ui.components.ArticleMenuActions
 
 /**
  * 单篇文章项按视图模式分发：列表/卡片走 [SwipeableArticleCard]（带滑动手势），

@@ -47,7 +47,7 @@ import com.cycling.rssradar.core.data.store.model.coerceLetterSpacing
 import com.cycling.rssradar.core.data.store.model.coerceLineHeight
 import com.cycling.rssradar.core.data.store.model.coercePadding
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.ui.components.SyncedSlider
+import com.cycling.rssradar.core.ui.components.SyncedSlider
 import kotlin.math.roundToInt
 
 /**
