@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data.store.model
+package com.cycling.rssradar.core.model
 
 /**
  * 归档保留档位（issue #57）。days = 保留天数，0 表示永久保留。

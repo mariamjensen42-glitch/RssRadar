@@ -22,7 +22,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
-import com.cycling.rssradar.core.data.store.model.TranslationDisplayState
+import com.cycling.rssradar.core.model.TranslationDisplayState
 import com.cycling.rssradar.core.domain.reading.FindIndex
 import com.cycling.rssradar.core.domain.reading.ReadingTextMap
 import com.cycling.rssradar.ui.theme.LocalReadingPrefs

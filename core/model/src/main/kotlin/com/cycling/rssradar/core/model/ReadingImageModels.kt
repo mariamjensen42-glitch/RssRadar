@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data.store.model
+package com.cycling.rssradar.core.model
 
 /**
  * 阅读页图片显示偏好（图片圆角 / 点击放大，ReadYou 差距表第 19 项）。

@@ -1,7 +1,7 @@
 package com.cycling.rssradar.sync
 
 import com.cycling.rssradar.core.data.store.prefs.ArchiveStore
-import com.cycling.rssradar.core.data.store.model.KeepArchived
+import com.cycling.rssradar.core.model.KeepArchived
 import com.cycling.rssradar.core.data.store.prefs.SyncStore
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext

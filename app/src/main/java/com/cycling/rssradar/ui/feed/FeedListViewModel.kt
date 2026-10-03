@@ -14,7 +14,7 @@ import com.cycling.rssradar.core.data.recommend.Recommendation
 import com.cycling.rssradar.core.data.ai.AiRepository
 import com.cycling.rssradar.core.data.store.prefs.GroupStore
 import com.cycling.rssradar.core.data.store.prefs.ListDisplayStore
-import com.cycling.rssradar.core.data.store.model.ListViewMode
+import com.cycling.rssradar.core.model.ListViewMode
 import com.cycling.rssradar.core.model.MarkAsReadCondition
 import com.cycling.rssradar.core.data.store.prefs.RecommendationStore
 import com.cycling.rssradar.core.ui.mvi.MviStateViewModel

@@ -4,11 +4,11 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import com.cycling.rssradar.core.data.store.model.LinkOpenMode
-import com.cycling.rssradar.core.data.store.model.LinkShareState
+import com.cycling.rssradar.core.model.LinkOpenMode
+import com.cycling.rssradar.core.model.LinkShareState
 import com.cycling.rssradar.core.data.store.prefs.LinkStore
 import com.cycling.rssradar.core.data.store.prefs.SettingsPrefs
-import com.cycling.rssradar.core.data.store.model.ShareContentFormat
+import com.cycling.rssradar.core.model.ShareContentFormat
 
 /**
  * 外链出口：阅读页 WebView 链接接管、查看原文、分享前的链接都走这里。

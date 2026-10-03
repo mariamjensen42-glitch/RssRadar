@@ -39,7 +39,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.SlidersHorizontal
 import com.cycling.rssradar.R
-import com.cycling.rssradar.core.data.store.model.ListViewMode
+import com.cycling.rssradar.core.model.ListViewMode
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.i18n.labelRes
 

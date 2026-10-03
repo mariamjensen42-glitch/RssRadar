@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
 import com.cycling.rssradar.R
-import com.cycling.rssradar.core.data.store.model.AiBudgetState
+import com.cycling.rssradar.core.model.AiBudgetState
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.i18n.formatCount
 

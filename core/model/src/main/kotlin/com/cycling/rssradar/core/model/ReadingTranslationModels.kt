@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data.store.model
+package com.cycling.rssradar.core.model
 
 /** 译文显示模式：纯译文（替换式）或双语对照。 */
 enum class TranslationViewMode { TRANSLATION_ONLY, BILINGUAL }

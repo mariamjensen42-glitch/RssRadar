@@ -1,11 +1,11 @@
 package com.cycling.rssradar.ui.settings
 
-import com.cycling.rssradar.core.data.store.model.AppLanguage
-import com.cycling.rssradar.core.data.store.model.KeepArchived
-import com.cycling.rssradar.core.data.store.model.LinkShareState
-import com.cycling.rssradar.core.data.store.model.ListDisplayState
-import com.cycling.rssradar.core.data.store.model.SyncState
-import com.cycling.rssradar.core.data.store.model.ThemeMode
+import com.cycling.rssradar.core.model.AppLanguage
+import com.cycling.rssradar.core.model.KeepArchived
+import com.cycling.rssradar.core.model.LinkShareState
+import com.cycling.rssradar.core.model.ListDisplayState
+import com.cycling.rssradar.core.model.SyncState
+import com.cycling.rssradar.core.model.ThemeMode
 import com.cycling.rssradar.core.model.rsshub.CatalogSource
 import com.cycling.rssradar.i18n.UiText
 

@@ -18,8 +18,8 @@ import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.ai.TranslationBlockPair
 import com.cycling.rssradar.core.data.ai.TranslationPairInput
 import com.cycling.rssradar.core.data.ai.TranslationSegments
-import com.cycling.rssradar.core.data.store.model.BilingualLayout
-import com.cycling.rssradar.core.data.store.model.TranslationViewMode
+import com.cycling.rssradar.core.model.BilingualLayout
+import com.cycling.rssradar.core.model.TranslationViewMode
 import com.cycling.rssradar.ui.theme.LocalReadingPrefs
 import com.cycling.rssradar.core.ui.theme.radarColors
 

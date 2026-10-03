@@ -44,8 +44,8 @@ import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
 import com.cycling.rssradar.R
-import com.cycling.rssradar.core.data.store.model.ReadingImageState
-import com.cycling.rssradar.core.data.store.model.ReadingStyleState
+import com.cycling.rssradar.core.model.ReadingImageState
+import com.cycling.rssradar.core.model.ReadingStyleState
 import com.cycling.rssradar.core.ui.components.ShimmerOverlay
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.crossfadeMotion

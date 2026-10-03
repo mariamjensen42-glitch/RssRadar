@@ -1,9 +1,9 @@
 package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
-import com.cycling.rssradar.core.data.store.model.LinkOpenMode
-import com.cycling.rssradar.core.data.store.model.LinkShareState
-import com.cycling.rssradar.core.data.store.model.ShareContentFormat
+import com.cycling.rssradar.core.model.LinkOpenMode
+import com.cycling.rssradar.core.model.LinkShareState
+import com.cycling.rssradar.core.model.ShareContentFormat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

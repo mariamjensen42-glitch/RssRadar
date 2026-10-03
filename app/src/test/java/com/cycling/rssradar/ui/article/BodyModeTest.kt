@@ -1,6 +1,6 @@
 package com.cycling.rssradar.ui.article
 
-import com.cycling.rssradar.core.data.store.model.ReadingRenderer
+import com.cycling.rssradar.core.model.ReadingRenderer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

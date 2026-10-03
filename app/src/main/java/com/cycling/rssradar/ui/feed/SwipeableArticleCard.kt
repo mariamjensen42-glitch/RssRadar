@@ -37,7 +37,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Star
 import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
-import com.cycling.rssradar.core.data.store.model.ListDisplayState
+import com.cycling.rssradar.core.model.ListDisplayState
 import com.cycling.rssradar.core.ui.theme.radarColors
 import kotlin.math.abs
 import kotlin.math.roundToInt

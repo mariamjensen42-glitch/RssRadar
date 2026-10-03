@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data.store.model
+package com.cycling.rssradar.core.model
 
 /**
  * 列表描述档位（issue #56）。NONE 隐藏摘要，SHORT 两行，LONG 四行。

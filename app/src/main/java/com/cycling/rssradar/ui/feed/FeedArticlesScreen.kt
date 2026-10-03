@@ -33,7 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
-import com.cycling.rssradar.core.data.store.model.ListViewMode
+import com.cycling.rssradar.core.model.ListViewMode
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide

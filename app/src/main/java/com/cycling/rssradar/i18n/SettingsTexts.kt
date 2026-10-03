@@ -2,12 +2,12 @@ package com.cycling.rssradar.i18n
 
 import androidx.annotation.StringRes
 import com.cycling.rssradar.R
-import com.cycling.rssradar.core.data.store.model.KeepArchived
-import com.cycling.rssradar.core.data.store.model.LinkOpenMode
-import com.cycling.rssradar.core.data.store.model.ListDescMode
-import com.cycling.rssradar.core.data.store.model.ListViewMode
-import com.cycling.rssradar.core.data.store.model.ShareContentFormat
-import com.cycling.rssradar.core.data.store.model.SyncInterval
+import com.cycling.rssradar.core.model.KeepArchived
+import com.cycling.rssradar.core.model.LinkOpenMode
+import com.cycling.rssradar.core.model.ListDescMode
+import com.cycling.rssradar.core.model.ListViewMode
+import com.cycling.rssradar.core.model.ShareContentFormat
+import com.cycling.rssradar.core.model.SyncInterval
 
 /**
  * 设置域枚举文案的资源映射（ADR-0017）：core 层的中文 label 是数据口径，

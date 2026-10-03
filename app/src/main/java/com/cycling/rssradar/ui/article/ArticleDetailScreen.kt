@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.db.entity.ArticleEntity
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
-import com.cycling.rssradar.core.data.store.model.ReadingRenderer
+import com.cycling.rssradar.core.model.ReadingRenderer
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.theme.LocalRadarColors
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion

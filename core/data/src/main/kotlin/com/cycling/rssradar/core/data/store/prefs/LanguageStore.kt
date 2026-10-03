@@ -2,7 +2,7 @@ package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import com.cycling.rssradar.core.data.store.model.AppLanguage
+import com.cycling.rssradar.core.model.AppLanguage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

@@ -1,9 +1,9 @@
 package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
-import com.cycling.rssradar.core.data.store.model.ListDescMode
-import com.cycling.rssradar.core.data.store.model.ListDisplayState
-import com.cycling.rssradar.core.data.store.model.ListViewMode
+import com.cycling.rssradar.core.model.ListDescMode
+import com.cycling.rssradar.core.model.ListDisplayState
+import com.cycling.rssradar.core.model.ListViewMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

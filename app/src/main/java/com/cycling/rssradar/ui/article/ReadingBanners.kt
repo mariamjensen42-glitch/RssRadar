@@ -28,9 +28,9 @@ import com.composables.icons.lucide.Type
 import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.parser.ExtractionIssue
 import com.cycling.rssradar.core.data.parser.FetchFailure
-import com.cycling.rssradar.core.data.store.model.BilingualLayout
-import com.cycling.rssradar.core.data.store.model.TranslationDisplayState
-import com.cycling.rssradar.core.data.store.model.TranslationViewMode
+import com.cycling.rssradar.core.model.BilingualLayout
+import com.cycling.rssradar.core.model.TranslationDisplayState
+import com.cycling.rssradar.core.model.TranslationViewMode
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.ui.theme.LocalReadingPrefs
 

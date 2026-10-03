@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data.store.model
+package com.cycling.rssradar.core.model
 
 import com.cycling.rssradar.core.data.ai.AiCategory
 import com.cycling.rssradar.core.data.ai.AiFeature

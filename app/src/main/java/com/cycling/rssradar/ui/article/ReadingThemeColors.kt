@@ -1,7 +1,7 @@
 package com.cycling.rssradar.ui.article
 
 import androidx.compose.ui.graphics.Color
-import com.cycling.rssradar.core.data.store.model.ReadingTheme
+import com.cycling.rssradar.core.model.ReadingTheme
 import com.cycling.rssradar.core.ui.theme.RadarColors
 
 /**

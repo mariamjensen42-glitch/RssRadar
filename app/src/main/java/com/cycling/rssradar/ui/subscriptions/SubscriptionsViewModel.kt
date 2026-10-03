@@ -15,7 +15,7 @@ import com.cycling.rssradar.core.data.service.SubscriptionFlow
 import com.cycling.rssradar.core.model.GROUP_DESIGN
 import com.cycling.rssradar.core.model.GROUP_DEV
 import com.cycling.rssradar.core.model.GROUP_TECH
-import com.cycling.rssradar.core.data.store.model.FeedSortMode
+import com.cycling.rssradar.core.model.FeedSortMode
 import com.cycling.rssradar.core.data.store.prefs.FeedSortStore
 import com.cycling.rssradar.core.data.store.prefs.GroupStore
 import com.cycling.rssradar.core.domain.rss.FeedFailureCategory

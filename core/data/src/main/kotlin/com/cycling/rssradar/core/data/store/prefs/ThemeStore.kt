@@ -1,7 +1,7 @@
 package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
-import com.cycling.rssradar.core.data.store.model.ThemeMode
+import com.cycling.rssradar.core.model.ThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

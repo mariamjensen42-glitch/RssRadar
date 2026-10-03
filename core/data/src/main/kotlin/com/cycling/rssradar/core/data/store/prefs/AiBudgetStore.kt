@@ -1,8 +1,8 @@
 package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
-import com.cycling.rssradar.core.data.store.model.AiBudgetState
-import com.cycling.rssradar.core.data.store.model.AiDayIndex
+import com.cycling.rssradar.core.model.AiBudgetState
+import com.cycling.rssradar.core.model.AiDayIndex
 import java.util.TimeZone
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

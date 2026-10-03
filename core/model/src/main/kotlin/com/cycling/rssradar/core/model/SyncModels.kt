@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data.store.model
+package com.cycling.rssradar.core.model
 
 /**
  * 自动同步间隔档位（issue #58）。minutes = 周期分钟数，0 表示仅手动。

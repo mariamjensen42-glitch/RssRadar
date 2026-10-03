@@ -30,8 +30,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide
 import com.cycling.rssradar.R
-import com.cycling.rssradar.core.data.store.model.KeepArchived
-import com.cycling.rssradar.core.data.store.model.SyncInterval
+import com.cycling.rssradar.core.model.KeepArchived
+import com.cycling.rssradar.core.model.SyncInterval
 import com.cycling.rssradar.core.ui.components.OptionPickerSheet
 import com.cycling.rssradar.core.ui.components.SectionHeader
 import com.cycling.rssradar.core.ui.components.SettingSwitchRow

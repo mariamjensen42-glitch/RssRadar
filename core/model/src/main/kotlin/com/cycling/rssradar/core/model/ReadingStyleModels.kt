@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data.store.model
+package com.cycling.rssradar.core.model
 
 /**
  * 正文字体族（issue #42）。纯 JVM 枚举：cssStack 供 WebView 模板直接拼接，

@@ -6,7 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import com.cycling.rssradar.core.data.store.model.ThemeMode
+import com.cycling.rssradar.core.model.ThemeMode
 import com.cycling.rssradar.core.data.store.prefs.ThemeStore
 
 /**

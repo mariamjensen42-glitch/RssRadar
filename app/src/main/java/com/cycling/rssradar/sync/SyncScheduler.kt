@@ -6,7 +6,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import com.cycling.rssradar.core.data.store.model.SyncInterval
+import com.cycling.rssradar.core.model.SyncInterval
 import com.cycling.rssradar.core.data.store.prefs.SyncStore
 import com.cycling.rssradar.di.AppEntryPoint
 import dagger.hilt.android.EntryPointAccessors

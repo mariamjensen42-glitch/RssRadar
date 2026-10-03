@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Sparkles
 import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
-import com.cycling.rssradar.core.data.store.model.TranslationDisplayState
+import com.cycling.rssradar.core.model.TranslationDisplayState
 import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.core.ui.theme.radarColors
 import kotlin.math.roundToInt

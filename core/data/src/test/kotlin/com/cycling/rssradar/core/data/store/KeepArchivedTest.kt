@@ -3,7 +3,7 @@ package com.cycling.rssradar.core.data.store
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
-import com.cycling.rssradar.core.data.store.model.KeepArchived
+import com.cycling.rssradar.core.model.KeepArchived
 
 /** KeepArchived.cutoffMillis 纯函数（issue #57）。 */
 class KeepArchivedTest {

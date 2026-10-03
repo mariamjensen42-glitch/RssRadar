@@ -1,7 +1,7 @@
 package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
-import com.cycling.rssradar.core.data.store.model.LibraryState
+import com.cycling.rssradar.core.model.LibraryState
 import com.cycling.rssradar.core.model.library.LibraryRange
 import com.cycling.rssradar.core.model.library.LibrarySort
 import kotlinx.coroutines.flow.MutableStateFlow

@@ -1,7 +1,7 @@
 package com.cycling.rssradar.ui.article
 
-import com.cycling.rssradar.core.data.store.model.ReadingImageState
-import com.cycling.rssradar.core.data.store.model.ReadingStyleState
+import com.cycling.rssradar.core.model.ReadingImageState
+import com.cycling.rssradar.core.model.ReadingStyleState
 
 /**
  * 阅读页 styled-HTML 构建（issue #42 单一测试缝）。

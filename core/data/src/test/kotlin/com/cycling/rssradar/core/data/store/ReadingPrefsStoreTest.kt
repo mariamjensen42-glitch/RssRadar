@@ -5,16 +5,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import com.cycling.rssradar.core.data.store.model.BilingualLayout
-import com.cycling.rssradar.core.data.store.model.ReadingFontFamily
-import com.cycling.rssradar.core.data.store.model.ReadingImageState
+import com.cycling.rssradar.core.model.BilingualLayout
+import com.cycling.rssradar.core.model.ReadingFontFamily
+import com.cycling.rssradar.core.model.ReadingImageState
 import com.cycling.rssradar.core.data.store.prefs.ReadingPrefsStore
-import com.cycling.rssradar.core.data.store.model.ReadingRenderer
-import com.cycling.rssradar.core.data.store.model.ReadingStyleState
-import com.cycling.rssradar.core.data.store.model.ReadingTextAlign
-import com.cycling.rssradar.core.data.store.model.ReadingTheme
-import com.cycling.rssradar.core.data.store.model.TranslationDisplayState
-import com.cycling.rssradar.core.data.store.model.TranslationViewMode
+import com.cycling.rssradar.core.model.ReadingRenderer
+import com.cycling.rssradar.core.model.ReadingStyleState
+import com.cycling.rssradar.core.model.ReadingTextAlign
+import com.cycling.rssradar.core.model.ReadingTheme
+import com.cycling.rssradar.core.model.TranslationDisplayState
+import com.cycling.rssradar.core.model.TranslationViewMode
 
 /**
  * 阅读偏好模块：默认值、落盘、越界夹取与重启后恢复。

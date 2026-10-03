@@ -52,8 +52,8 @@ import com.composables.icons.lucide.Play
 import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.db.entity.ArticleEntity
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
-import com.cycling.rssradar.core.data.store.model.ListDescMode
-import com.cycling.rssradar.core.data.store.model.ListDisplayState
+import com.cycling.rssradar.core.model.ListDescMode
+import com.cycling.rssradar.core.model.ListDisplayState
 import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.core.ui.components.FeedLetterTile
 import com.cycling.rssradar.core.ui.components.RadarImage

@@ -16,9 +16,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
-import com.cycling.rssradar.core.data.store.model.ReadingFontFamily
-import com.cycling.rssradar.core.data.store.model.ReadingStyleState
-import com.cycling.rssradar.core.data.store.model.ReadingTextAlign
+import com.cycling.rssradar.core.model.ReadingFontFamily
+import com.cycling.rssradar.core.model.ReadingStyleState
+import com.cycling.rssradar.core.model.ReadingTextAlign
 import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**

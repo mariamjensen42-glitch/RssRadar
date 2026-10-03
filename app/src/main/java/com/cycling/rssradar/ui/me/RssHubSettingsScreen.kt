@@ -35,7 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.ui.settings.RssHubSettingsViewModel
 import com.cycling.rssradar.R
-import com.cycling.rssradar.core.data.store.model.ThemeMode
+import com.cycling.rssradar.core.model.ThemeMode
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.i18n.labelRes

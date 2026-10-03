@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data.store.model
+package com.cycling.rssradar.core.model
 
 /** 外链打开方式（#26）。Custom Tabs 需要引入 androidx.browser 依赖，暂未提供。 */
 enum class LinkOpenMode(val label: String) {
