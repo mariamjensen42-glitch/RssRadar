@@ -3,8 +3,8 @@ package com.cycling.rssradar.ui.player
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.repository.FeedRepository
-import com.cycling.rssradar.playback.PlaybackController
-import com.cycling.rssradar.playback.PlaybackTrack
+import com.cycling.rssradar.core.playback.PlaybackController
+import com.cycling.rssradar.core.playback.PlaybackTrack
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow

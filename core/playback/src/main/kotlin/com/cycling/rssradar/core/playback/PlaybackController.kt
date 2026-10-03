@@ -1,4 +1,4 @@
-package com.cycling.rssradar.playback
+package com.cycling.rssradar.core.playback
 
 import android.content.ComponentName
 import android.content.Context

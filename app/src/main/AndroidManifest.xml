@@ -67,7 +67,7 @@
         <!-- 音频/播客播放（media3）：MediaSessionService 承载播放器，通知栏控制与
              后台播放由它提供；播放器本身活在服务里，退出播放页不中断。 -->
         <service
-            android:name=".playback.PlaybackService"
+            android:name="com.cycling.rssradar.core.playback.PlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>

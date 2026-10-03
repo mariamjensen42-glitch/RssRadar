@@ -1,4 +1,4 @@
-package com.cycling.rssradar.ui.navigation
+package com.cycling.rssradar.core.navigation
 
 import kotlinx.serialization.Serializable
 

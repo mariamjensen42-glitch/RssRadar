@@ -64,7 +64,7 @@ private const val SKIP_MILLIS = 15_000L
 /**
  * 音频/播客播放页：封面、进度、±15 秒、上一集/下一集、倍速。
  *
- * 播放器本体在 [com.cycling.rssradar.playback.PlaybackService] 里，本页只是它的一个视图——
+ * 播放器本体在 [com.cycling.rssradar.core.playback.PlaybackService] 里，本页只是它的一个视图——
  * 退出页面播放继续，通知栏与锁屏也能控制。所以这里**不发停止**，返回只是返回。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)

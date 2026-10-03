@@ -375,6 +375,8 @@ def main() -> int:
             ROOT / "core/domain/src/main",
             ROOT / "core/data/src/main",
             ROOT / "core/ui/src/main",
+            ROOT / "core/navigation/src/main",
+            ROOT / "core/playback/src/main",
             ROOT / "feature/addsubscription/src/main",
         ]
         files = [f for root in src_roots for f in sources(root)]
