@@ -25,7 +25,7 @@ import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.model.library.LibraryRange
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.i18n.labelRes
+import com.cycling.rssradar.core.ui.labels.labelRes
 import com.cycling.rssradar.core.ui.components.SegmentedChips
 
 /**

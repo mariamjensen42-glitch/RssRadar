@@ -7,8 +7,6 @@ import com.cycling.rssradar.core.domain.filter.RuleAction
 import com.cycling.rssradar.core.domain.filter.RuleField
 import com.cycling.rssradar.core.domain.filter.RuleMatchType
 import com.cycling.rssradar.core.domain.filter.RuleScopeType
-import com.cycling.rssradar.core.model.library.LibraryRange
-import com.cycling.rssradar.core.model.library.LibrarySort
 
 fun RuleMatchType.labelRes(): Int = when (this) {
     RuleMatchType.KEYWORD -> R.string.rule_match_keyword
@@ -44,17 +42,4 @@ fun ImportStrategy.labelRes(): Int = when (this) {
 fun ConflictPolicy.labelRes(): Int = when (this) {
     ConflictPolicy.KEEP_LOCAL -> R.string.backup_conflict_keep_local
     ConflictPolicy.KEEP_BACKUP -> R.string.backup_conflict_keep_backup
-}
-
-fun LibrarySort.labelRes(): Int = when (this) {
-    LibrarySort.STARRED_AT -> R.string.library_sort_added
-    LibrarySort.PUBLISHED_AT -> R.string.library_sort_published
-    LibrarySort.FEED -> R.string.library_sort_feed
-}
-
-fun LibraryRange.labelRes(): Int = when (this) {
-    LibraryRange.ALL -> R.string.library_range_all
-    LibraryRange.WEEK -> R.string.library_range_week
-    LibraryRange.MONTH -> R.string.library_range_month
-    LibraryRange.YEAR -> R.string.library_range_year
 }

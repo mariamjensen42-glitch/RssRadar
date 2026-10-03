@@ -29,6 +29,10 @@ android {
 }
 
 dependencies {
+    // core:model：labels/ 下的共享枚举文案扩展（如 LibraryRange.labelRes）要引用枚举类型本身。
+    // 仅此一处用途，方向合法——铁律禁的是 core:data / core:domain。
+    implementation(project(":core:model"))
+
     api(platform(libs.androidx.compose.bom))
     api(libs.androidx.compose.ui)
     api(libs.androidx.compose.ui.graphics)

@@ -796,14 +796,6 @@
     <string name="rule_move_down">Move down</string>
     <string name="rule_delete">Delete</string>
 
-    <string name="library_sort_added">By added time</string>
-    <string name="library_sort_published">By published date</string>
-    <string name="library_sort_feed">By source</string>
-    <string name="library_range_all">All time</string>
-    <string name="library_range_week">Past week</string>
-    <string name="library_range_month">Past month</string>
-    <string name="library_range_year">Past year</string>
-
     <string name="rule_entry_summary">Auto-handle articles by keyword or regex</string>
     <string name="backup_entry_summary">Export and import all your data</string>
     <string name="notify_entry_summary">Quiet hours and keywords</string>
@@ -823,17 +815,6 @@
     <string name="ann_note_hint">Write something (optional)</string>
     <string name="annotations_entry_summary">Select text while reading to highlight it or add a note</string>
     <string name="library_title">Starred &amp; read later</string>
-    <string name="library_tab_starred">Starred</string>
-    <string name="library_tab_bookmarked">Read later</string>
-    <string name="library_filter_all_feeds">All feeds</string>
-    <string name="library_select_all">Select all</string>
-    <string name="library_selected_count">%1$d selected</string>
-    <string name="library_unstar">Remove star</string>
-    <string name="library_unbookmark">Remove from read later</string>
-    <string name="library_clear_selection">Clear selection</string>
-    <string name="library_empty">Nothing here yet</string>
-    <string name="library_empty_hint">Star an article or send it to read later, and it will show up here</string>
-    <string name="library_loading_more">Loading more…</string>
     <string name="library_entry_summary">Sort by time or source, then tidy up in bulk</string>
     <string name="search_placeholder">Search articles, feeds or keywords</string>
     <string name="search_clear">Clear</string>

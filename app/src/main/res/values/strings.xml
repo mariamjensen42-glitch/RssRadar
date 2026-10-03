@@ -796,14 +796,6 @@
     <string name="rule_move_down">下移</string>
     <string name="rule_delete">删除</string>
 
-    <string name="library_sort_added">按收藏时间</string>
-    <string name="library_sort_published">按发布时间</string>
-    <string name="library_sort_feed">按来源</string>
-    <string name="library_range_all">全部时间</string>
-    <string name="library_range_week">近一周</string>
-    <string name="library_range_month">近一月</string>
-    <string name="library_range_year">近一年</string>
-
     <string name="rule_entry_summary">关键词或正则命中后自动处理文章</string>
     <string name="backup_entry_summary">导出与导入全部数据</string>
     <string name="notify_entry_summary">勿扰时段与关键词</string>
@@ -823,17 +815,6 @@
     <string name="ann_note_hint">写点什么（可留空）</string>
     <string name="annotations_entry_summary">选中正文里的文字即可高亮或记笔记</string>
     <string name="library_title">收藏与稍后读</string>
-    <string name="library_tab_starred">收藏</string>
-    <string name="library_tab_bookmarked">稍后读</string>
-    <string name="library_filter_all_feeds">全部来源</string>
-    <string name="library_select_all">全选</string>
-    <string name="library_selected_count">已选 %1$d 篇</string>
-    <string name="library_unstar">取消收藏</string>
-    <string name="library_unbookmark">移出稍后读</string>
-    <string name="library_clear_selection">取消选择</string>
-    <string name="library_empty">这里还空着</string>
-    <string name="library_empty_hint">在文章上点收藏或稍后读，就会出现在这里</string>
-    <string name="library_loading_more">正在加载更多…</string>
     <string name="library_entry_summary">按时间、来源排序，批量整理</string>
     <string name="search_placeholder">搜索文章、来源或关键词</string>
     <string name="search_clear">清空</string>

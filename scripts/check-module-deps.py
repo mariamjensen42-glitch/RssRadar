@@ -31,6 +31,7 @@ MODULES = {
     'feature:addsubscription': 'feature/addsubscription/src/main',
     'feature:annotations': 'feature/annotations/src/main',
     'feature:player': 'feature/player/src/main',
+    'feature:library': 'feature/library/src/main',
     'app': 'app/src/main',
 }
 
@@ -46,6 +47,7 @@ PREFIXES = [
     ('com.cycling.rssradar.ui.addsubscription', 'feature:addsubscription'),
     ('com.cycling.rssradar.ui.annotations', 'feature:annotations'),
     ('com.cycling.rssradar.ui.player', 'feature:player'),
+    ('com.cycling.rssradar.ui.library', 'feature:library'),
     ('com.cycling.rssradar', 'app'),
 ]
 

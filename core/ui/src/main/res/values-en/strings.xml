@@ -5,4 +5,8 @@
     <string name="enter">Open</string>
     <string name="delete">Delete</string>
     <string name="cancel">Cancel</string>
+    <string name="library_range_all">All time</string>
+    <string name="library_range_week">Past week</string>
+    <string name="library_range_month">Past month</string>
+    <string name="library_range_year">Past year</string>
 </resources>

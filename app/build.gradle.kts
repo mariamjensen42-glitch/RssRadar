@@ -86,6 +86,7 @@ dependencies {
     implementation(project(":feature:addsubscription"))
     implementation(project(":feature:annotations"))
     implementation(project(":feature:player"))
+    implementation(project(":feature:library"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)

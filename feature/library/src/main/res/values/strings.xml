@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_title">收藏与稍后读</string>
+    <string name="library_tab_starred">收藏</string>
+    <string name="library_tab_bookmarked">稍后读</string>
+    <string name="library_filter_all_feeds">全部来源</string>
+    <string name="library_select_all">全选</string>
+    <string name="library_selected_count">已选 %1$d 篇</string>
+    <string name="library_unstar">取消收藏</string>
+    <string name="library_unbookmark">移出稍后读</string>
+    <string name="library_clear_selection">取消选择</string>
+    <string name="library_empty">这里还空着</string>
+    <string name="library_empty_hint">在文章上点收藏或稍后读，就会出现在这里</string>
+    <string name="library_loading_more">正在加载更多…</string>
+    <string name="library_sort_added">按收藏时间</string>
+    <string name="library_sort_published">按发布时间</string>
+    <string name="library_sort_feed">按来源</string>
+</resources>
