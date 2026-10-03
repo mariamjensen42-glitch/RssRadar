@@ -26,7 +26,7 @@ import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.model.library.LibraryRange
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.i18n.labelRes
-import com.cycling.rssradar.ui.settings.SegmentedChips
+import com.cycling.rssradar.core.ui.components.SegmentedChips
 
 /**
  * 二次筛选条：时间范围 / 未读·收藏·稍后读 / 来源。

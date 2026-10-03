@@ -40,7 +40,7 @@ import com.cycling.rssradar.core.domain.filter.RuleScopeType
 import com.cycling.rssradar.core.ui.components.ConfirmDialog
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.i18n.labelRes
-import com.cycling.rssradar.ui.settings.SettingSwitchRow
+import com.cycling.rssradar.core.ui.components.SettingSwitchRow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

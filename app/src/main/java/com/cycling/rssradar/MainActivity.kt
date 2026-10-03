@@ -63,7 +63,7 @@ import com.cycling.rssradar.ui.me.FetchDiagnosticsScreen
 import com.cycling.rssradar.ui.me.FetchDiagnosticsViewModel
 import com.cycling.rssradar.ui.me.InterestProfileScreen
 import com.cycling.rssradar.ui.me.RssHubSettingsScreen
-import com.cycling.rssradar.ui.me.RssHubSettingsViewModel
+import com.cycling.rssradar.ui.settings.RssHubSettingsViewModel
 import com.cycling.rssradar.ui.me.ReadingStatsScreen
 import com.cycling.rssradar.ui.me.ReadingStatsViewModel
 import com.cycling.rssradar.ui.search.SearchScreen
@@ -109,10 +109,6 @@ import com.cycling.rssradar.core.ui.theme.fastEffectsSpec
 import com.cycling.rssradar.core.ui.theme.fastSpatialSpec
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.spatialSpec
-import com.cycling.rssradar.ui.settings.SettingsAiDiagScreen
-import com.cycling.rssradar.ui.settings.SettingsGeneralScreen
-import com.cycling.rssradar.ui.settings.SettingsRssHubScreen
-import com.cycling.rssradar.ui.settings.SettingsSyncScreen
 
 /**
  * 纯壳 Activity：edge-to-edge + 组合根。启动副作用在 [RssRadarApp]，

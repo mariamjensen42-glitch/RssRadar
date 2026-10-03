@@ -1,4 +1,4 @@
-package com.cycling.rssradar.ui.me
+package com.cycling.rssradar.ui.settings
 
 import android.content.Context
 import android.content.pm.PackageManager

@@ -36,12 +36,15 @@ import com.cycling.rssradar.core.data.store.model.ListViewMode
 import com.cycling.rssradar.core.data.store.model.ShareContentFormat
 import com.cycling.rssradar.core.data.store.model.ThemeMode
 import com.cycling.rssradar.core.ui.components.OptionPickerSheet
+import com.cycling.rssradar.core.ui.components.OptionRow
+import com.cycling.rssradar.core.ui.components.SectionHeader
+import com.cycling.rssradar.core.ui.components.SegmentedChips
+import com.cycling.rssradar.core.ui.components.SettingSwitchRow
+import com.cycling.rssradar.core.ui.components.SettingsSubPage
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.supportsDynamicColor
 import com.cycling.rssradar.i18n.labelRes
 import androidx.compose.runtime.setValue
-import com.cycling.rssradar.ui.me.RssHubSettingsViewModel
-import com.cycling.rssradar.ui.me.UpdateCheckRow
 
 @Composable
 fun SettingsGeneralScreen(

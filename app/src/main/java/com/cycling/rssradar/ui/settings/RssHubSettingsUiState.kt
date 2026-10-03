@@ -1,4 +1,4 @@
-package com.cycling.rssradar.ui.me
+package com.cycling.rssradar.ui.settings
 
 import com.cycling.rssradar.core.data.store.model.AppLanguage
 import com.cycling.rssradar.core.data.store.model.KeepArchived

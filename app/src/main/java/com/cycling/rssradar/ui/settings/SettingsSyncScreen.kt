@@ -33,11 +33,13 @@ import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.store.model.KeepArchived
 import com.cycling.rssradar.core.data.store.model.SyncInterval
 import com.cycling.rssradar.core.ui.components.OptionPickerSheet
+import com.cycling.rssradar.core.ui.components.SectionHeader
+import com.cycling.rssradar.core.ui.components.SettingSwitchRow
+import com.cycling.rssradar.core.ui.components.SettingsSubPage
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.i18n.labelRes
 import com.cycling.rssradar.i18n.resolve
 import androidx.compose.runtime.setValue
-import com.cycling.rssradar.ui.me.RssHubSettingsViewModel
 
 @Composable
 fun SettingsSyncScreen(

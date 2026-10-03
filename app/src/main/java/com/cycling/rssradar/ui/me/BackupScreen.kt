@@ -39,11 +39,11 @@ import com.composables.icons.lucide.ShieldCheck
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.cycling.rssradar.ui.settings.NavigateRow
-import com.cycling.rssradar.ui.settings.OptionRow
-import com.cycling.rssradar.ui.settings.SectionHeader
-import com.cycling.rssradar.ui.settings.SettingSwitchRow
-import com.cycling.rssradar.ui.settings.SettingsSubPage
+import com.cycling.rssradar.core.ui.components.NavigateRow
+import com.cycling.rssradar.core.ui.components.OptionRow
+import com.cycling.rssradar.core.ui.components.SectionHeader
+import com.cycling.rssradar.core.ui.components.SettingSwitchRow
+import com.cycling.rssradar.core.ui.components.SettingsSubPage
 
 /** 备份与恢复：全量导出 / 导入，外加检索索引重建。API Key 永不导出。 */
 @Composable

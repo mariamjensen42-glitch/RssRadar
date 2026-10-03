@@ -25,8 +25,8 @@ import com.composables.icons.lucide.Lightbulb
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Wrench
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.ui.settings.SectionHeader
-import com.cycling.rssradar.ui.settings.SettingsSubPage
+import com.cycling.rssradar.core.ui.components.SectionHeader
+import com.cycling.rssradar.core.ui.components.SettingsSubPage
 
 /**
  * 使用提示 / 疑难解答（ReadYou 差距表 #36）。
