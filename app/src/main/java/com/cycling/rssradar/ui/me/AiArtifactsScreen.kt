@@ -39,7 +39,7 @@ import com.composables.icons.lucide.Sparkles
 import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.ai.AiArtifactItem
 import com.cycling.rssradar.core.data.ai.AiPayloadText
-import com.cycling.rssradar.core.data.ai.AiScope
+import com.cycling.rssradar.core.model.AiScope
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.components.EmptyState
 import com.cycling.rssradar.core.ui.theme.radarColors

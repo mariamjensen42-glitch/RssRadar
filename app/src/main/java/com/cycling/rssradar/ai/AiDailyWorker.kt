@@ -11,7 +11,7 @@ import androidx.work.WorkerParameters
 import androidx.work.Constraints
 import androidx.work.NetworkType
 import com.cycling.rssradar.core.data.ai.AiBatchProcessor
-import com.cycling.rssradar.core.data.ai.AiFeature
+import com.cycling.rssradar.core.model.AiFeature
 import com.cycling.rssradar.di.AppEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import java.util.concurrent.TimeUnit

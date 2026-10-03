@@ -2,10 +2,10 @@ package com.cycling.rssradar.i18n
 
 import androidx.annotation.StringRes
 import com.cycling.rssradar.R
-import com.cycling.rssradar.core.data.ai.AiCategory
-import com.cycling.rssradar.core.data.ai.AiFeature
-import com.cycling.rssradar.core.data.ai.AiScope
-import com.cycling.rssradar.core.data.ai.AiTrigger
+import com.cycling.rssradar.core.model.AiCategory
+import com.cycling.rssradar.core.model.AiFeature
+import com.cycling.rssradar.core.model.AiScope
+import com.cycling.rssradar.core.model.AiTrigger
 
 /**
  * AI 枚举文案的资源映射（ADR-0017）：core 层的中文 label/summary 等是数据口径，

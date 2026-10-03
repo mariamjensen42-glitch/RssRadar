@@ -8,7 +8,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
-import com.cycling.rssradar.core.data.ai.AiFeature
+import com.cycling.rssradar.core.model.AiFeature
 
 /**
  * AI 任务队列。

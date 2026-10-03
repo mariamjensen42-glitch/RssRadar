@@ -1,6 +1,7 @@
 package com.cycling.rssradar.core.data.ai
 
 import com.cycling.rssradar.core.data.db.AiTaskEntity
+import com.cycling.rssradar.core.model.AiFeature
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

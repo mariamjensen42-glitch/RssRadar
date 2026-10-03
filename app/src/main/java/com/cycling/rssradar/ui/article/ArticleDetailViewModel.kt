@@ -12,7 +12,7 @@ import com.cycling.rssradar.core.data.recommend.Recommendation
 import com.cycling.rssradar.core.data.parser.ExtractionIssue
 import com.cycling.rssradar.core.data.parser.FetchFailure
 import com.cycling.rssradar.core.data.ai.AiArtifactRepository
-import com.cycling.rssradar.core.data.ai.AiFeature
+import com.cycling.rssradar.core.model.AiFeature
 import com.cycling.rssradar.core.data.ai.AiFeatureRunner
 import com.cycling.rssradar.core.data.ai.AiFulltextPayload
 import com.cycling.rssradar.core.data.ai.AiFeatureSpecs

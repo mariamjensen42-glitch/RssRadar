@@ -7,8 +7,8 @@ import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import com.cycling.rssradar.core.data.ai.AiFeature
-import com.cycling.rssradar.core.data.ai.AiScope
+import com.cycling.rssradar.core.model.AiFeature
+import com.cycling.rssradar.core.model.AiScope
 
 /**
  * AI 产物（AI 智能功能模块，35 项）。

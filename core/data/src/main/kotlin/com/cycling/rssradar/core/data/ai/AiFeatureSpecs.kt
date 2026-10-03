@@ -1,5 +1,7 @@
 package com.cycling.rssradar.core.data.ai
 
+import com.cycling.rssradar.core.model.AiFeature
+
 /**
  * 每项 AI 功能一份 [AiFeatureSpec]：prompt 构建、解析、「空壳判定」、文章 id 收口
  * 全部登记在一处。此前这四份知识按技术层散布在 [AiPrompts.build]、[AiParsers.parse]、

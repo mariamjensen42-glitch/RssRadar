@@ -9,8 +9,8 @@ import com.cycling.rssradar.i18n.UiText
 import com.cycling.rssradar.i18n.labelRes
 import com.cycling.rssradar.core.data.ai.AiArtifactRepository
 import com.cycling.rssradar.core.data.ai.AiBatchProcessor
-import com.cycling.rssradar.core.data.ai.AiCategory
-import com.cycling.rssradar.core.data.ai.AiFeature
+import com.cycling.rssradar.core.model.AiCategory
+import com.cycling.rssradar.core.model.AiFeature
 import com.cycling.rssradar.core.data.ai.AiQueueSnapshot
 import com.cycling.rssradar.core.data.ai.AiTaskQueue
 import com.cycling.rssradar.core.model.AiBudgetState

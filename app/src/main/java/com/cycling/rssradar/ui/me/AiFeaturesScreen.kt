@@ -46,10 +46,10 @@ import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
 import com.cycling.rssradar.R
-import com.cycling.rssradar.core.data.ai.AiCategory
-import com.cycling.rssradar.core.data.ai.AiFeature
-import com.cycling.rssradar.core.data.ai.AiTrigger
+import com.cycling.rssradar.core.model.AiCategory
+import com.cycling.rssradar.core.model.AiFeature
 import com.cycling.rssradar.core.model.AiFeatureSettings
+import com.cycling.rssradar.core.model.AiTrigger
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.i18n.descriptionRes

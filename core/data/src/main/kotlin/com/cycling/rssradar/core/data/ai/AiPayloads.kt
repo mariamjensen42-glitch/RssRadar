@@ -1,5 +1,6 @@
 package com.cycling.rssradar.core.data.ai
 
+import com.cycling.rssradar.core.model.AiFeature
 import kotlinx.serialization.Serializable
 
 

@@ -1,6 +1,4 @@
-package com.cycling.rssradar.core.data.ai
-
-
+package com.cycling.rssradar.core.model
 
 /**
  * 触发方式。这不是文档字段——[AiTaskPlanner] 与 UI 都按它分流：

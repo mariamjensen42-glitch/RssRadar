@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data.ai
+package com.cycling.rssradar.core.model
 
 /**
  * AI 智能功能的唯一注册表：35 项功能各占一个枚举项。

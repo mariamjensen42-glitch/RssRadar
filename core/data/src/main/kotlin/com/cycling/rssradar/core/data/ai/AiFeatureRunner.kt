@@ -1,5 +1,7 @@
 package com.cycling.rssradar.core.data.ai
 
+import com.cycling.rssradar.core.model.AiFeature
+import com.cycling.rssradar.core.model.AiScope
 import com.cycling.rssradar.core.data.db.dao.ArticleDao
 import com.cycling.rssradar.core.data.db.AiSupportDao
 import com.cycling.rssradar.core.data.db.FeedAiProfileDao

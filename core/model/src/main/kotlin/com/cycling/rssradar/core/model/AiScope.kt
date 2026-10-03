@@ -1,6 +1,4 @@
-package com.cycling.rssradar.core.data.ai
-
-
+package com.cycling.rssradar.core.model
 
 /** 产物挂在什么主体上，决定 ai_artifacts 的 subjectKind 与孤儿清理方式。 */
 enum class AiScope(val dbValue: Int, val label: String) {

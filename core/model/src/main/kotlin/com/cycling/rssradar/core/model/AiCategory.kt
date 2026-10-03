@@ -1,4 +1,4 @@
-package com.cycling.rssradar.core.data.ai
+package com.cycling.rssradar.core.model
 
 
 

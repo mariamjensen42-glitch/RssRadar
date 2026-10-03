@@ -60,7 +60,7 @@ import androidx.lifecycle.viewModelScope
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
-import com.cycling.rssradar.core.data.ai.AiFeature
+import com.cycling.rssradar.core.model.AiFeature
 import com.cycling.rssradar.core.data.ai.AiPrompts
 import com.cycling.rssradar.core.data.db.FeedAiProfileDao
 import com.cycling.rssradar.core.data.db.FeedAiProfileEntity

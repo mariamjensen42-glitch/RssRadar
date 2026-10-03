@@ -25,7 +25,7 @@ import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.ai.AiBriefPayload
 import com.cycling.rssradar.core.data.ai.AiClassifyPayload
 import com.cycling.rssradar.core.data.ai.AiCredibilityPayload
-import com.cycling.rssradar.core.data.ai.AiFeature
+import com.cycling.rssradar.core.model.AiFeature
 import com.cycling.rssradar.core.data.ai.AiFulltextPayload
 import com.cycling.rssradar.core.data.ai.AiGlossaryPayload
 import com.cycling.rssradar.core.data.ai.AiKeywordsPayload

@@ -1,7 +1,5 @@
 package com.cycling.rssradar.core.model
 
-import com.cycling.rssradar.core.data.ai.AiCategory
-import com.cycling.rssradar.core.data.ai.AiFeature
 
 /**
  * 「今日」的序号：本地时区下的自然日编号。

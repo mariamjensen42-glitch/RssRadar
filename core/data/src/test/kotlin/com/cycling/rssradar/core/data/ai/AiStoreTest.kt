@@ -4,6 +4,8 @@ import com.cycling.rssradar.core.data.FakeSharedPreferences
 import com.cycling.rssradar.core.model.AiBudgetState
 import com.cycling.rssradar.core.data.store.prefs.AiBudgetStore
 import com.cycling.rssradar.core.model.AiDayIndex
+import com.cycling.rssradar.core.model.AiCategory
+import com.cycling.rssradar.core.model.AiFeature
 import com.cycling.rssradar.core.model.AiFeatureSettings
 import com.cycling.rssradar.core.data.store.prefs.AiFeatureStore
 import org.junit.Assert.assertEquals
