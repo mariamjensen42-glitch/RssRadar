@@ -8,7 +8,7 @@ import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.store.prefs.LibraryStore
 import com.cycling.rssradar.core.model.library.LibraryRange
 import com.cycling.rssradar.core.model.library.LibrarySort
-import com.cycling.rssradar.ui.feed.PagedSnapshot
+import com.cycling.rssradar.core.ui.paging.PagedSnapshot
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow

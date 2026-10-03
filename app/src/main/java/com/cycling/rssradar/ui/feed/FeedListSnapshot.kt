@@ -6,35 +6,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /**
- * 分页快照纯函数模块（ADR-0006）：OFFSET 分页累积快照的全部规则，脱离 ViewModel
- * 即可 JVM 测试。背景规模：源 1000+、文章数万条，四 tab 统一 LIMIT/OFFSET 分页。
- *
- * 核心规则：**追加必去重**。任何 DB 删除（归档清理/单篇删除的本地移除）都会让
- * OFFSET 位移，下一页可能与快照尾部重叠；重复 id 会让 LazyColumn 的 key 冲突
- * 直接崩溃（实测 "Key 50442 was already used"）。ADR-0006 的 OFFSET 快照模型缺口，
- * 根治方向是 keyset 分页，追加边界先在此兜住。
- */
-object PagedSnapshot {
-
-    /**
-     * 追加一页并按 key 去重：与快照已有项重复、以及页内自重复的项都会被丢弃。
-     * 返回新快照；调用方据 `page.size == pageSize` 判 hasMore。
-     */
-    fun <T, K> append(current: List<T>, page: List<T>, keyOf: (T) -> K): List<T> {
-        val seen = current.mapTo(HashSet()) { keyOf(it) }
-        return current + page.filter { seen.add(keyOf(it)) }
-    }
-
-    /** 原地更新单条（key 命中的项经 [transform] 替换，其余原样）。 */
-    fun <T, K> mutate(list: List<T>, keyOf: (T) -> K, key: K, transform: (T) -> T): List<T> =
-        list.map { if (keyOf(it) == key) transform(it) else it }
-
-    /** 移除单条。 */
-    fun <T, K> remove(list: List<T>, keyOf: (T) -> K, key: K): List<T> =
-        list.filterNot { keyOf(it) == key }
-}
-
-/**
  * 滚动自动标记已读（#11）的纯逻辑，从 FeedListScreen 的 LaunchedEffect 里抽出：
  * 把「列表槽位 → 文章 id」铺平（粘性日期头也占一个槽位，用 null 占位），
  * 滚过视口顶部的槽位即视为已读。槽位表与列表结构严格同构，

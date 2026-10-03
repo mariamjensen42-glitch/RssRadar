@@ -18,6 +18,7 @@ import com.cycling.rssradar.core.model.ListViewMode
 import com.cycling.rssradar.core.model.MarkAsReadCondition
 import com.cycling.rssradar.core.data.store.prefs.RecommendationStore
 import com.cycling.rssradar.core.ui.mvi.MviStateViewModel
+import com.cycling.rssradar.core.ui.paging.PagedSnapshot
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job

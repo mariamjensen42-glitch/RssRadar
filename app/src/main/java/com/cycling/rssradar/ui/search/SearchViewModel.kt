@@ -9,7 +9,7 @@ import com.cycling.rssradar.core.data.repository.FeedRepository
 import com.cycling.rssradar.core.data.ai.AiRepository
 import com.cycling.rssradar.core.domain.search.SearchFilters
 import com.cycling.rssradar.core.model.library.LibraryRange
-import com.cycling.rssradar.ui.feed.PagedSnapshot
+import com.cycling.rssradar.core.ui.paging.PagedSnapshot
 import com.cycling.rssradar.core.ui.mvi.MviStateViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject

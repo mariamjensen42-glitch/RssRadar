@@ -137,7 +137,7 @@ fun ArticleCardList(
         emptyList()
     }
     // 滚动自动标记已读（#11）：槽位表构建与「滚过视口顶 = 已读」判定是纯函数
-    // （scrollSlots/passedUnreadIds，见 PagedSnapshot.kt），此处只做接线。
+    // （scrollSlots/passedUnreadIds，见 FeedListSnapshot.kt），此处只做接线。
     val slotIds: List<Long?> = if (display.stickyDateHeader) {
         remember(dayGroups) { scrollSlots(articles, stickyDateHeader = true, groups = dayGroups) }
     } else {
