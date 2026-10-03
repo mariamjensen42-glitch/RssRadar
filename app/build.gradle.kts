@@ -85,6 +85,7 @@ dependencies {
     implementation(project(":core:playback"))
     implementation(project(":feature:addsubscription"))
     implementation(project(":feature:annotations"))
+    implementation(project(":feature:player"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)

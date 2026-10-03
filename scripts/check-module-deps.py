@@ -30,6 +30,7 @@ MODULES = {
     'core:playback': 'core/playback/src/main',
     'feature:addsubscription': 'feature/addsubscription/src/main',
     'feature:annotations': 'feature/annotations/src/main',
+    'feature:player': 'feature/player/src/main',
     'app': 'app/src/main',
 }
 
@@ -44,6 +45,7 @@ PREFIXES = [
     # feature 模块暂时保留 ui.* 包名（package 与模块名解耦是有意为之）。
     ('com.cycling.rssradar.ui.addsubscription', 'feature:addsubscription'),
     ('com.cycling.rssradar.ui.annotations', 'feature:annotations'),
+    ('com.cycling.rssradar.ui.player', 'feature:player'),
     ('com.cycling.rssradar', 'app'),
 ]
 

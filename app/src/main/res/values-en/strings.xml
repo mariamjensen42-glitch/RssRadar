@@ -853,17 +853,5 @@
     <string name="search_filter_all_feeds">All feeds</string>
     <string name="search_filter_clear">Clear filters</string>
     <string name="search_loading_more">Loading more…</string>
-    <string name="player_title">Now playing</string>
     <string name="player_open">Play audio</string>
-    <string name="player_play">Play</string>
-    <string name="player_pause">Pause</string>
-    <string name="player_previous">Previous episode</string>
-    <string name="player_next">Next episode</string>
-    <string name="player_back_15">Back 15 seconds</string>
-    <string name="player_forward_15">Forward 15 seconds</string>
-    <string name="player_unknown_title">Unknown episode</string>
-    <string name="player_live_stream">Live</string>
-    <string name="player_no_audio">This article has no playable audio URL</string>
-    <string name="player_error">Playback error: %1$s</string>
-    <string name="player_queue_position">%1$d / %2$d</string>
 </resources>

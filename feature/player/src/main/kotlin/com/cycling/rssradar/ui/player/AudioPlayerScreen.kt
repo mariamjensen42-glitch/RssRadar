@@ -43,10 +43,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
-import com.cycling.rssradar.R
-import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.core.ui.components.SyncedSlider
+import com.cycling.rssradar.core.ui.R as UiR
 import com.cycling.rssradar.core.ui.components.SegmentedChips
+import com.cycling.rssradar.core.ui.components.SyncedSlider
+import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.ui.player.R
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Headphones
 import com.composables.icons.lucide.Lucide
@@ -98,7 +99,7 @@ fun AudioPlayerScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.back), tint = colors.textPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = colors.textPrimary)
             }
             Text(
                 text = stringResource(R.string.player_title),

@@ -853,17 +853,5 @@
     <string name="search_filter_all_feeds">全部来源</string>
     <string name="search_filter_clear">清除筛选</string>
     <string name="search_loading_more">正在加载更多…</string>
-    <string name="player_title">正在播放</string>
     <string name="player_open">播放音频</string>
-    <string name="player_play">播放</string>
-    <string name="player_pause">暂停</string>
-    <string name="player_previous">上一集</string>
-    <string name="player_next">下一集</string>
-    <string name="player_back_15">后退 15 秒</string>
-    <string name="player_forward_15">前进 15 秒</string>
-    <string name="player_unknown_title">未知节目</string>
-    <string name="player_live_stream">直播</string>
-    <string name="player_no_audio">这篇没有可播放的音频地址</string>
-    <string name="player_error">播放出错：%1$s</string>
-    <string name="player_queue_position">%1$d / %2$d</string>
 </resources>
