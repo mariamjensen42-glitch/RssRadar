@@ -43,16 +43,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import com.cycling.rssradar.core.ui.components.ArticleContextMenu
+import com.cycling.rssradar.core.ui.components.ArticleMenuActions
 import com.cycling.rssradar.core.ui.components.FeedIcon
+import com.cycling.rssradar.core.ui.components.articleMenuOffset
 import com.cycling.rssradar.core.ui.components.pressScale
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.core.ui.components.ArticleContextMenu
-import com.cycling.rssradar.core.ui.components.ArticleMenuActions
-import com.cycling.rssradar.core.ui.components.articleMenuOffset
+import com.cycling.rssradar.ui.search.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 

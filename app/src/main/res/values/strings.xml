@@ -816,23 +816,5 @@
     <string name="annotations_entry_summary">选中正文里的文字即可高亮或记笔记</string>
     <string name="library_title">收藏与稍后读</string>
     <string name="library_entry_summary">按时间、来源排序，批量整理</string>
-    <string name="search_placeholder">搜索文章、来源或关键词</string>
-    <string name="search_clear">清空</string>
-    <string name="search_recent">最近搜索</string>
-    <string name="search_clear_history">清空历史</string>
-    <string name="search_no_history">暂无搜索记录</string>
-    <string name="search_browse_feeds">浏览订阅源</string>
-    <string name="search_browse_feeds_hint">按分组查看已订阅的站点，再进入单个订阅源阅读</string>
-    <string name="search_delete_history_item">删除「%1$s」</string>
-    <string name="search_result_count">找到 %1$d 条与「%2$s」相关的结果</string>
-    <string name="search_no_result">暂无结果，试试其他关键词或放宽筛选条件</string>
-    <string name="search_deleted">已删除「%1$s」</string>
-    <string name="search_undo">撤销</string>
-    <string name="search_filter_unread">未读</string>
-    <string name="search_filter_starred">收藏</string>
-    <string name="search_filter_bookmarked">稍后读</string>
-    <string name="search_filter_all_feeds">全部来源</string>
-    <string name="search_filter_clear">清除筛选</string>
-    <string name="search_loading_more">正在加载更多…</string>
     <string name="player_open">播放音频</string>
 </resources>

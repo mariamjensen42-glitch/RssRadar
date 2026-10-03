@@ -46,10 +46,10 @@ import com.composables.icons.lucide.FolderOpen
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.X
-import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.ui.search.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
