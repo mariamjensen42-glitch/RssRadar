@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.repository.FeedPromptOverrideRepository
-import com.cycling.rssradar.i18n.UiText
+import com.cycling.rssradar.core.ui.text.UiText
 import com.cycling.rssradar.core.ui.mvi.MviStateViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject

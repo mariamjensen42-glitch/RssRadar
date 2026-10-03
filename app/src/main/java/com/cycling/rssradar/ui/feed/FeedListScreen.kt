@@ -41,7 +41,7 @@ import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.components.OptionPickerSheet
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.i18n.labelRes
-import com.cycling.rssradar.i18n.resolve
+import com.cycling.rssradar.core.ui.text.resolve
 import com.cycling.rssradar.ui.theme.LocalListDisplay
 
 @Composable

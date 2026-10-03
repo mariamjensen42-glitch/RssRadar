@@ -2,7 +2,7 @@ package com.cycling.rssradar.ui.feed
 
 import com.cycling.rssradar.R
 import androidx.compose.ui.platform.LocalContext
-import com.cycling.rssradar.i18n.resolve
+import com.cycling.rssradar.core.ui.text.resolve
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column

@@ -38,7 +38,7 @@ import com.cycling.rssradar.core.ui.components.SettingSwitchRow
 import com.cycling.rssradar.core.ui.components.SettingsSubPage
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.i18n.labelRes
-import com.cycling.rssradar.i18n.resolve
+import com.cycling.rssradar.core.ui.text.resolve
 import androidx.compose.runtime.setValue
 
 @Composable

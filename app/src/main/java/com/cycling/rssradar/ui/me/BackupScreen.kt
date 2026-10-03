@@ -33,7 +33,7 @@ import com.cycling.rssradar.core.data.backup.ImportStrategy
 import com.cycling.rssradar.core.ui.components.ConfirmDialog
 import com.cycling.rssradar.core.ui.components.OptionPickerSheet
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.i18n.resolve
+import com.cycling.rssradar.core.ui.text.resolve
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.ShieldCheck
 import java.text.SimpleDateFormat

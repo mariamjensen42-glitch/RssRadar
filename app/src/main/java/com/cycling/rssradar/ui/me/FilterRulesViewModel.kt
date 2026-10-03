@@ -11,7 +11,7 @@ import com.cycling.rssradar.core.data.repository.FeedRepository
 import com.cycling.rssradar.core.data.filter.FilterRuleRepository
 import com.cycling.rssradar.core.domain.filter.FilterRule
 import com.cycling.rssradar.core.domain.filter.RuleMatchType
-import com.cycling.rssradar.i18n.UiText
+import com.cycling.rssradar.core.ui.text.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

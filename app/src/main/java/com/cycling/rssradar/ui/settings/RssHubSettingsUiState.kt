@@ -7,7 +7,7 @@ import com.cycling.rssradar.core.model.ListDisplayState
 import com.cycling.rssradar.core.model.SyncState
 import com.cycling.rssradar.core.model.ThemeMode
 import com.cycling.rssradar.core.model.rsshub.CatalogSource
-import com.cycling.rssradar.i18n.UiText
+import com.cycling.rssradar.core.ui.text.UiText
 
 data class RssHubSettingsUiState(
     /** 当前生效的实例。 */

@@ -31,7 +31,7 @@ import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.core.model.rsshub.CatalogSource
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.i18n.resolve
+import com.cycling.rssradar.core.ui.text.resolve
 import com.cycling.rssradar.core.ui.components.SectionHeader
 import com.cycling.rssradar.core.ui.components.SettingsSubPage
 import androidx.compose.runtime.getValue

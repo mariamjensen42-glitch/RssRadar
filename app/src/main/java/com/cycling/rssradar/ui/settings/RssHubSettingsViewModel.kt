@@ -24,7 +24,7 @@ import com.cycling.rssradar.core.data.store.prefs.RecommendationStore
 import com.cycling.rssradar.core.data.store.prefs.SyncStore
 import com.cycling.rssradar.core.data.store.prefs.ThemeStore
 import com.cycling.rssradar.core.model.ThemeMode
-import com.cycling.rssradar.i18n.UiText
+import com.cycling.rssradar.core.ui.text.UiText
 import com.cycling.rssradar.sync.SyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext

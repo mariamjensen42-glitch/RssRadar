@@ -4,8 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.res.stringResource
 import com.cycling.rssradar.R
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
-import com.cycling.rssradar.i18n.UiText
-import com.cycling.rssradar.i18n.resolve
+import com.cycling.rssradar.core.ui.text.UiText
+import com.cycling.rssradar.core.ui.text.resolve
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column

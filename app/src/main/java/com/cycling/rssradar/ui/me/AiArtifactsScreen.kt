@@ -43,7 +43,7 @@ import com.cycling.rssradar.core.model.AiScope
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.components.EmptyState
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.i18n.resolve
+import com.cycling.rssradar.core.ui.text.resolve
 import java.text.SimpleDateFormat
 import java.util.Locale
 

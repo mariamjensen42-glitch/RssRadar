@@ -32,7 +32,7 @@ import com.cycling.rssradar.core.domain.filter.FilterRule
 import com.cycling.rssradar.core.ui.theme.Danger
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.i18n.labelRes
-import com.cycling.rssradar.i18n.resolve
+import com.cycling.rssradar.core.ui.text.resolve
 import com.composables.icons.lucide.ArrowDown
 import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Lucide

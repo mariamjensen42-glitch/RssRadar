@@ -56,7 +56,7 @@ import com.cycling.rssradar.i18n.descriptionRes
 import com.cycling.rssradar.i18n.entryRes
 import com.cycling.rssradar.i18n.labelRes
 import com.cycling.rssradar.i18n.presentationRes
-import com.cycling.rssradar.i18n.resolve
+import com.cycling.rssradar.core.ui.text.resolve
 import com.cycling.rssradar.i18n.summaryRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue

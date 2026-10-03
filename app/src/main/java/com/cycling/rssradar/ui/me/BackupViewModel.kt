@@ -11,7 +11,7 @@ import com.cycling.rssradar.core.data.backup.ConflictPolicy
 import com.cycling.rssradar.core.data.backup.ImportReport
 import com.cycling.rssradar.core.data.backup.ImportStrategy
 import com.cycling.rssradar.core.data.search.SearchIndexer
-import com.cycling.rssradar.i18n.UiText
+import com.cycling.rssradar.core.ui.text.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
