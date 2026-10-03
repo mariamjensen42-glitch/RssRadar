@@ -26,7 +26,7 @@ import com.cycling.rssradar.core.data.db.ArticleAnnotationEntity
 import com.cycling.rssradar.core.data.store.prefs.LinkStore
 import com.cycling.rssradar.core.data.store.model.ReadingPrefs
 import com.cycling.rssradar.core.data.store.prefs.ReadingPrefsStore
-import com.cycling.rssradar.ui.mvi.MviViewModel
+import com.cycling.rssradar.core.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException

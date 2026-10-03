@@ -3,14 +3,9 @@ package com.cycling.rssradar.ui.subscriptions
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,8 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -37,56 +30,41 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
-import com.cycling.rssradar.core.data.store.model.FeedSortMode
-import com.cycling.rssradar.core.ui.components.AppSnackbarHost
-import com.cycling.rssradar.core.ui.components.FeedIcon
-import com.cycling.rssradar.core.ui.components.OptionPickerSheet
-import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.composables.icons.lucide.ArrowDownUp
-import com.composables.icons.lucide.BookMarked
 import com.composables.icons.lucide.CheckCheck
-import com.composables.icons.lucide.ChevronDown
-import com.composables.icons.lucide.ChevronRight
-import com.composables.icons.lucide.Ellipsis
 import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.FileDown
 import com.composables.icons.lucide.FileUp
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Check
-import com.composables.icons.lucide.CornerUpRight
 import com.composables.icons.lucide.FolderInput
-import com.composables.icons.lucide.Pencil
+import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Search
-import com.composables.icons.lucide.Square
-import com.composables.icons.lucide.SquareCheckBig
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.X
-import com.cycling.rssradar.core.data.db.entity.FeedEntity
-import com.cycling.rssradar.core.ui.components.pressScale
+import com.cycling.rssradar.core.data.store.model.FeedSortMode
+import com.cycling.rssradar.core.ui.components.AppSnackbarHost
+import com.cycling.rssradar.core.ui.components.OptionPickerSheet
+import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.core.ui.theme.Danger
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
-import com.cycling.rssradar.core.ui.theme.MotionTokens
+import com.cycling.rssradar.core.ui.theme.effectsSpec
 import com.cycling.rssradar.core.ui.theme.radarColors
-
+import com.cycling.rssradar.core.ui.theme.spatialSpec
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 @Composable
 fun SubscriptionsScreen(
@@ -133,9 +111,9 @@ fun SubscriptionsScreen(
     // reduce-motion 时全部置 null = 直接增删（红线：所有动画响应降级）
     val reducedMotion = LocalReducedMotion.current
     val itemFadeSpec: FiniteAnimationSpec<Float>? =
-        if (reducedMotion) null else tween(MotionTokens.DurationShort, easing = MotionTokens.EasingStandard)
+        if (reducedMotion) null else effectsSpec()
     val itemPlacementSpec: FiniteAnimationSpec<IntOffset>? =
-        if (reducedMotion) null else tween(MotionTokens.DurationShort, easing = MotionTokens.EasingStandard)
+        if (reducedMotion) null else spatialSpec()
 
     // OPML 导入：SAF 文件选择器（mime 放宽，规避文件管理器标注不一致，见 ADR-0004）
     val opmlLauncher = rememberLauncherForActivityResult(
@@ -625,335 +603,8 @@ private fun SubscriptionsTopBar(
     }
 }
 
-/** 多选态顶栏：已选计数 + 执行移动/删除 + 退出。 */
-@Composable
-private fun SelectionTopBar(
-    selectedCount: Int,
-    canMove: Boolean,
-    onMove: () -> Unit,
-    onDelete: () -> Unit,
-    onCancel: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "已选择 $selectedCount 个订阅",
-            color = radarColors().textPrimary,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.weight(1f),
-        )
-        TextButton(onClick = onMove, enabled = canMove) {
-            Text("移动到", color = if (canMove) radarColors().accent else radarColors().textTertiary, fontWeight = FontWeight.SemiBold)
-        }
-        TextButton(onClick = onDelete, enabled = canMove) {
-            Text("删除", color = if (canMove) Danger else radarColors().textTertiary, fontWeight = FontWeight.SemiBold)
-        }
-        IconButton(onClick = onCancel) {
-            Icon(Lucide.X, contentDescription = "退出多选", tint = radarColors().textPrimary)
-        }
-    }
-}
-
-@Composable
-private fun GroupHeader(
-    title: String,
-    feedCount: Int,
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    onEdit: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            // 长按分组行 = 编辑（重命名/清空/删除）；行尾铅笔图标已删，减少视觉噪音
-            .combinedClickable(onClick = onToggle, onLongClick = onEdit)
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = if (expanded) Lucide.ChevronDown else Lucide.ChevronRight,
-            contentDescription = if (expanded) "折叠" else "展开",
-            tint = radarColors().textSecondary,
-            modifier = Modifier.size(18.dp),
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            text = title,
-            color = radarColors().textPrimary,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = "$feedCount 个订阅",
-            color = radarColors().textTertiary,
-            style = MaterialTheme.typography.labelMedium,
-        )
-        Spacer(Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun FeedRow(
-    item: FeedWithUnread,
-    onClick: () -> Unit,
-    onMore: () -> Unit,
-    selectionMode: Boolean = false,
-    selected: Boolean = false,
-) {
-    // 按压缩放（docs/motion.md #2）：source 与 clickable 共用同一实例
-    val interactionSource = remember { MutableInteractionSource() }
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = radarColors().surface1,
-        modifier = Modifier
-            .fillMaxWidth()
-            .pressScale(interactionSource)
-            // 整行点击进「订阅源文章列表」（issue #51）；管理入口仍是行尾"⋯"
-            .clickable(interactionSource = interactionSource, onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // 多选态：行首勾选框，图标与 tint 直接反映选中态
-            if (selectionMode) {
-                Icon(
-                    imageVector = if (selected) Lucide.SquareCheckBig else Lucide.Square,
-                    contentDescription = if (selected) "取消选择" else "选择",
-                    tint = if (selected) radarColors().accent else radarColors().textTertiary,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(10.dp))
-            }
-            FeedIcon(title = item.feed.title, iconUrl = item.feed.iconUrl, size = 32.dp, cornerRadius = 8.dp)
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.feed.title,
-                    color = radarColors().textPrimary,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = item.feed.url.withoutScheme(),
-                    color = radarColors().textTertiary,
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            // 类型标记：RSSHub 路由和常规 RSS 一眼区分
-            if (item.feed.sourceType == FeedEntity.SOURCE_TYPE_RSSHUB) {
-                Spacer(Modifier.width(6.dp))
-                Surface(shape = RoundedCornerShape(50), color = radarColors().surface2) {
-                    Text(
-                        text = "RSSHub",
-                        color = radarColors().textTertiary,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
-                }
-            }
-            // 失效标记（#82）：原因 + 连续失败次数，红色角标一眼定位伤员
-            item.failure?.let { failure ->
-                Spacer(Modifier.width(6.dp))
-                Surface(shape = RoundedCornerShape(50), color = Danger.copy(alpha = 0.14f)) {
-                    Text(
-                        text = "${failure.label} · 连续 ${item.feed.consecutiveFailures} 次",
-                        color = Danger,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
-                }
-            }
-            UnreadBadge(count = item.unreadCount)
-            // 多选态隐藏"⋯"：勾选才是当前主要动作，避免点错进操作页
-            if (!selectionMode) {
-                Spacer(Modifier.width(4.dp))
-                IconButton(onClick = onMore, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Lucide.Ellipsis,
-                        contentDescription = "更多",
-                        tint = radarColors().textSecondary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun UnreadBadge(count: Int) {
-    // 无未读不留任何徽标（UI 审计 F1）：灰色「已读」徽标无信息价值，还与状态标签混淆
-    if (count <= 0) return
-    Surface(shape = RoundedCornerShape(50), color = radarColors().accent) {
-        Text(
-            text = count.coerceAtMost(999).toString(),
-            color = radarColors().onAccent,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-        )
-    }
-}
-
-@Composable
-private fun CreateGroupRow(onClick: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = radarColors().surface1,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                Lucide.Plus,
-                contentDescription = null,
-                tint = radarColors().link,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "新建分组",
-                color = radarColors().link,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-    }
-}
-
-/**
- * 批量移动的目标分组选择（issue #7）：单选一个已注册分组，确认后一次性移动全部勾选项。
- * 分组数量是用户自建的量级（几十个以内），直接竖排滚动，不做懒加载。
- */
-@Composable
-private fun BatchMoveToGroupDialog(
-    groups: List<String>,
-    selectedCount: Int,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-) {
-    var target by remember { mutableStateOf(groups.firstOrNull().orEmpty()) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = radarColors().surface1,
-        titleContentColor = radarColors().textPrimary,
-        textContentColor = radarColors().textSecondary,
-        title = {
-            Text(
-                "移动 $selectedCount 个订阅到",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-        },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                groups.forEach { group ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { target = group }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = group,
-                            color = radarColors().textPrimary,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (group == target) {
-                            Icon(
-                                Lucide.Check,
-                                contentDescription = null,
-                                tint = radarColors().accent,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(target) }, enabled = target.isNotBlank()) {
-                Text("移动", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消", color = radarColors().textTertiary) }
-        },
-    )
-}
-
-private fun String.withoutScheme(): String = removePrefix("https://").removePrefix("http://")
+internal fun String.withoutScheme(): String = removePrefix("https://").removePrefix("http://")
 
 /** 导出文件名日期后缀：多次导出不互相覆盖。 */
 private fun todayStamp(): String =
     java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())
-
-/** 通用单行输入对话框：新建/重命名分组、重命名订阅共用。 */
-@Composable
-private fun TextInputDialog(
-    title: String,
-    placeholder: String,
-    confirmText: String,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-    initialValue: String = "",
-) {
-    var value by remember { mutableStateOf(initialValue) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = radarColors().surface1,
-        titleContentColor = radarColors().textPrimary,
-        textContentColor = radarColors().textSecondary,
-        title = { Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
-        text = {
-            OutlinedTextField(
-                value = value,
-                onValueChange = { value = it },
-                singleLine = true,
-                placeholder = { Text(placeholder, color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = radarColors().surface2,
-                    unfocusedContainerColor = radarColors().surface2,
-                    focusedBorderColor = radarColors().accent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = radarColors().textPrimary,
-                    unfocusedTextColor = radarColors().textPrimary,
-                    cursorColor = radarColors().accent,
-                ),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(value) }) {
-                Text(confirmText, color = radarColors().accent, fontWeight = FontWeight.SemiBold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消", color = radarColors().textTertiary)
-            }
-        },
-    )
-}
-

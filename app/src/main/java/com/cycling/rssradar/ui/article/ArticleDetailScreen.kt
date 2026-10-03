@@ -1,9 +1,5 @@
 package com.cycling.rssradar.ui.article
 
-import androidx.compose.ui.res.stringResource
-
-import com.cycling.rssradar.R
-
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -14,108 +10,45 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.db.entity.ArticleEntity
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
-import com.cycling.rssradar.core.data.store.model.ReadingFontFamily
-import com.cycling.rssradar.core.data.store.model.ReadingImageState
-import com.cycling.rssradar.core.data.store.model.ReadingPrefs
 import com.cycling.rssradar.core.data.store.model.ReadingRenderer
-import com.cycling.rssradar.core.data.store.model.ReadingStyleState
-import com.cycling.rssradar.core.data.store.model.ReadingTextAlign
-import com.cycling.rssradar.core.data.store.model.ReadingTheme
-import com.cycling.rssradar.core.data.store.model.coerceFontSize
-import com.cycling.rssradar.core.data.store.model.coerceLetterSpacing
-import com.cycling.rssradar.core.data.store.model.coerceImageCornerRadius
-import com.cycling.rssradar.core.data.store.model.coerceLineHeight
-import com.cycling.rssradar.core.data.store.model.coercePadding
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
-import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.LocalRadarColors
+import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.isLightBackground
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.ui.theme.ApplySystemBarIcons
-import com.cycling.rssradar.ui.components.SyncedSlider
 import com.cycling.rssradar.ui.components.shareArticle
-import com.composables.icons.lucide.ArrowLeft
-import com.composables.icons.lucide.Bookmark
-import com.composables.icons.lucide.ChevronLeft
-import com.composables.icons.lucide.ChevronRight
-import com.composables.icons.lucide.EllipsisVertical
-import com.composables.icons.lucide.ExternalLink
-import com.composables.icons.lucide.Headphones
-import com.composables.icons.lucide.Highlighter
-import com.composables.icons.lucide.Languages
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Minus
-import com.composables.icons.lucide.Plus
-import com.composables.icons.lucide.Search
-import com.composables.icons.lucide.Share2
-import com.composables.icons.lucide.Sparkles
-import com.composables.icons.lucide.Star
-import com.composables.icons.lucide.Type
-import kotlin.math.roundToInt
-
+import com.cycling.rssradar.ui.theme.ApplySystemBarIcons
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 /**
  * 全屏查看页的入参（issue #60）：本文图片列表 + 起始下标。
@@ -216,6 +149,10 @@ private fun ArticleDetailBody(
     val selectionBlocks = remember(selectionTexts) {
         selectionTexts.map { it.text }.filter { it.isNotBlank() }
     }
+    // 划词工具条的落位锚点：长按点相对浮层容器左上角的偏移。
+    // 公开 SelectionState 只有文本、没有坐标（内部那个不给契约），所以在长按发生时
+    // 自己记一笔坐标；没记到就退回底部居中（IntOffset.Zero 表示"未捕捉"）。
+    var selectionAnchor by remember { mutableStateOf(PRESET_BOTTOM_ANCHOR) }
     // 整页滚动状态提升到 Screen：顶栏标题「滚出视口才出现」需要读滚动量
     val scrollState = rememberScrollState()
     // 视口模式（有图文章）的头部折叠量 = WebView 内部滚动量，同样驱动顶栏补位标题
@@ -430,13 +367,17 @@ private fun ArticleDetailBody(
                         modifier = Modifier.padding(top = 4.dp),
                     )
                 }
-                // 划词：SelectionContainer 只提供选择能力，选中后的动作在底部工具条。
+                // 划词：SelectionContainer 只提供选择能力，选中后的动作在工具条。
                 // 它不含 lazy 布局的直接子级（相关阅读条在它外面），不触到未定义行为。
                 SelectionContainer(
                     state = selectionState,
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        // 长按点捕捉：用于把工具条定位到手指附近。放在 SelectionContainer
+                        // 的 modifier 上（容器本身消费长按做选区），用 detectTapGestures 只
+                        // 观察不消费——不传 onLongPress 给它，避免抢掉划词选择。
+                        .captureLongPressRootAnchor { selectionAnchor = it },
                 ) {
                     ReadingBody(
                         article = current,
@@ -475,9 +416,8 @@ private fun ArticleDetailBody(
             }
             if (selectionBlocks.isNotEmpty()) {
                 ReaderSelectionBar(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 16.dp),
+                    anchor = selectionAnchor,
+                    modifier = Modifier.fillMaxSize(),
                     onHighlight = { colorIndex, note ->
                         viewModel.addAnnotations(selectionBlocks, colorIndex, note)
                         selectionState.clear()
@@ -586,762 +526,5 @@ private fun openImageViewer(article: ArticleWithFeed, url: String): ImageViewer 
         ImageViewer(images, images.indexOf(url))
     } else {
         ImageViewer(listOf(url), 0)
-    }
-}
-
-@Composable
-private fun ArticleDetailTopBar(
-    title: String?,
-    showTitle: Boolean,
-    onBack: () -> Unit,
-    onOpenStyle: () -> Unit,
-    /** 打开页内查找栏。 */
-    onOpenFind: () -> Unit,
-    /** 跳到标注列表页。 */
-    onOpenAnnotations: () -> Unit,
-    /** 分享本文（#26）：内容格式由「我的」页偏好决定。 */
-    onShare: () -> Unit,
-    onToggleTranslation: () -> Unit,
-    isShowingTranslation: Boolean,
-    isGeneratingTranslation: Boolean,
-    aiSummary: String?,
-    aiSummaryState: AiSummaryState,
-    onGenerateSummary: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onBack) {
-            Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.nav_back), tint = radarColors().textPrimary)
-        }
-        // 标题滚出视口后顶栏补位显示（用户反馈）；阅读中隐藏，不占阅读注意力
-        Box(modifier = Modifier.weight(1f)) {
-            if (showTitle && title != null) {
-                Text(
-                    text = title,
-                    color = radarColors().textPrimary,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.align(Alignment.CenterStart),
-                )
-            }
-        }
-        // AI 摘要生成入口（用户反馈）：未生成/生成中在顶栏给 Sparkles 或转圈，不在正文占位卡片；
-        // 有摘要且空闲时隐藏（卡片里已显示内容）。生成中转圈禁用，失败态保持可点重生成。
-        if (aiSummaryState is AiSummaryState.Generating ||
-            aiSummaryState is AiSummaryState.Failed ||
-            aiSummary == null
-        ) {
-            if (aiSummaryState is AiSummaryState.Generating) {
-                CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
-            } else {
-                IconButton(onClick = onGenerateSummary) {
-                    Icon(
-                        Lucide.Sparkles,
-                        contentDescription = stringResource(R.string.ai_gen_summary),
-                        tint = if (aiSummaryState is AiSummaryState.Failed) radarColors().accent else radarColors().textPrimary,
-                    )
-                }
-            }
-        }
-        // AI 翻译开关（issue #44）：未显示译文时发起翻译，显示中切回原文；生成中禁用
-        IconButton(onClick = onToggleTranslation, enabled = !isGeneratingTranslation) {
-            Icon(
-                Lucide.Languages,
-                contentDescription = if (isShowingTranslation) stringResource(R.string.ai_back_to_original) else stringResource(R.string.ai_translate),
-                tint = if (isShowingTranslation || isGeneratingTranslation) radarColors().accent else radarColors().textPrimary,
-            )
-        }
-        // 分享与排版设置是低频操作：收进溢出菜单，顶栏图标从 4-5 个降到 2-3 个
-        Box {
-            var menuExpanded by remember { mutableStateOf(false) }
-            IconButton(onClick = { menuExpanded = true }) {
-                Icon(Lucide.EllipsisVertical, contentDescription = stringResource(R.string.more_actions), tint = radarColors().textPrimary)
-            }
-            DropdownMenu(
-                expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false },
-            ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.find_in_page)) },
-                    leadingIcon = { Icon(Lucide.Search, contentDescription = null) },
-                    onClick = {
-                        menuExpanded = false
-                        onOpenFind()
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.annotations_title)) },
-                    leadingIcon = { Icon(Lucide.Highlighter, contentDescription = null) },
-                    onClick = {
-                        menuExpanded = false
-                        onOpenAnnotations()
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.share)) },
-                    leadingIcon = { Icon(Lucide.Share2, contentDescription = null) },
-                    onClick = {
-                        menuExpanded = false
-                        onShare()
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.typography_settings)) },
-                    leadingIcon = { Icon(Lucide.Type, contentDescription = null) },
-                    onClick = {
-                        menuExpanded = false
-                        onOpenStyle()
-                    },
-                )
-            }
-        }
-    }
-}
-
-/**
- * 排版设置弹层（issue #42）：渲染器、字号步进、行距/边距滑杆、字体族、图片圆角/放大。
- * 显示值读 [LocalReadingPrefs]，写入经 VM 直达 ReadingPrefsStore，无确认按钮即改即见。
- *
- * 整份偏好作为一个参数进出，而不是拆成「渲染器 + 图片 + 排版」若干组回调——
- * 四项同属阅读偏好，拆开只会把接线成本再复制一遍。
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ReadingStyleSheet(
-    prefs: ReadingPrefs,
-    onRenderer: (ReadingRenderer) -> Unit,
-    onFontSize: (Int) -> Unit,
-    onLineHeight: (Float) -> Unit,
-    onPadding: (Int) -> Unit,
-    onLetterSpacing: (Float) -> Unit,
-    onTextAlign: (ReadingTextAlign) -> Unit,
-    onFontFamily: (ReadingFontFamily) -> Unit,
-    onImageCornerRadius: (Int) -> Unit,
-    onImageMaximize: (Boolean) -> Unit,
-    onImmersive: (Boolean) -> Unit,
-    /** 滚动时自动隐藏工具栏（ReadYou 差距表 #22）；与 [onImmersive] 是两件事。 */
-    autoHideBars: Boolean = false,
-    onAutoHideBars: (Boolean) -> Unit = {},
-    /** 阅读主题（ReadYou 差距表 #16）：四档配色，只换背景/表面/文字。 */
-    onReadingTheme: (ReadingTheme) -> Unit = {},
-    /** 越界切篇（ReadYou 差距表 #23）：顶部下拉看上一篇、底部上拉看下一篇。 */
-    onPullToSwitch: (Boolean) -> Unit = {},
-    /** 本文能否在「正文 / 摘要」之间切（[canSwitchToSummary]）：不能切时整块不出现。 */
-    canSwitchToSummary: Boolean = false,
-    /** 当前是否切成摘要。 */
-    preferSummary: Boolean = false,
-    onPreferSummary: (Boolean) -> Unit = {},
-    onDismiss: () -> Unit,
-) {
-    val style = prefs.style
-    val image = prefs.image
-    val renderer = prefs.renderer
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = radarColors().surface1) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.typography_settings),
-                color = radarColors().textPrimary,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(8.dp))
-
-            // 本文：正文 / 摘要（ReadYou 的 renderFullContent/renderDescriptionContent 同款）。
-            // 只在两者实质不同时给这一块：ADR-0001 入库时取 description 与 content 的较长者，
-            // 大量源的 content 就是 summary——那时给个开关，点下去屏幕纹丝不动。
-            // 没有意义的按钮不该存在，所以不成立时整块不渲染。
-            if (canSwitchToSummary) {
-                Text(
-                    text = stringResource(R.string.body_section),
-                    color = radarColors().textPrimary,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(false to stringResource(R.string.body_full), true to stringResource(R.string.body_summary)).forEach { (isSummary, label) ->
-                        val selected = isSummary == preferSummary
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = if (selected) radarColors().accent else radarColors().surface2,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { onPreferSummary(isSummary) },
-                        ) {
-                            Text(
-                                text = label,
-                                color = if (selected) radarColors().onAccent else radarColors().textSecondary,
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(vertical = 8.dp),
-                            )
-                        }
-                    }
-                }
-                Text(
-                    text = stringResource(R.string.summary_hint),
-                    color = radarColors().textTertiary,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-                Spacer(Modifier.height(12.dp))
-            }
-
-            // 阅读主题（ReadYou 差距表 #16）：四档。只换「纸的颜色」——背景/表面/文字，
-            // 强调色仍跟随应用（含 #29 的自定义色），且不随系统深浅变化：挑「纸张」
-            // 就是为了在深色模式下也要米黄纸。
-            Text(
-                text = stringResource(R.string.reading_theme),
-                color = radarColors().textPrimary,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(bottom = 4.dp),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ReadingTheme.entries.forEach { theme ->
-                    val selected = theme == prefs.readingTheme
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = if (selected) radarColors().accent else radarColors().surface2,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onReadingTheme(theme) },
-                    ) {
-                        Text(
-                            text = theme.label,
-                            color = if (selected) radarColors().onAccent else radarColors().textSecondary,
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(vertical = 8.dp),
-                        )
-                    }
-                }
-            }
-            Text(
-                text = stringResource(R.string.reading_theme_hint),
-                color = radarColors().textTertiary,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-            Spacer(Modifier.height(12.dp))
-
-            // 正文渲染器：WebView / 原生 Compose 二选一（ADR-0009）。
-            // 原生路对表格/视频/内联样式退化，仅建议被 WebView 滚动闪烁困扰时启用。
-            Text(
-                text = stringResource(R.string.body_renderer),
-                color = radarColors().textPrimary,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(bottom = 4.dp),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ReadingRenderer.entries.forEach { r ->
-                    val selected = r == renderer
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = if (selected) radarColors().accent else radarColors().surface2,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onRenderer(r) },
-                    ) {
-                        Text(
-                            text = r.label,
-                            color = if (selected) radarColors().onAccent else radarColors().textSecondary,
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(vertical = 8.dp),
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-
-            // 字号：步进
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(R.string.font_size),
-                    color = radarColors().textPrimary,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = { onFontSize(coerceFontSize(style.fontSize - 1)) }) {
-                    Icon(Lucide.Minus, contentDescription = stringResource(R.string.font_decrease), tint = radarColors().textPrimary, modifier = Modifier.size(18.dp))
-                }
-                Text(
-                    text = "${style.fontSize}",
-                    color = radarColors().textPrimary,
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.width(40.dp),
-                )
-                IconButton(onClick = { onFontSize(coerceFontSize(style.fontSize + 1)) }) {
-                    Icon(Lucide.Plus, contentDescription = stringResource(R.string.font_increase), tint = radarColors().textPrimary, modifier = Modifier.size(18.dp))
-                }
-            }
-
-            // 行距：滑杆（0.8–2.5）
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(R.string.line_height),
-                    color = radarColors().textPrimary,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.width(72.dp),
-                )
-                SyncedSlider(
-                    value = style.lineHeight,
-                    onValueChange = { onLineHeight(coerceLineHeight(it)) },
-                    valueRange = ReadingStyleState.LINE_HEIGHT_MIN..ReadingStyleState.LINE_HEIGHT_MAX,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = "%.1f".format(style.lineHeight),
-                    color = radarColors().textPrimary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.width(40.dp),
-                )
-            }
-
-            // 边距：滑杆（0–48dp）
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(R.string.margin),
-                    color = radarColors().textPrimary,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.width(72.dp),
-                )
-                SyncedSlider(
-                    value = style.horizontalPadding.toFloat(),
-                    onValueChange = { onPadding(coercePadding(it.roundToInt())) },
-                    valueRange = ReadingStyleState.PADDING_MIN.toFloat()..ReadingStyleState.PADDING_MAX.toFloat(),
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = "${style.horizontalPadding}dp",
-                    color = radarColors().textPrimary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.width(40.dp),
-                )
-            }
-
-            Spacer(Modifier.height(8.dp))
-            // 字间距（ReadYou 差距表 #17）：中文长段落拉开一点明显好读
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(R.string.letter_spacing),
-                    color = radarColors().textPrimary,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.width(72.dp),
-                )
-                SyncedSlider(
-                    value = style.letterSpacing,
-                    onValueChange = { onLetterSpacing(coerceLetterSpacing(it)) },
-                    valueRange = ReadingStyleState.LETTER_SPACING_MIN..ReadingStyleState.LETTER_SPACING_MAX,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = "%.1f".format(style.letterSpacing),
-                    color = radarColors().textPrimary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.width(40.dp),
-                )
-            }
-
-            // 正文对齐（ReadYou 差距表 #17）：只作用于没有自带 align 声明的段落，
-            // 正文里写死的居中/右对齐是内容的一部分，不该被全局偏好盖掉。
-            Text(
-                text = stringResource(R.string.text_align),
-                color = radarColors().textPrimary,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(bottom = 4.dp),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ReadingTextAlign.entries.forEach { align ->
-                    val selected = align == style.textAlign
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = if (selected) radarColors().accent else radarColors().surface2,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onTextAlign(align) },
-                    ) {
-                        Text(
-                            text = align.label,
-                            color = if (selected) radarColors().onAccent else radarColors().textSecondary,
-                            style = MaterialTheme.typography.labelLarge,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(vertical = 8.dp),
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-
-            // 字体族：三选一
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ReadingFontFamily.entries.forEach { family ->
-                    val selected = family == style.fontFamily
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = if (selected) radarColors().accent else radarColors().surface2,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(50))
-                            .clickable(onClick = { onFontFamily(family) }),
-                    ) {
-                        Text(
-                            text = family.label,
-                            color = if (selected) radarColors().onAccent else radarColors().textPrimary,
-                            style = MaterialTheme.typography.labelLarge,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(vertical = 8.dp),
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-
-            // 图片（issue #60）：圆角直接改 CSS/Compose 形状；点击放大关掉后，
-            // 正文不再把 <img> 包成链接，点图在 WebView 里自然无反应。
-            Text(
-                text = stringResource(R.string.images),
-                color = radarColors().textPrimary,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(bottom = 4.dp),
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(R.string.corner_radius),
-                    color = radarColors().textPrimary,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.width(72.dp),
-                )
-                SyncedSlider(
-                    value = image.cornerRadius.toFloat(),
-                    onValueChange = { onImageCornerRadius(coerceImageCornerRadius(it.roundToInt())) },
-                    valueRange = ReadingImageState.CORNER_RADIUS_MIN.toFloat()..
-                        ReadingImageState.CORNER_RADIUS_MAX.toFloat(),
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = "${image.cornerRadius}dp",
-                    color = radarColors().textPrimary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.width(40.dp),
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.tap_to_zoom),
-                    color = radarColors().textPrimary,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.weight(1f),
-                )
-                Switch(
-                    checked = image.maximizeOnTap,
-                    onCheckedChange = onImageMaximize,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = radarColors().onAccent,
-                        checkedTrackColor = radarColors().accent,
-                    ),
-                )
-            }
-
-            // 沉浸模式（issue #93）：只留正文与图片，剥掉分享/推荐/评论等网页杂乱元素
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.immersive_mode),
-                        color = radarColors().textPrimary,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    Text(
-                        text = stringResource(R.string.immersive_hint),
-                        color = radarColors().textTertiary,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                Switch(
-                    checked = prefs.immersive,
-                    onCheckedChange = onImmersive,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = radarColors().onAccent,
-                        checkedTrackColor = radarColors().accent,
-                    ),
-                )
-            }
-
-            Spacer(Modifier.height(4.dp))
-            // 自动隐藏工具栏（ReadYou 差距表 #22）：**不是**上面那个沉浸模式——
-            // 那是砍内容噪声，这只是把顶栏/底栏收起来腾阅读空间。名字必须分开，
-            // 否则两个开关共用一个形容词，用户（和两周后的我们）分不清谁干啥。
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.auto_hide_bars),
-                        color = radarColors().textPrimary,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    Text(
-                        text = stringResource(R.string.auto_hide_hint),
-                        color = radarColors().textTertiary,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                Switch(
-                    checked = autoHideBars,
-                    onCheckedChange = onAutoHideBars,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = radarColors().onAccent,
-                        checkedTrackColor = radarColors().accent,
-                    ),
-                )
-            }
-
-            Spacer(Modifier.height(4.dp))
-            // 越界切篇（ReadYou 差距表 #23）。默认关：手势换掉正在读的东西是强感知改动。
-            // 只做「上/下篇切换」，ReadYou 那个「下拉加载下一个 feed」不做——
-            // 那会悄悄换掉你正在看的东西，是惊喜不是功能。
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.pull_switch),
-                        color = radarColors().textPrimary,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    Text(
-                        text = stringResource(R.string.pull_switch_hint),
-                        color = radarColors().textTertiary,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                Switch(
-                    checked = prefs.pullToSwitchArticle,
-                    onCheckedChange = onPullToSwitch,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = radarColors().onAccent,
-                        checkedTrackColor = radarColors().accent,
-                    ),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ArticleActionsBar(
-    isStarred: Boolean,
-    isBookmarked: Boolean,
-    hasPrev: Boolean,
-    hasNext: Boolean,
-    onPrev: () -> Unit,
-    onNext: () -> Unit,
-    onStar: () -> Unit,
-    onBookmark: () -> Unit,
-    onOpenOriginal: () -> Unit,
-    /** AI 智能功能面板（35 项里的文章级功能）。 */
-    onOpenAi: () -> Unit = {},
-    /** 打开播放页；null = 这篇没有可播的音频（入口整个不出现，不留一个点不动的按钮）。 */
-    onPlayAudio: (() -> Unit)? = null,
-) {
-    val insets = WindowInsets.navigationBars.asPaddingValues()
-    Surface(color = radarColors().bgRoot) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp + insets.calculateBottomPadding()),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // 图标分两组：左 = 文章间导航（上一篇/下一篇），右 = 阅读动作（收藏/稍后读/
-            // AI/查看原文）。组内等间距，组间弹性 spacer 撑开，全部统一 40dp——
-            // 之前间距 6/10/6/6 混排 + 外链独占 48dp，视觉上忽密忽疏。
-            // 上一篇 = 发布更早（列表序更靠后），下一篇 = 更新一篇
-            ActionIcon(
-                icon = Lucide.ChevronLeft,
-                checked = false,
-                contentDescription = stringResource(R.string.prev_article),
-                enabled = hasPrev,
-                size = 40.dp,
-                onClick = onPrev,
-            )
-            Spacer(Modifier.width(8.dp))
-            ActionIcon(
-                icon = Lucide.ChevronRight,
-                checked = false,
-                contentDescription = stringResource(R.string.next_article),
-                enabled = hasNext,
-                size = 40.dp,
-                onClick = onNext,
-            )
-            Spacer(Modifier.weight(1f))
-            onPlayAudio?.let { play ->
-                ActionIcon(
-                    icon = Lucide.Headphones,
-                    checked = false,
-                    contentDescription = stringResource(R.string.player_open),
-                    size = 40.dp,
-                    onClick = play,
-                )
-                Spacer(Modifier.width(8.dp))
-            }
-            ActionIcon(icon = Lucide.Star, checked = isStarred, contentDescription = stringResource(R.string.star), size = 40.dp, onClick = onStar)
-            Spacer(Modifier.width(8.dp))
-            ActionIcon(icon = Lucide.Bookmark, checked = isBookmarked, contentDescription = stringResource(R.string.read_later), size = 40.dp, onClick = onBookmark)
-            Spacer(Modifier.width(8.dp))
-            ActionIcon(
-                icon = Lucide.Sparkles,
-                checked = false,
-                contentDescription = stringResource(R.string.ai_analysis),
-                size = 40.dp,
-                onClick = onOpenAi,
-            )
-            Spacer(Modifier.width(8.dp))
-            ActionIcon(
-                icon = Lucide.ExternalLink,
-                checked = true,
-                contentDescription = stringResource(R.string.view_original),
-                size = 40.dp,
-                onClick = onOpenOriginal,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ActionIcon(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    checked: Boolean,
-    contentDescription: String,
-    onClick: () -> Unit,
-    enabled: Boolean = true,
-    size: androidx.compose.ui.unit.Dp = 48.dp,
-) {
-    val bg = if (checked) radarColors().accent else radarColors().surface2
-    val fg = when {
-        checked -> radarColors().onAccent
-        !enabled -> radarColors().textTertiary
-        else -> radarColors().textPrimary
-    }
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = bg.copy(alpha = if (enabled || checked) 1f else 0.5f),
-        modifier = Modifier
-            .size(size)
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick, enabled = enabled),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = fg,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-    }
-}
-
-// ── 相关阅读（AiFeature.RELATED）───────────────────────────────────────────
-
-/**
- * 相关阅读横滑条：与本文内容最相近的近期文章（本地 bigram 相似度，needsLlm=false）。
- *
- * 刻意的呈现决定：
- * - **无候选时整体不渲染**而不是显示「暂无相关」——阅读页寸土寸金，
- *   一块永远写着"没有"的常驻面板只会消耗注意力。
- * - 卡片只放标题与来源，不放相似度分数——0.37 vs 0.41 对用户没有意义，
- *   排序已经把"更相关"表达完了，再亮数字就是拿实现细节打扰阅读。
- */
-@Composable
-private fun RelatedArticlesStrip(
-    items: List<ArticleWithFeed>,
-    onOpen: (Long) -> Unit,
-) {
-    val colors = radarColors()
-    Column(Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.related_reads),
-            style = MaterialTheme.typography.labelMedium,
-            color = colors.textTertiary,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
-        )
-        // 右缘渐隐：提示右侧还有卡片可滑，卡片文字截断不再显得"被裁掉"
-        val stripScroll = rememberScrollState()
-        Box(Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(stripScroll)
-                    .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items.forEach { item ->
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = colors.surface1,
-                        modifier = Modifier
-                            .width(200.dp)
-                            .clickable { onOpen(item.article.id) },
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(
-                                text = item.article.title,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = colors.textPrimary,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                text = item.feedTitle,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = colors.textTertiary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
-            if (stripScroll.canScrollForward) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .fillMaxHeight()
-                        .width(32.dp)
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(Color.Transparent, colors.bgRoot),
-                            ),
-                        ),
-                )
-            }
-        }
-        Spacer(Modifier.height(10.dp))
     }
 }

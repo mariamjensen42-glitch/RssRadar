@@ -50,12 +50,13 @@ import com.cycling.rssradar.core.model.library.LibrarySort
 import com.cycling.rssradar.core.ui.components.EmptyState
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.i18n.labelRes
-import com.cycling.rssradar.ui.me.SegmentedChips
+import com.cycling.rssradar.ui.settings.SegmentedChips
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Bookmark
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.X
+import com.cycling.rssradar.ui.settings.SegmentedChips
 
 /**
  * 收藏整理页：收藏与稍后读共用一个页面，页内切换。

@@ -425,7 +425,7 @@
     <string name="saturation">饱和度</string>
     <string name="lightness">明度</string>
     <string name="dynamic_color">动态取色</string>
-    <string name="dynamic_color_desc">强调色跟随系统壁纸，卡片与背景仍用 RssRadar 原配色。</string>
+    <string name="dynamic_color_desc">整套配色跟随系统壁纸，含卡片、背景与文字。</string>
     <string name="dynamic_color_unsupported">系统动态取色需要 Android 12 及以上，当前设备不支持。</string>
     <string name="list_display">列表显示</string>
     <string name="list_display_desc">信息流与订阅源文章列表卡片的显示项，全局生效，即改即见。</string>

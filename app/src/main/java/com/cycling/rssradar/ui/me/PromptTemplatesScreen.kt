@@ -74,103 +74,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** 一个已配置摘要提示词覆盖的订阅源。 */
-data class FeedPromptOverride(val feedId: Long, val feedTitle: String, val prompt: String)
-
-/** 供「新增覆盖」选择用的订阅源（只带 id 与标题，全部源都可选，不止已配置的）。 */
-data class FeedPickOption(val feedId: Long, val feedTitle: String)
-
-data class PromptTemplatesUiState(
-    /** 已配置覆盖的订阅源（管理列表）。 */
-    val overrides: List<FeedPromptOverride> = emptyList(),
-    /** 全部订阅源（新增覆盖时选择用）。 */
-    val feeds: List<FeedPickOption> = emptyList(),
-    val loading: Boolean = true,
-    val message: UiText? = null,
-)
-
-sealed interface PromptTemplatesIntent {
-    data object Refresh : PromptTemplatesIntent
-    data class SavePrompt(val feedId: Long, val prompt: String) : PromptTemplatesIntent
-    data class ClearPrompt(val feedId: Long) : PromptTemplatesIntent
-    data object ConsumeMessage : PromptTemplatesIntent
-}
-
-/**
- * 提示词模板管理（AiFeature.PROMPT_TEMPLATE）的状态宿主。
- *
- * 存储口径与 SubscriptionsViewModel.setFeedSummaryPrompt 完全一致：
- * 空白模板一律当「清除覆盖」——存一个只有空格的模板等于让模型收到空 system；
- * 新建行时用 upsert 兜底（该源没有 profile 行时 updateSummaryPrompt 更新 0 行等于白存）。
- * 刻意**不清除**已生成的摘要：旧摘要忠实于原文，用户点「重新生成」即可套用新提示词。
- */
-@HiltViewModel
-class PromptTemplatesViewModel @Inject constructor(
-    private val profileDao: FeedAiProfileDao,
-    private val feedDao: FeedDao,
-) : ViewModel() {
-
-    private val _state = MutableStateFlow(PromptTemplatesUiState())
-    val state: StateFlow<PromptTemplatesUiState> = _state.asStateFlow()
-
-    init {
-        refresh()
-    }
-
-    fun onIntent(intent: PromptTemplatesIntent) {
-        when (intent) {
-            PromptTemplatesIntent.Refresh -> refresh()
-            is PromptTemplatesIntent.SavePrompt -> save(intent.feedId, intent.prompt)
-            is PromptTemplatesIntent.ClearPrompt -> clear(intent.feedId)
-            PromptTemplatesIntent.ConsumeMessage -> _state.update { it.copy(message = null) }
-        }
-    }
-
-    private fun refresh() {
-        viewModelScope.launch {
-            _state.update { it.copy(loading = true) }
-            val profiles = profileDao.getAll().filter { !it.summaryPrompt.isNullOrBlank() }
-            val feeds = feedDao.getAll().map { FeedPickOption(it.id, it.title) }
-            val titleOf = feeds.associate { it.feedId to it.feedTitle }
-            _state.update {
-                it.copy(
-                    loading = false,
-                    overrides = profiles
-                        .map { p -> FeedPromptOverride(p.feedId, titleOf[p.feedId].orEmpty(), p.summaryPrompt.orEmpty()) }
-                        .sortedBy { it.feedTitle },
-                    feeds = feeds,
-                )
-            }
-        }
-    }
-
-    private fun save(feedId: Long, prompt: String) {
-        val normalized = prompt.trim().takeIf { it.isNotBlank() }
-        viewModelScope.launch {
-            val now = System.currentTimeMillis()
-            val current = profileDao.get(feedId)
-            if (current == null && normalized == null) return@launch
-            if (current == null) {
-                profileDao.upsert(FeedAiProfileEntity(feedId = feedId, summaryPrompt = normalized, updatedAt = now))
-            } else {
-                profileDao.updateSummaryPrompt(feedId, normalized, now)
-            }
-            _state.update {
-                it.copy(
-                    message = if (normalized == null) {
-                        UiText.res(R.string.aimsg_prompt_builtin)
-                    } else {
-                        UiText.res(R.string.aimsg_prompt_saved)
-                    },
-                )
-            }
-            refresh()
-        }
-    }
-
-    private fun clear(feedId: Long) = save(feedId, "")
-}
-
 /**
  * 提示词模板管理页（AiFeature.PROMPT_TEMPLATE 的专属出口）。
  *
@@ -188,7 +91,7 @@ fun PromptTemplatesScreen(
     viewModel: PromptTemplatesViewModel = hiltViewModel(),
     onBack: () -> Unit,
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.uiState.collectAsState()
     var editing by remember { mutableStateOf<FeedPromptOverride?>(null) }
     var adding by remember { mutableStateOf(false) }
     val colors = radarColors()

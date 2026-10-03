@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.ui.components.openUrl
+import androidx.compose.runtime.setValue
 
 /**
  * 检查更新（ReadYou 差距表第 35 项）。

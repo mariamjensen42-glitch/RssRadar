@@ -46,7 +46,7 @@ import coil3.request.ImageRequest
 import com.cycling.rssradar.R
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.ui.components.SyncedSlider
-import com.cycling.rssradar.ui.me.SegmentedChips
+import com.cycling.rssradar.ui.settings.SegmentedChips
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Headphones
 import com.composables.icons.lucide.Lucide
@@ -56,6 +56,7 @@ import com.composables.icons.lucide.RotateCcw
 import com.composables.icons.lucide.RotateCw
 import com.composables.icons.lucide.SkipBack
 import com.composables.icons.lucide.SkipForward
+import com.cycling.rssradar.ui.settings.SegmentedChips
 
 private val SPEEDS = listOf(0.8f, 1.0f, 1.25f, 1.5f, 2.0f)
 

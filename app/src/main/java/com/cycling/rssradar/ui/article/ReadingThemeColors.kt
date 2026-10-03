@@ -35,7 +35,7 @@ private fun RadarColors.paper() = copy(
     divider = Color(0xFFDED6C0),
 )
 
-private fun RadarColors.gray() = copy(
+internal fun RadarColors.gray() = copy(
     bgRoot = Color(0xFFE9E9EA),
     surface1 = Color(0xFFF4F4F5),
     surface2 = Color(0xFFDEDEE0),

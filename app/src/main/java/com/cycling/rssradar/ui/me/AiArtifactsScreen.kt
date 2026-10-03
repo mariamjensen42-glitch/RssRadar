@@ -1,82 +1,53 @@
 package com.cycling.rssradar.ui.me
 
-import androidx.compose.ui.res.stringResource
-import com.cycling.rssradar.R
-import com.cycling.rssradar.i18n.formatCount
-import com.cycling.rssradar.i18n.labelRes
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboard
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.platform.ClipEntry
-import android.content.ClipData
-import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.composables.icons.lucide.ArrowLeft
-import com.composables.icons.lucide.Copy
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.RotateCw
 import com.composables.icons.lucide.Sparkles
-import com.composables.icons.lucide.Trash2
-// AiArtifactDetail 定义在同包的 AiArtifactsViewModel 里，同包无需 import。
-import com.cycling.rssradar.core.data.ai.AiArtifactGroup
+import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.ai.AiArtifactItem
-import com.cycling.rssradar.core.data.ai.AiPayloadLine
 import com.cycling.rssradar.core.data.ai.AiPayloadText
 import com.cycling.rssradar.core.data.ai.AiScope
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
-import com.cycling.rssradar.i18n.resolve
 import com.cycling.rssradar.core.ui.components.EmptyState
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.i18n.resolve
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
+// AiArtifactDetail 定义在同包的 AiArtifactsViewModel 里，同包无需 import。
 
 /**
  * AI 产物中心：把 `ai_artifacts` 里的全部产物按功能摊开，随手可查。
@@ -95,7 +66,9 @@ import java.util.Locale
  *    必须都能看到，否则排查时只能靠猜。
  */
 @OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
+
 fun AiArtifactsScreen(
     viewModel: AiArtifactsViewModel = hiltViewModel(),
     onBack: () -> Unit,
@@ -227,360 +200,20 @@ fun AiArtifactsScreen(
 
 // ── 总览与筛选 ──────────────────────────────────────────────────────────────
 
-@Composable
-private fun OverviewRow(total: Int, featureCount: Int, outputChars: Long) {
-    val colors = radarColors()
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        OverviewCell(label = stringResource(R.string.tab_artifacts), value = total.toString(), modifier = Modifier.weight(1f))
-        OverviewCell(label = stringResource(R.string.tab_features), value = featureCount.toString(), modifier = Modifier.weight(1f))
-        OverviewCell(label = stringResource(R.string.model_output), value = stringResource(R.string.chars_suffix, formatCount(outputChars)), modifier = Modifier.weight(1f))
-    }
-    Spacer(Modifier.height(6.dp))
-    Text(
-        text = stringResource(R.string.artifacts_page_desc),
-        style = MaterialTheme.typography.bodySmall,
-        color = colors.textTertiary,
-    )
-}
-
-@Composable
-private fun OverviewCell(label: String, value: String, modifier: Modifier = Modifier) {
-    val colors = radarColors()
-    Surface(shape = RoundedCornerShape(12.dp), color = colors.surface1, modifier = modifier) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = colors.textTertiary)
-            Spacer(Modifier.height(2.dp))
-            Text(
-                value,
-                style = MaterialTheme.typography.titleSmall,
-                color = colors.textPrimary,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun FeatureFilterRow(
-    groups: List<AiArtifactGroup>,
-    selected: Int?,
-    onSelect: (Int?) -> Unit,
-) {
-    val colors = radarColors()
-    Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        FilterChip(
-            text = stringResource(R.string.filter_all),
-            selected = selected == null,
-            onClick = { onSelect(null) },
-        )
-        groups.forEach { group ->
-            FilterChip(
-                text = "${stringResource(group.feature.labelRes())} ${group.total}",
-                selected = selected == group.feature.dbValue,
-                onClick = { onSelect(group.feature.dbValue) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun FilterChip(text: String, selected: Boolean, onClick: () -> Unit) {
-    val colors = radarColors()
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = if (selected) colors.accent else colors.surface2,
-        modifier = Modifier.clickable(onClick = onClick),
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = if (selected) colors.onAccent else colors.textSecondary,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        )
-    }
-}
-
-// ── 列表 ────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun ArtifactList(
-    items: List<AiArtifactItem>,
-    timeFormat: SimpleDateFormat,
-    onOpen: (AiArtifactItem) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = radarColors()
-    // 按功能分组，组内按时间倒序（数据库已按时间倒序返回，分组不破坏该顺序）。
-    val groups = remember(items) {
-        items.groupBy { it.feature }.toList().sortedByDescending { (_, list) -> list.first().createdAt }
-    }
-    LazyColumn(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(bottom = 32.dp),
-    ) {
-        groups.forEach { (feature, list) ->
-            stickyHeader(key = "h-${feature.dbValue}") {
-                Surface(color = colors.bgRoot) {
-                    Text(
-                        text = stringResource(R.string.artifacts_feature_count, stringResource(feature.labelRes()), list.size),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = colors.accent,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                    )
-                }
-            }
-            items(list, key = { "${it.feature.dbValue}:${it.subjectId}" }) { item ->
-                ArtifactRow(item = item, timeFormat = timeFormat, onOpen = { onOpen(item) })
-            }
-        }
-    }
-}
-
-@Composable
-private fun ArtifactRow(
-    item: AiArtifactItem,
-    timeFormat: SimpleDateFormat,
-    onOpen: () -> Unit,
-) {
-    val colors = radarColors()
-    val preview = remember(item.payload) { previewOf(item) }
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = colors.surface1,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onOpen),
-    ) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 11.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(item.feature.labelRes()),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.accent,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    text = timeFormat.format(Date(item.createdAt)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.textTertiary,
-                )
-            }
-            Spacer(Modifier.height(5.dp))
-            Text(
-                text = subjectLabel(item),
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.textPrimary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (preview.isNotBlank()) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = preview,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.textSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
 /** 条目上的主体名。查不到标题时不留空——给「文章 #id」比一片空白好定位。 */
 @Composable
-private fun subjectLabel(item: AiArtifactItem): String = when (item.scope) {
+
+internal fun subjectLabel(item: AiArtifactItem): String = when (item.scope) {
     AiScope.ARTICLE -> item.subjectTitle ?: stringResource(R.string.subject_article, item.subjectId)
     AiScope.FEED -> item.subjectTitle ?: stringResource(R.string.subject_feed, item.subjectId)
     AiScope.GLOBAL -> stringResource(R.string.subject_global, item.subjectId)
 }
 
 /** 列表预览：取渲染结果的第一行有意义文本，省得用户为了看一句结论点开每一条。 */
-private fun previewOf(item: AiArtifactItem): String {
+internal fun previewOf(item: AiArtifactItem): String {
     val lines = AiPayloadText.lines(item.payload)
     val first = lines.firstOrNull { it.value.length >= 2 } ?: return ""
     return if (first.label != null) "${first.label}：${first.value}" else first.value
 }
 
 // ── 详情面板 ────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AiArtifactDetailSheet(
-    detail: AiArtifactDetail,
-    timeFormat: SimpleDateFormat,
-    onOpenArticle: (Long) -> Unit,
-    onOpenFeed: (Long) -> Unit,
-    onDelete: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val colors = radarColors()
-    val clipboard = LocalClipboard.current
-    val clipboardScope = rememberCoroutineScope()
-    var showRaw by remember(detail) { mutableStateOf(false) }
-    val item = detail.item
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = colors.bgRoot,
-    ) {
-        Column(
-            // 用确定高度（屏高 92%）而不是 wrap + max：面板高度不定时，
-            // 下面内容区的 weight(1f) 拿不到确定约束，滚动区会被压成 0。
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.92f)
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp),
-        ) {
-            Text(
-                text = stringResource(item.feature.labelRes()),
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.textPrimary,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = subjectLabel(item),
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.textSecondary,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = listOf(
-                    item.model,
-                    timeFormat.format(Date(item.createdAt)),
-                    stringResource(R.string.artifacts_input_chars, formatCount(item.inputChars.toLong())),
-                    stringResource(R.string.artifacts_output_chars, formatCount(item.outputChars.toLong())),
-                ).joinToString(" · "),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.textTertiary,
-            )
-            Spacer(Modifier.height(12.dp))
-
-            // 结构化内容：可能很长，必须可滚动，否则会被父容器截断。
-            // weight(1f) 而非 fill=false——fill=false 时高度由内容决定，
-            // 内容多高就要多高，verticalScroll 反而失去意义。
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                if (detail.lines.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.artifact_unparseable),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.textSecondary,
-                    )
-                } else {
-                    detail.lines.forEach { line ->
-                        PayloadLineRow(line = line)
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            TextButton(onClick = { showRaw = !showRaw }) {
-                Text(
-                    text = if (showRaw) stringResource(R.string.collapse_raw) else stringResource(R.string.view_raw),
-                    color = colors.accent,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            if (showRaw) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = colors.surface2,
-                    modifier = Modifier.heightIn(max = 220.dp),
-                ) {
-                    Box(Modifier.verticalScroll(rememberScrollState()).padding(12.dp)) {
-                        Text(
-                            text = detail.raw,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.textSecondary,
-                        )
-                    }
-                }
-                TextButton(onClick = { clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("artifact", detail.raw))) } }) {
-                    Icon(
-                        imageVector = Lucide.Copy,
-                        contentDescription = null,
-                        tint = colors.textSecondary,
-                        modifier = Modifier.size(14.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.copy_raw), color = colors.textSecondary, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // 跳转按钮只在有落点时出现：点一个没接线的按钮，用户只会以为又坏了。
-                if (item.scope == AiScope.ARTICLE) {
-                    TextButton(onClick = { onOpenArticle(item.subjectId) }) {
-                        Text(stringResource(R.string.open_article), color = colors.accent, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-                if (item.scope == AiScope.FEED) {
-                    TextButton(onClick = { onOpenFeed(item.subjectId) }) {
-                        Text(stringResource(R.string.open_feed), color = colors.accent, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = Lucide.Trash2,
-                        contentDescription = null,
-                        tint = colors.textTertiary,
-                        modifier = Modifier.size(14.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.delete), color = colors.textTertiary)
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-        }
-    }
-}
-
-@Composable
-private fun PayloadLineRow(line: AiPayloadLine) {
-    val colors = radarColors()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = (line.depth * 12).dp, top = 3.dp, bottom = 3.dp),
-    ) {
-        // label 来自另一模块的 data class，smart cast 不可用，必须先落到本地变量
-        val label = line.label
-        if (label != null) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.textTertiary,
-                modifier = Modifier.width(84.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-        }
-        Text(
-            text = line.value,
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.textPrimary,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-

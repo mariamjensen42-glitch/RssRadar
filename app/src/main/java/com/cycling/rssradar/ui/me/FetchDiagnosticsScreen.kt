@@ -56,6 +56,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.cycling.rssradar.core.ui.theme.radarColors
+import androidx.compose.runtime.setValue
+import com.cycling.rssradar.i18n.formatLogTimestamp
 
 @HiltViewModel
 class FetchDiagnosticsViewModel @Inject constructor(
@@ -293,5 +295,4 @@ private fun facts(log: ContentFetchLogEntity, context: Context): String {
     return parts.joinToString(" · ") { it.resolve(context) }
 }
 
-private fun formatTime(millis: Long): String =
-    SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(millis))
+private fun formatTime(millis: Long): String = formatLogTimestamp(millis)

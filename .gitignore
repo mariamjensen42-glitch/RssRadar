@@ -20,6 +20,9 @@ local.properties
 .idea/
 .workbuddy/
 prototype/__pycache__/
+.kotlin/
+.mimosa/
+.zcodeignore
 
 # 模块构建产物
 **/build/

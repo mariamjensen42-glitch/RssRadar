@@ -1,13 +1,5 @@
 package com.cycling.rssradar.ui.me
 
-import androidx.compose.ui.res.stringResource
-import com.cycling.rssradar.R
-import com.cycling.rssradar.i18n.descriptionRes
-import com.cycling.rssradar.i18n.formatCount
-import com.cycling.rssradar.i18n.presentationRes
-import com.cycling.rssradar.i18n.entryRes
-import com.cycling.rssradar.i18n.summaryRes
-import com.cycling.rssradar.i18n.labelRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,7 +24,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -41,29 +32,34 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
+import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.ai.AiCategory
 import com.cycling.rssradar.core.data.ai.AiFeature
-import com.cycling.rssradar.core.data.ai.AiQueueSnapshot
 import com.cycling.rssradar.core.data.ai.AiTrigger
-import com.cycling.rssradar.core.data.store.model.AiBudgetState
 import com.cycling.rssradar.core.data.store.model.AiFeatureSettings
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
-import com.cycling.rssradar.i18n.resolve
 import com.cycling.rssradar.core.ui.theme.radarColors
-
+import com.cycling.rssradar.i18n.descriptionRes
+import com.cycling.rssradar.i18n.entryRes
+import com.cycling.rssradar.i18n.labelRes
+import com.cycling.rssradar.i18n.presentationRes
+import com.cycling.rssradar.i18n.resolve
+import com.cycling.rssradar.i18n.summaryRes
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 /**
  * AI 智能功能总览：35 项功能的独立开关、用量看板、任务队列与预算设置。
@@ -204,242 +200,6 @@ fun AiFeaturesScreen(
 }
 
 // ── 用量看板 ────────────────────────────────────────────────────────────────
-
-/**
- * 用量：只显示真实统计到的次数与字数，**不换算金额**。
- * DeepSeek 的单价会调整，硬编码一个系数就是给用户一个看起来精确实则过期的数字。
- */
-@Composable
-private fun UsageCard(budget: AiBudgetState) {
-    val colors = radarColors()
-    Surface(shape = RoundedCornerShape(14.dp), color = colors.surface1) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Lucide.Sparkles,
-                    contentDescription = null,
-                    tint = colors.accent,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.usage_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = colors.textPrimary,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-
-            val limitText = if (budget.dailyLimit <= 0) stringResource(R.string.unlimited) else budget.dailyLimit.toString()
-            UsageRow(stringResource(R.string.calls_today), "${budget.usedToday} / $limitText")
-            if (budget.dailyLimit > 0) {
-                Spacer(Modifier.height(8.dp))
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .background(colors.surface3, RoundedCornerShape(3.dp)),
-                ) {
-                    val ratio = (budget.usedToday.toFloat() / budget.dailyLimit).coerceIn(0f, 1f)
-                    Box(
-                        Modifier
-                            .fillMaxWidth(ratio)
-                            .height(6.dp)
-                            .background(colors.accent, RoundedCornerShape(3.dp)),
-                    )
-                }
-                // 空进度条状态不明（UI 审计 M4）：0 时直接说明
-                if (budget.usedToday == 0) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(stringResource(R.string.not_used_today), style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            UsageRow(stringResource(R.string.io_today), stringResource(R.string.io_today_chars, formatCount(budget.inputCharsToday), formatCount(budget.outputCharsToday)))
-            UsageRow(stringResource(R.string.calls_total), stringResource(R.string.calls_suffix, formatCount(budget.totalCalls)))
-            UsageRow(stringResource(R.string.failed_total), stringResource(R.string.calls_suffix, formatCount(budget.totalFailed)))
-        }
-    }
-}
-
-@Composable
-private fun UsageRow(label: String, value: String) {
-    val colors = radarColors()
-    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
-        Spacer(Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
-    }
-}
-
-// ── 预算设置 ────────────────────────────────────────────────────────────────
-
-@Composable
-private fun BudgetSection(
-    budget: AiBudgetState,
-    viewModel: AiFeaturesViewModel,
-) {
-    val colors = radarColors()
-    Surface(shape = RoundedCornerShape(14.dp), color = colors.surface1) {
-        Column(Modifier.padding(16.dp)) {
-            Text(
-                stringResource(R.string.budget_section),
-                style = MaterialTheme.typography.titleSmall,
-                color = colors.textPrimary,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                stringResource(R.string.budget_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.textTertiary,
-            )
-            Spacer(Modifier.height(12.dp))
-
-            val unlimitedLabel = stringResource(R.string.unlimited)
-            ChipChoiceRow(
-                label = stringResource(R.string.daily_limit),
-                options = listOf(0, 50, 100, 200, 500),
-                selected = budget.dailyLimit,
-                labelOf = { if (it == 0) unlimitedLabel else it.toString() },
-                onSelect = { viewModel.onIntent(AiFeaturesIntent.SetDailyLimit(it)) },
-            )
-            Spacer(Modifier.height(10.dp))
-            ChipChoiceRow(
-                label = stringResource(R.string.concurrency),
-                options = listOf(1, 2, 3, 4),
-                selected = budget.concurrentLimit,
-                labelOf = { it.toString() },
-                onSelect = { viewModel.onIntent(AiFeaturesIntent.SetConcurrent(it)) },
-            )
-            Spacer(Modifier.height(10.dp))
-            ChipChoiceRow(
-                label = stringResource(R.string.min_interval),
-                options = listOf(0L, 500L, 1_200L, 3_000L),
-                selected = budget.minIntervalMs,
-                labelOf = { if (it == 0L) unlimitedLabel else "${it}ms" },
-                onSelect = { viewModel.onIntent(AiFeaturesIntent.SetMinInterval(it)) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun <T> ChipChoiceRow(
-    label: String,
-    options: List<T>,
-    selected: T,
-    labelOf: (T) -> String,
-    onSelect: (T) -> Unit,
-) {
-    val colors = radarColors()
-    Column {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
-        Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            options.forEach { option ->
-                val isSelected = option == selected
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = if (isSelected) colors.accent else colors.surface2,
-                    modifier = Modifier.clickable { onSelect(option) },
-                ) {
-                    Text(
-                        text = labelOf(option),
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isSelected) colors.onAccent else colors.textSecondary,
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ── 任务队列 ────────────────────────────────────────────────────────────────
-
-@Composable
-private fun QueueSection(
-    queue: AiQueueSnapshot,
-    running: Boolean,
-    viewModel: AiFeaturesViewModel,
-) {
-    val colors = radarColors()
-    // 清空待执行是批量丢弃（UI 审计 M3）：二次确认，不一键直发
-    var confirmClearPending by remember { mutableStateOf(false) }
-    Surface(shape = RoundedCornerShape(14.dp), color = colors.surface1) {
-        Column(Modifier.padding(16.dp)) {
-            Text(
-                stringResource(R.string.queue_title),
-                style = MaterialTheme.typography.titleSmall,
-                color = colors.textPrimary,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth()) {
-                QueueStat(stringResource(R.string.status_pending), queue.pending, colors.textPrimary)
-                QueueStat(stringResource(R.string.status_running), queue.running, colors.accent)
-                QueueStat(stringResource(R.string.status_done), queue.done, colors.textTertiary)
-                QueueStat(stringResource(R.string.status_failed), queue.failed, colors.textTertiary)
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(
-                    enabled = !running,
-                    onClick = { viewModel.onIntent(AiFeaturesIntent.RunNow) },
-                ) {
-                    Text(if (running) stringResource(R.string.running_now) else stringResource(R.string.run_now), color = colors.accent)
-                }
-                TextButton(onClick = { viewModel.onIntent(AiFeaturesIntent.RetryFailed) }) {
-                    Text(stringResource(R.string.retry_failed), color = colors.textSecondary)
-                }
-                TextButton(onClick = { confirmClearPending = true }) {
-                    Text(stringResource(R.string.clear_pending), color = colors.textSecondary)
-                }
-            }
-        }
-    }
-    if (confirmClearPending) {
-        AlertDialog(
-            onDismissRequest = { confirmClearPending = false },
-            containerColor = colors.surface1,
-            titleContentColor = colors.textPrimary,
-            textContentColor = colors.textSecondary,
-            title = { Text(stringResource(R.string.clear_pending), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
-            text = { Text(stringResource(R.string.clear_pending_warning, queue.pending)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmClearPending = false
-                    viewModel.onIntent(AiFeaturesIntent.ClearPending)
-                }) {
-                    Text(stringResource(R.string.clear), color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmClearPending = false }) {
-                    Text(stringResource(R.string.cancel), color = colors.textTertiary)
-                }
-            },
-        )
-    }
-}
-
-@Composable
-private fun QueueStat(label: String, value: Int, color: Color) {
-    val colors = radarColors()
-    Column(Modifier.padding(end = 18.dp)) {
-        Text(
-            value.toString(),
-            style = MaterialTheme.typography.titleMedium,
-            color = color,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(label, style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
-    }
-}
-
-// ── 功能开关 ────────────────────────────────────────────────────────────────
 
 @Composable
 private fun CategoryHeader(

@@ -7,7 +7,13 @@ package com.cycling.rssradar.core.data.ai
  * 在 AiPayloads 加载荷、AiParsers 加解析函数，再到 [AiFeatureSpecs] 登记一行
  * （prompt 构建 + 解析 + 空壳判定 + id 收口），app 侧 AiArticleSheet 的渲染注册表补一行。
  * 产物落 `ai_artifacts` 的 (subjectKind, subjectId, kind) 三元组，**不需要 schema 迁移**，
- * 这是本表刻意不做外键、改由每日任务清理孤儿换来的（见 AiSchema.kt 注释）。
+ * 这是本表刻意不做外键、改由每日任务清理孤儿换来的（见 AiArtifactSchema.kt 注释）。
+ *
+ * 本文件约 500 行，是本仓库少数**不能再拆**的文件之一：Kotlin 枚举项不能分文件，
+ * 35 项各带一段 KDoc（说明它做什么 / 入口在哪 / 呈现是什么），拆不动也不该拆——
+ * 把 KDoc 挪进 markdown 只会让「改功能时漏改说明」。同级的 [AiCategory]、
+ * [AiScope]、[AiTrigger] 已各自独立成文件。新增功能请只往这里加枚举项，
+ * 别的逻辑（spec / 载荷 / 解析）都在别的文件。
  *
  * 三项不变量：
  * 1. `dbValue` 一旦发布**永不复用、永不重排**——老版本写进 ai_artifacts 的 kind 靠它解释。
@@ -495,42 +501,4 @@ enum class AiFeature(
         /** 走后台批处理的那些——[AiTaskPlanner] 按这个入队。 */
         val BATCH_FEATURES: List<AiFeature> = entries.filter { it.trigger == AiTrigger.BATCH }
     }
-}
-
-/** 三大功能分组，与需求文档的内容处理 / 推荐发现 / 辅助推送一一对应。 */
-enum class AiCategory(val label: String, val description: String) {
-    CONTENT("内容处理", "对单篇文章做理解、提炼与加工。"),
-    DISCOVERY("推荐发现", "帮你找到该读的、该订的、以及你还没看到的。"),
-    ASSIST("辅助推送", "总结、提醒与控制成本，让 AI 用得起。"),
-}
-
-/** 产物挂在什么主体上，决定 ai_artifacts 的 subjectKind 与孤儿清理方式。 */
-enum class AiScope(val dbValue: Int, val label: String) {
-    /** 文章级：随文章一起归档清理。 */
-    ARTICLE(dbValue = 0, label = "文章"),
-
-    /** 订阅源级：随订阅源删除而清理。 */
-    FEED(dbValue = 1, label = "订阅源"),
-
-    /** 全局级：按时间滚动清理（简报、报告、画像解读）。 */
-    GLOBAL(dbValue = 2, label = "全局"),
-    ;
-
-    companion object {
-        fun fromDbValue(value: Int): AiScope? = entries.firstOrNull { it.dbValue == value }
-    }
-}
-
-/**
- * 触发方式。这不是文档字段——[AiTaskPlanner] 与 UI 都按它分流：
- * - MANUAL：只有用户显式点按钮才跑，不进队列。
- * - ON_DEMAND：进入时若有产物直接用，没有才跑；跑完持久化（摘要、关联推荐）。
- * - BATCH：不实时跑，由每日任务批量入队，受并发与日预算双重限制。
- * - REALTIME：每次都实时调，结果不落库（问答、划词解释）。
- */
-enum class AiTrigger(val label: String, val description: String) {
-    MANUAL("手动触发", "用户点按钮才执行，不占用后台额度。"),
-    ON_DEMAND("按需生成", "有产物直接用，没有才生成，生成后持久保存。"),
-    BATCH("后台批处理", "每日任务批量执行，受并发与日预算限制。"),
-    REALTIME("实时交互", "每次都实时调用，结果不落库。"),
 }

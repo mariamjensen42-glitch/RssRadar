@@ -61,42 +61,10 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.i18n.formatLogTimestamp
 
 /** 单条崩溃的全文（dialog 内容）。 */
 data class CrashDetail(val name: String, val head: String, val text: String)
-
-@HiltViewModel
-class CrashLogViewModel @Inject constructor() : ViewModel() {
-
-    private val _records = MutableStateFlow<List<CrashRecord>>(emptyList())
-    val records: StateFlow<List<CrashRecord>> = _records
-
-    private val _detail = MutableStateFlow<CrashDetail?>(null)
-    val detail: StateFlow<CrashDetail?> = _detail
-
-    /** 落盘/读取都在 IO：崩溃日志可能有几十 KB，别在主线程啃文件。 */
-    fun refresh(context: Context) {
-        viewModelScope.launch(Dispatchers.IO) { _records.value = CrashLog.list(context) }
-    }
-
-    fun open(context: Context, record: CrashRecord) {
-        viewModelScope.launch(Dispatchers.IO) {
-            _detail.value = CrashDetail(record.name, record.head, CrashLog.read(context, record.name))
-        }
-    }
-
-    fun close() {
-        _detail.value = null
-    }
-
-    fun clear(context: Context) {
-        viewModelScope.launch(Dispatchers.IO) {
-            CrashLog.clear(context)
-            _records.value = emptyList()
-            _detail.value = null
-        }
-    }
-}
 
 /**
  * 崩溃日志（issue #61）：最近 5 次崩溃的清单，点开看全文、可导出分享。
@@ -111,12 +79,13 @@ fun CrashLogScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val records by viewModel.records.collectAsState()
-    val detail by viewModel.detail.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+    val records = uiState.records
+    val detail = uiState.detail
     var confirmClear by remember { mutableStateOf(false) }
 
     // 进页面读一次磁盘；崩溃日志只在打开时变，不做轮询。
-    LaunchedEffect(Unit) { viewModel.refresh(context) }
+    LaunchedEffect(Unit) { viewModel.onIntent(CrashLogIntent.Refresh, context) }
 
     Column(
         modifier = modifier
@@ -165,7 +134,7 @@ fun CrashLogScreen(
         } else {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 records.forEach { record ->
-                    CrashRow(record) { viewModel.open(context, record) }
+                    CrashRow(record) { viewModel.onIntent(CrashLogIntent.OpenDetail(record), context) }
                     Spacer(Modifier.height(8.dp))
                 }
                 Spacer(Modifier.height(16.dp))
@@ -175,7 +144,7 @@ fun CrashLogScreen(
 
     detail?.let { crash ->
         AlertDialog(
-            onDismissRequest = viewModel::close,
+            onDismissRequest = { viewModel.onIntent(CrashLogIntent.CloseDetail, context) },
             title = {
                 Text(
                     text = crash.head,
@@ -202,7 +171,7 @@ fun CrashLogScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::close) { Text(stringResource(R.string.close), color = radarColors().textSecondary) }
+                TextButton(onClick = { viewModel.onIntent(CrashLogIntent.CloseDetail, context) }) { Text(stringResource(R.string.close), color = radarColors().textSecondary) }
             },
             containerColor = radarColors().surface1,
         )
@@ -217,7 +186,7 @@ fun CrashLogScreen(
                 TextButton(
                     onClick = {
                         confirmClear = false
-                        viewModel.clear(context)
+                        viewModel.onIntent(CrashLogIntent.Clear, context)
                     },
                 ) { Text(stringResource(R.string.clear), color = Danger, fontWeight = FontWeight.SemiBold) }
             },
@@ -296,5 +265,4 @@ private fun Context.shareCrashLog(text: String, head: String) {
         .onFailure { Toast.makeText(this, getString(R.string.crash_export_failed), Toast.LENGTH_SHORT).show() }
 }
 
-private fun formatTime(millis: Long): String =
-    SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault()).format(Date(millis))
+private fun formatTime(millis: Long): String = formatLogTimestamp(millis, withSeconds = true)

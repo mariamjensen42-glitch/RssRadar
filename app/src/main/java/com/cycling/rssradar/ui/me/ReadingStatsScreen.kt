@@ -44,6 +44,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.setValue
 
 /** 统计仪表盘 UiState（#83）：所有数字来自 DB 真实计算，一个都不许编。 */
 data class ReadingStatsUiState(
@@ -69,68 +70,13 @@ data class ReadingStatsUiState(
  * 统计仪表盘 VM（#83）：编排 SQL 原料与 [AiReadingStats] 纯函数。
  * 纯函数管算法，DAO 管取数，这里只拼装——保证每个数字都能回溯到一条查询。
  */
-@HiltViewModel
-class ReadingStatsViewModel @Inject constructor(
-    private val articleDao: ArticleDao,
-) : ViewModel() {
-
-    private val _state = MutableStateFlow(ReadingStatsUiState())
-    val state: StateFlow<ReadingStatsUiState> = _state.asStateFlow()
-
-    init {
-        viewModelScope.launch {
-            // 口径装配收敛到 ReadingStatsDashboard（core/domain 纯函数，JVM 可测）——
-            // 本 VM 只负责取数：每个数字都能回溯到一条查询，装配规则只写一遍。
-            val now = System.currentTimeMillis()
-            val zoneOffset = java.util.TimeZone.getDefault().getOffset(now)
-
-            val since = now - ReadingStatsDashboard.WINDOW_DAYS * ReadingStatsDashboard.DAY_MS
-            val window = articleDao.readingWindowStat(since)
-            // 全部打开时间戳：活跃时段只要近 7 天的，streak 要全部历史（断一天就断）
-            val allOpened = articleDao.allOpenedTimestamps()
-            val perFeed = articleDao.openedCountsByFeedSince(since)
-            val top = articleDao.topOpenedFeeds(since, ReadingStatsDashboard.TOP_FEED_LIMIT)
-
-            val summary = ReadingStatsDashboard.assemble(
-                ReadingStatsDashboard.Inputs(
-                    now = now,
-                    zoneOffsetMillis = zoneOffset,
-                    windowCnt = window.cnt,
-                    windowMinutes = window.minutes,
-                    allOpened = allOpened,
-                    openedCountsByFeed = perFeed.map { it.cnt },
-                ),
-            )
-
-            _state.value = ReadingStatsUiState(
-                weekOpens = summary.weekOpens,
-                weekMinutes = summary.weekMinutes,
-                activeHours = summary.activeHours,
-                topFeeds = top,
-                concentration = summary.concentration,
-                streakDays = summary.streakDays,
-                starredCount = articleDao.starredCount(),
-                bookmarkedCount = articleDao.bookmarkedCount(),
-                loaded = true,
-            )
-            // 未读存量跟随 DB 实时变化，单独 collect
-            launch {
-                articleDao.observeUnreadCount().collect { unread ->
-                    _state.value = _state.value.copy(unreadCount = unread)
-                }
-            }
-        }
-    }
-
-    }
-
 /** 统计仪表盘页（#83）：一屏卡片，近 7 天滚动窗，无切换。 */
 @Composable
 fun ReadingStatsScreen(
     onBack: () -> Unit,
     viewModel: ReadingStatsViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.uiState.collectAsState()
     val colors = radarColors()
 
     Column(

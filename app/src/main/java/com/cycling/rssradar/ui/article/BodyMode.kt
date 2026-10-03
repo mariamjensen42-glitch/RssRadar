@@ -107,7 +107,7 @@ internal fun resolveBodyPlan(
 private const val SUMMARY_SWITCH_MIN_GAIN = 120
 
 private val HTML_TAG = Regex("<[^>]*>")
-private val WHITESPACE = Regex("\\s+")
+internal val WHITESPACE = Regex("\\s+")
 
 /** HTML 去标签后的可见字数（够用的估算：不解码实体，只用于长短比较）。 */
 internal fun plainTextLength(html: String): Int =

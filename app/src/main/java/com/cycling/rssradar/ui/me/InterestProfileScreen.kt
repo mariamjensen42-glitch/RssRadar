@@ -38,6 +38,7 @@ import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
 import com.cycling.rssradar.core.ui.theme.radarColors
+import androidx.compose.runtime.setValue
 
 /**
  * 兴趣画像页（ADR-0013）：推荐流"为什么推这些"的答案，只读。

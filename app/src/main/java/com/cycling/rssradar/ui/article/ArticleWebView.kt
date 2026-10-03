@@ -18,6 +18,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.cycling.rssradar.ui.components.openUrl
 import com.cycling.rssradar.ui.theme.LocalReadingPrefs
 import com.cycling.rssradar.core.ui.theme.radarColors
+import androidx.compose.runtime.setValue
 
 /**
  * 页内查找在 WebView 路的状态。刻意**不用 Compose State**——[AndroidView] 的 update

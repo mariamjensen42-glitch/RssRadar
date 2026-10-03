@@ -39,6 +39,8 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Trash2
+import com.cycling.rssradar.ui.settings.SettingsSubPage
+import androidx.compose.runtime.setValue
 
 /** 本地关键词过滤规则：规则命中后的动作由 FilterRuleEngine 在刷新链与通知链执行。 */
 @Composable

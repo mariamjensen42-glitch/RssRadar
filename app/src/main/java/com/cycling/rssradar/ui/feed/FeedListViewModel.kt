@@ -17,7 +17,7 @@ import com.cycling.rssradar.core.data.store.prefs.ListDisplayStore
 import com.cycling.rssradar.core.data.store.model.ListViewMode
 import com.cycling.rssradar.core.model.MarkAsReadCondition
 import com.cycling.rssradar.core.data.store.prefs.RecommendationStore
-import com.cycling.rssradar.ui.mvi.MviViewModel
+import com.cycling.rssradar.core.ui.mvi.MviStateViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -85,6 +86,12 @@ data class FeedListUiState(
      * Snackbar 期内可撤销；超时即丢弃（降权保留）。
      */
     val pendingUndoReduceFeedId: Long? = null,
+    /** 全局未读数（底栏角标）。 */
+    val unreadCount: Int = 0,
+    /** 分组清单（注册表），供筛选栏使用。 */
+    val groupOptions: List<String> = emptyList(),
+    /** 推荐流开关状态（ADR-0013）。 */
+    val recommendationEnabled: Boolean = false,
 )
 
 /** 信息流事件（候选 A，ADR-0003）。 */
@@ -131,19 +138,10 @@ class FeedListViewModel @Inject constructor(
     private val recommendation: Recommendation,
     recommendationStore: RecommendationStore,
     private val listDisplayStore: ListDisplayStore,
-) : ViewModel(), MviViewModel<FeedListIntent> {
+) : ViewModel(), MviStateViewModel<FeedListIntent, FeedListUiState> {
 
     private val _uiState = MutableStateFlow(FeedListUiState())
-    val uiState: StateFlow<FeedListUiState> = _uiState.asStateFlow()
-
-    val unreadCount: StateFlow<Int> = repository.observeUnreadCount()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
-
-    /** 分组清单（注册表），供筛选栏使用。 */
-    val groupOptions: StateFlow<List<String>> = MutableStateFlow(groupStore.getGroups())
-
-    /** 推荐流开关状态（ADR-0013）。 */
-    val recommendationEnabled: StateFlow<Boolean> = recommendationStore.state
+    override val uiState: StateFlow<FeedListUiState> = _uiState.asStateFlow()
 
     private var loadMoreJob: Job? = null
 
@@ -167,10 +165,22 @@ class FeedListViewModel @Inject constructor(
         // 推荐流在设置里被关掉时，若正停在「推荐」tab 则退回「全部」——
         // 否则用户会看到一个没有对应 chip 的列表（tab 与内容对不上）。
         viewModelScope.launch {
-            recommendationEnabled.collect { enabled ->
+            recommendationStore.state.collect { enabled ->
+                _uiState.update { it.copy(recommendationEnabled = enabled) }
                 if (!enabled && _uiState.value.selectedTab == FeedTab.Recommended) {
                     selectTab(FeedTab.All)
                 }
+            }
+        }
+        viewModelScope.launch {
+            repository.observeUnreadCount().collect { count ->
+                _uiState.update { it.copy(unreadCount = count) }
+            }
+        }
+        // 原先 groupOptions 是一次性快照：建 VM 时读一次注册表，此后新建分组在信息流筛选栏里看不到。
+        viewModelScope.launch {
+            groupStore.state.collect { groups ->
+                _uiState.update { it.copy(groupOptions = groups) }
             }
         }
     }

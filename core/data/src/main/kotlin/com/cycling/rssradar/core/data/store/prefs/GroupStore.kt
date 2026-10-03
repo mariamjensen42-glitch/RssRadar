@@ -6,6 +6,9 @@ import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.core.model.GROUP_DESIGN
 import com.cycling.rssradar.core.model.GROUP_DEV
 import com.cycling.rssradar.core.model.GROUP_TECH
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * 分组注册表：分组名清单（SharedPreferences）。
@@ -16,6 +19,9 @@ import com.cycling.rssradar.core.model.GROUP_TECH
  * - 重命名 = 注册表改名 + feeds.groupName 批量更新
  */
 class GroupStore(private val prefs: SharedPreferences) {
+
+    private val _groups = MutableStateFlow(readGroups())
+    val state: StateFlow<List<String>> = _groups.asStateFlow()
 
     init {
         // 首次运行：写入默认分组，保证注册表非空、UI 总有分组可显示
@@ -28,31 +34,38 @@ class GroupStore(private val prefs: SharedPreferences) {
                     )
                 )
             }
+            _groups.value = readGroups()
         }
     }
 
-    fun getGroups(): List<String> =
+    private fun readGroups(): List<String> =
         (prefs.getString(KEY_GROUPS, null) ?: "").split(GROUP_SEPARATOR).filter { it.isNotBlank() }
+
+    fun getGroups(): List<String> = _groups.value
 
     fun addGroup(name: String): Boolean {
         val clean = name.trim()
-        if (clean.isBlank() || getGroups().contains(clean)) return false
-        val next = (getGroups() + clean).distinct()
-        prefs.edit { putString(KEY_GROUPS, next.joinToString(GROUP_SEPARATOR)) }
+        if (clean.isBlank() || _groups.value.contains(clean)) return false
+        persist(_groups.value + clean)
         return true
     }
 
     fun renameGroup(old: String, new: String): Boolean {
         val clean = new.trim()
-        if (clean.isBlank() || getGroups().contains(clean)) return false
-        val next = getGroups().map { if (it == old) clean else it }
-        prefs.edit { putString(KEY_GROUPS, next.joinToString(GROUP_SEPARATOR)) }
+        if (clean.isBlank() || _groups.value.contains(clean)) return false
+        persist(_groups.value.map { if (it == old) clean else it })
         return true
     }
 
     fun removeGroup(name: String) {
-        val next = getGroups().filterNot { it == name }
-        prefs.edit { putString(KEY_GROUPS, next.joinToString(GROUP_SEPARATOR)) }
+        persist(_groups.value.filterNot { it == name })
+    }
+
+    /** 每次落盘后同步推给订阅者，否则各 ViewModel 只能拿到建 VM 那刻的快照，新建分组看不见。 */
+    private fun persist(next: List<String>) {
+        val distinct = next.distinct()
+        prefs.edit { putString(KEY_GROUPS, distinct.joinToString(GROUP_SEPARATOR)) }
+        _groups.value = distinct
     }
 
     companion object {

@@ -23,7 +23,8 @@ import com.cycling.rssradar.core.domain.rsshub.RoutePath
 import com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.core.model.rsshub.RssHubRoute
 import com.cycling.rssradar.core.domain.rsshub.RssHubRoutes
-import com.cycling.rssradar.ui.mvi.MviViewModel
+import com.cycling.rssradar.core.data.store.prefs.GroupStore
+import com.cycling.rssradar.core.ui.mvi.MviStateViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -31,6 +32,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -82,7 +84,11 @@ data class AddSubscriptionUiState(
     val catalogSource: CatalogSource = CatalogSource.BUILTIN,
     /** 当前检索结果。单独存而不用派生属性：3800 条打分不该在每次 state 拷贝时重算。 */
     val visibleRoutes: List<RssHubRoute> = emptyList(),
-    ) {
+    /** Snackbar 文案。原先漏在 UiState 外用 Compose mutableStateOf，渲染时序会与其它字段不同步。 */
+    val uiMessage: String? = null,
+    /** 分组选项。原先硬编码三个常量，与订阅页读注册表各说各话，新建分组这里看不见。 */
+    val groupOptions: List<String> = emptyList(),
+) {
     /** 当前参数拼出来的完整地址；必填参数没填时为 null。 */
     val builtUrl: String? get() = selectedRoute?.let { RssHubRoutes.buildUrl(it, paramValues, host) }
     /** 还没填的必填参数（顺序与表单一致）。空 = 能生成。缺参数时必须说缺哪个，不能只把按钮置灰。 */
@@ -121,16 +127,11 @@ class AddSubscriptionViewModel @Inject constructor(
     private val subscriptionFlow: SubscriptionFlow,
     private val instanceStore: RssHubInstanceStore,
     private val catalogStore: RouteCatalogStore,
-) : ViewModel(), MviViewModel<AddSubscriptionIntent> {
+    private val groupStore: GroupStore,
+) : ViewModel(), MviStateViewModel<AddSubscriptionIntent, AddSubscriptionUiState> {
 
     private val _state = MutableStateFlow(AddSubscriptionUiState(host = instanceStore.currentOrDefault()))
-    val state: StateFlow<AddSubscriptionUiState> = _state.asStateFlow()
-
-    /** 分组选项。与订阅页保持一致，避免两处各写一份。 */
-    val groupOptions: List<String> = listOf(GROUP_TECH, GROUP_DEV, GROUP_DESIGN)
-
-    var uiMessage by mutableStateOf<String?>(null)
-        private set
+    override val uiState: StateFlow<AddSubscriptionUiState> = _state.asStateFlow()
 
     private var validationJob: Job? = null
 
@@ -138,6 +139,9 @@ class AddSubscriptionViewModel @Inject constructor(
     private var allRoutes: List<RssHubRoute> = emptyList()
 
     init {
+        viewModelScope.launch {
+            groupStore.state.collect { groups -> _state.update { it.copy(groupOptions = groups) } }
+        }
         loadCatalog()
     }
 
@@ -167,7 +171,7 @@ class AddSubscriptionViewModel @Inject constructor(
             AddSubscriptionIntent.PreviewRoute -> previewRoute()
             AddSubscriptionIntent.RefreshCatalog -> refreshCatalog()
             AddSubscriptionIntent.Submit -> submit()
-            AddSubscriptionIntent.ConsumeMessage -> uiMessage = null
+            AddSubscriptionIntent.ConsumeMessage -> _state.update { it.copy(uiMessage = null) }
             is AddSubscriptionIntent.PickDiscovered -> pickDiscovered(intent.feed)
         }
     }
@@ -204,11 +208,11 @@ class AddSubscriptionViewModel @Inject constructor(
                         catalogSource = CatalogSource.UPDATED,
                         visibleRoutes = search(),
                     )
-                    uiMessage = "路由目录已更新，共 $count 条"
+                    _state.update { it.copy(uiMessage = "路由目录已更新，共 $count 条") }
                 }
                 .onFailure { error ->
                     _state.value = _state.value.copy(isCatalogRefreshing = false)
-                    uiMessage = "路由目录更新失败：${error.message ?: "网络错误"}"
+                    _state.update { it.copy(uiMessage = "路由目录更新失败：${error.message ?: "网络错误"}") }
                 }
         }
     }
@@ -273,7 +277,7 @@ class AddSubscriptionViewModel @Inject constructor(
         val route = _state.value.selectedRoute ?: return
         val values = RoutePath.match(route.path, example.path)
         if (values == null) {
-            uiMessage = "这条示例与路由模板对不上，请手动填写参数"
+            _state.update { it.copy(uiMessage = "这条示例与路由模板对不上，请手动填写参数") }
             return
         }
         validationJob?.cancel()
@@ -299,12 +303,12 @@ class AddSubscriptionViewModel @Inject constructor(
         if (missing.isNotEmpty()) {
             val names = missing.joinToString("、") { it.label.ifBlank { it.key } }
             _state.value = _state.value.copy(validation = ValidationInfo.Invalid("请先填写：$names"))
-            uiMessage = "请先填写：$names"
+            _state.update { it.copy(uiMessage = "请先填写：$names") }
             return
         }
         val built = state.builtUrl
         if (built == null) {
-            uiMessage = "参数拼不出完整地址，请检查参数"
+            _state.update { it.copy(uiMessage = "参数拼不出完整地址，请检查参数") }
             return
         }
         validate(built, fromRoute = true)
@@ -465,7 +469,7 @@ class AddSubscriptionViewModel @Inject constructor(
             catalogSource = current.catalogSource,
             visibleRoutes = RouteCatalogQuery.search(allRoutes, "", RouteCategory.ALL),
         )
-        uiMessage = null
+        _state.update { it.copy(uiMessage = null) }
     }
 
     /** 抽屉整体关闭（非流程内返回目录）：VM 是 Activity 作用域、不随弹层销毁，需手动重置。 */
@@ -488,16 +492,16 @@ class AddSubscriptionViewModel @Inject constructor(
             _state.value = _state.value.copy(host = host)
             if (isReachable(host)) return@launch
             if (instanceStore.customHost != null) {
-                uiMessage = "自定义实例 $host 不可达，到「我的 → RSSHub 实例」检查"
+                _state.update { it.copy(uiMessage = "自定义实例 $host 不可达，到「我的 → RSSHub 实例」检查") }
                 return@launch
             }
             val found = instanceStore.refreshAvailableHost()
             if (found == null) {
-                uiMessage = "所有内置实例都不可达，请检查网络或填入自建实例"
+                _state.update { it.copy(uiMessage = "所有内置实例都不可达，请检查网络或填入自建实例") }
                 return@launch
             }
             _state.value = _state.value.copy(host = found)
-            uiMessage = "已切换到可用实例：$found"
+            _state.update { it.copy(uiMessage = "已切换到可用实例：$found") }
         }
     }
 
@@ -514,11 +518,15 @@ class AddSubscriptionViewModel @Inject constructor(
             }
             val result = subscriptionFlow.addFeed(state.url.trim(), state.selectedGroup, sourceType)
             _state.value = _state.value.copy(isAdding = false)
-            uiMessage = when (result) {
-                AddFeedResult.Success -> "订阅成功"
-                AddFeedResult.Duplicate -> "该源已订阅"
-                AddFeedResult.InvalidFeed -> "不是有效的 RSS/Atom 源"
-                AddFeedResult.NetworkError -> "网络错误，请检查链接后重试"
+            _state.update {
+                it.copy(
+                    uiMessage = when (result) {
+                        AddFeedResult.Success -> "订阅成功"
+                        AddFeedResult.Duplicate -> "该源已订阅"
+                        AddFeedResult.InvalidFeed -> "不是有效的 RSS/Atom 源"
+                        AddFeedResult.NetworkError -> "网络错误，请检查链接后重试"
+                    }
+                )
             }
             if (result == AddFeedResult.Success) reset()
         }

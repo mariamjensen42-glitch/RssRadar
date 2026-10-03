@@ -13,7 +13,7 @@ import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.repository.FeedRepository
 import com.cycling.rssradar.core.data.ai.AiRepository
-import com.cycling.rssradar.ui.mvi.MviViewModel
+import com.cycling.rssradar.core.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job

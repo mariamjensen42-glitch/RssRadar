@@ -10,7 +10,7 @@ import com.cycling.rssradar.core.data.ai.AiRepository
 import com.cycling.rssradar.core.domain.search.SearchFilters
 import com.cycling.rssradar.core.model.library.LibraryRange
 import com.cycling.rssradar.ui.feed.PagedSnapshot
-import com.cycling.rssradar.ui.mvi.MviViewModel
+import com.cycling.rssradar.core.ui.mvi.MviStateViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -63,16 +63,18 @@ sealed interface SearchIntent {
     data object ToggleStarredOnly : SearchIntent
     data object ToggleBookmarkedOnly : SearchIntent
     data object ClearFilters : SearchIntent
+    /** 滚动触发的加载更多，与 FeedListIntent.LoadMore 对齐，不留散装公开方法。 */
+    data object LoadMore : SearchIntent
 }
 
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val repository: FeedRepository,
     private val aiRepository: AiRepository,
-) : ViewModel(), MviViewModel<SearchIntent> {
+) : ViewModel(), MviStateViewModel<SearchIntent, SearchUiState> {
 
     private val _state = MutableStateFlow(SearchUiState())
-    val state: StateFlow<SearchUiState> = _state.asStateFlow()
+    override val uiState: StateFlow<SearchUiState> = _state.asStateFlow()
 
     /** 源筛选的候选清单（同时用于把 feedId 显示成源名）。 */
     val feeds: StateFlow<List<FeedEntity>> = repository.observeFeeds()
@@ -106,6 +108,7 @@ class SearchViewModel @Inject constructor(
                 _state.update { it.copy(range = LibraryRange.ALL) }
                 applyFilters { SearchFilters.None }
             }
+            SearchIntent.LoadMore -> loadMore()
         }
     }
 
@@ -118,7 +121,7 @@ class SearchViewModel @Inject constructor(
         runSearch()
     }
 
-    fun loadMore() {
+    private fun loadMore() {
         val state = _state.value
         if (state.loading || state.results.size >= state.hits || state.query.isBlank()) return
         loadMoreJob?.cancel()

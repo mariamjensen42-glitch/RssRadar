@@ -425,7 +425,7 @@
     <string name="saturation">Saturation</string>
     <string name="lightness">Lightness</string>
     <string name="dynamic_color">Dynamic color</string>
-    <string name="dynamic_color_desc">Accent follows the system wallpaper; cards and backgrounds keep RssRadar\'s palette.</string>
+    <string name="dynamic_color_desc">The whole palette follows the system wallpaper, including cards, backgrounds, and text.</string>
     <string name="dynamic_color_unsupported">System dynamic color requires Android 12+; not supported on this device.</string>
     <string name="list_display">List display</string>
     <string name="list_display_desc">Which items article cards show in the home and feed lists; global, applies immediately.</string>

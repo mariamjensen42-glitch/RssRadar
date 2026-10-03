@@ -37,6 +37,10 @@ dependencies {
     api(libs.androidx.compose.ui.tooling.preview)
     api(libs.androidx.compose.runtime.saveable)
 
+    // MVI 契约（core.ui.mvi）把 StateFlow/SharedFlow 作为公开 API 类型暴露，
+    // 必须走 api，否则实现方拿不到 coroutines 类型。
+    api(libs.kotlinx.coroutines.core)
+
     api(libs.coil.compose)
     api(libs.coil.network.okhttp)
     api(libs.compose.icons.lucide)

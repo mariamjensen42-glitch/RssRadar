@@ -84,10 +84,10 @@ import com.cycling.rssradar.ui.navigation.FeedArticlesRoute
 import com.cycling.rssradar.ui.navigation.FeedRoute
 import com.cycling.rssradar.ui.navigation.FetchDiagnosticsRoute
 import com.cycling.rssradar.ui.navigation.InterestProfileRoute
-import com.cycling.rssradar.ui.me.SettingsAiDiagScreen
-import com.cycling.rssradar.ui.me.SettingsGeneralScreen
-import com.cycling.rssradar.ui.me.SettingsRssHubScreen
-import com.cycling.rssradar.ui.me.SettingsSyncScreen
+import com.cycling.rssradar.ui.settings.SettingsAiDiagScreen
+import com.cycling.rssradar.ui.settings.SettingsGeneralScreen
+import com.cycling.rssradar.ui.settings.SettingsRssHubScreen
+import com.cycling.rssradar.ui.settings.SettingsSyncScreen
 import com.cycling.rssradar.ui.navigation.MeRoute
 import com.cycling.rssradar.ui.navigation.ReadingStatsRoute
 import com.cycling.rssradar.ui.navigation.SearchRoute
@@ -105,8 +105,14 @@ import com.cycling.rssradar.ui.me.NotificationSettingsScreen
 import com.cycling.rssradar.ui.theme.CompositionLocalRoot
 import dagger.hilt.android.AndroidEntryPoint
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
-import com.cycling.rssradar.core.ui.theme.MotionTokens
+import com.cycling.rssradar.core.ui.theme.fastEffectsSpec
+import com.cycling.rssradar.core.ui.theme.fastSpatialSpec
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.theme.spatialSpec
+import com.cycling.rssradar.ui.settings.SettingsAiDiagScreen
+import com.cycling.rssradar.ui.settings.SettingsGeneralScreen
+import com.cycling.rssradar.ui.settings.SettingsRssHubScreen
+import com.cycling.rssradar.ui.settings.SettingsSyncScreen
 
 /**
  * 纯壳 Activity：edge-to-edge + 组合根。启动副作用在 [RssRadarApp]，
@@ -203,16 +209,17 @@ private fun RssRadarAppContent(
 
     Box(modifier = Modifier.fillMaxSize().background(radarColors().bgRoot)) {
         // 页面转场（docs/motion.md #1，issue #72）分两层：
-        // - 层级导航（列表→详情这类）：前进「新页右滑入 1/12 + fade」（280ms emphasized），
-        //   返回镜像；退场用 200ms——退场比进场快，转场才跟手，双向同速必然显拖。
+        // - 层级导航（列表→详情这类）：前进「新页右滑入 1/12 + fade」，返回镜像；
+        //   退场用官方 fast 档——退场比进场快，转场才跟手，双向同速必然显拖。
         // - 顶层 tab 互切（Feed/订阅/搜索/我的）：同级没有方向语义，滑左右是假动作，
-        //   统一 200ms crossfade。
+        //   统一淡入淡出。
         // - reduce-motion：None = 瞬时切换。
+        // 规格来自 M3 Expressive 官方 MotionScheme：空间位移走 spatial 族，淡入淡出走 effects 族。
         val reducedMotion = LocalReducedMotion.current
-        val enterSlide = tween<IntOffset>(MotionTokens.DurationMedium, easing = MotionTokens.EasingEmphasized)
-        val enterFade = tween<Float>(MotionTokens.DurationMedium, easing = MotionTokens.EasingEmphasized)
-        val exitSlide = tween<IntOffset>(MotionTokens.DurationShort, easing = MotionTokens.EasingEmphasized)
-        val exitFade = tween<Float>(MotionTokens.DurationShort, easing = MotionTokens.EasingEmphasized)
+        val enterSlide = spatialSpec<IntOffset>()
+        val enterFade = spatialSpec<Float>()
+        val exitSlide = fastSpatialSpec<IntOffset>()
+        val exitFade = fastEffectsSpec()
         val topLevelRoutes = listOf(
             FeedRoute::class,
             SubscriptionsRoute::class,

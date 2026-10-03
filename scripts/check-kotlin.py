@@ -349,13 +349,16 @@ def main() -> int:
     if args.files:
         files = [str(ROOT / f) for f in args.files]
     else:
-        # 模块拆分后 app + core 四个子模块一起编；漏 core 源码会 2000+ 假 unresolved
+        # 模块拆分后 app + core 四个子模块一起编；漏 core 源码会 2000+ 假 unresolved。
+        # feature 模块同样纳入：脚本按扁平 classpath 编译，不还原 gradle 模块边界，
+        # 模块间非法依赖由 check-module-deps.py 守（本脚本管类型正确性）。
         src_roots = [
             ROOT / "app/src/main/java",
             ROOT / "core/model/src/main",
             ROOT / "core/domain/src/main",
             ROOT / "core/data/src/main",
             ROOT / "core/ui/src/main",
+            ROOT / "feature/addsubscription/src/main",
         ]
         files = [f for root in src_roots for f in sources(root)]
         if not args.main_only:

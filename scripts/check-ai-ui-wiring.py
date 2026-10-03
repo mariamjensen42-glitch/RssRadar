@@ -104,11 +104,22 @@ def has_generic_trigger() -> bool:
 
 
 def sheet_render_branches() -> set[str]:
-    """AI_RESULT_RENDERS 注册表里已处理的 payload 类型名。"""
-    src = read(SHEET_FILE)
-    table = src.split("AI_RESULT_RENDERS: Map<AiFeature,", 1)[1]
-    table = table.split("\n}", 1)[0]
-    return set(re.findall(r"as (Ai[A-Za-z]*Payload)", table))
+    """AI_RESULT_RENDERS 注册表里已处理的 payload 类型名。
+
+    注册表会随文件拆分搬家（曾在 AiArticleSheet.kt，后拆到 AiResultBodies.kt），
+    所以这里在整个 ui/article 下搜内容而不是钉死某个路径——钉死路径在拆分后
+    会 IndexError，看着像脚本坏了，其实是它找不到文件了。
+    """
+    for kt in (ROOT / "app/src/main/java/com/cycling/rssradar/ui/article").rglob("*.kt"):
+        src = read(kt)
+        if "AI_RESULT_RENDERS: Map<AiFeature," in src:
+            table = src.split("AI_RESULT_RENDERS: Map<AiFeature,", 1)[1]
+            table = table.split("\n}", 1)[0]
+            return set(re.findall(r"as (Ai[A-Za-z]*Payload)", table))
+    raise SystemExit(
+        "未找到 AI_RESULT_RENDERS 注册表：ui/article 下已无该声明，"
+        "渲染注册可能被改名或删除，请人工确认 AI 功能是否仍全部有渲染分支。"
+    )
 
 
 def payload_type_of() -> dict[str, str]:

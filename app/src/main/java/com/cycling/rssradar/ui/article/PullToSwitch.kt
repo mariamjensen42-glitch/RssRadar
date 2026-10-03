@@ -10,6 +10,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Velocity
+import androidx.compose.runtime.setValue
 
 /**
  * 触发切篇所需的越界位移（px，ReadYou 差距表 #23）。

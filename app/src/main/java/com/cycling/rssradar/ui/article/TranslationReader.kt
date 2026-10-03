@@ -180,7 +180,7 @@ internal fun TranslationReader(
                     )
                     Spacer(Modifier.height(PAIR_GAP_DP.dp))
                 } else {
-                    Spacer(Modifier.height(BLOCK_GAP_DP.dp))
+                    Spacer(Modifier.height(TRANSLATION_BLOCK_GAP_DP.dp))
                 }
             }
         }
@@ -230,4 +230,4 @@ private const val ITEM_GAP_DP = 4
 private const val PAIR_GAP_DP = 10
 
 /** 纯译文模式相邻块之间的间距。 */
-private const val BLOCK_GAP_DP = 8
+private const val TRANSLATION_BLOCK_GAP_DP = 8

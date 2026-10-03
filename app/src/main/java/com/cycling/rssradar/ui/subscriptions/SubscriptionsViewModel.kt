@@ -20,7 +20,7 @@ import com.cycling.rssradar.core.data.store.prefs.FeedSortStore
 import com.cycling.rssradar.core.data.store.prefs.GroupStore
 import com.cycling.rssradar.core.domain.rss.FeedFailureCategory
 import com.cycling.rssradar.core.domain.rss.FeedHealth
-import com.cycling.rssradar.ui.mvi.MviViewModel
+import com.cycling.rssradar.core.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -133,9 +133,8 @@ class SubscriptionsViewModel @Inject constructor(
     private val _selectedFeedIds = MutableStateFlow(emptySet<Long>())
     val selectedFeedIds: StateFlow<Set<Long>> = _selectedFeedIds.asStateFlow()
 
-    /** 分组注册表：保证空分组也显示。 */
-    private val _groupsList = MutableStateFlow(groupStore.getGroups())
-    val groupsList: StateFlow<List<String>> = _groupsList.asStateFlow()
+    /** 分组注册表：保证空分组也显示。直连 GroupStore 的流，不再自持一份需要手动刷新的副本。 */
+    val groupsList: StateFlow<List<String>> = groupStore.state
 
     val groups: StateFlow<List<GroupSectionUi>> =
         combine(
@@ -143,7 +142,7 @@ class SubscriptionsViewModel @Inject constructor(
             repository.observeFeedUnreadCounts(),
             repository.observeFeedLatestTimes(),
         ) { feeds, unread, latest -> FeedInputs(feeds, unread, latest) }
-            .combine(_groupsList) { inputs, registered -> inputs to registered }
+            .combine(groupsList) { inputs, registered -> inputs to registered }
             .combine(feedSortStore.state) { (inputs, registered), sort ->
                 groupFeeds(inputs.feeds, inputs.unread, inputs.latest, registered, sort)
             }
@@ -299,14 +298,12 @@ class SubscriptionsViewModel @Inject constructor(
     /** 新建分组：仅注册表加名；已有同名返回 false。 */
     private fun createGroup(name: String) {
         val ok = groupStore.addGroup(name)
-        refreshGroups()
         uiMessage = if (ok) "已创建分组「${name.trim()}」" else "分组已存在或名称为空"
     }
 
     /** 重命名分组：注册表改名 + feeds.groupName 批量改。 */
     private fun renameGroup(oldName: String, newName: String) {
         val ok = groupStore.renameGroup(oldName, newName)
-        refreshGroups()
         if (!ok) {
             uiMessage = "新名称无效或已存在"
             return
@@ -324,7 +321,6 @@ class SubscriptionsViewModel @Inject constructor(
             return
         }
         groupStore.removeGroup(name)
-        refreshGroups()
         viewModelScope.launch {
             repository.deleteGroup(name)
             uiMessage = "已删除分组「$name」，其中的订阅移入默认分组"
@@ -361,7 +357,6 @@ class SubscriptionsViewModel @Inject constructor(
         _selectedFeedIds.value = emptySet()
         if (ids.isEmpty()) return
         if (group !in groupStore.getGroups()) groupStore.addGroup(group)
-        refreshGroups()
         viewModelScope.launch {
             repository.moveFeedsToGroup(ids, group)
             uiMessage = "已移动 ${ids.size} 个订阅到「$group」"
@@ -467,8 +462,7 @@ class SubscriptionsViewModel @Inject constructor(
                 return@launch
             }
             result.groups.forEach { groupStore.addGroup(it) }
-            refreshGroups()
-            uiMessage = if (result.skipped > 0) {
+                uiMessage = if (result.skipped > 0) {
                 "已导入 ${result.imported} 个订阅源，跳过 ${result.skipped} 个重复"
             } else {
                 "已导入 ${result.imported} 个订阅源"
@@ -510,10 +504,6 @@ class SubscriptionsViewModel @Inject constructor(
             }.getOrDefault(false)
             uiMessage = if (written) "已导出 OPML" else "导出失败，请重试"
         }
-    }
-
-    private fun refreshGroups() {
-        _groupsList.value = groupStore.getGroups()
     }
 
     private fun groupFeeds(

@@ -17,11 +17,13 @@ class ThemeStore(private val prefs: SharedPreferences) {
     val mode: StateFlow<ThemeMode> = _mode.asStateFlow()
 
     /**
-     * Material You 动态取色（对照表 #27）：**只换强调色**，表面阶梯仍用自有色板。
-     * 默认关：整套换成 Monet 会让「RssRadar 长什么样」这件事消失，且老用户升级
-     * 视觉突变。要跟随壁纸的人显式开一次即可。
+     * Material You 动态取色（对照表 #27）：整套配色跟随系统壁纸（表面 + 文字 + 强调色）。
+     *
+     * 2026-10-03 默认改为**开**：项目已弃用固定紫调色板，自动配色成为唯一来源，
+     * 关掉就等于退回被废弃的配色。非 Android 12 设备上本开关无效（见 supportsDynamicColor），
+     * 那时回退到固定色板以免出现不可读的配色。
      */
-    private val _dynamicColor = MutableStateFlow(prefs.getBoolean(KEY_DYNAMIC_COLOR, false))
+    private val _dynamicColor = MutableStateFlow(prefs.getBoolean(KEY_DYNAMIC_COLOR, true))
     val dynamicColor: StateFlow<Boolean> = _dynamicColor.asStateFlow()
 
     /**
