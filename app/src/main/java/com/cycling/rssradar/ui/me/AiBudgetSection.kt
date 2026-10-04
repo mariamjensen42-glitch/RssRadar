@@ -28,7 +28,7 @@ import com.composables.icons.lucide.Sparkles
 import com.cycling.rssradar.R
 import com.cycling.rssradar.core.model.AiBudgetState
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.i18n.formatCount
+import com.cycling.rssradar.core.ui.text.formatCount
 
 /**
  * 用量：只显示真实统计到的次数与字数，**不换算金额**。

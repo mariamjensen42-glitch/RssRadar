@@ -20,7 +20,7 @@ import com.cycling.rssradar.core.data.ai.TranslationPairInput
 import com.cycling.rssradar.core.data.ai.TranslationSegments
 import com.cycling.rssradar.core.model.BilingualLayout
 import com.cycling.rssradar.core.model.TranslationViewMode
-import com.cycling.rssradar.ui.theme.LocalReadingPrefs
+import com.cycling.rssradar.core.ui.theme.LocalReadingPrefs
 import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**

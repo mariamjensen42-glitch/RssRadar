@@ -1,4 +1,4 @@
-package com.cycling.rssradar.i18n
+package com.cycling.rssradar.core.ui.text
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -15,6 +15,9 @@ private const val EN_THOUSAND = 1_000.0
  *
  * 小数分隔符固定 [Locale.US]：系统语言为德语/法语时默认 locale 会输出 "1,2万"，
  * 数字里的逗号与千分位混淆。
+ *
+ * 原住 `app/i18n`：消费方分布在 feature:ai（用量与产物统计）与 feature:me（诊断）两处，
+ * 留在 app 则两个 feature 都够不着 ⇒ 沉 core.ui.text。
  */
 fun formatCount(value: Long, chinese: Boolean): String = if (chinese) {
     when {

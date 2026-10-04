@@ -1,5 +1,7 @@
 package com.cycling.rssradar.core.data.parser
 
+import com.cycling.rssradar.core.model.ExtractionIssue
+import com.cycling.rssradar.core.model.FetchFailure
 import net.dankito.readability4j.Readability4J
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -10,37 +12,6 @@ import kotlin.math.max
 
 /** 提取器来源（可观测：哪条路径救回了这篇）。 */
 enum class Extractor { READABILITY, JSOUP_FALLBACK, BODY_FALLBACK }
-
-/** 质量问题分类（对应 [FetchFailure] 里 EXTRACT_* 的细分，用于日志与诊断页归因）。 */
-enum class ExtractionIssue {
-    NONE,
-    /** 正文过短（低于 [ExtractConfig.minContentChars]）。 */
-    TOO_SHORT,
-    /** 一个段落都没有：基本可以断定容器误判。 */
-    NO_PARAGRAPH,
-    /** 正文空/极短且页面是 JS 空壳（#app/#root/React 容器 + 大量脚本）。 */
-    DYNAMIC_RENDER,
-    /** 正文短且命中付费墙/登录墙特征。 */
-    PAYWALL,
-    /** 正文够长但没有标题或时间（只告警，不算不完整）。 */
-    METADATA_MISSING,
-    ;
-
-    /**
-     * 阅读页要说人话：诊断页看枚举名就够了，读者看不懂 `DYNAMIC_RENDER`。
-     * 与 [com.cycling.rssradar.core.data.parser.FetchFailure.label] 同源同类，
-     * 都属于「失败必须可见」那一类文案。
-     */
-    val label: String
-        get() = when (this) {
-            NONE -> "正文完整"
-            TOO_SHORT -> "正文过短"
-            NO_PARAGRAPH -> "没找到正文段落"
-            DYNAMIC_RENDER -> "页面由脚本动态渲染"
-            PAYWALL -> "疑似付费墙或登录墙"
-            METADATA_MISSING -> "缺少标题或发布时间"
-        }
-}
 
 data class ExtractionQuality(
     val chars: Int,

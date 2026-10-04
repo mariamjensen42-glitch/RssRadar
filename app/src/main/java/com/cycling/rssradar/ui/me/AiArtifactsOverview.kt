@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.ai.AiArtifactGroup
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.i18n.formatCount
+import com.cycling.rssradar.core.ui.text.formatCount
 import com.cycling.rssradar.i18n.labelRes
 
 @Composable

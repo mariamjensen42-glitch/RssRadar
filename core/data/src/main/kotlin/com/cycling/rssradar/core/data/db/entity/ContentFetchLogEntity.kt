@@ -23,9 +23,9 @@ data class ContentFetchLogEntity(
     val pages: Int,
     /** 是否拿到了可写入的正文（false = 抓取/提取失败）。 */
     val ok: Boolean,
-    /** [com.cycling.rssradar.core.data.parser.FetchFailure] 的 name，成功时 null。 */
+    /** [com.cycling.rssradar.core.model.FetchFailure] 的 name，成功时 null。 */
     val failure: String?,
-    /** [com.cycling.rssradar.core.data.parser.ExtractionIssue] 的 name，成功时非空。 */
+    /** [com.cycling.rssradar.core.model.ExtractionIssue] 的 name，成功时非空。 */
     val issue: String?,
     val contentChars: Int,
     val durationMs: Long,

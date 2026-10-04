@@ -25,7 +25,7 @@ import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.model.TranslationDisplayState
 import com.cycling.rssradar.core.domain.reading.FindIndex
 import com.cycling.rssradar.core.domain.reading.ReadingTextMap
-import com.cycling.rssradar.ui.theme.LocalReadingPrefs
+import com.cycling.rssradar.core.ui.theme.LocalReadingPrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

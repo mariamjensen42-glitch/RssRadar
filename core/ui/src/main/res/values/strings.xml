@@ -15,4 +15,22 @@
     <string name="set_view_card">卡片</string>
     <string name="set_view_magazine">杂志</string>
     <string name="set_view_grid">网格</string>
+    <string name="fetch_invalid_url">链接无效</string>
+    <string name="fetch_timeout">请求超时</string>
+    <string name="fetch_network">网络连接失败</string>
+    <string name="fetch_http_401">需要登录（401）</string>
+    <string name="fetch_http_403">被站点拒绝（403）</string>
+    <string name="fetch_http_404">页面不存在（404）</string>
+    <string name="fetch_http_429">请求太频繁（429）</string>
+    <string name="fetch_http_5xx">站点服务器错误（5xx）</string>
+    <string name="fetch_http_other">站点返回异常状态</string>
+    <string name="fetch_empty_body">返回内容为空</string>
+    <string name="fetch_decode_error">内容解码失败</string>
+    <string name="fetch_extract_failed">正文提取失败</string>
+    <string name="issue_site_limit">站点限制或动态加载</string>
+    <string name="issue_too_short">正文过短</string>
+    <string name="issue_no_paragraph">未找到正文段落</string>
+    <string name="issue_dynamic_render">页面由脚本动态渲染</string>
+    <string name="issue_paywall">疑似付费墙/登录墙</string>
+    <string name="issue_metadata_missing">缺少标题或时间</string>
 </resources>

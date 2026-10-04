@@ -1,5 +1,7 @@
 package com.cycling.rssradar.core.data.parser
 
+import com.cycling.rssradar.core.model.ExtractionIssue
+import com.cycling.rssradar.core.model.FetchFailure
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -14,43 +16,6 @@ import java.net.URL
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import kotlin.text.Charsets
-
-/** 抓取/提取失败的原因分类（诊断页按此归类）。 */
-enum class FetchFailure {
-    INVALID_URL,
-    TIMEOUT,
-    NETWORK,
-    HTTP_401,
-    HTTP_403,
-    HTTP_404,
-    HTTP_429,
-    HTTP_5XX,
-    HTTP_OTHER,
-    EMPTY_BODY,
-    DECODE_ERROR,
-    EXTRACT_FAILED,
-    ;
-
-    /** 是否值得重试：401/403/404 重试无意义，只会浪费配额并招致更狠的封禁。 */
-    val retryable: Boolean
-        get() = this == TIMEOUT || this == NETWORK || this == HTTP_429 || this == HTTP_5XX
-
-    val label: String
-        get() = when (this) {
-            INVALID_URL -> "链接无效"
-            TIMEOUT -> "连接/读取超时"
-            NETWORK -> "网络不可达"
-            HTTP_401 -> "401 需登录"
-            HTTP_403 -> "403 拒绝（反爬）"
-            HTTP_404 -> "404 页面不存在"
-            HTTP_429 -> "429 限流"
-            HTTP_5XX -> "服务端 5xx"
-            HTTP_OTHER -> "HTTP 其他状态码"
-            EMPTY_BODY -> "响应为空"
-            DECODE_ERROR -> "编码解码失败"
-            EXTRACT_FAILED -> "正文提取失败"
-        }
-}
 
 /** 一次抓取的可观测结果：诊断页清单与警告日志都出自这里。 */
 data class FetchReport(

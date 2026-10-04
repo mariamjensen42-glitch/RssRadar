@@ -33,6 +33,9 @@ dependencies {
     // 仅此一处用途，方向合法——铁律禁的是 core:data / core:domain。
     implementation(project(":core:model"))
 
+    // WindowCompat（ApplySystemBarIcons 补系统栏图标色）来自 androidx.core。
+    implementation(libs.androidx.core.ktx)
+
     api(platform(libs.androidx.compose.bom))
     api(libs.androidx.compose.ui)
     api(libs.androidx.compose.ui.graphics)

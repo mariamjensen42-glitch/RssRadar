@@ -7,9 +7,9 @@ import com.cycling.rssradar.core.data.db.dao.ContentFetchLogDao
 import com.cycling.rssradar.core.data.db.entity.ContentFetchLogEntity
 import com.cycling.rssradar.core.data.db.dao.FeedDao
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
-import com.cycling.rssradar.core.data.parser.ExtractionIssue
+import com.cycling.rssradar.core.model.ExtractionIssue
 import com.cycling.rssradar.core.data.parser.Extractor
-import com.cycling.rssradar.core.data.parser.FetchFailure
+import com.cycling.rssradar.core.model.FetchFailure
 import com.cycling.rssradar.core.data.parser.FetchOutcome
 import com.cycling.rssradar.core.data.parser.FetchReport
 import com.cycling.rssradar.core.data.parser.FetchedContent

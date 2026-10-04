@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.size.Size
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.ui.theme.LocalReadingPrefs
+import com.cycling.rssradar.core.ui.theme.LocalReadingPrefs
 import kotlin.math.sqrt
 
 /**

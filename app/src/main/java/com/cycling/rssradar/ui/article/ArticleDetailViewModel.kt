@@ -9,8 +9,8 @@ import com.cycling.rssradar.core.data.repository.FeedRepository
 import com.cycling.rssradar.core.data.service.OnDemandFetch
 import com.cycling.rssradar.core.data.service.OnDemandResult
 import com.cycling.rssradar.core.data.recommend.Recommendation
-import com.cycling.rssradar.core.data.parser.ExtractionIssue
-import com.cycling.rssradar.core.data.parser.FetchFailure
+import com.cycling.rssradar.core.model.ExtractionIssue
+import com.cycling.rssradar.core.model.FetchFailure
 import com.cycling.rssradar.core.data.ai.AiArtifactRepository
 import com.cycling.rssradar.core.model.AiFeature
 import com.cycling.rssradar.core.data.ai.AiFeatureRunner
@@ -282,7 +282,7 @@ class ArticleDetailViewModel @Inject constructor(
     /**
      * 阅读偏好（排版 / 图片 / 渲染器 / 译文显示）。偏好属 UI 环境而非业务事件，
      * 按 ADR-0003「纯函数与状态 producer 保持 fun」的先例走普通方法，不进 Intent 面；
-     * 数据源与主题宿主注入的 [com.cycling.rssradar.ui.theme.LocalReadingPrefs] 是同一份 Store。
+     * 数据源与主题宿主注入的 [com.cycling.rssradar.core.ui.theme.LocalReadingPrefs] 是同一份 Store。
      *
      * 四项偏好合成一份 state，因此这里只暴露两个成员，而不是原先的八个
      * （四个 StateFlow + 四个写方法）。

@@ -43,7 +43,7 @@ import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.ai.AiPayloadLine
 import com.cycling.rssradar.core.model.AiScope
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.i18n.formatCount
+import com.cycling.rssradar.core.ui.text.formatCount
 import com.cycling.rssradar.i18n.labelRes
 import java.text.SimpleDateFormat
 import java.util.Date

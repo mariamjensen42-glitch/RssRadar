@@ -1,5 +1,7 @@
 package com.cycling.rssradar.core.data.parser
 
+import com.cycling.rssradar.core.model.ExtractionIssue
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull

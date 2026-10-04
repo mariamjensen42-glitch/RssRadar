@@ -26,13 +26,14 @@ import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Type
 import com.cycling.rssradar.R
-import com.cycling.rssradar.core.data.parser.ExtractionIssue
-import com.cycling.rssradar.core.data.parser.FetchFailure
+import com.cycling.rssradar.core.model.ExtractionIssue
+import com.cycling.rssradar.core.model.FetchFailure
 import com.cycling.rssradar.core.model.BilingualLayout
 import com.cycling.rssradar.core.model.TranslationDisplayState
 import com.cycling.rssradar.core.model.TranslationViewMode
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.ui.theme.LocalReadingPrefs
+import com.cycling.rssradar.core.ui.labels.uiRes
+import com.cycling.rssradar.core.ui.theme.LocalReadingPrefs
 
 /**
  * 抓取结果横幅：把「为什么这篇没有正文」说给读者听（ReadYou 的 Error 态同款）。
@@ -161,7 +162,7 @@ private fun IncompleteContentBanner(
     ) {
         // issue 的枚举先在组合作用域翻成当前语言，再喂给带占位符的资源
         val issueText = when (val i = issue) {
-            null -> stringResource(R.string.issue_site_limit)
+            null -> stringResource(ExtractionIssue.NONE.uiRes())
             else -> stringResource(i.uiRes())
         }
         Row(

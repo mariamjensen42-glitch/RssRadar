@@ -5,7 +5,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.cycling.rssradar.R
 import com.cycling.rssradar.core.ui.text.UiText
-import com.cycling.rssradar.ui.article.uiRes
+import com.cycling.rssradar.core.ui.R as UiR
+import com.cycling.rssradar.core.ui.labels.uiRes
 import com.cycling.rssradar.core.ui.text.resolve
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -39,8 +40,8 @@ import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.service.OnDemandFetch
 import com.cycling.rssradar.core.data.db.entity.ContentFetchLogEntity
 import com.cycling.rssradar.core.data.db.projection.FetchHostStat
-import com.cycling.rssradar.core.data.parser.ExtractionIssue
-import com.cycling.rssradar.core.data.parser.FetchFailure
+import com.cycling.rssradar.core.model.ExtractionIssue
+import com.cycling.rssradar.core.model.FetchFailure
 import com.cycling.rssradar.core.ui.theme.Danger
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.CircleAlert
@@ -57,7 +58,7 @@ import java.util.Date
 import java.util.Locale
 import com.cycling.rssradar.core.ui.theme.radarColors
 import androidx.compose.runtime.setValue
-import com.cycling.rssradar.i18n.formatLogTimestamp
+import com.cycling.rssradar.core.ui.text.formatLogTimestamp
 
 @HiltViewModel
 class FetchDiagnosticsViewModel @Inject constructor(
@@ -276,10 +277,10 @@ private fun describe(log: ContentFetchLogEntity, context: Context): Pair<String,
     }
     val issue = runCatching { ExtractionIssue.valueOf(log.issue.orEmpty()) }.getOrNull()
     val label = when (issue) {
-        ExtractionIssue.TOO_SHORT -> UiText.res(R.string.issue_too_short)
-        ExtractionIssue.NO_PARAGRAPH -> UiText.res(R.string.issue_no_paragraph)
+        ExtractionIssue.TOO_SHORT -> UiText.res(UiR.string.issue_too_short)
+        ExtractionIssue.NO_PARAGRAPH -> UiText.res(UiR.string.issue_no_paragraph)
         ExtractionIssue.DYNAMIC_RENDER -> UiText.res(R.string.issue_js_render)
-        ExtractionIssue.PAYWALL -> UiText.res(R.string.issue_paywall)
+        ExtractionIssue.PAYWALL -> UiText.res(UiR.string.issue_paywall)
         ExtractionIssue.METADATA_MISSING -> UiText.res(R.string.issue_missing_meta)
         else -> UiText.res(R.string.issue_incomplete)
     }

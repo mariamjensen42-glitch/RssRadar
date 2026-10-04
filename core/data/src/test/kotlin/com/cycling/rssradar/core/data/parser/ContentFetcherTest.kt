@@ -1,5 +1,8 @@
 package com.cycling.rssradar.core.data.parser
 
+import com.cycling.rssradar.core.model.ExtractionIssue
+import com.cycling.rssradar.core.model.FetchFailure
+
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import kotlin.io.path.createTempDirectory

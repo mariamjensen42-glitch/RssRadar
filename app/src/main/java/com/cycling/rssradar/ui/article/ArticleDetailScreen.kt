@@ -46,7 +46,7 @@ import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.isLightBackground
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.data.platform.shareArticle
-import com.cycling.rssradar.ui.theme.ApplySystemBarIcons
+import com.cycling.rssradar.core.ui.theme.ApplySystemBarIcons
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 

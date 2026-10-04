@@ -61,7 +61,7 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.i18n.formatLogTimestamp
+import com.cycling.rssradar.core.ui.text.formatLogTimestamp
 
 /** 单条崩溃的全文（dialog 内容）。 */
 data class CrashDetail(val name: String, val head: String, val text: String)

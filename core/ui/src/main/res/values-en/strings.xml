@@ -15,4 +15,22 @@
     <string name="set_view_card">Card</string>
     <string name="set_view_magazine">Magazine</string>
     <string name="set_view_grid">Grid</string>
+    <string name="fetch_invalid_url">Invalid URL</string>
+    <string name="fetch_timeout">Request timed out</string>
+    <string name="fetch_network">Network connection failed</string>
+    <string name="fetch_http_401">Login required (401)</string>
+    <string name="fetch_http_403">Rejected by the site (403)</string>
+    <string name="fetch_http_404">Page not found (404)</string>
+    <string name="fetch_http_429">Too many requests (429)</string>
+    <string name="fetch_http_5xx">Site server error (5xx)</string>
+    <string name="fetch_http_other">Unexpected status from the site</string>
+    <string name="fetch_empty_body">Response body was empty</string>
+    <string name="fetch_decode_error">Failed to decode content</string>
+    <string name="fetch_extract_failed">Body extraction failed</string>
+    <string name="issue_site_limit">Site restriction or dynamic loading</string>
+    <string name="issue_too_short">Body too short</string>
+    <string name="issue_no_paragraph">No body paragraphs found</string>
+    <string name="issue_dynamic_render">Page rendered dynamically by scripts</string>
+    <string name="issue_paywall">Likely paywalled or login-walled</string>
+    <string name="issue_metadata_missing">Missing title or date</string>
 </resources>

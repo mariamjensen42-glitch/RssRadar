@@ -14,11 +14,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
-import com.cycling.rssradar.core.data.parser.ExtractionIssue
-import com.cycling.rssradar.core.data.parser.FetchFailure
+import com.cycling.rssradar.core.model.ExtractionIssue
+import com.cycling.rssradar.core.model.FetchFailure
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.data.platform.openUrl
-import com.cycling.rssradar.ui.theme.LocalReadingPrefs
+import com.cycling.rssradar.core.ui.theme.LocalReadingPrefs
 
 /**
  * 正文槽位：五条渲染路径的唯一实现（原视口与整页两份逐行重复的 when 已合并）。
@@ -114,30 +114,3 @@ internal fun BodyParagraph(text: String) {
 
 internal fun formatDate(ts: Long?): String =
     ts?.let { DateUtils.getRelativeTimeSpanString(it).toString() } ?: stringResource(R.string.unknown_time)
-
-/** ADR-0017：枚举只给身份，人话由 UI 层按当前语言翻译。 */
-internal fun FetchFailure.uiRes(): Int = when (this) {
-    FetchFailure.INVALID_URL -> R.string.fetch_invalid_url
-    FetchFailure.TIMEOUT -> R.string.fetch_timeout
-    FetchFailure.NETWORK -> R.string.fetch_network
-    FetchFailure.HTTP_401 -> R.string.fetch_http_401
-    FetchFailure.HTTP_403 -> R.string.fetch_http_403
-    FetchFailure.HTTP_404 -> R.string.fetch_http_404
-    FetchFailure.HTTP_429 -> R.string.fetch_http_429
-    FetchFailure.HTTP_5XX -> R.string.fetch_http_5xx
-    FetchFailure.HTTP_OTHER -> R.string.fetch_http_other
-    FetchFailure.EMPTY_BODY -> R.string.fetch_empty_body
-    FetchFailure.DECODE_ERROR -> R.string.fetch_decode_error
-    FetchFailure.EXTRACT_FAILED -> R.string.fetch_extract_failed
-}
-
-@Composable
-
-internal fun ExtractionIssue.uiRes(): Int = when (this) {
-    ExtractionIssue.NONE -> R.string.issue_site_limit
-    ExtractionIssue.TOO_SHORT -> R.string.issue_too_short
-    ExtractionIssue.NO_PARAGRAPH -> R.string.issue_no_paragraph
-    ExtractionIssue.DYNAMIC_RENDER -> R.string.issue_dynamic_render
-    ExtractionIssue.PAYWALL -> R.string.issue_paywall
-    ExtractionIssue.METADATA_MISSING -> R.string.issue_metadata_missing
-}

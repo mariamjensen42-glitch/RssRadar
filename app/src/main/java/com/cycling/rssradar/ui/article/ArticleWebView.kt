@@ -16,7 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
 import com.cycling.rssradar.core.data.platform.openUrl
-import com.cycling.rssradar.ui.theme.LocalReadingPrefs
+import com.cycling.rssradar.core.ui.theme.LocalReadingPrefs
 import com.cycling.rssradar.core.ui.theme.radarColors
 import androidx.compose.runtime.setValue
 
