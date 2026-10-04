@@ -33,4 +33,5 @@
     <string name="issue_dynamic_render">页面由脚本动态渲染</string>
     <string name="issue_paywall">疑似付费墙/登录墙</string>
     <string name="issue_metadata_missing">缺少标题或时间</string>
+    <string name="close">关闭</string>
 </resources>

@@ -33,4 +33,5 @@
     <string name="issue_dynamic_render">Page rendered dynamically by scripts</string>
     <string name="issue_paywall">Likely paywalled or login-walled</string>
     <string name="issue_metadata_missing">Missing title or date</string>
+    <string name="close">Close</string>
 </resources>

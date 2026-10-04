@@ -91,6 +91,7 @@ dependencies {
     implementation(project(":feature:settings"))
     implementation(project(":feature:subscriptions"))
     implementation(project(":feature:feed"))
+    implementation(project(":feature:article"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)
