@@ -1,4 +1,4 @@
-package com.cycling.rssradar.ui.intent
+package com.cycling.rssradar.ui.addsubscription
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

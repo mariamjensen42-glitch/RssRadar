@@ -1,4 +1,4 @@
-package com.cycling.rssradar.ui.intent
+package com.cycling.rssradar.ui.addsubscription
 
 import android.content.Intent
 

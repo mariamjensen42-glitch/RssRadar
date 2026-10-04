@@ -42,8 +42,8 @@ import androidx.navigation.compose.rememberNavController
 import com.cycling.rssradar.ui.addsubscription.AddSubscriptionSheet
 import com.cycling.rssradar.ui.addsubscription.AddSubscriptionIntent
 import com.cycling.rssradar.ui.addsubscription.AddSubscriptionViewModel
-import com.cycling.rssradar.ui.intent.SharedText
-import com.cycling.rssradar.ui.intent.sharedText
+import com.cycling.rssradar.ui.addsubscription.SharedText
+import com.cycling.rssradar.ui.addsubscription.sharedText
 import com.cycling.rssradar.ui.me.AiArtifactsScreen
 import com.cycling.rssradar.ui.me.AiFeaturesScreen
 import com.cycling.rssradar.ui.me.AiFeaturesViewModel
