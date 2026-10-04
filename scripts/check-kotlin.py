@@ -285,6 +285,8 @@ def generate_r_stub(out_dir: pathlib.Path) -> str | None:
         ("feature/settings/src/main/res", "com.cycling.rssradar.ui.settings"),
         ("feature/feed/src/main/res", "com.cycling.rssradar.ui.feed"),
         ("feature/article/src/main/res", "com.cycling.rssradar.ui.article"),
+        ("feature/ai/src/main/res", "com.cycling.rssradar.ui.ai"),
+        ("feature/me/src/main/res", "com.cycling.rssradar.ui.me"),
     ]
     java_root = out_dir / "rstub"
     java_files: list[pathlib.Path] = []
@@ -393,6 +395,8 @@ def main() -> int:
             ROOT / "feature/subscriptions/src/main",
             ROOT / "feature/feed/src/main",
             ROOT / "feature/article/src/main",
+            ROOT / "feature/ai/src/main",
+            ROOT / "feature/me/src/main",
         ]
         files = [f for root in src_roots for f in sources(root)]
         if not args.main_only:

@@ -44,10 +44,10 @@ import com.cycling.rssradar.ui.addsubscription.AddSubscriptionIntent
 import com.cycling.rssradar.ui.addsubscription.AddSubscriptionViewModel
 import com.cycling.rssradar.ui.addsubscription.SharedText
 import com.cycling.rssradar.ui.addsubscription.sharedText
-import com.cycling.rssradar.ui.me.AiArtifactsScreen
-import com.cycling.rssradar.ui.me.AiFeaturesScreen
-import com.cycling.rssradar.ui.me.AiFeaturesViewModel
-import com.cycling.rssradar.ui.me.PromptTemplatesScreen
+import com.cycling.rssradar.ui.ai.AiArtifactsScreen
+import com.cycling.rssradar.ui.ai.AiFeaturesScreen
+import com.cycling.rssradar.ui.ai.AiFeaturesViewModel
+import com.cycling.rssradar.ui.ai.PromptTemplatesScreen
 import com.cycling.rssradar.ui.article.ArticleDetailScreen
 import com.cycling.rssradar.ui.article.ArticleDetailViewModel
 import com.cycling.rssradar.ui.annotations.AnnotationsScreen
@@ -61,7 +61,7 @@ import com.cycling.rssradar.ui.me.CrashLogScreen
 import com.cycling.rssradar.ui.me.CrashLogViewModel
 import com.cycling.rssradar.ui.me.FetchDiagnosticsScreen
 import com.cycling.rssradar.ui.me.FetchDiagnosticsViewModel
-import com.cycling.rssradar.ui.me.InterestProfileScreen
+import com.cycling.rssradar.ui.ai.InterestProfileScreen
 import com.cycling.rssradar.ui.settings.RssHubSettingsScreen
 import com.cycling.rssradar.ui.settings.RssHubSettingsViewModel
 import com.cycling.rssradar.ui.me.ReadingStatsScreen
@@ -127,7 +127,7 @@ class MainActivity : ComponentActivity() {
     /** 界面语言覆盖（ADR-0017）：API 31/32 无系统 per-app locale，attach 时手动包一层。 */
     override fun attachBaseContext(newBase: android.content.Context) {
         super.attachBaseContext(
-            com.cycling.rssradar.i18n.AppLocales.wrapContext(
+            com.cycling.rssradar.core.data.platform.AppLocales.wrapContext(
                 newBase,
                 com.cycling.rssradar.core.data.store.prefs.SettingsPrefs.of(newBase),
             ),

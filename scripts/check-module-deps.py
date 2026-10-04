@@ -37,6 +37,8 @@ MODULES = {
     'feature:subscriptions': 'feature/subscriptions/src/main',
     'feature:feed': 'feature/feed/src/main',
     'feature:article': 'feature/article/src/main',
+    'feature:ai': 'feature/ai/src/main',
+    'feature:me': 'feature/me/src/main',
     'app': 'app/src/main',
 }
 
@@ -58,8 +60,13 @@ PREFIXES = [
     ('com.cycling.rssradar.ui.subscriptions', 'feature:subscriptions'),
     ('com.cycling.rssradar.ui.feed', 'feature:feed'),
     ('com.cycling.rssradar.ui.article', 'feature:article'),
+    ('com.cycling.rssradar.ui.ai', 'feature:ai'),
+    ('com.cycling.rssradar.ui.me', 'feature:me'),
     ('com.cycling.rssradar', 'app'),
 ]
+
+
+FQ = re.compile(r'\bcom\.cycling\.rssradar\.[A-Za-z_][\w.]*')
 
 
 def target_module(import_path: str) -> str | None:
@@ -82,12 +89,17 @@ def build_graph() -> dict[str, set[str]]:
                 path = pathlib.Path(root) / name
                 text = path.read_text(encoding='utf-8', errors='ignore')
                 for line in text.splitlines():
-                    m = re.match(r'\s*import\s+(com\.cycling\.rssradar[\w.]*)', line)
-                    if not m:
+                    stripped = line.strip()
+                    # 注释行里的 FQN（KDoc 的 [com.foo.Bar] 引用）不是真实依赖
+                    if stripped.startswith('//') or stripped.startswith('*') or stripped.startswith('/*'):
                         continue
-                    tgt = target_module(m.group(1))
-                    if tgt and tgt != mod:
-                        graph[mod].add(tgt)
+                    # 不只认 import：**全限定调用同样构成依赖**，而它原先被漏掉 ——
+                    # feature:settings 曾用 `com.cycling.rssradar.i18n.AppLocales.apply(...)`
+                    # 直接引 app 包，脚本却一直显示它只依赖 core。
+                    for m in FQ.finditer(line):
+                        tgt = target_module(m.group(0))
+                        if tgt and tgt != mod:
+                            graph[mod].add(tgt)
     return graph
 
 

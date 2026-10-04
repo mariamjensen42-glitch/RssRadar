@@ -111,7 +111,7 @@ fun SettingsGeneralScreen(
                             label = { languageLabels.getValue(it) },
                             onSelect = { language ->
                                 viewModel.setAppLanguage(language)
-                                if (com.cycling.rssradar.i18n.AppLocales.apply(context, language)) {
+                                if (com.cycling.rssradar.core.data.platform.AppLocales.apply(context, language)) {
                                     (context as? ComponentActivity)?.let { activity ->
                                         activity.recreate()
                                         // Android 12+ 的 relaunch 过渡会让旧/新窗口间隙透出桌面；
