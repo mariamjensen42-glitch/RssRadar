@@ -35,6 +35,7 @@ MODULES = {
     'feature:search': 'feature/search/src/main',
     'feature:settings': 'feature/settings/src/main',
     'feature:subscriptions': 'feature/subscriptions/src/main',
+    'feature:feed': 'feature/feed/src/main',
     'app': 'app/src/main',
 }
 
@@ -54,6 +55,7 @@ PREFIXES = [
     ('com.cycling.rssradar.ui.search', 'feature:search'),
     ('com.cycling.rssradar.ui.settings', 'feature:settings'),
     ('com.cycling.rssradar.ui.subscriptions', 'feature:subscriptions'),
+    ('com.cycling.rssradar.ui.feed', 'feature:feed'),
     ('com.cycling.rssradar', 'app'),
 ]
 

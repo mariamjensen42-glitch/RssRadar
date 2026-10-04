@@ -23,14 +23,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.model.ListViewMode
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.effectsSpec
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.ui.theme.LocalListDisplay
+import com.cycling.rssradar.core.ui.theme.LocalListDisplay
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 @OptIn(ExperimentalFoundationApi::class)

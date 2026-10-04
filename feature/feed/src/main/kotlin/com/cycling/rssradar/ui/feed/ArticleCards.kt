@@ -49,7 +49,6 @@ import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Music
 import com.composables.icons.lucide.Play
-import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.db.entity.ArticleEntity
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.model.ListDescMode

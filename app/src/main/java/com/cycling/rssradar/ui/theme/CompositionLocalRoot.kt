@@ -13,11 +13,11 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
 import com.cycling.rssradar.core.ui.theme.RssRadarTheme
+import com.cycling.rssradar.core.ui.theme.LocalListDisplay
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.rememberReducedMotion
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import com.cycling.rssradar.core.model.ListDisplayState
 import com.cycling.rssradar.core.model.ReadingPrefs
 import com.cycling.rssradar.core.model.ThemeMode
 import com.cycling.rssradar.core.data.di.AppEntryPoint
@@ -32,9 +32,6 @@ val LocalDarkTheme = staticCompositionLocalOf { true }
 
 /** 全局阅读偏好（排版 / 图片 / 渲染器 / 译文显示）：阅读页与其弹层共享同一数据源。 */
 val LocalReadingPrefs = staticCompositionLocalOf { ReadingPrefs() }
-
-/** 信息流列表显示项（issue #56）：列表与设置页共享同一数据源。 */
-val LocalListDisplay = staticCompositionLocalOf { ListDisplayState() }
 
 /**
  * 环境宿主：读各 Store 的持久化偏好并注入 CompositionLocal，再包主题。

@@ -1,6 +1,5 @@
 package com.cycling.rssradar.ui.feed
 
-import com.cycling.rssradar.R
 import androidx.compose.ui.platform.LocalContext
 import com.cycling.rssradar.core.ui.text.resolve
 import androidx.compose.ui.res.stringResource
@@ -34,12 +33,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.model.ListViewMode
+import com.cycling.rssradar.core.ui.R as UiR
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.RefreshCw
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.ui.theme.LocalListDisplay
+import com.cycling.rssradar.core.ui.theme.LocalListDisplay
 
 /**
  * 订阅源文章列表（CONTEXT.md「Feed article list」，issue #51）：
@@ -80,7 +80,7 @@ fun FeedArticlesScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.back), tint = radarColors().textPrimary)
+                        Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = radarColors().textPrimary)
                     }
                 },
                 actions = {

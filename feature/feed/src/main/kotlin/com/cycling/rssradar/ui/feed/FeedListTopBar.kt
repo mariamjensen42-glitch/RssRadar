@@ -38,11 +38,9 @@ import com.composables.icons.lucide.LayoutGrid
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.SlidersHorizontal
-import com.cycling.rssradar.R
 import com.cycling.rssradar.core.model.ListViewMode
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.labels.labelRes
-import com.cycling.rssradar.i18n.labelRes
 
 @Composable
 

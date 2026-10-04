@@ -29,9 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.SlidersHorizontal
-import com.cycling.rssradar.R
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.i18n.labelRes
 
 /**
  * 顶栏筛选底部弹层：分组 + 内容类型（图片/视频/音频）。

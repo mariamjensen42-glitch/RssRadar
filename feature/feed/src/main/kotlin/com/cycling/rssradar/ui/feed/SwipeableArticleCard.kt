@@ -35,7 +35,6 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Star
-import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.model.ListDisplayState
 import com.cycling.rssradar.core.ui.theme.radarColors

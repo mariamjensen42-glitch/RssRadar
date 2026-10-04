@@ -33,7 +33,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.R
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.model.ListViewMode
 import com.cycling.rssradar.core.model.MarkAsReadCondition
@@ -41,9 +40,8 @@ import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.components.OptionPickerSheet
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.labels.labelRes
-import com.cycling.rssradar.i18n.labelRes
 import com.cycling.rssradar.core.ui.text.resolve
-import com.cycling.rssradar.ui.theme.LocalListDisplay
+import com.cycling.rssradar.core.ui.theme.LocalListDisplay
 
 @Composable
 

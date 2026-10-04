@@ -36,6 +36,9 @@ TEST_ROOTS = [
 ]
 
 PACKAGE_RE = re.compile(r"^\s*package\s+([\w.]+)", re.M)
+CLASS_RE = re.compile(
+    r"^(?:internal\s+)?(?:open\s+|abstract\s+|sealed\s+|data\s+)*class\s+([A-Za-z_][A-Za-z0-9_]*)", re.M
+)
 
 
 def android_jar() -> pathlib.Path:
@@ -96,16 +99,22 @@ def test_classes(keywords: list[str]) -> list[str]:
         if not root.exists():
             continue
         for path in sorted(root.rglob("*Test.kt")):
-            m = PACKAGE_RE.search(path.read_text(encoding="utf-8", errors="replace"))
+            text = path.read_text(encoding="utf-8", errors="replace")
+            m = PACKAGE_RE.search(text)
             if not m:
                 print(f"  [warn] {path.relative_to(ROOT).as_posix()} 没有 package 声明，跳过")
                 continue
-            fqcn = f"{m.group(1)}.{path.stem}"
-            if not OUT.joinpath(*fqcn.split(".")).with_suffix(".class").exists():
-                print(f"  [warn] {fqcn} 没有编译产物——源已改名或编译未通过，跳过")
-                continue
-            if not keywords or any(k in fqcn for k in keywords):
-                names.append(fqcn)
+            # 类名取源文件的行首声明，**不用文件名**。反例：FeedListSnapshotTest.kt 里装的是
+            # ScrollSlotsTest / DayGroupsTest / CalendarDayLabelTest 三个类——按 stem 找产物必然
+            # 落空，那些测试就在「全量」里被静默漏跑（Gradle/CI 按真实类名跑，只有本地会漏）。
+            declared = [c for c in CLASS_RE.findall(text) if c.endswith("Test")]
+            for cls in declared or [path.stem]:
+                fqcn = f"{m.group(1)}.{cls}"
+                if not OUT.joinpath(*fqcn.split(".")).with_suffix(".class").exists():
+                    print(f"  [warn] {fqcn} 没有编译产物——源已改名或编译未通过，跳过")
+                    continue
+                if not keywords or any(k in fqcn for k in keywords):
+                    names.append(fqcn)
     return sorted(set(names))
 
 

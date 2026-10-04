@@ -23,10 +23,8 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.FileUp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
-import com.cycling.rssradar.R
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.i18n.labelRes
 
 @Composable
 

@@ -1,6 +1,5 @@
 package com.cycling.rssradar.ui.feed
 
-import com.cycling.rssradar.R
 import com.cycling.rssradar.core.ui.text.UiText
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
