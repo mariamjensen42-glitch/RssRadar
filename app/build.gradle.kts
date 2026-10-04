@@ -89,6 +89,7 @@ dependencies {
     implementation(project(":feature:library"))
     implementation(project(":feature:search"))
     implementation(project(":feature:settings"))
+    implementation(project(":feature:subscriptions"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)

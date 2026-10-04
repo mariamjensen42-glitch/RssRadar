@@ -388,6 +388,7 @@ def main() -> int:
             ROOT / "feature/library/src/main",
             ROOT / "feature/search/src/main",
             ROOT / "feature/settings/src/main",
+            ROOT / "feature/subscriptions/src/main",
         ]
         files = [f for root in src_roots for f in sources(root)]
         if not args.main_only:
