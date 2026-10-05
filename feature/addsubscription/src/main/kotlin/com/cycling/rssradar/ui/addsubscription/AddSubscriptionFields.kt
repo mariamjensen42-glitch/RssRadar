@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Link2
@@ -83,7 +84,7 @@ internal fun SearchField(
         onValueChange = onChange,
         modifier = modifier.fillMaxWidth(),
         placeholder = {
-            Text("搜索 3800 条路由，如 b站 / github / 日报", color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.add_search_hint), color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium)
         },
         singleLine = true,
         leadingIcon = {
@@ -143,7 +144,7 @@ internal fun DiscoveredFeedRow(
                 )
             }
             Text(
-                text = "${feed.articleCount} 篇",
+                text = stringResource(R.string.add_article_count, feed.articleCount),
                 color = radarColors().textSecondary,
                 style = MaterialTheme.typography.labelSmall,
             )

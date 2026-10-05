@@ -163,7 +163,7 @@ class MainActivity : ComponentActivity() {
         val text = incoming?.sharedText() ?: return
         val url = SharedText.extractUrl(text)
         if (url == null) {
-            Toast.makeText(this, "这段内容里没有链接，RssRadar 只能订阅链接", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.share_no_link), Toast.LENGTH_LONG).show()
             return
         }
         sharedUrl = url

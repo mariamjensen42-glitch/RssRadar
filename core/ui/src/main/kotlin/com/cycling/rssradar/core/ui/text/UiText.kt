@@ -17,25 +17,40 @@ import androidx.compose.ui.res.stringResource
  * res id 与 Context，不含任何具体文案，正好是「跨 feature 的 UI 层契约」。
  */
 sealed interface UiText {
-    data class Res(val id: Int, val args: List<UiText> = emptyList()) : UiText
+    data class Res(val id: Int, val args: List<Any?> = emptyList()) : UiText
     data class Raw(val value: String) : UiText
 
     companion object {
-        /** args 里 UiText 原样收，其余（数字/动态串）转 Raw；单一重载避免 vararg 歧义。 */
-        fun res(id: Int, vararg args: Any?): Res = Res(id, args.map { toText(it) })
-
-        private fun toText(a: Any?): UiText = when (a) {
-            is UiText -> a
-            else -> Raw(a?.toString().orEmpty())
-        }
+        /**
+         * args 原样收（UiText 递归解析，其余保持原类型交给 String.format）。
+         *
+         * **数字必须保持数字**：把它提前 `toString()` 再进 `%1$d` 会抛
+         * `IllegalFormatConversionException`（`%d` 只吃 Byte/Short/Int/Long/BigInteger）。
+         * 资源里写 `%d` 还是 `%s` 由文案决定，载体不替它做转换。
+         */
+        fun res(id: Int, vararg args: Any?): Res = Res(id, args.toList())
     }
+}
+
+private fun Any?.resolveArg(context: Context): Any = when (this) {
+    is UiText -> resolve(context)
+    null -> ""
+    else -> this
+}
+
+@Composable
+@ReadOnlyComposable
+private fun Any?.resolveArgComposable(): Any = when (this) {
+    is UiText -> resolve()
+    null -> ""
+    else -> this
 }
 
 /** 非 Compose 语境（Snackbar/LaunchedEffect/Toast）解析。 */
 fun UiText.resolve(context: Context): String = when (this) {
     is UiText.Res -> context.getString(
         id,
-        *args.map { it.resolve(context) }.toTypedArray(),
+        *args.map { it.resolveArg(context) }.toTypedArray(),
     )
     is UiText.Raw -> value
 }
@@ -44,6 +59,6 @@ fun UiText.resolve(context: Context): String = when (this) {
 @Composable
 @ReadOnlyComposable
 fun UiText.resolve(): String = when (this) {
-    is UiText.Res -> stringResource(id, *args.map { it.resolve() }.toTypedArray())
+    is UiText.Res -> stringResource(id, *args.map { it.resolveArgComposable() }.toTypedArray())
     is UiText.Raw -> value
 }

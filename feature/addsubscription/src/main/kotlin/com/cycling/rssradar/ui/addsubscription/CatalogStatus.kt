@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.RefreshCw
@@ -57,14 +58,16 @@ internal fun CatalogStatusBar(
                 } else {
                     Icon(
                         imageVector = Lucide.RefreshCw,
-                        contentDescription = "更新路由目录",
+                        contentDescription = stringResource(R.string.add_catalog_refresh_cd),
                         tint = radarColors().textSecondary,
                         modifier = Modifier.size(12.dp),
                     )
                 }
                 Spacer(Modifier.width(5.dp))
                 Text(
-                    text = if (refreshing) "更新中" else "更新目录",
+                    text = stringResource(
+                        if (refreshing) R.string.add_catalog_refreshing else R.string.add_catalog_refresh,
+                    ),
                     color = radarColors().textSecondary,
                     style = MaterialTheme.typography.labelMedium,
                 )
@@ -73,10 +76,13 @@ internal fun CatalogStatusBar(
     }
 }
 
+@Composable
 private fun catalogStatusText(routeCount: Int, generatedAtMillis: Long?, source: CatalogSource): String {
     if (routeCount == 0) return ""
-    val count = "$routeCount 条路由"
-    val origin = if (source == CatalogSource.UPDATED) "已更新" else "内置"
+    val count = stringResource(R.string.add_catalog_count, routeCount)
+    val origin = stringResource(
+        if (source == CatalogSource.UPDATED) R.string.add_catalog_updated else R.string.add_catalog_builtin,
+    )
     val date = generatedAtMillis?.let { formatCatalogDate(it) }
     return listOfNotNull(count, origin, date).joinToString(" · ")
 }

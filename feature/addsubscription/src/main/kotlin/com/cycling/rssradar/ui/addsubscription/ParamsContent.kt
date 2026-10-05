@@ -32,6 +32,7 @@ import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -84,7 +85,7 @@ internal fun ColumnScope.ParamsContent(
         if (route.params.isEmpty()) {
             item {
                 Text(
-                    text = "此路由无需参数，直接生成即可。",
+                    text = stringResource(R.string.add_no_params),
                     color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -112,7 +113,7 @@ internal fun ColumnScope.ParamsContent(
             Column {
                 // 结果由哪个实例解析，写在按钮上方：实例不可达时这是最先要核对的信息
                 Text(
-                    text = "由 ${state.host} 解析",
+                    text = stringResource(R.string.add_resolved_by, state.host),
                     color = radarColors().textTertiary,
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
@@ -141,7 +142,7 @@ internal fun ColumnScope.ParamsContent(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "生成并预览",
+                        text = stringResource(R.string.add_generate_preview),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -149,7 +150,7 @@ internal fun ColumnScope.ParamsContent(
                 if (state.missingParams.isNotEmpty()) {
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        text = "还需填写：" + state.missingParams.joinToString("、") {
+                        text = stringResource(R.string.add_still_need) + state.missingParams.joinToString("、") {
                             it.label.ifBlank { it.key }
                         },
                         color = radarColors().textTertiary,
@@ -214,7 +215,7 @@ private fun ParamField(
             modifier = Modifier.fillMaxWidth(),
             placeholder = {
                 Text(
-                    text = param.fallback ?: "必填",
+                    text = param.fallback ?: stringResource(R.string.add_required),
                     color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -254,7 +255,7 @@ private fun OptionalTag() {
             .padding(horizontal = 5.dp, vertical = 2.dp),
     ) {
         Text(
-            text = "可选",
+            text = stringResource(R.string.add_optional),
             color = radarColors().textTertiary,
             style = MaterialTheme.typography.labelSmall,
         )

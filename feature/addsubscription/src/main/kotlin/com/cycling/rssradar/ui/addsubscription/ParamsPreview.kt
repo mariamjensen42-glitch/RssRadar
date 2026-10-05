@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -32,6 +33,7 @@ import com.composables.icons.lucide.Lucide
 import com.cycling.rssradar.core.model.rsshub.RouteExample
 import com.cycling.rssradar.core.model.rsshub.RssHubRoute
 import com.cycling.rssradar.core.ui.components.FeedIcon
+import com.cycling.rssradar.core.ui.text.resolve
 import com.cycling.rssradar.core.ui.theme.Success
 import com.cycling.rssradar.core.ui.theme.radarColors
 
@@ -45,7 +47,7 @@ internal fun ParamsHeader(route: RssHubRoute, onBack: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onBack) {
-            Icon(Lucide.ArrowLeft, contentDescription = "返回目录", tint = radarColors().textPrimary)
+            Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.add_back_to_catalog), tint = radarColors().textPrimary)
         }
         FeedIcon(title = route.sourceName, size = 32.dp, cornerRadius = 9.dp)
         Spacer(Modifier.width(10.dp))
@@ -94,9 +96,9 @@ internal fun PreviewResult(
                     // 路由拼出来的地址要等 RSSHub 现抓上游站点，十几秒是常态。
                     // 不说清就是干转圈，用户会以为卡死了（UI 铁律：静默 = 坏了）。
                     text = if (state.isUrlFromRoute) {
-                        "正在校验…（RSSHub 首次抓这条路由要现抓源站，可能要二三十秒）"
+                        stringResource(R.string.add_validating_slow)
                     } else {
-                        "正在校验…"
+                        stringResource(R.string.add_validating)
                     },
                     color = radarColors().textTertiary,
                     style = MaterialTheme.typography.bodySmall,
@@ -113,7 +115,7 @@ internal fun PreviewResult(
             )
             Spacer(Modifier.height(12.dp))
             PrimaryButton(
-                text = "订阅",
+                text = stringResource(R.string.add_subscribe),
                 enabled = state.canSubmit,
                 loading = state.isAdding,
                 onClick = { viewModel.onIntent(AddSubscriptionIntent.Submit) },
@@ -136,7 +138,7 @@ internal fun ExamplePicker(
 ) {
     Column {
         Text(
-            text = "示例",
+            text = stringResource(R.string.add_example),
             color = radarColors().textSecondary,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
@@ -219,7 +221,7 @@ internal fun ValidationBanner(info: ValidationInfo) {
             Spacer(Modifier.width(6.dp))
         }
         Text(
-            text = info.message,
+            text = info.message.resolve(),
             color = color,
             style = MaterialTheme.typography.bodySmall,
         )

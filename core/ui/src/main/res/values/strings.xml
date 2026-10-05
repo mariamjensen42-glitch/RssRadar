@@ -34,4 +34,20 @@
     <string name="issue_paywall">疑似付费墙/登录墙</string>
     <string name="issue_metadata_missing">缺少标题或时间</string>
     <string name="close">关闭</string>
+    <string name="menu_mark_read">标为已读</string>
+    <string name="menu_mark_unread">标为未读</string>
+    <string name="menu_star">收藏</string>
+    <string name="menu_unstar">取消收藏</string>
+    <string name="menu_bookmark">稍后读</string>
+    <string name="menu_unbookmark">移出稍后读</string>
+    <string name="menu_copy_link">复制链接</string>
+    <string name="menu_share">分享</string>
+    <string name="menu_open_original">查看原文</string>
+    <string name="menu_reduce_such">减少此类</string>
+    <string name="toast_link_copied">链接已复制</string>
+    <string name="toast_share_failed">无法分享</string>
+    <string name="toast_open_link_failed">无法打开链接</string>
+    <string name="tab_articles">文章</string>
+    <string name="tab_subscriptions">订阅</string>
+    <string name="tab_me">我的</string>
 </resources>

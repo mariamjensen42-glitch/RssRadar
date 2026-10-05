@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -32,6 +33,7 @@ import com.composables.icons.lucide.Rss
 import com.composables.icons.lucide.X
 import com.cycling.rssradar.core.model.rsshub.RouteCategory
 import com.cycling.rssradar.core.model.rsshub.RssHubRoute
+import com.cycling.rssradar.core.ui.R as UiR
 import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.core.ui.theme.radarColors
 
@@ -75,7 +77,7 @@ internal fun SheetHeader(title: String, subtitle: String?, onClose: () -> Unit) 
             }
         }
         IconButton(onClick = onClose) {
-            Icon(Lucide.X, contentDescription = "关闭", tint = radarColors().textSecondary)
+            Icon(Lucide.X, contentDescription = stringResource(UiR.string.close), tint = radarColors().textSecondary)
         }
     }
 }
@@ -94,7 +96,7 @@ internal fun ColumnScope.CatalogContent(
     ) {
         item {
             Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                FieldLabel("订阅源链接")
+                FieldLabel(stringResource(R.string.add_field_url))
                 Spacer(Modifier.height(8.dp))
                 UrlField(
                     value = state.url,
@@ -113,7 +115,7 @@ internal fun ColumnScope.CatalogContent(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "正在探测订阅源…",
+                            text = stringResource(R.string.add_discovering),
                             color = radarColors().textTertiary,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -140,7 +142,7 @@ internal fun ColumnScope.CatalogContent(
                     )
                     Spacer(Modifier.height(12.dp))
                     PrimaryButton(
-                        text = "添加订阅",
+                        text = stringResource(R.string.add_title),
                         enabled = state.canSubmit,
                         loading = state.isAdding,
                         onClick = { viewModel.onIntent(AddSubscriptionIntent.Submit) },
@@ -158,7 +160,7 @@ internal fun ColumnScope.CatalogContent(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "或从 RSSHub 路由构建",
+                    text = stringResource(R.string.add_or_from_route),
                     color = radarColors().textSecondary,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
@@ -207,7 +209,7 @@ internal fun ColumnScope.CatalogContent(
                         CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "正在装载路由目录…",
+                            text = stringResource(R.string.add_catalog_loading),
                             color = radarColors().textTertiary,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -223,7 +225,7 @@ internal fun ColumnScope.CatalogContent(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "没有匹配的路由",
+                        text = stringResource(R.string.add_catalog_empty),
                         color = radarColors().textTertiary,
                         style = MaterialTheme.typography.bodyMedium,
                     )

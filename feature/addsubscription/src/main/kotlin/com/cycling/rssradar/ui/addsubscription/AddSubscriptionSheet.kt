@@ -32,9 +32,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
+import com.cycling.rssradar.core.ui.text.resolve
 import com.cycling.rssradar.core.ui.theme.radarColors
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -65,12 +68,13 @@ internal fun AddSheetShell(
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
     )
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val message = viewModel.uiState.collectAsState().value.uiMessage
 
     LaunchedEffect(message) {
         message?.let {
-            snackbarHostState.showSnackbar(it)
+            snackbarHostState.showSnackbar(it.resolve(context))
             viewModel.onIntent(AddSubscriptionIntent.ConsumeMessage)
         }
     }
@@ -117,8 +121,8 @@ fun AddSubscriptionSheet(
         val route = state.selectedRoute
         if (route == null) {
             SheetHeader(
-                title = "添加订阅",
-                subtitle = "粘贴链接，或从 RSSHub 路由构建",
+                title = stringResource(R.string.add_title),
+                subtitle = stringResource(R.string.add_subtitle),
                 onClose = onDismiss,
             )
             CatalogContent(state = state, viewModel = viewModel)

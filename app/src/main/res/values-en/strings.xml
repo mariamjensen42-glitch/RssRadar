@@ -73,4 +73,5 @@
 
     <string name="annotations_title">My highlights</string>
     <string name="library_title">Starred &amp; read later</string>
+    <string name="share_no_link">This content has no link — RssRadar can only subscribe to links</string>
 </resources>

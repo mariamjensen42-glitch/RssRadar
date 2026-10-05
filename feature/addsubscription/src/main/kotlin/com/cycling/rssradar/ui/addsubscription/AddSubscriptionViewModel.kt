@@ -25,6 +25,7 @@ import com.cycling.rssradar.core.model.rsshub.RssHubRoute
 import com.cycling.rssradar.core.domain.rsshub.RssHubRoutes
 import com.cycling.rssradar.core.data.store.prefs.GroupStore
 import com.cycling.rssradar.core.ui.mvi.MviStateViewModel
+import com.cycling.rssradar.core.ui.text.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -38,18 +39,18 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /** 链接校验结果。 */
 sealed interface ValidationInfo {
-    val message: String
-    data object Idle : ValidationInfo { override val message = "" }
+    val message: UiText
+    data object Idle : ValidationInfo { override val message: UiText = UiText.Raw("") }
     data class Valid(val articleCount: Int) : ValidationInfo {
-        override val message = "链接有效，已识别 RSS 2.0 格式，共 $articleCount 篇文章"
+        override val message: UiText get() = UiText.res(R.string.add_valid_ok, articleCount)
     }
-    data class Invalid(override val message: String) : ValidationInfo
-    data class Network(override val message: String) : ValidationInfo
+    data class Invalid(override val message: UiText) : ValidationInfo
+    data class Network(override val message: UiText) : ValidationInfo
     /**
      * 地址本身不是 feed，但自动发现（#5）找到了候选：让用户挑一个。
      * [message] 说明"这不是 feed，发现了 N 个"。
      */
-    data class Discovered(override val message: String) : ValidationInfo
+    data class Discovered(override val message: UiText) : ValidationInfo
 }
 
 /**
@@ -85,7 +86,7 @@ data class AddSubscriptionUiState(
     /** 当前检索结果。单独存而不用派生属性：3800 条打分不该在每次 state 拷贝时重算。 */
     val visibleRoutes: List<RssHubRoute> = emptyList(),
     /** Snackbar 文案。原先漏在 UiState 外用 Compose mutableStateOf，渲染时序会与其它字段不同步。 */
-    val uiMessage: String? = null,
+    val uiMessage: UiText? = null,
     /** 分组选项。原先硬编码三个常量，与订阅页读注册表各说各话，新建分组这里看不见。 */
     val groupOptions: List<String> = emptyList(),
 ) {
@@ -208,11 +209,15 @@ class AddSubscriptionViewModel @Inject constructor(
                         catalogSource = CatalogSource.UPDATED,
                         visibleRoutes = search(),
                     )
-                    _state.update { it.copy(uiMessage = "路由目录已更新，共 $count 条") }
+                    _state.update { it.copy(uiMessage = UiText.res(R.string.add_catalog_refreshed, count)) }
                 }
                 .onFailure { error ->
                     _state.value = _state.value.copy(isCatalogRefreshing = false)
-                    _state.update { it.copy(uiMessage = "路由目录更新失败：${error.message ?: "网络错误"}") }
+                    val reason = error.message?.let { msg -> UiText.Raw(msg) }
+                        ?: UiText.res(R.string.add_err_network)
+                    _state.update {
+                        it.copy(uiMessage = UiText.res(R.string.add_catalog_refresh_failed, reason))
+                    }
                 }
         }
     }
@@ -277,7 +282,7 @@ class AddSubscriptionViewModel @Inject constructor(
         val route = _state.value.selectedRoute ?: return
         val values = RoutePath.match(route.path, example.path)
         if (values == null) {
-            _state.update { it.copy(uiMessage = "这条示例与路由模板对不上，请手动填写参数") }
+            _state.update { it.copy(uiMessage = UiText.res(R.string.add_err_example_mismatch)) }
             return
         }
         validationJob?.cancel()
@@ -302,13 +307,14 @@ class AddSubscriptionViewModel @Inject constructor(
         val missing = state.missingParams
         if (missing.isNotEmpty()) {
             val names = missing.joinToString("、") { it.label.ifBlank { it.key } }
-            _state.value = _state.value.copy(validation = ValidationInfo.Invalid("请先填写：$names"))
-            _state.update { it.copy(uiMessage = "请先填写：$names") }
+            val hint = UiText.res(R.string.add_err_missing_params, names)
+            _state.value = _state.value.copy(validation = ValidationInfo.Invalid(hint))
+            _state.update { it.copy(uiMessage = hint) }
             return
         }
         val built = state.builtUrl
         if (built == null) {
-            _state.update { it.copy(uiMessage = "参数拼不出完整地址，请检查参数") }
+            _state.update { it.copy(uiMessage = UiText.res(R.string.add_err_build_failed)) }
             return
         }
         validate(built, fromRoute = true)
@@ -343,7 +349,9 @@ class AddSubscriptionViewModel @Inject constructor(
             if (fromRoute && probeHost && !isReachable(host)) {
                 _state.value = _state.value.copy(
                     isValidating = false,
-                    validation = ValidationInfo.Network("$host 不可达，到「我的 → RSSHub 实例」换个实例"),
+                    validation = ValidationInfo.Network(
+                        UiText.res(R.string.add_err_host_unreachable, host),
+                    ),
                 )
                 return@launch
             }
@@ -366,7 +374,7 @@ class AddSubscriptionViewModel @Inject constructor(
                     isDiscovering = false,
                     discovered = found,
                     validation = if (found.isNotEmpty()) {
-                        ValidationInfo.Discovered("这个地址不是订阅源，但发现了 ${found.size} 个可订阅的源")
+                        ValidationInfo.Discovered(UiText.res(R.string.add_discovered, found.size))
                     } else {
                         validationOf(probe, fromRoute)
                     },
@@ -389,31 +397,23 @@ class AddSubscriptionViewModel @Inject constructor(
      */
     private fun validationOf(probe: FeedProbeResult?, fromRoute: Boolean): ValidationInfo = when (probe) {
         // 被 PROBE_TIMEOUT_MS 兜底掐断（含重试也没赶上）：还是慢，不是连不上
-        null -> ValidationInfo.Network("等了 50 秒仍未返回，这个实例响应太慢，换个实例试试")
+        null -> ValidationInfo.Network(UiText.res(R.string.add_err_slow))
         is FeedProbeResult.Valid -> ValidationInfo.Valid(probe.articleCount)
-        FeedProbeResult.InvalidUrl -> ValidationInfo.Invalid("链接格式不正确")
+        FeedProbeResult.InvalidUrl -> ValidationInfo.Invalid(UiText.res(R.string.add_err_bad_url))
         is FeedProbeResult.HttpError -> httpErrorInfo(probe.code, fromRoute)
         is FeedProbeResult.Timeout -> if (probe.connecting) {
-            ValidationInfo.Network("连接超时：地址没响应，检查网络或换个实例")
+            ValidationInfo.Network(UiText.res(R.string.add_err_connect_timeout))
         } else {
             // 已自动重试过一次仍超时，把这点说出来，否则用户会以为只试了一次
-            ValidationInfo.Network(
-                "实例响应太慢（已重试一次仍超时）：RSSHub 首次抓这条路由要现抓源站，" +
-                    "抓过一次后实例会缓存，稍后再试通常就成了",
-            )
+            ValidationInfo.Network(UiText.res(R.string.add_err_slow_retry))
         }
-        FeedProbeResult.DnsError -> ValidationInfo.Network(
-            "域名解析失败：这个域名不存在，或当前网络的 DNS 解析不了它",
-        )
-        FeedProbeResult.CertificateError -> ValidationInfo.Network(
-            "证书校验失败：自建实例常用自签/过期证书，Android 不信任" +
-                "（浏览器能点「继续访问」绕过，App 不行）——换成受信任的证书",
-        )
-        FeedProbeResult.NetworkError -> ValidationInfo.Network("连接被对方拒绝或中断，检查网络或换个实例")
+        FeedProbeResult.DnsError -> ValidationInfo.Network(UiText.res(R.string.add_err_dns))
+        FeedProbeResult.CertificateError -> ValidationInfo.Network(UiText.res(R.string.add_err_cert))
+        FeedProbeResult.NetworkError -> ValidationInfo.Network(UiText.res(R.string.add_err_refused))
         FeedProbeResult.InvalidFeed -> if (fromRoute) {
-            ValidationInfo.Invalid("实例没能返回有效内容：参数可能不对，或该路由已失效")
+            ValidationInfo.Invalid(UiText.res(R.string.add_err_invalid_from_route))
         } else {
-            ValidationInfo.Invalid("不是有效的 RSS/Atom 源，也没找到可用的订阅源")
+            ValidationInfo.Invalid(UiText.res(R.string.add_err_no_feed))
         }
     }
 
@@ -423,13 +423,13 @@ class AddSubscriptionViewModel @Inject constructor(
      */
     private fun httpErrorInfo(code: Int, fromRoute: Boolean): ValidationInfo = when (code) {
         404 -> ValidationInfo.Invalid(
-            if (fromRoute) "实例返回 404：参数可能不对，或这个实例没收录该路由"
-            else "404，这个地址不存在",
+            if (fromRoute) UiText.res(R.string.add_err_404_route)
+            else UiText.res(R.string.add_err_404),
         )
-        429 -> ValidationInfo.Network("实例限流（429）：公共实例有频率限制，稍后再试或换个实例")
-        401, 403 -> ValidationInfo.Network("实例拒绝访问（$code）：公共实例常这样，建议自建实例")
-        in 500..599 -> ValidationInfo.Network("实例报错 $code：它自己出问题了，换个实例试试")
-        else -> ValidationInfo.Network("实例返回 $code")
+        429 -> ValidationInfo.Network(UiText.res(R.string.add_err_429))
+        401, 403 -> ValidationInfo.Network(UiText.res(R.string.add_err_denied, code))
+        in 500..599 -> ValidationInfo.Network(UiText.res(R.string.add_err_5xx, code))
+        else -> ValidationInfo.Network(UiText.res(R.string.add_err_http, code))
     }
 
     /** 采用发现结果：地址栏换成候选地址，再走一次常规校验（成功后即可订阅）。 */
@@ -445,7 +445,7 @@ class AddSubscriptionViewModel @Inject constructor(
                 // 走同一套分类：候选地址失败的原因也各不相同（慢 / DNS / 证书 / 404），
                 // 一句「暂时无法访问」把用户能做的事全抹掉了
                 validation = if (probe == null) {
-                    ValidationInfo.Network("请求未返回结果，稍后再试")
+                    ValidationInfo.Network(UiText.res(R.string.add_err_no_result))
                 } else {
                     validationOf(probe, fromRoute = false)
                 },
@@ -492,16 +492,18 @@ class AddSubscriptionViewModel @Inject constructor(
             _state.value = _state.value.copy(host = host)
             if (isReachable(host)) return@launch
             if (instanceStore.customHost != null) {
-                _state.update { it.copy(uiMessage = "自定义实例 $host 不可达，到「我的 → RSSHub 实例」检查") }
+                _state.update {
+                    it.copy(uiMessage = UiText.res(R.string.add_err_custom_unreachable, host))
+                }
                 return@launch
             }
             val found = instanceStore.refreshAvailableHost()
             if (found == null) {
-                _state.update { it.copy(uiMessage = "所有内置实例都不可达，请检查网络或填入自建实例") }
+                _state.update { it.copy(uiMessage = UiText.res(R.string.add_err_all_unreachable)) }
                 return@launch
             }
             _state.value = _state.value.copy(host = found)
-            _state.update { it.copy(uiMessage = "已切换到可用实例：$found") }
+            _state.update { it.copy(uiMessage = UiText.res(R.string.add_switched_host, found)) }
         }
     }
 
@@ -521,10 +523,10 @@ class AddSubscriptionViewModel @Inject constructor(
             _state.update {
                 it.copy(
                     uiMessage = when (result) {
-                        AddFeedResult.Success -> "订阅成功"
-                        AddFeedResult.Duplicate -> "该源已订阅"
-                        AddFeedResult.InvalidFeed -> "不是有效的 RSS/Atom 源"
-                        AddFeedResult.NetworkError -> "网络错误，请检查链接后重试"
+                        AddFeedResult.Success -> UiText.res(R.string.add_ok_success)
+                        AddFeedResult.Duplicate -> UiText.res(R.string.add_ok_duplicate)
+                        AddFeedResult.InvalidFeed -> UiText.res(R.string.add_err_invalid_feed)
+                        AddFeedResult.NetworkError -> UiText.res(R.string.add_err_network_retry)
                     }
                 )
             }

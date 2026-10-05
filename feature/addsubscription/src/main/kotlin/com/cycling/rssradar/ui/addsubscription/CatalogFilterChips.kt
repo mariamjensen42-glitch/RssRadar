@@ -15,6 +15,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.model.rsshub.RouteCategory
@@ -29,7 +30,7 @@ internal fun HotTag() {
             .padding(horizontal = 5.dp, vertical = 2.dp),
     ) {
         Text(
-            text = "热门",
+            text = stringResource(R.string.add_hot),
             color = RssHubOrange,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,

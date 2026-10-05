@@ -20,8 +20,10 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import com.cycling.rssradar.core.ui.R
 import com.cycling.rssradar.core.ui.theme.Danger
 import com.composables.icons.lucide.Bookmark
 import com.composables.icons.lucide.ExternalLink
@@ -124,39 +126,39 @@ fun ArticleContextMenu(
         border = BorderStroke(1.dp, radarColors().divider),
     ) {
         DropdownMenuItem(
-            text = { Text(if (actions.isRead) "标为未读" else "标为已读") },
+            text = { Text(stringResource(if (actions.isRead) R.string.menu_mark_unread else R.string.menu_mark_read)) },
             leadingIcon = { MenuIcon(if (actions.isRead) Lucide.EyeOff else Lucide.Eye) },
             colors = normalItemColors(),
             onClick = { onDismiss(); actions.onToggleRead() },
         )
         DropdownMenuItem(
-            text = { Text(if (actions.isStarred) "取消收藏" else "收藏") },
+            text = { Text(stringResource(if (actions.isStarred) R.string.menu_unstar else R.string.menu_star)) },
             leadingIcon = { MenuIcon(Lucide.Star) },
             colors = normalItemColors(),
             onClick = { onDismiss(); actions.onToggleStarred() },
         )
         DropdownMenuItem(
-            text = { Text(if (actions.isBookmarked) "移出稍后读" else "稍后读") },
+            text = { Text(stringResource(if (actions.isBookmarked) R.string.menu_unbookmark else R.string.menu_bookmark)) },
             leadingIcon = { MenuIcon(Lucide.Bookmark) },
             colors = normalItemColors(),
             onClick = { onDismiss(); actions.onToggleBookmarked() },
         )
         DropdownMenuItem(
-            text = { Text("复制链接") },
+            text = { Text(stringResource(R.string.menu_copy_link)) },
             leadingIcon = { MenuIcon(Lucide.Link) },
             enabled = hasLink,
             colors = normalItemColors(),
             onClick = { onDismiss(); copyLink(context, actions.link) },
         )
         DropdownMenuItem(
-            text = { Text("分享") },
+            text = { Text(stringResource(R.string.menu_share)) },
             leadingIcon = { MenuIcon(Lucide.Share2) },
             enabled = hasLink,
             colors = normalItemColors(),
             onClick = { onDismiss(); shareLink(context, actions.link) },
         )
         DropdownMenuItem(
-            text = { Text("查看原文") },
+            text = { Text(stringResource(R.string.menu_open_original)) },
             leadingIcon = { MenuIcon(Lucide.ExternalLink) },
             enabled = hasLink,
             colors = normalItemColors(),
@@ -164,14 +166,14 @@ fun ArticleContextMenu(
         )
         actions.onReduceSuch?.let { reduce ->
             DropdownMenuItem(
-                text = { Text("减少此类") },
+                text = { Text(stringResource(R.string.menu_reduce_such)) },
                 leadingIcon = { MenuIcon(Lucide.ThumbsDown) },
                 colors = normalItemColors(),
                 onClick = { onDismiss(); reduce() },
             )
         }
         DropdownMenuItem(
-            text = { Text("删除") },
+            text = { Text(stringResource(R.string.delete)) },
             leadingIcon = { MenuIcon(Lucide.Trash2) },
             colors = dangerItemColors(),
             onClick = { onDismiss(); actions.onDelete() },
@@ -209,7 +211,7 @@ private fun MenuIcon(icon: androidx.compose.ui.graphics.vector.ImageVector) {
 private fun copyLink(context: Context, url: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText("link", url))
-    Toast.makeText(context, "链接已复制", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, context.getString(R.string.toast_link_copied), Toast.LENGTH_SHORT).show()
 }
 
 private fun shareLink(context: Context, url: String) {
@@ -217,7 +219,7 @@ private fun shareLink(context: Context, url: String) {
         .setType("text/plain")
         .putExtra(Intent.EXTRA_TEXT, url)
     runCatching { context.startActivity(Intent.createChooser(intent, null)) }
-        .onFailure { Toast.makeText(context, "无法分享", Toast.LENGTH_SHORT).show() }
+        .onFailure { Toast.makeText(context, context.getString(R.string.toast_share_failed), Toast.LENGTH_SHORT).show() }
 }
 
 private fun openInBrowser(context: Context, url: String) {
@@ -225,5 +227,5 @@ private fun openInBrowser(context: Context, url: String) {
         context.startActivity(
             Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
-    }.onFailure { Toast.makeText(context, "无法打开链接", Toast.LENGTH_SHORT).show() }
+    }.onFailure { Toast.makeText(context, context.getString(R.string.toast_open_link_failed), Toast.LENGTH_SHORT).show() }
 }

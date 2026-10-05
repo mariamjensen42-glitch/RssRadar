@@ -1,5 +1,6 @@
 package com.cycling.rssradar.core.ui.components
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,21 +13,23 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Library
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Rss
 import com.composables.icons.lucide.User
+import com.cycling.rssradar.core.ui.R
 import com.cycling.rssradar.core.ui.theme.radarColors
 
 /** 底部 TabBar 的主屏条目，与 Nav 路由一一对应（key 用于选中态判定）。 */
-private data class TabDef(val key: String, val title: String, val icon: ImageVector)
+private data class TabDef(val key: String, @StringRes val titleRes: Int, val icon: ImageVector)
 
 private val TOP_LEVEL_TABS = listOf(
-    TabDef("feed", "文章", Lucide.Rss),
-    TabDef("subs", "订阅", Lucide.Library),
-    TabDef("me", "我的", Lucide.User),
+    TabDef("feed", R.string.tab_articles, Lucide.Rss),
+    TabDef("subs", R.string.tab_subscriptions, Lucide.Library),
+    TabDef("me", R.string.tab_me, Lucide.User),
 )
 
 /**
@@ -74,8 +77,8 @@ fun FloatingBottomBar(
             NavigationBarItem(
                 selected = tab.key == currentRoute,
                 onClick = { onTabSelected(tab.key) },
-                icon = { Icon(tab.icon, contentDescription = tab.title) },
-                label = { Text(tab.title) },
+                icon = { Icon(tab.icon, contentDescription = stringResource(tab.titleRes)) },
+                label = { Text(stringResource(tab.titleRes)) },
                 alwaysShowLabel = true,
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = radarColors().onAccent,

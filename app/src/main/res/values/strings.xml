@@ -73,4 +73,5 @@
 
     <string name="annotations_title">我的标注</string>
     <string name="library_title">收藏与稍后读</string>
+    <string name="share_no_link">这段内容里没有链接，RssRadar 只能订阅链接</string>
 </resources>
