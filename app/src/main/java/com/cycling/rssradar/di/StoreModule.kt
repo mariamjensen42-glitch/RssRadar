@@ -9,6 +9,7 @@ import com.cycling.rssradar.core.data.store.prefs.LanguageStore
 import com.cycling.rssradar.core.data.store.prefs.LinkStore
 import com.cycling.rssradar.core.data.store.prefs.ListDisplayStore
 import com.cycling.rssradar.core.data.store.prefs.NotificationStore
+import com.cycling.rssradar.core.data.store.prefs.ReadingPositionStore
 import com.cycling.rssradar.core.data.store.prefs.ReadingPrefsStore
 import com.cycling.rssradar.core.data.store.prefs.SettingsPrefs
 import com.cycling.rssradar.core.data.store.prefs.SyncStore
@@ -86,4 +87,10 @@ object StoreModule {
     @Singleton
     fun provideLinkStore(@ApplicationContext context: Context): LinkStore =
         LinkStore(SettingsPrefs.of(context))
+
+    /** 阅读位置记忆：每篇文章读到哪里（比例），重开长文回到原位。 */
+    @Provides
+    @Singleton
+    fun provideReadingPositionStore(@ApplicationContext context: Context): ReadingPositionStore =
+        ReadingPositionStore(SettingsPrefs.of(context))
 }

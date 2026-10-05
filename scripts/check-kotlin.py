@@ -285,6 +285,7 @@ def generate_r_stub(out_dir: pathlib.Path) -> str | None:
         ("feature/settings/src/main/res", "com.cycling.rssradar.ui.settings"),
         ("feature/feed/src/main/res", "com.cycling.rssradar.ui.feed"),
         ("feature/article/src/main/res", "com.cycling.rssradar.ui.article"),
+        ("feature/addsubscription/src/main/res", "com.cycling.rssradar.ui.addsubscription"),
         ("feature/ai/src/main/res", "com.cycling.rssradar.ui.ai"),
         ("feature/me/src/main/res", "com.cycling.rssradar.ui.me"),
     ]
@@ -402,8 +403,10 @@ def main() -> int:
         if not args.main_only:
             files += sources(ROOT / "app/src/test/java")
             files += sources(ROOT / "core/data/src/test")
-            # domain 纯函数测试（FeedHealthTest / AiReadingStatsTest…）：纯 JVM 可断言，
-            # 不收进来这些「数字必须真实」的守门测试就只在 CI 里跑
+            # model / domain 纯函数测试（MarkAsReadTest / FeedHealthTest / ReadingPositionTest…）：
+            # 纯 JVM 可断言。不收进来，这些「数字必须真实」的守门测试就只在 CI 里跑，
+            # 本地每次都「全绿」——core:model 的那几个此前一直没被收（2026-10-05 补上）。
+            files += sources(ROOT / "core/model/src/test")
             files += sources(ROOT / "core/domain/src/test")
 
     out = WORK / "out"

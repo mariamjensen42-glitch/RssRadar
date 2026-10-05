@@ -156,6 +156,10 @@ private fun ArticleDetailBody(
     val scrollState = rememberScrollState()
     // 视口模式（有图文章）的头部折叠量 = WebView 内部滚动量，同样驱动顶栏补位标题
     var headerScrollY by remember { mutableStateOf(0) }
+    // 视口模式的可滚动上限（WebView 内部滚动范围）：与 headerScrollY 一起算阅读位置比例
+    var headerMaxScroll by remember { mutableStateOf(0) }
+    // 本次打开要恢复的位置（比例）。只取一次、之后不再变：切译文/换排版引起的重组不该再滚一遍
+    var restoreRatio by remember { mutableStateOf<Float?>(null) }
     // 标题完全滚出视口所需的滚动量（标题 top + 高度，onGloballyPositioned 量出）。
     // 初值 Int.MAX_VALUE = 未量出前顶栏不显标题。
     var titleHideOffset by remember { mutableStateOf(Int.MAX_VALUE) }
@@ -184,12 +188,15 @@ private fun ArticleDetailBody(
         viewModel.load(articleId)
         scrollState.scrollTo(0)
         headerScrollY = 0
+        headerMaxScroll = 0
         titleHideOffset = Int.MAX_VALUE
         imageViewer = null
         findActive = false
         findQuery = ""
         findCursor = 0
         findCount = 0
+        // 阅读位置记忆：换文章时取一次上次读到的位置，交给正文区按自己的滚动宿主恢复
+        restoreRatio = viewModel.readingRatio(articleId)
     }
     // 翻译失败走 Snackbar（spec #44：正文保持原文，报错可重试）；按状态实例触发，不会重复弹
     LaunchedEffect(translationState) {
@@ -391,7 +398,13 @@ private fun ArticleDetailBody(
                         translationState = translationState,
                         scrollState = scrollState,
                         headerScrollY = headerScrollY,
-                        onHeaderScroll = { headerScrollY = it },
+                        headerMaxScroll = headerMaxScroll,
+                        restoreRatio = restoreRatio,
+                        onHeaderScroll = { y, max ->
+                            headerScrollY = y
+                            headerMaxScroll = max
+                        },
+                        onPositionChange = { viewModel.rememberReadingRatio(articleId, it) },
                         onTitleMeasured = { titleHideOffset = it },
                         onGenerateSummary = { viewModel.onIntent(ArticleDetailIntent.GenerateSummary) },
                         onRetranslate = { viewModel.onIntent(ArticleDetailIntent.RetranslateArticle) },

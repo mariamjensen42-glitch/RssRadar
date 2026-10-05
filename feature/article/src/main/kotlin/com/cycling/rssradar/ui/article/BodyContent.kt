@@ -36,13 +36,19 @@ internal fun BodyContent(
     plan: BodyPlan,
     viewport: Boolean,
     imageUrls: List<String>,
-    onHeaderScroll: (Int) -> Unit,
+    /** 视口模式的滚动回调：(滚动量, 可滚动上限)。上限为 0 = 内容不足一屏。 */
+    onHeaderScroll: (Int, Int) -> Unit,
     onImageClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     /** 页内查找的活跃项：原生渲染器据此叠查找底色。 */
     find: ReadingFind = ReadingFind(),
     /** 命中总数上报（WebView 路自己算命中数，需要出口）。 */
     onFindCount: (Int) -> Unit = {},
+    /**
+     * 本次打开要恢复的阅读位置（比例）。只对视口模式生效——整页模式的滚动归外层
+     * Compose，由 [ReadingBody] 自己恢复；WebView 只在自己滚动的视口模式里滚得动。
+     */
+    restoreRatio: Float? = null,
 ) {
     val context = LocalContext.current
     when (plan.mode) {
@@ -59,6 +65,7 @@ internal fun BodyContent(
             imageUrls = imageUrls,
             passThroughTouch = !viewport,
             onScroll = if (viewport) onHeaderScroll else null,
+            restoreRatio = if (viewport) restoreRatio else null,
             onImageClick = onImageClick,
             findQuery = find.query,
             findCursor = find.cursor,
@@ -80,6 +87,7 @@ internal fun BodyContent(
             imageUrls = imageUrls,
             passThroughTouch = !viewport,
             onScroll = if (viewport) onHeaderScroll else null,
+            restoreRatio = if (viewport) restoreRatio else null,
             onImageClick = onImageClick,
             findQuery = find.query,
             findCursor = find.cursor,

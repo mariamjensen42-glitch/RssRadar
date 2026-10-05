@@ -17,17 +17,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import com.cycling.rssradar.core.model.ReadingPosition
 import com.cycling.rssradar.core.model.TranslationDisplayState
 import com.cycling.rssradar.core.domain.reading.FindIndex
 import com.cycling.rssradar.core.domain.reading.ReadingTextMap
 import com.cycling.rssradar.core.ui.theme.LocalReadingPrefs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * 页内查找在正文区的全部输入：一个打包参数，而不是四散五个。
@@ -61,7 +66,14 @@ fun ReadingBody(
     scrollState: ScrollState,
     /** 视口模式的头部折叠量（= WebView 内部滚动量），随滚驱动。 */
     headerScrollY: Int,
-    onHeaderScroll: (Int) -> Unit,
+    /** 视口模式的可滚动上限（WebView 内部滚动范围）。 */
+    headerMaxScroll: Int,
+    /** 滚动上报：(滚动量, 可滚动上限)。整页模式没有第二个值，恒为 0。 */
+    onHeaderScroll: (Int, Int) -> Unit,
+    /** 本次打开要恢复的阅读位置（比例）；null = 不恢复（没读过、读过又回顶部、或已读完）。 */
+    restoreRatio: Float? = null,
+    /** 阅读位置变化出口（已归一成比例）：上层只管写库，不必知道滚动宿主是哪一个。 */
+    onPositionChange: (Float) -> Unit = {},
     onTitleMeasured: (Int) -> Unit,
     onGenerateSummary: () -> Unit,
     onRetranslate: () -> Unit,
@@ -160,6 +172,45 @@ fun ReadingBody(
     // 否则会出现「按 content 判定无图 → 整页 WebView，实际渲染的是带图的摘要」这种错位。
     val bodyHtml = if (resolvedPlan.summaryMode) article.article.summary else article.article.content
     val viewport = shouldUseViewport(resolvedPlan.mode, bodyHtml)
+
+    // 阅读位置记忆（一）恢复：整页模式由外层 Compose 滚，等正文高度落定（连续两次相同）再滚，
+    // 最多等 RESTORE_SETTLE_MS；视口模式交给 WebView 自己恢复——只有它知道内部滚动范围。
+    // 恢复完成前不写位置：首次组合时滚动量还是 0，那时落盘会把刚读到的那条记录冲掉
+    val positionReady = remember(article.article.id) { mutableStateOf(restoreRatio == null) }
+
+    LaunchedEffect(article.article.id, restoreRatio, viewport) {
+        val ratio = restoreRatio
+        if (ratio == null || viewport) {
+            positionReady.value = true
+            return@LaunchedEffect
+        }
+        withTimeoutOrNull(RESTORE_SETTLE_MS) {
+            var last = -1
+            while (true) {
+                val max = scrollState.maxValue
+                if (max > 0 && max == last) break
+                last = max
+                delay(RESTORE_POLL_MS)
+            }
+        }
+        if (scrollState.maxValue > 0) {
+            scrollState.scrollTo(ReadingPosition.pixels(ratio, scrollState.maxValue))
+        }
+        positionReady.value = true
+    }
+
+    // 阅读位置记忆（二）保存：滚动停下后写一次（防抖）。两种滚动宿主在这里归一成同一个比例，
+    // 上层因此完全不必知道当前走的是哪条渲染路。
+    LaunchedEffect(article.article.id, viewport) {
+        snapshotFlow {
+            if (viewport) headerScrollY to headerMaxScroll
+            else scrollState.value to scrollState.maxValue
+        }
+            .debounce(POSITION_SAVE_DEBOUNCE_MS)
+            .collect { (pos, max) ->
+                if (positionReady.value && max > 0) onPositionChange(ReadingPosition.ratio(pos, max))
+            }
+    }
     // 全屏查看页的多图列表与点击分流共用这一份；只有 WebView 路需要（译文路与原生路
     // 由 Compose 直接处理图片点击）。空串/无图正文 → 空集合，自动静默。
     // 与 plan 同批后台算：同为主线程正则，同样会卡导航动画的帧。
@@ -264,6 +315,7 @@ fun ReadingBody(
                 modifier = Modifier.weight(1f),
                 find = find,
                 onFindCount = onFindCount,
+                restoreRatio = restoreRatio,
             )
             Spacer(Modifier.height(12.dp)) // 避让底部操作栏
         }
@@ -311,8 +363,18 @@ fun ReadingBody(
                 modifier = Modifier.fillMaxWidth(),
                 find = find,
                 onFindCount = onFindCount,
+                restoreRatio = restoreRatio,
             )
             Spacer(Modifier.height(12.dp)) // 避让底部操作栏
         }
     }
 }
+
+/** 恢复前的等待上限：等正文高度"连续两次不变"，避免图片 reflow 后位置漂走。 */
+private const val RESTORE_SETTLE_MS = 1500L
+
+/** 高度采样的轮询间隔。 */
+private const val RESTORE_POLL_MS = 100L
+
+/** 位置写入的防抖：滚动停下（或停 0.6s）才落一次盘，滚动中不写。 */
+private const val POSITION_SAVE_DEBOUNCE_MS = 600L

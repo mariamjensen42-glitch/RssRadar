@@ -25,6 +25,7 @@ import com.cycling.rssradar.core.data.annotation.AnnotationRepository
 import com.cycling.rssradar.core.data.db.ArticleAnnotationEntity
 import com.cycling.rssradar.core.data.store.prefs.LinkStore
 import com.cycling.rssradar.core.model.ReadingPrefs
+import com.cycling.rssradar.core.data.store.prefs.ReadingPositionStore
 import com.cycling.rssradar.core.data.store.prefs.ReadingPrefsStore
 import com.cycling.rssradar.core.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -186,6 +187,8 @@ class ArticleDetailViewModel @Inject constructor(
     private val recommendation: Recommendation,
     /** 正文高亮与笔记（DB v17）。 */
     private val annotationRepository: AnnotationRepository,
+    /** 每篇文章的阅读位置（比例）：重开长文回到上次读到的地方。 */
+    private val readingPositionStore: ReadingPositionStore,
 ) : ViewModel(), MviViewModel<ArticleDetailIntent> {
 
     private val _article = MutableStateFlow<ArticleWithFeed?>(null)
@@ -303,6 +306,17 @@ class ArticleDetailViewModel @Inject constructor(
         val articleId = savedStateHandle.get<Long>(KEY_ARTICLE_ID)
             ?: savedStateHandle.get<String>(KEY_ARTICLE_ID)?.toLongOrNull()
         if (articleId != null) load(articleId)
+    }
+
+    /** 上次读到的位置（比例）。null = 没有值得恢复的记录：没读过，或读过又滚回了开头。 */
+    fun readingRatio(articleId: Long): Float? = readingPositionStore.get(articleId)
+
+    /**
+     * 记下当前阅读位置。比例落在「还在开头 / 已经读完」区间时 Store 会把记录清掉——
+     * 那代表新的语义（回到开头），不该留着上一次的中间位置。
+     */
+    fun rememberReadingRatio(articleId: Long, ratio: Float) {
+        readingPositionStore.save(articleId, ratio)
     }
 
     /** 幂等：init 自加载后，screen 生命周期处重复调用只是重查 DB。切换文章时重置 AI 过程状态。 */

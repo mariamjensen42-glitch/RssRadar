@@ -30,6 +30,33 @@ private class WebViewFindState {
     var consumedCursor = -1
 }
 
+/** 阅读位置恢复的一次性闸门：同样不用 Compose State（理由见 [WebViewFindState]）。 */
+private class WebViewRestoreState {
+    var consumed = false
+}
+
+/**
+ * 当前还能滚多少：内容总高（CSS px × 缩放）减去视口高。
+ *
+ * 不用 `computeVerticalScrollRange()/Extent()`——WebView 把它们标成了 protected，
+ * 顶层扩展函数访问不到（只有子类内部能用）；[contentHeight] 与 [WebView.getScale] 都是公开的。
+ * 页面未加载完时 contentHeight 为 0，结果是 0（调用方按「还滚不动」处理）。
+ */
+private fun WebView.scrollableRange(): Int =
+    (contentHeight * scale).toInt().minus(height).coerceAtLeast(0)
+
+/**
+ * 按比例恢复视口模式的滚动位置。
+ *
+ * 幂等：每次都用**当前**可滚动上限重算——页面加载中与图片 reflow 之后上限都会变，
+ * 隔一段时间多滚两次才能落到同一段文字上。调用点见 [ArticleWebView] 的 update。
+ */
+private fun WebView.restoreToRatio(ratio: Float) {
+    val range = scrollableRange()
+    if (range <= 0) return
+    scrollTo(0, (ratio * range).toInt())
+}
+
 /**
  * 净化后的正文 HTML 用 WebView 渲染：排版参数与主题色注入 CSS（issue #42）。
  * 模板构建在 [ReadingContentHtml]（纯函数，JVM 单测覆盖）；本组合函数只负责
@@ -58,10 +85,13 @@ internal fun ArticleWebView(
     onImageClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     passThroughTouch: Boolean = true,
-    onScroll: ((Int) -> Unit)? = null,
+    /** 视口模式的滚动上报：(滚动量, 可滚动上限)。上限为 0 = 内容不足一屏。 */
+    onScroll: ((Int, Int) -> Unit)? = null,
     findQuery: String = "",
     findCursor: Int = 0,
     onFindCount: (Int) -> Unit = {},
+    /** 视口模式要恢复的阅读位置（比例）。整页模式不传——那时 WebView 自己不滚动。 */
+    restoreRatio: Float? = null,
 ) {
     // 颜色读自 radarColors()（CompositionLocal），主题切换自动重组
     val bg = toCssColor(radarColors().bgRoot)
@@ -96,6 +126,7 @@ internal fun ArticleWebView(
     val currentImageUrls by rememberUpdatedState(linkedImages)
     val currentOnFindCount by rememberUpdatedState(onFindCount)
     val findState = remember { WebViewFindState() }
+    val restoreState = remember { WebViewRestoreState() }
     // 闪烁修复（用户反馈）：AndroidView 的 update 在每次父重组时都会跑，而 ArticleWebView
     // 的父（ReadingBody）会因顶栏 showTitle 翻转而重组 → 不加守卫就会每帧 reload 整页 HTML。
     // 用非 State 容器记住"已加载的 HTML 串"，只有内容真变才 reload。
@@ -108,7 +139,7 @@ internal fun ArticleWebView(
 
                 override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
                     super.onScrollChanged(l, t, oldl, oldt)
-                    currentOnScroll?.invoke(t)
+                    currentOnScroll?.invoke(t, scrollableRange())
                 }
 
                 // WebView 被布局移动后（首帧头部量测把它推到最终位置），Chromium 合成层
@@ -203,6 +234,14 @@ internal fun ArticleWebView(
                     // ordinal 是 1 基，cursor 是 0 基：cursor >= ordinal 即往后走
                     webView.findNext(findCursor >= findState.ordinal)
                 }
+            }
+            // 阅读位置恢复：只在首次触发（consumed 闸门），分三次重试覆盖首帧与图片
+            // reflow 之后的新高度——那时可滚动上限变了，按新上限重算才落回同一段
+            if (restoreRatio != null && !restoreState.consumed) {
+                restoreState.consumed = true
+                webView.post { webView.restoreToRatio(restoreRatio) }
+                webView.postDelayed({ webView.restoreToRatio(restoreRatio) }, 300)
+                webView.postDelayed({ webView.restoreToRatio(restoreRatio) }, 900)
             }
         },
         modifier = modifier,

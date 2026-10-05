@@ -32,6 +32,7 @@ SDK = pathlib.Path(r"E:\SoftWare\SDK")
 TEST_ROOTS = [
     ROOT / "app/src/test/java",
     ROOT / "core/data/src/test",
+    ROOT / "core/model/src/test",
     ROOT / "core/domain/src/test",
 ]
 
