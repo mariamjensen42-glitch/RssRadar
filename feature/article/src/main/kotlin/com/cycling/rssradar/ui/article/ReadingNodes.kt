@@ -587,7 +587,7 @@ object ReadingNodes {
     // ———————————————————————————————————————————————
 
     /** 只放行 http(s)；协议相对补 https；其余（空串/相对/mailto/javascript:）一律 null。 */
-    internal fun absoluteUrl(raw: String?): String? {
+    fun absoluteUrl(raw: String?): String? {
         val v = raw?.trim().orEmpty()
         return when {
             v.startsWith("http://", ignoreCase = true) || v.startsWith("https://", ignoreCase = true) -> v
