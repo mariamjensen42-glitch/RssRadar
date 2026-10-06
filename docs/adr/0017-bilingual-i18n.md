@@ -31,7 +31,7 @@
     `createConfigurationContext` 覆盖（`app/i18n/AppLocales`），切换后手动
     `recreate()`。
 - 语言偏好的单一真相源：`SettingsPrefs` 的 `app_language` 键，
-  `LanguageStore`（core/data/store，与 ThemeStore 同构）持久化 + StateFlow 广播。
+  `LanguageStore`（core/data/store/prefs，与 ThemeStore 同构）持久化 + StateFlow 广播。
 
 ### 2. 本地化范围
 

@@ -1,6 +1,6 @@
 package com.cycling.rssradar.core.data.notify
 
-import com.cycling.rssradar.core.data.db.ArticleWithFeed
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 
 /**
  * 新文章通知（#31）的文案汇总：纯函数，不碰 Android，JVM 可测。

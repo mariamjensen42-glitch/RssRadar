@@ -1,5 +1,7 @@
 package com.cycling.rssradar.core.data.parser
 
+import com.cycling.rssradar.core.model.ExtractionIssue
+import com.cycling.rssradar.core.model.FetchFailure
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -14,43 +16,6 @@ import java.net.URL
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import kotlin.text.Charsets
-
-/** 抓取/提取失败的原因分类（诊断页按此归类）。 */
-enum class FetchFailure {
-    INVALID_URL,
-    TIMEOUT,
-    NETWORK,
-    HTTP_401,
-    HTTP_403,
-    HTTP_404,
-    HTTP_429,
-    HTTP_5XX,
-    HTTP_OTHER,
-    EMPTY_BODY,
-    DECODE_ERROR,
-    EXTRACT_FAILED,
-    ;
-
-    /** 是否值得重试：401/403/404 重试无意义，只会浪费配额并招致更狠的封禁。 */
-    val retryable: Boolean
-        get() = this == TIMEOUT || this == NETWORK || this == HTTP_429 || this == HTTP_5XX
-
-    val label: String
-        get() = when (this) {
-            INVALID_URL -> "链接无效"
-            TIMEOUT -> "连接/读取超时"
-            NETWORK -> "网络不可达"
-            HTTP_401 -> "401 需登录"
-            HTTP_403 -> "403 拒绝（反爬）"
-            HTTP_404 -> "404 页面不存在"
-            HTTP_429 -> "429 限流"
-            HTTP_5XX -> "服务端 5xx"
-            HTTP_OTHER -> "HTTP 其他状态码"
-            EMPTY_BODY -> "响应为空"
-            DECODE_ERROR -> "编码解码失败"
-            EXTRACT_FAILED -> "正文提取失败"
-        }
-}
 
 /** 一次抓取的可观测结果：诊断页清单与警告日志都出自这里。 */
 data class FetchReport(
@@ -401,6 +366,13 @@ class ContentFetcher(
 
             when (val code = connection.responseCode) {
                 in 200..299 -> {
+                    // 链接本身就是资源（图片/PDF 等）时直接放弃：不校验的话，JPEG 二进制
+                    // 会被当文本解码成乱码写进正文 —— 「link 即图片」的源（必应每日壁纸）
+                    // 就靠这条挡住。服务器不给 Content-Type 时不拦，不能因此放掉正常抓取。
+                    val contentType = connection.contentType
+                    if (contentType != null && !contentType.isWebPageLike()) {
+                        return Download.Err(FetchFailure.NOT_HTML, code, null)
+                    }
                     val bytes = connection.inputStream.use { it.readBytes() }
                     if (bytes.isEmpty()) return Download.Err(FetchFailure.EMPTY_BODY, code, null)
                     val html = decode(bytes, connection.contentType)
@@ -426,6 +398,18 @@ class ContentFetcher(
             runCatching { connection.errorStream?.close() }
             connection.disconnect()
         }
+    }
+
+    /**
+     * 响应类型是否可能承载网页正文。
+     *
+     * 判据取「宽进」：`text/` 开头的一律放行（不少站点用 text/plain 吐正文），含 html/xml 也放行；
+     * 只有明确是图片/音视频/PDF/二进制流的才拒。宁可让一份非 HTML 走正常的「提取失败」，
+     * 也不要把图片字节当文本塞进库里 —— 后者不会报错，只会在阅读页显示一屏乱码。
+     */
+    private fun String.isWebPageLike(): Boolean {
+        val type = substringBefore(';').trim().lowercase()
+        return type.startsWith("text/") || type.contains("html") || type.contains("xml")
     }
 
     private fun retryAfter(connection: HttpURLConnection): Long? {

@@ -6,16 +6,18 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.cycling.rssradar.core.model.ThemeMode
+import com.cycling.rssradar.core.data.store.prefs.ThemeStore
 
 /**
  * ThemeStore：主题模式 + Material You 动态取色（#27）的持久化。
- * 动态取色默认关——整套色板跟随壁纸会让产品视觉身份消失，必须显式开启。
+ * 动态取色默认开——2026-10-03 起自动配色是唯一来源，固定色板仅作低版本回退。
  */
 class ThemeStoreTest {
 
     @Test
-    fun `dynamic color defaults to off`() {
-        assertFalse(ThemeStore(FakeSharedPreferences()).dynamicColor.value)
+    fun `dynamic color defaults to on`() {
+        assertTrue(ThemeStore(FakeSharedPreferences()).dynamicColor.value)
     }
 
     @Test

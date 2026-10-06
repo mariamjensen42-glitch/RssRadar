@@ -1,8 +1,8 @@
 package com.cycling.rssradar.core.data
 
-import com.cycling.rssradar.core.data.db.ArticleDao
-import com.cycling.rssradar.core.data.db.FeedDao
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.dao.ArticleDao
+import com.cycling.rssradar.core.data.db.dao.FeedDao
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -10,6 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.lang.reflect.Proxy
+import com.cycling.rssradar.core.data.refresh.RefreshEngine
 
 /**
  * 回归测试（真机反馈缺口，2026-09-05）：708 源全量刷新可达数十分钟，

@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import com.cycling.rssradar.core.data.maintenance.CrashLog
 
 /**
  * 崩溃日志落盘逻辑（issue #61）：只测纯逻辑（写文件 / 截断 / 滚动保留 / 摘要解析），

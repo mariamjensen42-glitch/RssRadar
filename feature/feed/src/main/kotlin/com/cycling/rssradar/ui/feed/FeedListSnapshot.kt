@@ -1,0 +1,133 @@
+package com.cycling.rssradar.ui.feed
+
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+
+/**
+ * 滚动自动标记已读（#11）的纯逻辑，从 FeedListScreen 的 LaunchedEffect 里抽出：
+ * 把「列表槽位 → 文章 id」铺平（粘性日期头也占一个槽位，用 null 占位），
+ * 滚过视口顶部的槽位即视为已读。槽位表与列表结构严格同构，
+ * 否则粘性头开启时索引会错位。
+ *
+ * 与 [dayGroups] 配对使用：开启粘性头时 [groups] 必须来自同一个 dayGroups 结果。
+ */
+fun scrollSlots(
+    articles: List<ArticleWithFeed>,
+    stickyDateHeader: Boolean,
+    groups: List<DayGroup> = emptyList(),
+): List<Long?> = if (stickyDateHeader) {
+    buildList {
+        groups.forEach { group ->
+            add(null) // 日期头占一个槽位
+            group.items.forEach { add(it.article.id) }
+        }
+    }
+} else {
+    articles.map { it.article.id }
+}
+
+/** 首屏可见索引 [firstVisibleIndex] 之前的槽位里，仍未读的文章 id（保持列表序）。 */
+fun passedUnreadIds(
+    slots: List<Long?>,
+    firstVisibleIndex: Int,
+    unreadIds: Set<Long>,
+): List<Long> = slots.subList(0, firstVisibleIndex.coerceAtMost(slots.size))
+    .filterNotNull()
+    .filter { it in unreadIds }
+
+/** 粘性日期头分组（issue #56）：一个自然日一组。 */
+data class DayGroup(
+    /** 自然日的 epochDay，作 LazyColumn key；无日期组为 [UNDATED_DAY_KEY]。 */
+    val key: Long,
+    /** 粘性头文案，恒有值——包括无发布日期的沉底组。 */
+    val label: String,
+    val items: List<ArticleWithFeed>,
+)
+
+/** 无发布日期组的 key 哨兵：真实 epochDay 可正可负，用极小值避免撞车。 */
+const val UNDATED_DAY_KEY = Long.MIN_VALUE
+
+/**
+ * 按自然日分组（issue #56）。无发布日期的文章沉底为「未知日期」组。
+ * 输入须已按时间倒序（DAO 排序保证，SQLite 视 NULL 最小故沉底）；
+ * groupBy 保持首次出现顺序，无需再排。
+ * [labelOf] 是标签缝：入参为 epochDay，生产用日历日文案，JVM 测试注入固定文案。
+ */
+fun dayGroups(
+    articles: List<ArticleWithFeed>,
+    labels: CalendarDayLabels,
+    today: Long = LocalDate.now().toEpochDay(),
+): List<DayGroup> {
+    val dated = mutableListOf<Pair<Long, ArticleWithFeed>>()
+    val undated = mutableListOf<ArticleWithFeed>()
+    articles.forEach { a ->
+        val ts = a.article.publishedAt
+        if (ts == null) undated.add(a) else dated.add(ts to a)
+    }
+    val groups = dated
+        .groupBy { (ts, _) ->
+            Instant.ofEpochMilli(ts).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
+        }
+        .map { (day, list) ->
+            DayGroup(key = day, label = calendarDayLabel(day, today, labels), items = list.map { it.second })
+        }
+    // 沉底组也必须带日期头：没有头的话，这批文章会一直挂在最后一个日期头下面，
+    // 滚多久吸顶的日期都不变，看着就像粘性头坏了。
+    return if (undated.isEmpty()) groups else groups + DayGroup(UNDATED_DAY_KEY, labels.unknown, undated)
+}
+
+/**
+ * 日历日文案包（ADR-0017 §3）：纯 JVM 数据结构，生产端由 Composable 用
+ * `stringResource` 装配后传入，测试端直接给常量——[calendarDayLabel] 因此
+ * 保持零 Android 依赖，也就不必在纯 JVM 代码里硬编码任何语言的文案。
+ */
+data class CalendarDayLabels(
+    val today: String,
+    val yesterday: String,
+    val twoDaysAgo: String,
+    val unknown: String,
+    val weekdays: List<String>,
+    val months: List<String>,
+    /** 月日，参数：(月份名, 日)。中英占位符顺序不同，故整串进资源。 */
+    val monthDay: String,
+    /** 月日 + 周几，参数：(月日串, 周几)。 */
+    val monthDayWeekday: String,
+    /** 年月日，参数：(年, 月份名, 日)。 */
+    val yearMonthDay: String,
+)
+
+/**
+ * 粘性日期头文案：按**日历日**给，不用相对时长。
+ *
+ * 这里踩过坑：原先拿组内第一条的时间戳喂 `DateUtils.getRelativeTimeSpanString`，
+ * 那是「距今多久」而不是「哪一天」——duration 不足 24h 一律显示「N 小时前」，
+ * 于是昨天 23:00 的组和今天凌晨的组会顶着同一句话；排序一乱（推荐 tab 按分数排、
+ * 日期不是单调的）撞车更多。日期头要回答的是「这一天是哪天」，只能按日历算。
+ *
+ * 纯 java.time，无 Android 依赖，JVM 可测。
+ * 注意：跨零点后已渲染的标签不会自己变，要下一次重组（翻页/刷新/切 tab）才更新。
+ */
+fun calendarDayLabel(
+    day: Long,
+    today: Long = LocalDate.now().toEpochDay(),
+    labels: CalendarDayLabels,
+): String {
+    when (today - day) {
+        0L -> return labels.today
+        1L -> return labels.yesterday
+        2L -> return labels.twoDaysAgo
+    }
+    val date = LocalDate.ofEpochDay(day)
+    // 一周内带周几，读起来最快；超出一周只有日期。diff 为负（源的时间戳超前，
+    // 时区或源站时钟问题）不给「明天」这种假答案，一律落到绝对日期。
+    val monthDay = labels.monthDay.format(labels.months[date.monthValue - 1], date.dayOfMonth)
+    return if (today - day in 3..6) {
+        labels.monthDayWeekday.format(monthDay, labels.weekdays[date.dayOfWeek.value - 1])
+    } else if (date.year == LocalDate.ofEpochDay(today).year) {
+        monthDay
+    } else {
+        labels.yearMonthDay.format(date.year, labels.months[date.monthValue - 1], date.dayOfMonth)
+    }
+}

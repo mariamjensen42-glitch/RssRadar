@@ -1,0 +1,360 @@
+package com.cycling.rssradar.ui.search
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.cycling.rssradar.core.ui.theme.RssRadarTheme
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.ArrowLeft
+import com.composables.icons.lucide.ChevronRight
+import com.composables.icons.lucide.FolderOpen
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Search
+import com.composables.icons.lucide.X
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import com.cycling.rssradar.core.ui.R as UiR
+import com.cycling.rssradar.core.ui.components.AppSnackbarHost
+import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
+import com.cycling.rssradar.ui.search.R
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
+@Composable
+fun SearchDestination(
+    onBack: () -> Unit,
+    onOpenArticle: (ArticleWithFeed) -> Unit = {},
+    /** 空态托底入口：跳订阅管理页（订阅源多的时候按源浏览比关键词更顺手）。 */
+    onOpenSubscriptions: () -> Unit = {},
+    viewModel: SearchViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val feeds by viewModel.feeds.collectAsStateWithLifecycle()
+    SearchScreen(
+        state = state,
+        feeds = feeds,
+        onBack = onBack,
+        onOpenArticle = onOpenArticle,
+        onOpenSubscriptions = onOpenSubscriptions,
+        onIntent = viewModel::onIntent,
+    )
+}
+
+@Composable
+fun SearchScreen(
+    state: SearchUiState,
+    feeds: List<FeedEntity>,
+    onBack: () -> Unit = {},
+    onOpenArticle: (ArticleWithFeed) -> Unit = {},
+    /** 空态托底入口：跳订阅管理页（订阅源多的时候按源浏览比关键词更顺手）。 */
+    onOpenSubscriptions: () -> Unit = {},
+    onIntent: (SearchIntent) -> Unit = {},
+) {
+    val focusRequester = remember { FocusRequester() }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+
+    // 删除撤销（issue #46），与信息流一致
+    // 文案在组合作用域预取，避免 lint 的 LocalContextGetResourceValueCall（同 FeedListScreen）
+    val pendingUndo = state.pendingUndoDelete
+    val deletedMessage = stringResource(R.string.search_deleted, pendingUndo?.title.orEmpty())
+    val undoLabel = stringResource(R.string.search_undo)
+    LaunchedEffect(pendingUndo) {
+        pendingUndo?.let {
+            val result = snackbarHostState.showSnackbar(
+                message = deletedMessage,
+                actionLabel = undoLabel,
+                duration = SnackbarDuration.Short,
+            )
+            when (result) {
+                SnackbarResult.ActionPerformed -> onIntent(SearchIntent.UndoDeleteArticle)
+                SnackbarResult.Dismissed -> onIntent(SearchIntent.DiscardUndo)
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(radarColors().bgRoot)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(start = 4.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Lucide.ArrowLeft,
+                        contentDescription = stringResource(UiR.string.back),
+                        tint = radarColors().textPrimary,
+                    )
+                }
+                SearchBar(
+                    query = state.query,
+                    onQueryChange = { onIntent(SearchIntent.QueryChange(it)) },
+                    onClear = { onIntent(SearchIntent.QueryChange("")) },
+                    onSubmit = { onIntent(SearchIntent.Submit) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusRequester(focusRequester),
+                )
+            }
+
+            if (state.query.isBlank()) {
+                RecentSearches(
+                    history = state.history,
+                    onPick = { onIntent(SearchIntent.QueryChange(it)) },
+                    onClear = { onIntent(SearchIntent.ClearHistory) },
+                    onDeleteItem = { onIntent(SearchIntent.DeleteHistoryItem(it)) },
+                )
+                // 无历史时的托底内容：整页只剩一句"暂无搜索记录"太空洞
+                if (state.history.isEmpty()) {
+                    IdleSuggestions(onOpenSubscriptions = onOpenSubscriptions)
+                }
+            } else {
+                SearchResults(
+                    state = state,
+                    feeds = feeds,
+                    onOpenArticle = onOpenArticle,
+                    onToggleRead = { id, read -> onIntent(SearchIntent.SetRead(id, read)) },
+                    onToggleStarred = { id -> onIntent(SearchIntent.ToggleStarred(id)) },
+                    onToggleBookmarked = { id -> onIntent(SearchIntent.ToggleBookmarked(id)) },
+                    onDelete = { id -> onIntent(SearchIntent.DeleteArticle(id)) },
+                    onIntent = onIntent,
+                    onLoadMore = { onIntent(SearchIntent.LoadMore) },
+                )
+            }
+        }
+        AppSnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+    }
+}
+
+@Composable
+private fun SearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClear: () -> Unit,
+    onSubmit: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // 键盘 action 触发搜索（UI 审计 S1）：移动端惯例，去掉右上角文字按钮
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = modifier.fillMaxWidth(),
+        placeholder = {
+            Text(
+                stringResource(R.string.search_placeholder),
+                color = radarColors().textTertiary,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        },
+        singleLine = true,
+        shape = RoundedCornerShape(50),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
+        leadingIcon = {
+            Icon(Lucide.Search, contentDescription = null, tint = radarColors().textTertiary, modifier = Modifier.size(18.dp))
+        },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = onClear) {
+                    Icon(Lucide.X, contentDescription = stringResource(R.string.search_clear), tint = radarColors().textTertiary, modifier = Modifier.size(18.dp))
+                }
+            }
+        },
+        colors = radarOutlinedTextFieldColors(containerColor = radarColors().surface1, borderColor = radarColors().surface2),
+    )
+}
+
+@Composable
+private fun RecentSearches(
+    history: List<String>,
+    onPick: (String) -> Unit,
+    onClear: () -> Unit,
+    /** 删除单条历史（UI 审计 S2）。 */
+    onDeleteItem: (String) -> Unit,
+) {
+    Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(R.string.search_recent),
+                color = radarColors().textPrimary,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            if (history.isNotEmpty()) {
+                TextButton(onClick = onClear) {
+                    Text(
+                        text = stringResource(R.string.search_clear_history),
+                        color = radarColors().textTertiary,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        if (history.isEmpty()) {
+            Text(
+                text = stringResource(R.string.search_no_history),
+                color = radarColors().textTertiary,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        } else {
+            // 用 FlowRow 效果的最简实现：3 个一行手写（如果 chips 太多可换 FlowRow）
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                history.chunked(3).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { term ->
+                            HistoryChip(
+                                term = term,
+                                onClick = { onPick(term) },
+                                onDelete = { onDeleteItem(term) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 无搜索历史时的托底：给「按订阅源浏览」一条出路，页面不再是空洞的一片。 */
+@Composable
+private fun IdleSuggestions(onOpenSubscriptions: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = radarColors().surface1,
+        modifier = Modifier
+            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onOpenSubscriptions),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Lucide.FolderOpen,
+                contentDescription = null,
+                tint = radarColors().accent,
+                modifier = Modifier.size(22.dp),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.search_browse_feeds),
+                    color = radarColors().textPrimary,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.search_browse_feeds_hint),
+                    color = radarColors().textTertiary,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Icon(
+                Lucide.ChevronRight,
+                contentDescription = null,
+                tint = radarColors().textTertiary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun HistoryChip(term: String, onClick: () -> Unit, onDelete: (String) -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = radarColors().surface1,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .clickable(onClick = onClick),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = term,
+                color = radarColors().textPrimary,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(start = 14.dp),
+            )
+            // 尾随 × 删除单条（UI 审计 S2）
+            IconButton(onClick = { onDelete(term) }, modifier = Modifier.size(24.dp)) {
+                Icon(
+                    Lucide.X,
+                    contentDescription = stringResource(R.string.search_delete_history_item, term),
+                    tint = radarColors().textTertiary,
+                    modifier = Modifier.size(12.dp),
+                )
+            }
+        }
+    }
+}
+
+
+@Preview(showBackground = true, name = "搜索 · 未搜")
+@Composable
+private fun SearchScreenIdlePreview() {
+    RssRadarTheme(darkTheme = false) {
+        SearchScreen(state = SearchUiState(), feeds = emptyList())
+    }
+}
+
+@Preview(showBackground = true, name = "搜索 · 无结果")
+@Composable
+private fun SearchScreenNoHitPreview() {
+    RssRadarTheme(darkTheme = true) {
+        SearchScreen(
+            state = SearchUiState(query = "kotlin", searched = true, hits = 0),
+            feeds = emptyList(),
+        )
+    }
+}

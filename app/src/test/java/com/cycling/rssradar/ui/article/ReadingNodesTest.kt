@@ -1,6 +1,7 @@
 package com.cycling.rssradar.ui.article
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -203,6 +204,33 @@ class ReadingNodesTest {
     }
 
     @Test
+    fun `image declared pixel size is parsed for proportional placeholder`() {
+        val img = ReadingNodes.parse(
+            """<img src="https://a.com/x.png" width="1280" height="720">""",
+        ).single() as NodeImage
+        assertEquals(1280, img.width)
+        assertEquals(720, img.height)
+    }
+
+    @Test
+    fun `image percentage size is ignored`() {
+        val img = ReadingNodes.parse(
+            """<img src="https://a.com/x.png" width="100%" height="auto">""",
+        ).single() as NodeImage
+        assertNull(img.width)
+        assertNull(img.height)
+    }
+
+    @Test
+    fun `image with a single declared dimension keeps the other null`() {
+        val img = ReadingNodes.parse(
+            """<img src="https://a.com/x.png" width="800">""",
+        ).single() as NodeImage
+        assertEquals(800, img.width)
+        assertNull(img.height)
+    }
+
+    @Test
     fun `media card label drops the play glyph`() {
         val card = ReadingNodes.parse(
             """<a class="media-card" href="https://youtu.be/abc"><span>▶</span>嵌入内容 · youtu.be</a>""",
@@ -214,6 +242,83 @@ class ReadingNodesTest {
     @Test
     fun `media card without a usable href is dropped`() {
         assertEquals(0, ReadingNodes.parse("""<a class="media-card">▶嵌入内容</a>""").size)
+    }
+
+    @Test
+    fun `media card carries the kind from its class suffix`() {
+        val video = ReadingNodes.parse(
+            """<a class="media-card media-card-video" href="https://a.com/v.mp4"><span>▶</span>视频 · a.com</a>""",
+        ).single() as NodeMediaCard
+        val audio = ReadingNodes.parse(
+            """<a class="media-card media-card-audio" href="https://a.com/a.mp3"><span>▶</span>音频 · a.com</a>""",
+        ).single() as NodeMediaCard
+
+        assertEquals(MediaNodeKind.VIDEO, video.kind)
+        assertEquals(MediaNodeKind.AUDIO, audio.kind)
+    }
+
+    @Test
+    fun `media card without a kind suffix falls back to embed`() {
+        val card = ReadingNodes.parse(
+            """<a class="media-card" href="https://youtu.be/abc"><span>▶</span>嵌入内容 · youtu.be</a>""",
+        ).single() as NodeMediaCard
+
+        assertEquals(MediaNodeKind.EMBED, card.kind)
+    }
+
+    @Test
+    fun `legacy media card without a suffix is recognized by its label`() {
+        val video = ReadingNodes.parse(
+            """<a class="media-card" href="https://cdn.example.com/abc"><span>▶</span>视频 · cdn.example.com</a>""",
+        ).single() as NodeMediaCard
+
+        assertEquals(MediaNodeKind.VIDEO, video.kind)
+    }
+
+    @Test
+    fun `media card falls back to the url extension when nothing else names the kind`() {
+        fun kindOf(href: String) = (
+            ReadingNodes.parse("""<a class="media-card" href="$href">▶内容</a>""").single() as NodeMediaCard
+            ).kind
+
+        assertEquals(MediaNodeKind.VIDEO, kindOf("https://cdn.example.com/clip.mp4"))
+        assertEquals(MediaNodeKind.AUDIO, kindOf("https://cdn.example.com/ep.mp3"))
+        assertEquals(MediaNodeKind.VIDEO, kindOf("https://cdn.example.com/live.m3u8?token=abc"))
+        assertEquals(MediaNodeKind.EMBED, kindOf("https://player.bilibili.com/player.html?bvid=BV1"))
+    }
+
+    @Test
+    fun `media card class suffix wins over the label`() {
+        val card = ReadingNodes.parse(
+            """<a class="media-card media-card-audio" href="https://a.com/x.mp4"><span>▶</span>视频 · a.com</a>""",
+        ).single() as NodeMediaCard
+
+        assertEquals(MediaNodeKind.AUDIO, card.kind)
+    }
+
+    @Test
+    fun `leftover iframe pointing straight at a media file is playable`() {
+        val card = ReadingNodes.parse("""<iframe src="https://cdn.example.com/clip.mp4"></iframe>""")
+            .single() as NodeMediaCard
+
+        assertEquals(MediaNodeKind.VIDEO, card.kind)
+    }
+
+    @Test
+    fun `leftover video and audio tags keep their kind`() {
+        val video = ReadingNodes.parse("""<video src="https://a.com/v.mp4"></video>""").single() as NodeMediaCard
+        val audio = ReadingNodes.parse("""<audio src="https://a.com/a.mp3"></audio>""").single() as NodeMediaCard
+
+        assertEquals(MediaNodeKind.VIDEO, video.kind)
+        assertEquals(MediaNodeKind.AUDIO, audio.kind)
+    }
+
+    @Test
+    fun `bilingual strip drops media cards from the original side`() {
+        val kept = NodeParagraph(listOf(InlineText("正文")))
+        val nodes = listOf(NodeMediaCard("https://a.com/v.mp4", "视频 · a.com", MediaNodeKind.VIDEO), kept)
+
+        assertEquals(listOf<ReadingNode>(kept), ReadingNodes.stripVisualDuplicates(nodes))
     }
 
     @Test

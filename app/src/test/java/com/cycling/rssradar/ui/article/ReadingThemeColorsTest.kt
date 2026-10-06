@@ -1,6 +1,6 @@
 package com.cycling.rssradar.ui.article
 
-import com.cycling.rssradar.core.data.store.ReadingTheme
+import com.cycling.rssradar.core.model.ReadingTheme
 import com.cycling.rssradar.core.ui.theme.RadarColors
 import com.cycling.rssradar.core.ui.theme.isLightBackground
 import org.junit.Assert.assertEquals

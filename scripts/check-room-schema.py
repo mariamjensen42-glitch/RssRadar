@@ -123,9 +123,13 @@ def parse_impl(path: str) -> tuple:
 
 
 def parse_migrations() -> tuple:
-    """从源码里取手写 migration 的建表与建索引语句。"""
+    """从源码里取手写 migration 的建表与建索引语句。
+
+    递归子目录：migration 已按域拆分（db/migration/Migrations.kt、db/AiSchema.kt 等），
+    只 glob 顶层会在拆分后静默扫不到任何语句、把校验变成恒真。
+    """
     tables, indexes = {}, {}
-    for src in sorted(DB_SRC.glob("*.kt")):
+    for src in sorted(DB_SRC.rglob("*.kt")):
         text = preprocess(src.read_text(encoding="utf-8"))
         for stmt in find_create_statements(text):
             parse_sql_object(stmt, tables, indexes)

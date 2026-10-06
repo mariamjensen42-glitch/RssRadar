@@ -1,11 +1,13 @@
 package com.cycling.rssradar.core.data.ai
 
 import com.cycling.rssradar.core.data.FakeSharedPreferences
-import com.cycling.rssradar.core.data.store.AiBudgetState
-import com.cycling.rssradar.core.data.store.AiBudgetStore
-import com.cycling.rssradar.core.data.store.AiDayIndex
-import com.cycling.rssradar.core.data.store.AiFeatureSettings
-import com.cycling.rssradar.core.data.store.AiFeatureStore
+import com.cycling.rssradar.core.model.AiBudgetState
+import com.cycling.rssradar.core.data.store.prefs.AiBudgetStore
+import com.cycling.rssradar.core.model.AiDayIndex
+import com.cycling.rssradar.core.model.AiCategory
+import com.cycling.rssradar.core.model.AiFeature
+import com.cycling.rssradar.core.model.AiFeatureSettings
+import com.cycling.rssradar.core.data.store.prefs.AiFeatureStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

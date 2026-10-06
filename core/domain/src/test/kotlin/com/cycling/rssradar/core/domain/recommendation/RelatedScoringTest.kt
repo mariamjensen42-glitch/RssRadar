@@ -1,5 +1,6 @@
 package com.cycling.rssradar.core.domain.recommendation
 
+import com.cycling.rssradar.core.model.AiFeature
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

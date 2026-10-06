@@ -35,3 +35,102 @@ jobs:
 
       - name: Run unit tests
         run: ./gradlew :app:testDebugUnitTest :core:model:test :core:domain:test :core:data:testDebugUnitTest --stacktrace
+
+  lint:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ github.event_name != 'pull_request' }}
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: app
+            task: ":app"
+            label: app
+          - module: core/data
+            task: ":core:data"
+            label: core-data
+          - module: core/ui
+            task: ":core:ui"
+            label: core-ui
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Make Gradle executable
+        run: chmod +x ./gradlew
+
+      - name: Run Android Lint
+        run: ./gradlew ${{ matrix.task }}:lintDebug --stacktrace
+
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-${{ matrix.label }}
+          if-no-files-found: warn
+          path: ${{ matrix.module }}/build/reports/lint-results-debug.*
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ matrix.module }}/build/reports/lint-results-debug.sarif
+          category: lint-${{ matrix.label }}
+
+  # Compose UI 测试（app/src/androidTest）：Screen 已全部拆成纯 UI，测试直接喂模拟状态，
+  # 不启动 Hilt、不碰 ViewModel。本地跑不了（要设备），所以由 CI 兜这一层。
+  # 只在 PR→main 上跑：emulator 启动 + 安装要几分钟，push dev 不必为它排队。
+  instrumented-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Make Gradle executable
+        run: chmod +x ./gradlew
+
+      # GitHub 的 ubuntu runner 默认不允许普通用户访问 /dev/kvm，不开这条模拟器会退化成软件渲染。
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Compose UI tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          # Compose 测试依赖「UI 空闲」判定，动画不停会直接挂住。
+          disable-animations: true
+          script: ./gradlew :app:connectedDebugAndroidTest --stacktrace
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: androidTest-reports
+          if-no-files-found: warn
+          path: app/build/reports/androidTests/connected/**

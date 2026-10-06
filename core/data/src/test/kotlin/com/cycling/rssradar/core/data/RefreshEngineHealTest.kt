@@ -1,8 +1,8 @@
 package com.cycling.rssradar.core.data
 
-import com.cycling.rssradar.core.data.db.ArticleDao
-import com.cycling.rssradar.core.data.db.FeedDao
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.dao.ArticleDao
+import com.cycling.rssradar.core.data.db.dao.FeedDao
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.parser.RssParser
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import kotlinx.coroutines.runBlocking
@@ -13,6 +13,7 @@ import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.lang.reflect.Proxy
 import java.util.Collections
+import com.cycling.rssradar.core.data.refresh.RefreshEngine
 
 /**
  * 失效源自愈（连续解析失败后 autodiscovery 换地址）的行为契约。

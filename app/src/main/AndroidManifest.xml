@@ -5,6 +5,11 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 新文章通知（#31）：Android 13+ 需运行时授权，设置页在用户开启时请求 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 音频/播客后台播放：media3 的 MediaSessionService 走前台服务，
+         Android 14+ 必须显式声明 mediaPlayback 类型，否则 startForeground 抛异常 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- RSS 生态仍有 http 源，MVP 阶段放行明文流量 -->
     <application
@@ -58,6 +63,17 @@
                     android:scheme="rssradar" />
             </intent-filter>
         </activity>
+
+        <!-- 音频/播客播放（media3）：MediaSessionService 承载播放器，通知栏控制与
+             后台播放由它提供；播放器本身活在服务里，退出播放页不中断。 -->
+        <service
+            android:name="com.cycling.rssradar.core.playback.PlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

@@ -1,9 +1,10 @@
 package com.cycling.rssradar
 
 import android.app.Application
-import com.cycling.rssradar.core.data.CrashLog
-import com.cycling.rssradar.sync.FeedHealthScheduler
-import com.cycling.rssradar.sync.SyncScheduler
+import com.cycling.rssradar.core.data.maintenance.CrashLog
+import com.cycling.rssradar.core.data.sync.FeedHealthScheduler
+import com.cycling.rssradar.core.data.sync.SearchIndexScheduler
+import com.cycling.rssradar.core.data.sync.SyncScheduler
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import javax.inject.Inject
@@ -25,5 +26,8 @@ class RssRadarApp : Application() {
         // 失效源每日复探（#82）：固定每日一次，无需开关——
         // 没有伤员时 Worker 查一次库即返回，成本可忽略
         FeedHealthScheduler.schedule(this)
+        // 检索语料自检：升级用户的历史文章没进 FTS，不补就搜不到。
+        // 一致时 Worker 只查一次计数即返回，成本可忽略。
+        SearchIndexScheduler.ensureIndexed(this)
     }
 }

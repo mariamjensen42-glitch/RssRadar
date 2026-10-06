@@ -1,0 +1,157 @@
+package com.cycling.rssradar.ui.feed
+
+import com.cycling.rssradar.core.data.db.entity.ArticleEntity
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.time.LocalDate
+
+/** 滚动自动标记已读（#11）的槽位规则：槽位表与列表结构（含日期头占位）严格同构。 */
+class ScrollSlotsTest {
+
+    private fun article(id: Long, read: Boolean = false) = ArticleWithFeed(
+        article = ArticleEntity(id = id, feedId = 1, link = "l$id", title = "t$id", summary = null, publishedAt = null, fetchedAt = 0, isRead = read),
+        feedTitle = "f", feedGroup = "g", feedIconUrl = null,
+    )
+
+    @Test
+    fun `不开粘性头时槽位就是文章 id 列表`() {
+        val slots = scrollSlots(listOf(article(1), article(2)), stickyDateHeader = false)
+        assertEquals(listOf(1L, 2L), slots)
+    }
+
+    @Test
+    fun `开粘性头时每组先占一个 null 槽位——错位即标错文章`() {
+        val groups = listOf(
+            DayGroup(1, "D1", listOf(article(1), article(2))),
+            DayGroup(2, "D2", listOf(article(3))),
+        )
+        val slots = scrollSlots(emptyList(), stickyDateHeader = true, groups = groups)
+        assertEquals(listOf<Long?>(null, 1L, 2L, null, 3L), slots)
+    }
+
+    @Test
+    fun `passedUnreadIds 只取首屏之前且仍未读的 id`() {
+        val slots = listOf<Long?>(null, 1L, 2L, null, 3L)
+        val unread = setOf(2L, 3L, 4L)
+        val passed = passedUnreadIds(slots, firstVisibleIndex = 3, unreadIds = unread)
+        assertEquals(listOf(2L), passed)
+    }
+
+    @Test
+    fun `firstVisibleIndex 越界按槽位表长度截断`() {
+        val passed = passedUnreadIds(listOf(1L, 2L), firstVisibleIndex = 99, unreadIds = setOf(1L, 2L))
+        assertEquals(listOf(1L, 2L), passed)
+    }
+}
+
+/** 粘性日期头分组规则（issue #56）：无日期沉底、自然日分组、标签经缝注入。 */
+class DayGroupsTest {
+
+    private fun article(id: Long, publishedAt: Long?) = ArticleWithFeed(
+        article = ArticleEntity(id = id, feedId = 1, link = "l$id", title = "t", summary = null, publishedAt = publishedAt, fetchedAt = 0),
+        feedTitle = "f", feedGroup = "g", feedIconUrl = null,
+    )
+
+    @Test
+    fun `同日合并为一组，不同日分开，顺序保持输入序`() {
+        // 同一天 09:00 与 10:00（GMT+8）
+        val day1a = 1_000_000L
+        val day1b = day1a + 3_600_000L
+        val day2 = day1a + 86_400_000L
+
+        val groups = dayGroups(
+            listOf(article(1, day1b), article(2, day1a), article(3, day2)),
+            TEST_DAY_LABELS,
+        )
+
+        assertEquals(2, groups.size)
+        assertEquals(listOf(1L, 2L), groups[0].items.map { it.article.id })
+        assertEquals(listOf(3L), groups[1].items.map { it.article.id })
+    }
+
+    @Test
+    fun `无日期文章沉底为独立组，且必须带日期头`() {
+        val groups = dayGroups(
+            listOf(article(1, 5_000_000L), article(2, null)),
+            TEST_DAY_LABELS,
+        )
+
+        assertEquals(2, groups.size)
+        assertEquals(UNDATED_DAY_KEY, groups[1].key)
+        // 沉底组不带日期头的话，这批文章会一直挂在最后一个日期头下面，
+        // 滚到底吸顶的日期都不变，看着就像粘性头坏了。
+        assertEquals("未知日期", groups[1].label)
+        assertEquals(listOf(2L), groups[1].items.map { it.article.id })
+    }
+
+    @Test
+    fun `全部无日期则只有沉底组`() {
+        val groups = dayGroups(listOf(article(1, null), article(2, null)), TEST_DAY_LABELS)
+        assertEquals(1, groups.size)
+        assertEquals(UNDATED_DAY_KEY, groups[0].key)
+    }
+
+    @Test
+    fun `每组都有非空标签——存在无头组就等于粘性头会卡住不动`() {
+        val groups = dayGroups(
+            listOf(article(1, 5_000_000L), article(2, null), article(3, 9_000_000L)),
+            TEST_DAY_LABELS,
+        )
+        assertTrue(groups.all { it.label.isNotBlank() })
+        assertEquals(groups.size, groups.map { it.label }.distinct().size)
+    }
+}
+
+
+/** 中文文案包夹具：主源码不再自带任何语言的文案，测试自己带（ADR-0017 §3）。 */
+private val TEST_DAY_LABELS = CalendarDayLabels(
+    today = "今天",
+    yesterday = "昨天",
+    twoDaysAgo = "前天",
+    unknown = "未知日期",
+    weekdays = listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日"),
+    months = (1..12).map { "${it}月" },
+    monthDay = "%1\$s%2\$s日",
+    monthDayWeekday = "%1\$s %2\$s",
+    yearMonthDay = "%1\$s年%2\$s%3\$s日",
+)
+
+/** 日期头文案：按日历日算，不按相对时长算（回归用例见「跨午夜」）。 */
+class CalendarDayLabelTest {
+
+    private val today = LocalDate.of(2026, 9, 2).toEpochDay()
+
+    @Test
+    fun `最近三天给相对词`() {
+        assertEquals("今天", calendarDayLabel(today, today, TEST_DAY_LABELS))
+        assertEquals("昨天", calendarDayLabel(today - 1, today, TEST_DAY_LABELS))
+        assertEquals("前天", calendarDayLabel(today - 2, today, TEST_DAY_LABELS))
+    }
+
+    @Test
+    fun `一周内带周几`() {
+        // 2026-08-30 是周日
+        assertEquals("8月30日 周日", calendarDayLabel(LocalDate.of(2026, 8, 30).toEpochDay(), today, TEST_DAY_LABELS))
+    }
+
+    @Test
+    fun `超过一周只给日期，跨年补年份`() {
+        assertEquals("7月15日", calendarDayLabel(LocalDate.of(2026, 7, 15).toEpochDay(), today, TEST_DAY_LABELS))
+        assertEquals("2025年12月1日", calendarDayLabel(LocalDate.of(2025, 12, 1).toEpochDay(), today, TEST_DAY_LABELS))
+    }
+
+    @Test
+    fun `跨午夜的两个自然日标签必须不同——相对时长会撞车`() {
+        // 昨天 23:50 与今天 00:10 只差 20 分钟，getRelativeTimeSpanString 会给同一句
+        // 「N 小时前」；按日历日算则必然是「昨天」与「今天」。
+        val labels = listOf(today - 1, today).map { calendarDayLabel(it, today, TEST_DAY_LABELS) }
+        assertEquals(listOf("昨天", "今天"), labels)
+    }
+
+    @Test
+    fun `时间戳超前的文章不谎称明天，直接报日期`() {
+        assertEquals("9月3日", calendarDayLabel(today + 1, today, TEST_DAY_LABELS))
+    }
+}

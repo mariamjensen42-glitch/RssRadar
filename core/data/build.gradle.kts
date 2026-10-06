@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.hilt)
 }
 
 android {
@@ -41,12 +42,18 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.androidx.core.ktx)
+    // sync/ 与 ai/AiDailyWorker 的 WorkManager 任务属数据层（spec Q4b）：
+    // 后台同步/索引/健康检查/每日 AI 批处理都挂在这里，不依赖 hilt-work（worker 内用 EntryPointAccessors 取依赖）。
+    implementation(libs.androidx.work.runtime.ktx)
     api(libs.androidx.room.runtime)
     api(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
-    // javax.inject（@Inject/@Singleton）来自 hilt-android 传递依赖
+    // hilt-android 只提供注解；@EntryPoint 的聚合元数据必须由 hilt 编译器产出、
+    // 再由 hilt 插件的聚合任务收进 app 的 SingletonC，否则运行时 EntryPoints.get 直接
+    // ClassCastException（Cannot cast DaggerRssRadarApp_HiltComponents_SingletonC to AppEntryPoint）。
     implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
 
     implementation(libs.rome)
     implementation(libs.rome.modules)

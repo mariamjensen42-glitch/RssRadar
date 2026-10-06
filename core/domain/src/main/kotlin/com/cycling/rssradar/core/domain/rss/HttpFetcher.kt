@@ -3,7 +3,10 @@ package com.cycling.rssradar.core.domain.rss
 import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
+import java.net.MalformedURLException
 import java.net.SocketTimeoutException
+import java.net.URI
+import java.net.URISyntaxException
 import java.net.URL
 
 /**
@@ -33,11 +36,54 @@ fun normalizeHttpUrl(raw: String): String? {
         "https://$trimmed"
     }
     return try {
-        URL(withScheme).toString().takeIf { it.startsWith("http") }
+        parseUrl(withScheme).toString().takeIf { it.startsWith("http") }
     } catch (_: Exception) {
         null
     }
 }
+
+/**
+ * 字符串 → [URI]。JDK 20 起 [URL] 的字符串构造器废弃，替代品是 [URI.toURL]；
+ * 但 URI 比旧构造器严格（空格、方括号等字符直接抛），而用户粘贴的地址与 Location
+ * 响应头里这类字符真实存在。故：先 trim（旧构造器本就吞首尾空白）→ 严格解析 →
+ * 失败则对非法字符做百分号编码重试。
+ *
+ * 两次都失败抛 [MalformedURLException]：畸形地址必须仍是 IOException，
+ * 不能让 URISyntaxException 这个 RuntimeException 冒到刷新链路顶层。
+ */
+internal fun parseUri(spec: String): URI {
+    val trimmed = spec.trim()
+    return try {
+        URI(trimmed)
+    } catch (e: URISyntaxException) {
+        try {
+            URI(escapeIllegalUrlChars(trimmed))
+        } catch (_: URISyntaxException) {
+            throw MalformedURLException(trimmed).apply { initCause(e) }
+        }
+    }
+}
+
+internal fun parseUrl(spec: String): URL = parseUri(spec).toURL()
+
+private fun escapeIllegalUrlChars(spec: String): String {
+    val sb = StringBuilder(spec.length)
+    for (ch in spec) {
+        if (isIllegalUrlChar(ch)) {
+            for (b in ch.toString().toByteArray(Charsets.UTF_8)) {
+                sb.append("%%%02X".format(b))
+            }
+        } else {
+            sb.append(ch)
+        }
+    }
+    return sb.toString()
+}
+
+private fun isIllegalUrlChar(ch: Char): Boolean =
+    ch == ' ' || ch == '"' || ch == '<' || ch == '>' || ch == '\\' ||
+        ch == '{' || ch == '}' || ch == '|' || ch == '[' || ch == ']' ||
+        ch == '^' || ch.code == 0x60
 
 /**
  * HTTP 抓取缝：刷新/订阅链路取 feed XML 的唯一入口。
@@ -141,7 +187,7 @@ class HttpUrlFetcher(
     }
 
     private fun open(url: String): HttpURLConnection {
-        val connection = URL(url).openConnection() as HttpURLConnection
+        val connection = parseUrl(url).openConnection() as HttpURLConnection
         connection.connectTimeout = connectTimeoutMs
         connection.readTimeout = readTimeoutMs
         connection.instanceFollowRedirects = true
@@ -173,7 +219,7 @@ class HttpUrlFetcher(
                 val location = connection.getHeaderField("Location")
                 release(connection)
                 if (location.isNullOrBlank()) throw HttpStatusException(code)
-                current = URL(URL(current), location).toString()
+                current = parseUri(current).resolve(parseUri(location)).toURL().toString()
                 redirects++
             } else {
                 return connection to code

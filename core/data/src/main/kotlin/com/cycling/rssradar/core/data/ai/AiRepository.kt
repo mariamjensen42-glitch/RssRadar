@@ -1,6 +1,9 @@
 package com.cycling.rssradar.core.data.ai
 
-import com.cycling.rssradar.core.data.db.ArticleDao
+import com.cycling.rssradar.core.model.AiFeature
+import com.cycling.rssradar.core.data.db.dao.ArticleDao
+import com.cycling.rssradar.core.data.store.prefs.AiFeatureStore
+import kotlinx.coroutines.CancellationException
 
 /** 译文缓存上限（篇）。 */
 private const val TRANSLATION_CACHE_MAX = 20
@@ -40,6 +43,8 @@ data class TranslationProgress(
 class AiRepository(
     private val articleDao: ArticleDao,
     private val client: DeepSeekClient,
+    private val limiter: AiRateLimiter,
+    private val featureStore: AiFeatureStore,
 ) {
 
     /**
@@ -59,6 +64,9 @@ class AiRepository(
     sealed interface SummaryOutcome {
         data class Success(val summary: String) : SummaryOutcome
         data class Failure(val userMessage: String) : SummaryOutcome
+
+        /** 今日额度用尽。**不是失败**：不重试，等明天。 */
+        data object OutOfBudget : SummaryOutcome
     }
 
     sealed interface TranslationOutcome {
@@ -66,26 +74,66 @@ class AiRepository(
         data object Success : TranslationOutcome
         data object AlreadyChinese : TranslationOutcome
         data class Failure(val userMessage: String) : TranslationOutcome
+
+        /** 今日额度用尽（翻译中途耗尽也算）：已完成段落已上屏，但不入缓存。 */
+        data object OutOfBudget : TranslationOutcome
     }
 
     /**
-     * 生成 AI 摘要并入库。来源优先正文纯文本、退回摘要；两者皆无则拒绝生成——不编造。
+     * 走闸调用模型：**预算 / 最小间隔 / 记账**三件事收在这一处，与 [AiFeatureRunner] 同源。
+     *
+     * 这个类曾经直接 `client.chat(...)`，于是阅读页的摘要与翻译两条路径完全绕过了
+     * [AiRateLimiter]——额度用尽后还能无限调、用量页也看不见这些调用。所有真实付费调用
+     * 必须经此方法，不得再直连 [client]。
+     *
+     * @return 模型原文；null 表示今日额度用尽（未发起请求）。
+     */
+    private suspend fun chatGuarded(system: String, input: String, temperature: Double?): String? =
+        try {
+            when (val call = limiter.withPermit { client.chat(system, input, temperature) }) {
+                is AiCallResult.Ok -> {
+                    limiter.record(input.length, call.value.length, success = true)
+                    call.value
+                }
+
+                AiCallResult.OutOfBudget -> null
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // 失败的调用同样占额度——否则反复失败能把当天额度无限次烧穿。
+            limiter.record(input.length, 0, success = false)
+            throw e
+        }
+
+    /**
+     * 生成 AI 摘要并入库（阅读页「生成摘要」走这条）。来源优先正文纯文本、退回摘要；
+     * 两者皆无则拒绝生成——不编造。
+     *
+     * 提示词取 [DEFAULT_SUMMARY_SYSTEM]，与 [AiFeatureRunner] 那条自动摘要路径**共用同一份**：
+     * 这里原先带一份内容重复的私有副本，改 prompt 时极易只改一处、另一处照旧生效。
      */
     suspend fun generateSummary(articleId: Long): SummaryOutcome {
+        if (!featureStore.isEnabled(AiFeature.SUMMARY)) {
+            return SummaryOutcome.Failure("「AI 摘要」未开启，可在设置里打开")
+        }
         val article = articleDao.getWithFeed(articleId)?.article
             ?: return SummaryOutcome.Failure("文章不存在")
         val source = article.contentText?.takeIf { it.isNotBlank() }
             ?: article.summary?.takeIf { it.isNotBlank() }
             ?: return SummaryOutcome.Failure("本文没有可用于摘要的内容")
+        val (input, truncated) = AiText.truncateForPrompt(source)
         return try {
-            val (input, truncated) = AiText.truncateForPrompt(source)
             // 低 temperature 压发散：摘要要忠实原文，不要模型自由发挥
-            val text = client.chat(SUMMARY_SYSTEM, input, temperature = 0.4)
+            val text = chatGuarded(DEFAULT_SUMMARY_SYSTEM, input, 0.4)
+                ?: return SummaryOutcome.OutOfBudget
             val summary = if (truncated) text + AiText.truncationNote(input.length) else text
             // 入库前截断（CursorWindow 防线）：列表流会连 aiSummary 一起查出，
             // 异常长的模型输出会把单行撑爆 2MB 窗口（数万行查询里一粒老鼠屎坏一锅粥）
             articleDao.updateAiSummary(articleId, summary.take(AI_SUMMARY_MAX_LENGTH))
             SummaryOutcome.Success(summary.take(AI_SUMMARY_MAX_LENGTH))
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: AiException) {
             SummaryOutcome.Failure(e.userMessage)
         } catch (e: Exception) {
@@ -105,6 +153,9 @@ class AiRepository(
         articleId: Long,
         onProgress: (TranslationProgress) -> Unit,
     ): TranslationOutcome {
+        if (!featureStore.isEnabled(AiFeature.TRANSLATE)) {
+            return TranslationOutcome.Failure("「文章翻译」未开启，可在设置里打开")
+        }
         val article = articleDao.getWithFeed(articleId)?.article
             ?: return TranslationOutcome.Failure("文章不存在")
         val html = article.content?.takeIf { it.isNotBlank() }
@@ -131,10 +182,10 @@ class AiRepository(
         return try {
             for (i in chunks.indices) {
                 val (input, _) = AiText.truncateForPrompt(chunks[i].html)
-                val out = client.chat(TRANSLATE_SYSTEM, input, temperature = 0.3)
-                    .takeIf { it.isNotBlank() }
-                    ?: chunks[i].html // 单段失败回退原文，不中断整篇
-                translated[i] = out
+                val raw = chatGuarded(TRANSLATE_SYSTEM, input, 0.3)
+                    ?: return TranslationOutcome.OutOfBudget
+                // 单段失败回退原文，不中断整篇
+                translated[i] = raw.takeIf { it.isNotBlank() } ?: chunks[i].html
                 onProgress(TranslationProgress(chunks, translated.toList()))
             }
             translationCache[articleId] = TranslationCacheEntry(
@@ -142,6 +193,8 @@ class AiRepository(
                 translated = translated.map { it.orEmpty() },
             )
             TranslationOutcome.Success
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: AiException) {
             TranslationOutcome.Failure(e.userMessage)
         } catch (e: Exception) {
@@ -150,25 +203,6 @@ class AiRepository(
     }
 
     companion object {
-        // 提示词设计（用户反馈"摘要不好"后的优化）：
-        // - 先一句核心结论再列要点，信息密度优先，禁止"本文介绍了"式套话；
-        // - 要点行用「· 」前缀，摘要卡片按纯文本多行渲染，视觉上即分点；
-        // - 低信息量文章（公告/短讯）允许只输出一句，不硬凑；
-        // - 忠实原文 + 保留数字与专名，延续 AI 不捏造原则（ADR-0005）。
-        private const val SUMMARY_SYSTEM =
-            "你是 RSS 阅读器里的中文导读编辑。基于用户提供的文章内容写一份摘要，" +
-                "让读者不点开全文也能抓住重点。\n" +
-                "要求：\n" +
-                "1. 第一行用一句话点明文章的核心结论或主旨，直接陈述，" +
-                "禁止用「本文介绍了」「这篇文章讲述了」之类的套话开头。\n" +
-                "2. 之后用 2 到 4 行以「· 」开头的要点，每行一个关键信息" +
-                "（事实、数据、观点或结论），按重要性排序。\n" +
-                "3. 忠实于原文：只使用文中真实出现的信息，数字、人名、专有名词照原文写，" +
-                "禁止编造、禁止推测、禁止添加文中没有的内容。\n" +
-                "4. 信息密度优先：宁短勿空，不复述显而易见的废话，不为凑句数注水。\n" +
-                "5. 若文章本身信息量很少（如简短公告、快讯），只输出第一行那一句话即可。\n" +
-                "6. 直接输出摘要本身，不要任何前缀、标题或解释。"
-
         // 逐块配对（双语一一对应）的前提：译文块数/块序必须与原文严格一致，
         // 否则 UI 侧按索引配对就会错位。因此把"不合并、不拆分、不增删块"写成硬约束。
         private const val TRANSLATE_SYSTEM =

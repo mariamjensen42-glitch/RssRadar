@@ -1,0 +1,101 @@
+package com.cycling.rssradar.core.navigation
+
+import kotlinx.serialization.Serializable
+
+/**
+ * 导航路由：类型安全的目的地标识（ADR-0002）。
+ *
+ * 4 个主屏（Feed / Subscriptions / Search / Me）为顶层 composable 目的地；
+ * [ArticleDetailRoute] 为独立 composable 目的地（带 articleId）；
+ * [FeedArticlesRoute] 为订阅源文章列表（从订阅源清单进入，单源浏览）。
+ * Feed 操作底栏曾是 composable + ModalBottomSheet 目的地（ADR-0002 #31），
+ * 已废弃：整页导航只为弹 sheet 没有必要，收回 SubscriptionsScreen 内联承载。
+ * Group 对话框是纯弹层，不入路由。
+ * 加订阅（[AddSubscriptionRoute]）2026-10-05 由 ModalBottomSheet 改回独立页面：
+ * 抽屉最高只到 92%，键盘顶起后路由目录与参数表单全挤在窄条里，而加订阅虽低频却要填表单，
+ * 全屏才够用。外部分享链接的预填改由 MainActivity 的一次性状态传入，不走路由参数——
+ * 导航对 String 参数需要编码处理，全仓没有先例，不值得为一条预填引入。
+ *
+ * NavHost 与各目的地的装配见后续提交。
+ */
+@Serializable data object FeedRoute
+
+@Serializable data object SubscriptionsRoute
+
+/**
+ * 添加订阅（RSSHub 路由目录 → 填参数两步同页）。
+ * 入口：订阅管理的「+」、信息流空态、系统分享/选中文字。
+ */
+@Serializable data object AddSubscriptionRoute
+
+@Serializable data object SearchRoute
+
+@Serializable data object MeRoute
+
+@Serializable data class ArticleDetailRoute(val articleId: Long)
+
+/** 订阅源文章列表（CONTEXT.md「Feed article list」）：单源浏览，单列表不分 tab。 */
+@Serializable data class FeedArticlesRoute(val feedId: Long)
+
+/** 全文抓取诊断（ADR-0012）：抓不到/抓不全的记录清单与按站点归因。 */
+@Serializable data object FetchDiagnosticsRoute
+
+/** 兴趣画像（ADR-0013）：推荐流的画像只读展示，回答"为什么推荐这些"。 */
+@Serializable data object InterestProfileRoute
+
+/** 崩溃日志（issue #61）：最近 5 次崩溃的清单与全文导出。 */
+@Serializable data object CrashLogRoute
+
+/** 阅读统计仪表盘（issue #83）：近 7 天阅读行为的真实数字。 */
+@Serializable data object ReadingStatsRoute
+
+// —— 设置二级页（主页只留分组入口，见 RssHubSettingsScreen） ——
+
+/** 通用：外观、列表显示、推荐、链接与分享。 */
+@Serializable data object SettingsGeneralRoute
+
+/** 同步与清理：自动同步、文章清理、新文章通知。 */
+@Serializable data object SettingsSyncRoute
+
+/** RSSHub：实例、自定义实例、内置镜像、路由目录。 */
+@Serializable data object SettingsRssHubRoute
+
+/** AI 与诊断：DeepSeek Key、AI 功能开关、用量、全文抓取诊断、崩溃日志。 */
+@Serializable data object SettingsAiDiagRoute
+
+/** AI 功能总览（AI 智能功能模块）：35 项独立开关、用量看板、任务队列、预算设置。 */
+@Serializable data object AiFeaturesRoute
+
+/** 提示词模板管理（AiFeature.PROMPT_TEMPLATE）：内置模板预览 + 各订阅源摘要提示词覆盖的集中管理。 */
+@Serializable data object PromptTemplatesRoute
+
+/**
+ * AI 产物中心（AI 智能功能模块）：按功能摊开 `ai_artifacts` 里的全部产物。
+ *
+ * 它是 35 项功能的**通用出口**——只有一部分功能有专属展示位，
+ * 其余功能的产物至少要有地方能看见，否则"跑成功了但看不到结果"无从自查。
+ */
+@Serializable data class AiArtifactsRoute(
+    /** 打开时预选的功能（dbValue）；null = 全部。总览页「查看结果」按功能直达。 */
+    val featureDbValue: Int? = null,
+)
+
+// —— 收藏整理 / 过滤规则 / 备份 / 通知细粒度（八项功能） ——
+
+/** 收藏整理：收藏与稍后读共用一套排序与筛选，页内切换。 */
+@Serializable data object LibraryRoute
+
+/** 本地关键词过滤规则管理。 */
+@Serializable data object FilterRulesRoute
+
+/** 通知细粒度：勿扰时段与关键词。 */
+@Serializable data object SettingsNotificationRoute
+
+/** 备份与恢复：全量导出 / 导入，不含 API Key。 */
+@Serializable data object BackupRoute
+
+/** 全库高亮与笔记列表（阅读页溢出菜单、「我的」页进入）。 */
+@Serializable data object AnnotationsRoute
+
+/** 音频播放器。feedId 非 0 时按该源构队列，articleId 非 0 时定位到该篇。 */
+@Serializable data class AudioPlayerRoute(val articleId: Long = 0L, val feedId: Long = 0L)

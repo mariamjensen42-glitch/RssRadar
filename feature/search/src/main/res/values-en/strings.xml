@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="search_placeholder">Search articles, feeds or keywords</string>
+    <string name="search_clear">Clear</string>
+    <string name="search_recent">Recent searches</string>
+    <string name="search_clear_history">Clear history</string>
+    <string name="search_no_history">No recent searches</string>
+    <string name="search_browse_feeds">Browse feeds</string>
+    <string name="search_browse_feeds_hint">Look through subscribed sites by group, then read a single feed</string>
+    <string name="search_delete_history_item">Remove “%1$s”</string>
+    <string name="search_result_count">%1$d results for “%2$s”</string>
+    <string name="search_no_result">No results. Try another keyword or loosen the filters</string>
+    <string name="search_deleted">Deleted “%1$s”</string>
+    <string name="search_undo">Undo</string>
+    <string name="search_filter_unread">Unread</string>
+    <string name="search_filter_starred">Starred</string>
+    <string name="search_filter_bookmarked">Read later</string>
+    <string name="search_filter_all_feeds">All feeds</string>
+    <string name="search_filter_clear">Clear filters</string>
+    <string name="search_loading_more">Loading more…</string>
+</resources>

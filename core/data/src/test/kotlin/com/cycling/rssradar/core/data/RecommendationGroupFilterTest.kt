@@ -2,6 +2,7 @@ package com.cycling.rssradar.core.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import com.cycling.rssradar.core.data.recommend.filterRankedIdsByGroup
 
 /** 推荐流按分组过滤推荐序的纯规则（issue #74）：默认组必须同时命中空串。 */
 class RecommendationGroupFilterTest {

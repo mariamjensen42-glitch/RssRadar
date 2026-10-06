@@ -53,8 +53,17 @@ data class TranslationPairInput(
 
 object TranslationSegments {
 
-    /** 单块字符上限（合成一次 API 请求的上限，不是渲染配对单位）。 */
-    const val MAX_CHUNK_CHARS = 1_800
+    /**
+     * 单块字符上限（合成一次 API 请求的上限，不是渲染配对单位）。
+     *
+     * 这个数直接决定**译文多久出现一次**：chunk 是渐进显示的粒度，翻完一整块才亮一块。
+     * 原先的 1800 约合 5~7 段英文，读者要盯着满屏原文等这一整批翻完（用户反馈
+     * 「这么长的英文居然是一段，翻译很慢」）。收到 600 后一次往返大致对应 1~2 段。
+     *
+     * 代价是请求数变多、每趟都要重付一次 prompt 与网络开销，总耗时略增；但读者感知的
+     * 「慢」几乎全押在首段译文何时出现上，这笔换手是值的。
+     */
+    const val MAX_CHUNK_CHARS = 600
 
     /**
      * 两级切分的唯一入口：chunk（API 往返单位）+ 其内的 block（双语配对单位）一次切好。
@@ -115,23 +124,30 @@ object TranslationSegments {
      * 原文块边界由 [TranslationChunk.blocks] 给定——切分是 [chunk] 的事，这里不再切第二遍；
      * 只有译文侧是模型新产出的内容，需要现场 [splitBlocks]。
      *
-     * 模型没做到时（译文块数少了/多了）如实降级——少则缺的块没有译文（渐进中表现为
-     * 待译），多则多出的译文块挂在末尾，绝不为了凑对齐而合并或重排原文块。
+     * **块数一致才逐块配对**。模型没守住块数时（少一块/多一块）退化成「整段一对」：
+     * 按索引硬配会把某一块的译文切给另一块，读者看到的是段落错位、句子半截——
+     * 宁可丢掉逐块对照的粒度，也不能给出错位的对照。
      */
     fun pair(inputs: List<TranslationPairInput>): List<TranslationBlockPair> {
         val pairs = mutableListOf<TranslationBlockPair>()
         for (input in inputs) {
-            val translated = input.translatedHtml?.let { splitBlocks(it) }
-            if (translated == null) {
+            val translatedHtml = input.translatedHtml
+            val translated = translatedHtml?.let { splitBlocks(it) }
+            if (translated == null || translatedHtml == null) {
                 input.originalBlocks.forEach { pairs.add(TranslationBlockPair(it, null)) }
                 continue
             }
-            val count = maxOf(input.originalBlocks.size, translated.size)
-            for (i in 0 until count) {
+            if (translated.size == input.originalBlocks.size) {
+                input.originalBlocks.forEachIndexed { i, block ->
+                    pairs.add(TranslationBlockPair(block, translated[i]))
+                }
+            } else {
+                // 块数对不上：原文/译文各自并成一段。拼接后的 HTML 仍由渲染侧 [ReadingNodes.parse]
+                // 解析成多个节点，所以内容完整、顺序不乱，只是不再逐块对照。
                 pairs.add(
                     TranslationBlockPair(
-                        originalHtml = input.originalBlocks.getOrNull(i) ?: "",
-                        translatedHtml = translated.getOrNull(i),
+                        originalHtml = input.originalBlocks.joinToString(""),
+                        translatedHtml = translatedHtml,
                     ),
                 )
             }

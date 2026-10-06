@@ -53,6 +53,8 @@ class RssParser {
          * 供列表卡片变形（跳原站播放）。数值与 ArticleEntity.MEDIA_KIND_* 对齐。
          */
         val mediaKind: Int = MEDIA_KIND_NONE,
+        /** 条目级媒体直链：音频/视频 enclosure 或 media:content 的 url，供播放器取源。 */
+        val mediaUrl: String? = null,
     )
 
     data class ParsedFeed(
@@ -233,7 +235,37 @@ class RssParser {
             publishedAt = sanitizePublishedAt(publishedDate?.time ?: updatedDate?.time),
             coverUrl = extractCover(this, coverSource, link),
             mediaKind = extractMediaKind(this),
+            mediaUrl = extractMediaUrl(this),
         )
+    }
+
+    /**
+     * 条目级媒体直链：enclosure 与 media 模块里第一条 audio/video 的 url。
+     * 只在真有地址时返回——列表上摆一个点不开的播放按钮，比不摆更糟。
+     */
+    private fun extractMediaUrl(entry: SyndEntry): String? {
+        entry.enclosures.orEmpty().forEach { enclosure ->
+            val type = enclosure.type.orEmpty().lowercase()
+            val url = enclosure.url
+            if ((type.startsWith("audio") || type.startsWith("video")) && !url.isNullOrBlank()) {
+                return url
+            }
+        }
+        val contents = (entry.getModule(MEDIA_MODULE_URI)
+            as? com.rometools.modules.mediarss.MediaEntryModule)
+            ?.mediaContents.orEmpty()
+            ?: return null
+        contents.forEach { content ->
+            val type = content.type.orEmpty().lowercase()
+            if (!type.startsWith("audio") && !type.startsWith("video")) return@forEach
+            val url = when (val reference = content.reference) {
+                is com.rometools.modules.mediarss.types.UrlReference -> reference.url?.toString()
+                is com.rometools.modules.mediarss.types.PlayerReference -> reference.url?.toString()
+                else -> null
+            }
+            if (!url.isNullOrBlank()) return url
+        }
+        return null
     }
 
     /**
@@ -310,6 +342,19 @@ class RssParser {
         const val MEDIA_KIND_VIDEO = 1
         const val MEDIA_KIND_AUDIO = 2
 
+        /**
+         * 正文媒体占位卡的类名（与 `ReadingNodes.MEDIA_CARD_CLASS` 对齐）。
+         *
+         * 类型后缀是给渲染层分派用的：`-video`/`-audio` 是**直链媒体文件**，App 侧
+         * ExoPlayer 可内嵌播放（ADR-0018）；`-embed` 是第三方页面（iframe），只给外跳卡。
+         */
+        const val MEDIA_CARD_CLASS = "media-card"
+        const val MEDIA_CARD_VIDEO = "media-card-video"
+        const val MEDIA_CARD_AUDIO = "media-card-audio"
+        const val MEDIA_CARD_EMBED = "media-card-embed"
+
+        private val MEDIA_CARD_KINDS = setOf(MEDIA_CARD_VIDEO, MEDIA_CARD_AUDIO, MEDIA_CARD_EMBED)
+
         private const val ONE_DAY_MS = 24 * 60 * 60 * 1000L
 
         /**
@@ -349,8 +394,14 @@ class RssParser {
 
         /**
          * 净化 HTML：去 script/style 等危险元素与事件属性，保留结构与白名单属性。
-         * 嵌入媒体（iframe/object/embed/video）不静默删除，替换为媒体占位卡
-         * （CONTEXT.md「媒体占位卡」）：不开 JS、不动 ADR-0007，视频类源至少可见可跳。
+         *
+         * 三类嵌入各有去向：
+         * - `iframe/object/embed`（第三方页面）：替换为**媒体占位卡**（CONTEXT.md），
+         *   不开 JS、不动 ADR-0007，正文里永不执行第三方页面脚本。
+         * - `video/audio` 直链文件：同样产出占位卡，但**记下媒体类型**——App 侧用
+         *   ExoPlayer 直接解码播放，不涉及第三方页面，这是 ADR-0018 允许的内嵌播放。
+         * - `<audio>` 此前既不在删除列表、也没做替换，src 随后被属性净化剥掉，
+         *   整条标签静默消失（正文里的播客音频被吞掉）。现与 video 同等处理。
          */
         internal fun sanitizeHtml(html: String): String {
             val doc = Jsoup.parseBodyFragment(html)
@@ -358,18 +409,26 @@ class RssParser {
             // 占位卡替换必须在属性净化之前：cleanAttributes 会剥掉非白名单属性，src 就没了
             doc.select("iframe").forEach { el ->
                 absoluteMediaSrc(el.attr("src"))
-                    ?.let { el.replaceWith(mediaCard(doc, it, "嵌入内容")) }
+                    ?.let { el.replaceWith(mediaCard(doc, it, "嵌入内容", MEDIA_CARD_EMBED)) }
                     ?: el.remove()
             }
             doc.select("video").forEach { el ->
-                val src = absoluteMediaSrc(el.attr("src"))
-                    ?: absoluteMediaSrc(el.selectFirst("source[src]")?.attr("src"))
-                if (src != null) el.replaceWith(mediaCard(doc, src, "视频")) else el.remove()
+                mediaSource(el)?.let { el.replaceWith(mediaCard(doc, it, "视频", MEDIA_CARD_VIDEO)) }
+                    ?: el.remove()
+            }
+            doc.select("audio").forEach { el ->
+                mediaSource(el)?.let { el.replaceWith(mediaCard(doc, it, "音频", MEDIA_CARD_AUDIO)) }
+                    ?: el.remove()
             }
             val body = doc.body()
             body.select("*").forEach { el -> cleanAttributes(el) }
             return body.html()
         }
+
+        /** 媒体源：优先元素自身 src，其次第一个 `<source src>`（video/audio 两种写法都常见）。 */
+        private fun mediaSource(el: Element): String? =
+            absoluteMediaSrc(el.attr("src"))
+                ?: absoluteMediaSrc(el.selectFirst("source[src]")?.attr("src"))
 
         /** 媒体地址归一化：只认 http(s) 与协议相对（//host/...），相对路径一律丢弃。 */
         private fun absoluteMediaSrc(raw: String?): String? = when {
@@ -379,12 +438,17 @@ class RssParser {
             else -> null
         }
 
-        /** 构建占位卡：<a class="media-card"><span>▶</span>标签 · 域名</a>。 */
-        private fun mediaCard(doc: org.jsoup.nodes.Document, src: String, label: String): Element {
+        /** 构建占位卡：<a class="media-card <类型>"><span>▶</span>标签 · 域名</a>。 */
+        private fun mediaCard(
+            doc: org.jsoup.nodes.Document,
+            src: String,
+            label: String,
+            kindClass: String,
+        ): Element {
             val host = runCatching { java.net.URI(src).host }
                 .getOrNull().orEmpty().ifEmpty { "外部内容" }
             val card = doc.createElement("a")
-                .attr("class", "media-card")
+                .attr("class", "$MEDIA_CARD_CLASS $kindClass")
                 .attr("href", src)
             card.appendElement("span").text("▶")
             card.appendText("$label · $host")
@@ -432,10 +496,10 @@ class RssParser {
             // 其余属性照旧全剥
             sanitizeStyle(el.attr("style"))?.let { keep["style"] = it }
             when (el.tagName()) {
-                // class 仅媒体占位卡在用（外来自带的 class 无害：样式只匹配 .media-card/.play）
+                // class 仅媒体占位卡在用（外来自带的 class 一律剥掉：样式只匹配 .media-card 前缀）
                 "a" -> {
                     el.attr("href")?.takeIf { it.startsWith("http") }?.let { keep["href"] = it }
-                    el.attr("class")?.takeIf { it == "media-card" }?.let { keep["class"] = it }
+                    mediaCardClass(el.attr("class"))?.let { keep["class"] = it }
                 }
                 "img" -> {
                     el.attr("src")?.takeIf { it.startsWith("http") }?.let { keep["src"] = it }
@@ -445,6 +509,17 @@ class RssParser {
             el.attr("title")?.takeIf { it.isNotBlank() }?.let { keep["title"] = it }
             el.clearAttributes()
             keep.forEach { (k, v) -> el.attr(k, v) }
+        }
+
+        /**
+         * 类名白名单：只回一个自家占位卡类名（`media-card` 加至多一个已知类型后缀）。
+         * 逐令牌重建而不是 `startsWith` 放行——否则 `class="media-card evil"` 会把 evil 一起带出去。
+         */
+        private fun mediaCardClass(raw: String?): String? {
+            val tokens = raw.orEmpty().split(' ').filter { it.isNotEmpty() }
+            if (MEDIA_CARD_CLASS !in tokens) return null
+            val kind = tokens.firstOrNull { it in MEDIA_CARD_KINDS }
+            return if (kind == null) MEDIA_CARD_CLASS else "$MEDIA_CARD_CLASS $kind"
         }
 
         /** 允许保留的 CSS 声明：纯视觉、无 JS 面、不破坏阅读布局（不放行 font-size/position 等）。 */

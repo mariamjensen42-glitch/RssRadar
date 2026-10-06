@@ -1,7 +1,7 @@
 package com.cycling.rssradar.core.data.ai
 
 import com.cycling.rssradar.core.data.FakeSharedPreferences
-import com.cycling.rssradar.core.data.store.AiBudgetStore
+import com.cycling.rssradar.core.data.store.prefs.AiBudgetStore
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals

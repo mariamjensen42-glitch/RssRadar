@@ -1,12 +1,12 @@
 package com.cycling.rssradar.core.data
 
-import com.cycling.rssradar.core.data.db.ArchivedArticleTombstoneEntity
-import com.cycling.rssradar.core.data.db.ArticleDao
-import com.cycling.rssradar.core.data.db.ArticleEntity
-import com.cycling.rssradar.core.data.db.ArticleFeedLink
-import com.cycling.rssradar.core.data.db.ArticleIdLink
-import com.cycling.rssradar.core.data.db.FeedDao
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.db.entity.ArchivedArticleTombstoneEntity
+import com.cycling.rssradar.core.data.db.dao.ArticleDao
+import com.cycling.rssradar.core.data.db.entity.ArticleEntity
+import com.cycling.rssradar.core.data.db.projection.ArticleFeedLink
+import com.cycling.rssradar.core.data.db.projection.ArticleIdLink
+import com.cycling.rssradar.core.data.db.dao.FeedDao
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.parser.RssParser
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import kotlinx.coroutines.runBlocking
@@ -18,6 +18,8 @@ import java.lang.reflect.Proxy
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME
+import com.cycling.rssradar.core.data.maintenance.ArticleCleaner
+import com.cycling.rssradar.core.data.refresh.RefreshEngine
 
 /**
  * 回归测试（issue「归档后刷新文章复活」）：
@@ -85,18 +87,22 @@ class ArchiveReinsertTest {
             }
             "insertAll" -> {
                 @Suppress("UNCHECKED_CAST")
-                (args[0] as List<ArticleEntity>).forEach { a ->
+                (args[0] as List<ArticleEntity>).map { a ->
                     val id = mem.nextId++
                     mem.articles[id] = a.copy(id = id)
+                    id
                 }
-                null
             }
             "updateContentState" -> {
+                // 索引与 ArticleWriteDao.updateContentState 的参数顺序一一对应 ——
+                // 那侧增删参数，这里必须跟着挪，否则取到的会是隔壁字段（`as Long` 撞上
+                // 字符串参数会直接抛类型转换异常，不算静默错，但一样是红的）
                 val id = args[0] as Long
                 val current = mem.articles[id] ?: return@daoProxy null
                 mem.articles[id] = current.copy(
-                    title = args[1] as String,
-                    fetchedAt = args[10] as Long,
+                    link = args[1] as String,
+                    title = args[2] as String,
+                    fetchedAt = args[11] as Long,
                 )
                 null
             }

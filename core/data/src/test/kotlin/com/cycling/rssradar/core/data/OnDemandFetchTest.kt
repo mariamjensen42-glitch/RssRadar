@@ -1,15 +1,15 @@
 package com.cycling.rssradar.core.data
 
-import com.cycling.rssradar.core.data.db.ArticleDao
-import com.cycling.rssradar.core.data.db.ArticleEntity
-import com.cycling.rssradar.core.data.db.ArticleWithFeed
-import com.cycling.rssradar.core.data.db.ContentFetchLogDao
-import com.cycling.rssradar.core.data.db.ContentFetchLogEntity
-import com.cycling.rssradar.core.data.db.FeedDao
-import com.cycling.rssradar.core.data.db.FeedEntity
-import com.cycling.rssradar.core.data.parser.ExtractionIssue
+import com.cycling.rssradar.core.data.db.dao.ArticleDao
+import com.cycling.rssradar.core.data.db.entity.ArticleEntity
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import com.cycling.rssradar.core.data.db.dao.ContentFetchLogDao
+import com.cycling.rssradar.core.data.db.entity.ContentFetchLogEntity
+import com.cycling.rssradar.core.data.db.dao.FeedDao
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
+import com.cycling.rssradar.core.model.ExtractionIssue
 import com.cycling.rssradar.core.data.parser.Extractor
-import com.cycling.rssradar.core.data.parser.FetchFailure
+import com.cycling.rssradar.core.model.FetchFailure
 import com.cycling.rssradar.core.data.parser.FetchOutcome
 import com.cycling.rssradar.core.data.parser.FetchReport
 import com.cycling.rssradar.core.data.parser.FetchedContent
@@ -20,6 +20,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.lang.reflect.Proxy
+import com.cycling.rssradar.core.data.service.OnDemandFetch
+import com.cycling.rssradar.core.data.service.OnDemandResult
 
 /**
  * 按需抓取模块三条写入规则的 JVM 证明（此前它们住在 FeedRepository 抽屉里，零测试）：

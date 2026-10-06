@@ -1,10 +1,11 @@
 package com.cycling.rssradar.core.data
 
-import com.cycling.rssradar.core.data.db.ArticleEntity
+import com.cycling.rssradar.core.data.db.entity.ArticleEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.cycling.rssradar.core.data.qualify.ContentQualification
 
 /** 「够格正文」判定唯一落点的规则测试（写侧归类 + 读侧可用性）。 */
 class ContentQualificationTest {

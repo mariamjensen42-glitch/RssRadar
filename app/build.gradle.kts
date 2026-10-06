@@ -18,8 +18,8 @@ android {
         applicationId = "com.cycling.rssradar"
         minSdk = 31
         targetSdk = 37
-        versionCode = 5
-        versionName = "1.1.0"
+        versionCode = 6
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -81,6 +81,19 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:data"))
     implementation(project(":core:ui"))
+    implementation(project(":core:navigation"))
+    implementation(project(":core:playback"))
+    implementation(project(":feature:addsubscription"))
+    implementation(project(":feature:annotations"))
+    implementation(project(":feature:player"))
+    implementation(project(":feature:library"))
+    implementation(project(":feature:search"))
+    implementation(project(":feature:settings"))
+    implementation(project(":feature:subscriptions"))
+    implementation(project(":feature:feed"))
+    implementation(project(":feature:article"))
+    implementation(project(":feature:ai"))
+    implementation(project(":feature:me"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)
@@ -106,6 +119,19 @@ dependencies {
     implementation(libs.coil.network.okhttp)
     implementation(libs.okhttp)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.exoplayer.hls)
+    implementation(libs.androidx.media3.exoplayer.dash)
+    implementation(libs.androidx.media3.session)
+    implementation(libs.androidx.media3.ui)
+    implementation(libs.androidx.media3.ui.compose)
+    implementation(libs.androidx.media3.common)
+    implementation(libs.androidx.media3.common.ktx)
+    implementation(libs.androidx.media3.datasource)
+    implementation(libs.androidx.media3.decoder)
+    implementation(libs.androidx.media3.container)
+    implementation(libs.androidx.media3.extractor)
+    implementation(libs.androidx.media3.database)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

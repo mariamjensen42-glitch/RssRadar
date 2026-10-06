@@ -1,7 +1,8 @@
 package com.cycling.rssradar.ui.feed
+import com.cycling.rssradar.R
 
-import com.cycling.rssradar.core.data.filterRankedIdsByContentType
-import com.cycling.rssradar.core.data.db.FeedEntity
+import com.cycling.rssradar.core.data.recommend.filterRankedIdsByContentType
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -43,7 +44,7 @@ class ContentTypePartitionTest {
 
     @Test
     fun `枚举 dbValue 与 ADR-0014 常量一致`() {
-        assertEquals(null, ContentTypeFilter.All.dbValue)
+        assertEquals(FeedEntity.CONTENT_TYPE_ARTICLE, ContentTypeFilter.Article.dbValue)
         assertEquals(FeedEntity.CONTENT_TYPE_IMAGE, ContentTypeFilter.Image.dbValue)
         assertEquals(FeedEntity.CONTENT_TYPE_VIDEO, ContentTypeFilter.Video.dbValue)
         assertEquals(FeedEntity.CONTENT_TYPE_AUDIO, ContentTypeFilter.Audio.dbValue)
@@ -51,13 +52,13 @@ class ContentTypePartitionTest {
 
     @Test
     fun `空分区文案按类型区分`() {
-        val imageCopy = ContentTypeFilter.Image.emptyCopy()
-        assertTrue(imageCopy.first.contains("图片"))
-        assertTrue(imageCopy.second.contains("图片"))
-        val audioCopy = ContentTypeFilter.Audio.emptyCopy()
-        assertTrue(audioCopy.first.contains("音频"))
-        // 「全部」为空沿用 All tab 现有口径
-        assertEquals("还没有订阅", ContentTypeFilter.All.emptyCopy().first)
+        // 文案已资源化（ADR-0017）：枚举不再自带任何语言的字符串，
+        // 这里守住「非全部走分区专用资源、且四项资源互不相同」这条结构约束。
+        val titles = ContentTypeFilter.entries.map { it.emptyTitleRes() }
+        assertTrue(ContentTypeFilter.Image.emptyTitleRes() != R.string.feed_empty_no_feeds)
+        assertEquals(ContentTypeFilter.Image.emptyTitleRes(), ContentTypeFilter.Audio.emptyTitleRes())
+        assertEquals(4, ContentTypeFilter.entries.map { it.labelRes() }.distinct().size)
+        assertTrue(titles.all { it != 0 })
     }
 
     // ———— 以下为 QA 补充边界（#75 验证清单第 4 项） ————
@@ -85,21 +86,28 @@ class ContentTypePartitionTest {
     }
 
     /**
-     * 方案 C 的 chip 行结构约束（PRD）：恰好 4 个 chip（全部/图片/视频/音频），
-     * 不设「文章」chip——文章是默认态，多出「文章」chip 即与 PRD 不符。
+     * 分区表与 ADR-0014 的四类内容一一对应：既不能少（少一类就没法只浏览那一类），
+     * 也不能多出「不过滤」那一档。2026-10-06 用「文章」替掉「全部」之后，
+     * 每个分区都必须映射到一个真实的 contentType 值 —— dbValue 也因此从可空收紧成非空。
      */
     @Test
-    fun `分区枚举恰好四个且无文章chip`() {
+    fun `分区枚举恰好四个且穷尽 ADR-0014 的四类`() {
         assertEquals(4, ContentTypeFilter.entries.size)
-        assertEquals(listOf("全部", "图片", "视频", "音频"), ContentTypeFilter.entries.map { it.label })
-        assertTrue(ContentTypeFilter.entries.none { it.dbValue == FeedEntity.CONTENT_TYPE_ARTICLE })
+        assertEquals(
+            setOf(
+                FeedEntity.CONTENT_TYPE_ARTICLE,
+                FeedEntity.CONTENT_TYPE_IMAGE,
+                FeedEntity.CONTENT_TYPE_VIDEO,
+                FeedEntity.CONTENT_TYPE_AUDIO,
+            ),
+            ContentTypeFilter.entries.map { it.dbValue }.toSet(),
+        )
     }
 
     /** Video 的空分区文案分支（原测试未覆盖）。 */
     @Test
     fun `视频分区空文案`() {
-        val videoCopy = ContentTypeFilter.Video.emptyCopy()
-        assertTrue(videoCopy.first.contains("视频"))
-        assertTrue(videoCopy.second.contains("视频"))
+        assertEquals(ContentTypeFilter.Image.emptyTitleRes(), ContentTypeFilter.Video.emptyTitleRes())
+        assertEquals(ContentTypeFilter.Image.emptyDescRes(), ContentTypeFilter.Video.emptyDescRes())
     }
 }

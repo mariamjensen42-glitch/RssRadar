@@ -1,12 +1,14 @@
 package com.cycling.rssradar.core.data.ai
 
+import com.cycling.rssradar.core.model.AiFeature
+import com.cycling.rssradar.core.model.AiScope
 import com.cycling.rssradar.core.data.db.AiSupportDao
 import com.cycling.rssradar.core.data.db.AiTaskEntity
 import com.cycling.rssradar.core.data.db.FeedAiProfileDao
-import com.cycling.rssradar.core.data.db.FeedDao
+import com.cycling.rssradar.core.data.db.dao.FeedDao
 import com.cycling.rssradar.core.domain.ai.AiReadingStats
-import com.cycling.rssradar.core.data.store.AiBudgetStore
-import com.cycling.rssradar.core.data.store.AiFeatureStore
+import com.cycling.rssradar.core.data.store.prefs.AiBudgetStore
+import com.cycling.rssradar.core.data.store.prefs.AiFeatureStore
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope

@@ -1,19 +1,15 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ 的数据提取规则。
+
+  云备份与设备间直传**都**排除 rssradar_secrets.xml（DeepSeek API Key）：
+  凭据只该留在本机，用户换机时重填一次即可。其余设置不受影响。
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="sharedpref" path="rssradar_secrets.xml"/>
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="sharedpref" path="rssradar_secrets.xml"/>
     </device-transfer>
-    -->
 </data-extraction-rules>

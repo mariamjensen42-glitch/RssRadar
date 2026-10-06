@@ -92,18 +92,74 @@ private fun RadarColors.withAccent(accent: Color, onAccent: Color, darkTheme: Bo
     )
 }
 
-private fun RadarColors.withSystemAccent(context: Context, darkTheme: Boolean): RadarColors {
+/**
+ * 整套表面/文字跟随系统动态色板（2026-10-03：弃用固定紫调色板，改自动配色）。
+ *
+ * 之前这里有个只换强调色的 `withSystemAccent`，理由是「紫调表面阶梯与新强调色不同源，混着用会脏」。
+ * 现在整套跟随，紫调 surface1/2/3 与 divider 全部改由系统色板的 surface 族承载，文字层级由 onSurface 族承载，
+ * 那份半吊子实现已删除。
+ *
+ * 字段映射依据（surfaceContainer 阶梯是 M3 官方为「层叠表面」提供的，正好对上旧的
+ * surface1/2/3 三档；onSurfaceVariant / outlineVariant 对上旧的次级文字与弱描边）：
+ * - bgRoot ← surface（最底层，官方 surface 是背景色）
+ * - surface1 ← surfaceContainerLowest（卡片，比背景略高）
+ * - surface2 ← surfaceContainer（选中态等次级容器）
+ * - surface3 ← surfaceContainerHighest（hover / 弱描边）
+ * - articleCard ← surfaceContainerLow（内容卡片，比 surface1 亮一档，保留"卡片浮起"的观感）
+ * - textPrimary ← onSurface，textSecondary ← onSurfaceVariant，textTertiary ← onSurfaceVariant
+ * - divider ← outlineVariant
+ *
+ * [accent] 之外的字段全部取自 scheme，因此开启动态取色时表面与强调色同源，不会再出现
+ * 「新强调色 + 旧紫表面」这种脏搭配。
+ *
+ * 低于 Android 12（[supportsDynamicColor] 为 false）时调用方回退到固定色板，此函数不会被调用。
+ */
+private fun RadarColors.withSystemScheme(context: Context, darkTheme: Boolean): RadarColors {
     val scheme = if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-    return withAccent(scheme.primary, scheme.onPrimary, darkTheme)
+    val derived = deriveAccentColors(scheme.primary, scheme.onPrimary, darkTheme)
+    return copy(
+        bgRoot = scheme.surface,
+        surface1 = scheme.surfaceContainerLowest,
+        surface2 = scheme.surfaceContainer,
+        surface3 = scheme.surfaceContainerHighest,
+        articleCard = scheme.surfaceContainerLow,
+        textPrimary = scheme.onSurface,
+        textSecondary = scheme.onSurfaceVariant,
+        textTertiary = scheme.onSurfaceVariant,
+        divider = scheme.outlineVariant,
+        accent = derived.accent,
+        accentPressed = derived.accentPressed,
+        onAccent = derived.onAccent,
+        link = derived.link,
+    )
 }
 
 /**
- * RssRadar 主题：深色 / 浅色两套色板 + 强调色（固定紫，或 #27 动态取色）。
- * 深色保持 iOS Dark 风（纯黑背景），浅色用近白表面。
+ * RssRadar 主题：深色 / 浅色两套色板 + 强调色来源。
+ *
+ * 色板来源三选一（优先级从高到低）：
+ * 1. 自定义主色（#29）：只换强调色四件套，表面与文字保持当前色板。
+ * 2. 系统动态取色（#27）：Android 12+ 取壁纸色，**整套表面与文字一并跟随**（见 [withSystemScheme]）；
+ *    低于 12 的设备回退到固定色板，开关不生效。
+ * 3. 固定紫调色板：[RadarColors.Dark] / [RadarColors.Light]。
+ *
+ * 深色保持 iOS Dark 风（纯黑背景），浅色用近白表面——这是回退色板的表现。
  *
  * 色板经 [LocalRadarColors] 注入，UI 层统一用 [radarColors] 读取；
  * M3 colorScheme 槽位由同一份 [RadarColors] 映射，供 M3 组件内部取色——
  * 因此开关动态取色时两边不会走偏。
+ */
+/**
+ * RadarColors → M3 colorScheme。
+ *
+ * surfaceContainer 族必须显式映射：M3 组件的默认底色走的就是这几个 slot
+ * （DropdownMenu←Container、ModalBottomSheet←ContainerLow、BottomAppBar / SegmentedButton
+ * ←Container 系），不映射就会落到 [darkColorScheme] 的内置 baseline 色板（紫灰），
+ * 与项目配色脱节——表现成「菜单 / 底部抽屉看着像没适配过的默认组件」。
+ *
+ * 阶梯与 [withSystemScheme] 的反向对应保持一致：
+ * Lowest ← surface1 · Low ← articleCard · Container ← surface2 · Highest ← surface3。
+ * 项目只有四档，High 沿用 Container。
  */
 private fun darkScheme(colors: RadarColors) = darkColorScheme(
     primary = colors.accent,
@@ -118,6 +174,11 @@ private fun darkScheme(colors: RadarColors) = darkColorScheme(
     onSurface = colors.textPrimary,
     surfaceVariant = colors.surface2,
     onSurfaceVariant = colors.textSecondary,
+    surfaceContainerLowest = colors.surface1,
+    surfaceContainerLow = colors.articleCard,
+    surfaceContainer = colors.surface2,
+    surfaceContainerHigh = colors.surface2,
+    surfaceContainerHighest = colors.surface3,
     outline = colors.divider,
     outlineVariant = colors.surface3,
     error = DarkError,
@@ -137,6 +198,11 @@ private fun lightScheme(colors: RadarColors) = lightColorScheme(
     onSurface = colors.textPrimary,
     surfaceVariant = colors.surface2,
     onSurfaceVariant = colors.textSecondary,
+    surfaceContainerLowest = colors.surface1,
+    surfaceContainerLow = colors.articleCard,
+    surfaceContainer = colors.surface2,
+    surfaceContainerHigh = colors.surface2,
+    surfaceContainerHighest = colors.surface3,
     outline = colors.divider,
     outlineVariant = colors.surface3,
     error = LightError,
@@ -157,11 +223,14 @@ fun RssRadarTheme(
     val colors = remember(darkTheme, dynamicColor, customAccentArgb, context) {
         val base = if (darkTheme) RadarColors.Dark else RadarColors.Light
         when {
+            //自定义主色优先：只换强调色，表面与文字不动（用户明确挑了颜色，不该被系统取色覆盖）
             customAccentArgb != null -> {
                 val accent = Color(customAccentArgb)
                 base.withAccent(accent, onAccentFor(accent), darkTheme)
             }
-            dynamicColor && supportsDynamicColor() -> base.withSystemAccent(context, darkTheme)
+            // 动态取色：整套色板跟随系统（表面 + 文字 + 强调色同源）
+            dynamicColor && supportsDynamicColor() -> base.withSystemScheme(context, darkTheme)
+            // 低版本回退固定色板
             else -> base
         }
     }
