@@ -1,8 +1,10 @@
 name: CI
 
 on:
+  # 只监听 dev 的 push：main 上的提交 100% 来自已经跑过本 workflow 的 PR，
+  # 再跟一次是白跑一遍（同样 3 个 lint job + 单测）。合并后不重复验。
   push:
-    branches: [dev, main]
+    branches: [dev]
   pull_request:
     branches: [main]
   # 手动触发：push 事件偶发丢投递时，可在 Actions 页手动跑一遍单测

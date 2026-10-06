@@ -1,8 +1,8 @@
 name: CodeQL
 
 on:
-  push:
-    branches: [main]
+  # 去掉 push: main：那个提交已经由 PR 触发跑过一次 CodeQL（本 workflow 最慢，近 9 分钟）。
+  # 定时任务兜住「长期没开 PR 的分支也算扫过一遍」。
   pull_request:
     branches: [main]
   schedule:
