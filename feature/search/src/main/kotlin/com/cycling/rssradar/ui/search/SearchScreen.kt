@@ -21,7 +21,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -30,7 +29,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.cycling.rssradar.core.ui.theme.RssRadarTheme
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,27 +44,52 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.FolderOpen
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.X
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import com.cycling.rssradar.core.ui.R as UiR
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
 import com.cycling.rssradar.ui.search.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
 @Composable
-fun SearchScreen(
-    viewModel: SearchViewModel,
+fun SearchDestination(
+    onBack: () -> Unit,
     onOpenArticle: (ArticleWithFeed) -> Unit = {},
     /** 空态托底入口：跳订阅管理页（订阅源多的时候按源浏览比关键词更顺手）。 */
     onOpenSubscriptions: () -> Unit = {},
+    viewModel: SearchViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
-    val feeds by viewModel.feeds.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val feeds by viewModel.feeds.collectAsStateWithLifecycle()
+    SearchScreen(
+        state = state,
+        feeds = feeds,
+        onBack = onBack,
+        onOpenArticle = onOpenArticle,
+        onOpenSubscriptions = onOpenSubscriptions,
+        onIntent = viewModel::onIntent,
+    )
+}
+
+@Composable
+fun SearchScreen(
+    state: SearchUiState,
+    feeds: List<FeedEntity>,
+    onBack: () -> Unit = {},
+    onOpenArticle: (ArticleWithFeed) -> Unit = {},
+    /** 空态托底入口：跳订阅管理页（订阅源多的时候按源浏览比关键词更顺手）。 */
+    onOpenSubscriptions: () -> Unit = {},
+    onIntent: (SearchIntent) -> Unit = {},
+) {
     val focusRequester = remember { FocusRequester() }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -79,31 +107,45 @@ fun SearchScreen(
                 duration = SnackbarDuration.Short,
             )
             when (result) {
-                SnackbarResult.ActionPerformed -> viewModel.onIntent(SearchIntent.UndoDeleteArticle)
-                SnackbarResult.Dismissed -> viewModel.onIntent(SearchIntent.DiscardUndo)
+                SnackbarResult.ActionPerformed -> onIntent(SearchIntent.UndoDeleteArticle)
+                SnackbarResult.Dismissed -> onIntent(SearchIntent.DiscardUndo)
             }
         }
     }
 
     Box(modifier = Modifier.fillMaxSize().background(radarColors().bgRoot)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            SearchBar(
-                query = state.query,
-                onQueryChange = { viewModel.onIntent(SearchIntent.QueryChange(it)) },
-                onClear = { viewModel.onIntent(SearchIntent.QueryChange("")) },
-                onSubmit = { viewModel.onIntent(SearchIntent.Submit) },
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
+                    .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .focusRequester(focusRequester),
-            )
+                    .padding(start = 4.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Lucide.ArrowLeft,
+                        contentDescription = stringResource(UiR.string.back),
+                        tint = radarColors().textPrimary,
+                    )
+                }
+                SearchBar(
+                    query = state.query,
+                    onQueryChange = { onIntent(SearchIntent.QueryChange(it)) },
+                    onClear = { onIntent(SearchIntent.QueryChange("")) },
+                    onSubmit = { onIntent(SearchIntent.Submit) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusRequester(focusRequester),
+                )
+            }
 
             if (state.query.isBlank()) {
                 RecentSearches(
                     history = state.history,
-                    onPick = { viewModel.onIntent(SearchIntent.QueryChange(it)) },
-                    onClear = { viewModel.onIntent(SearchIntent.ClearHistory) },
-                    onDeleteItem = { viewModel.onIntent(SearchIntent.DeleteHistoryItem(it)) },
+                    onPick = { onIntent(SearchIntent.QueryChange(it)) },
+                    onClear = { onIntent(SearchIntent.ClearHistory) },
+                    onDeleteItem = { onIntent(SearchIntent.DeleteHistoryItem(it)) },
                 )
                 // 无历史时的托底内容：整页只剩一句"暂无搜索记录"太空洞
                 if (state.history.isEmpty()) {
@@ -114,12 +156,12 @@ fun SearchScreen(
                     state = state,
                     feeds = feeds,
                     onOpenArticle = onOpenArticle,
-                    onToggleRead = { id, read -> viewModel.onIntent(SearchIntent.SetRead(id, read)) },
-                    onToggleStarred = { id -> viewModel.onIntent(SearchIntent.ToggleStarred(id)) },
-                    onToggleBookmarked = { id -> viewModel.onIntent(SearchIntent.ToggleBookmarked(id)) },
-                    onDelete = { id -> viewModel.onIntent(SearchIntent.DeleteArticle(id)) },
-                    onIntent = viewModel::onIntent,
-                    onLoadMore = { viewModel.onIntent(SearchIntent.LoadMore) },
+                    onToggleRead = { id, read -> onIntent(SearchIntent.SetRead(id, read)) },
+                    onToggleStarred = { id -> onIntent(SearchIntent.ToggleStarred(id)) },
+                    onToggleBookmarked = { id -> onIntent(SearchIntent.ToggleBookmarked(id)) },
+                    onDelete = { id -> onIntent(SearchIntent.DeleteArticle(id)) },
+                    onIntent = onIntent,
+                    onLoadMore = { onIntent(SearchIntent.LoadMore) },
                 )
             }
         }
@@ -164,15 +206,7 @@ private fun SearchBar(
                 }
             }
         },
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = radarColors().surface1,
-            unfocusedContainerColor = radarColors().surface1,
-            focusedBorderColor = radarColors().accent,
-            unfocusedBorderColor = radarColors().surface2,
-            focusedTextColor = radarColors().textPrimary,
-            unfocusedTextColor = radarColors().textPrimary,
-            cursorColor = radarColors().accent,
-        ),
+        colors = radarOutlinedTextFieldColors(containerColor = radarColors().surface1, borderColor = radarColors().surface2),
     )
 }
 
@@ -238,6 +272,7 @@ private fun IdleSuggestions(onOpenSubscriptions: () -> Unit) {
         modifier = Modifier
             .padding(horizontal = 20.dp, vertical = 16.dp)
             .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onOpenSubscriptions),
     ) {
         Row(
@@ -280,7 +315,9 @@ private fun HistoryChip(term: String, onClick: () -> Unit, onDelete: (String) ->
     Surface(
         shape = RoundedCornerShape(50),
         color = radarColors().surface1,
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .clickable(onClick = onClick),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -299,5 +336,25 @@ private fun HistoryChip(term: String, onClick: () -> Unit, onDelete: (String) ->
                 )
             }
         }
+    }
+}
+
+
+@Preview(showBackground = true, name = "搜索 · 未搜")
+@Composable
+private fun SearchScreenIdlePreview() {
+    RssRadarTheme(darkTheme = false) {
+        SearchScreen(state = SearchUiState(), feeds = emptyList())
+    }
+}
+
+@Preview(showBackground = true, name = "搜索 · 无结果")
+@Composable
+private fun SearchScreenNoHitPreview() {
+    RssRadarTheme(darkTheme = true) {
+        SearchScreen(
+            state = SearchUiState(query = "kotlin", searched = true, hits = 0),
+            feeds = emptyList(),
+        )
     }
 }

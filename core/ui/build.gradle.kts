@@ -52,5 +52,9 @@ dependencies {
     api(libs.coil.network.okhttp)
     api(libs.compose.icons.lucide)
 
+    // collectAsStateWithLifecycle（androidx.lifecycle.compose）：全应用状态收集入口。
+    // 走 api：各 feature 屏都在用，随 core:ui 一次继承，不必逐个模块加依赖。
+    api(libs.androidx.lifecycle.runtime.compose)
+
     testImplementation(libs.junit)
 }

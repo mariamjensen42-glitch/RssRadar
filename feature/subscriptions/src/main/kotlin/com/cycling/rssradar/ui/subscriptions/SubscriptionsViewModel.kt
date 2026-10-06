@@ -2,9 +2,6 @@ package com.cycling.rssradar.ui.subscriptions
 
 import android.content.Context
 import android.net.Uri
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
@@ -45,12 +42,39 @@ data class FeedWithUnread(
 /** 一个分组下的所有订阅。 */
 data class GroupSectionUi(val group: String, val feeds: List<FeedWithUnread>)
 
+/**
+ * 订阅页的渲染输入快照，唯一产出点是 [SubscriptionsViewModel.uiState]。
+ * 定义在 VM 侧（而不是 Screen 侧）：状态是 VM 的契约，Screen 只是消费者。
+ */
+data class SubscriptionsUiState(
+    val groups: List<GroupSectionUi> = emptyList(),
+    val expandedIds: Set<String> = emptySet(),
+    val totalUnread: Int = 0,
+    val groupOptions: List<String> = emptyList(),
+    val sortMode: FeedSortMode = FeedSortMode.BY_NAME,
+    val unhealthyOnly: Boolean = false,
+    val unhealthyCount: Int = 0,
+    val unhealthyFeeds: List<FeedWithUnread> = emptyList(),
+    val selectionMode: Boolean = false,
+    val selectedIds: Set<Long> = emptySet(),
+    val message: String? = null,
+)
+
 /** 排序所需的三股数据流快照（feeds / 未读数 / 每源最近文章时间）。 */
 private data class FeedInputs(
     val feeds: List<FeedEntity>,
     val unread: Map<Long, Int>,
     val latest: Map<Long, Long>,
 )
+
+/**
+ * 订阅源的分组归属归一：groupName 为空串的源归 [DEFAULT_GROUP]。
+ *
+ * 抽出来是因为它有**两个消费者**——列表分组与「删除分组内全部订阅」的目标筛选。
+ * 各写一遍 `ifBlank { DEFAULT_GROUP }` 看着无害，但两边一旦走偏，表现是
+ * 「列表里明明归在这一组，按组删除却漏掉它们」这种不会报错的静默错误。
+ */
+private fun groupOfFeed(feed: FeedEntity): String = feed.groupName.ifBlank { DEFAULT_GROUP }
 
 /** 订阅页事件（候选 A，ADR-0003）。 */
 sealed interface SubscriptionsIntent {
@@ -72,6 +96,14 @@ sealed interface SubscriptionsIntent {
     /** 清空文章（issue #8）：只删文章，源与分组都保留；收藏/稍后读豁免。 */
     data class ClearFeedArticles(val feedId: Long, val feedTitle: String) : SubscriptionsIntent
     data class ClearGroupArticles(val group: String) : SubscriptionsIntent
+
+    /**
+     * 删除分组内全部订阅源（文章级联删除）。
+     *
+     * 与 [DeleteGroup] 是两件事，别混：那个**只把订阅移进默认分组**、一个都不删；
+     * 这个删的是订阅源本身。也与 [ClearGroupArticles] 不同——那个保源删文章。
+     */
+    data class DeleteGroupFeeds(val group: String) : SubscriptionsIntent
     /** Feed 级预设：全文抓取开关（issue #9）。 */
     data class SetFullContentEnabled(val feedId: Long, val enabled: Boolean) : SubscriptionsIntent
     data class RenameFeed(val feedId: Long, val title: String) : SubscriptionsIntent
@@ -185,15 +217,60 @@ class SubscriptionsViewModel @Inject constructor(
         feedAiProfileDao.observe(feedId)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    var uiMessage by mutableStateOf<String?>(null)
-        private set
+    private val _uiMessage = MutableStateFlow<String?>(null)
+    val uiMessage: StateFlow<String?> = _uiMessage.asStateFlow()
+
+    /**
+     * 订阅页的单一状态快照：11 条流合成一份，UI 侧只订阅这一条。
+     *
+     * 分组 combine 是因为 Flow 的 combine 最多接 5 个流，分组只影响构造、不改对外语义。
+     */
+    val uiState: StateFlow<SubscriptionsUiState> = combine(
+        combine(groups, expandedGroupIds, totalUnread, groupsList, sortMode, ::CoreInputs),
+        combine(unhealthyOnly, unhealthyCount, unhealthyFeeds, ::HealthInputs),
+        combine(selectionMode, selectedFeedIds, uiMessage, ::SelectionInputs),
+    ) { core, health, sel ->
+        SubscriptionsUiState(
+            groups = core.groups,
+            expandedIds = core.expandedIds,
+            totalUnread = core.totalUnread,
+            groupOptions = core.groupOptions,
+            sortMode = core.sortMode,
+            unhealthyOnly = health.unhealthyOnly,
+            unhealthyCount = health.unhealthyCount,
+            unhealthyFeeds = health.unhealthyFeeds,
+            selectionMode = sel.selectionMode,
+            selectedIds = sel.selectedIds,
+            message = sel.message,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SubscriptionsUiState())
+
+    private data class CoreInputs(
+        val groups: List<GroupSectionUi>,
+        val expandedIds: Set<String>,
+        val totalUnread: Int,
+        val groupOptions: List<String>,
+        val sortMode: FeedSortMode,
+    )
+
+    private data class HealthInputs(
+        val unhealthyOnly: Boolean,
+        val unhealthyCount: Int,
+        val unhealthyFeeds: List<FeedWithUnread>,
+    )
+
+    private data class SelectionInputs(
+        val selectionMode: Boolean,
+        val selectedIds: Set<Long>,
+        val message: String?,
+    )
 
     override fun onIntent(intent: SubscriptionsIntent) {
         when (intent) {
             is SubscriptionsIntent.ToggleGroup -> toggleGroup(intent.group)
             SubscriptionsIntent.MarkAllRead -> markAllRead()
             is SubscriptionsIntent.SelectSort -> selectSort(intent.mode)
-            SubscriptionsIntent.ConsumeMessage -> uiMessage = null
+            SubscriptionsIntent.ConsumeMessage -> _uiMessage.value = null
             is SubscriptionsIntent.CreateGroup -> createGroup(intent.name)
             is SubscriptionsIntent.RenameGroup -> renameGroup(intent.oldName, intent.newName)
             is SubscriptionsIntent.DeleteGroup -> deleteGroup(intent.name)
@@ -204,6 +281,7 @@ class SubscriptionsViewModel @Inject constructor(
             SubscriptionsIntent.DeleteSelectedFeeds -> deleteSelectedFeeds()
             is SubscriptionsIntent.ClearFeedArticles -> clearFeedArticles(intent.feedId, intent.feedTitle)
             is SubscriptionsIntent.ClearGroupArticles -> clearGroupArticles(intent.group)
+            is SubscriptionsIntent.DeleteGroupFeeds -> deleteGroupFeeds(intent.group)
             is SubscriptionsIntent.SetFullContentEnabled -> setFullContentEnabled(intent.feedId, intent.enabled)
             is SubscriptionsIntent.RenameFeed -> renameFeed(intent.feedId, intent.title)
             is SubscriptionsIntent.DeleteFeed -> deleteFeed(intent.feedId, intent.feedTitle)
@@ -229,11 +307,11 @@ class SubscriptionsViewModel @Inject constructor(
             val targets = repository.observeFeeds().first()
                 .filter { FeedHealth.isUnhealthy(it.consecutiveFailures, it.failureReason) }
             if (targets.isEmpty()) {
-                uiMessage = "没有失效的订阅源"
+                _uiMessage.value = "没有失效的订阅源"
                 return@launch
             }
             repository.deleteFeeds(targets.map { it.id })
-            uiMessage = "已删除 ${targets.size} 个失效订阅源（含其文章）"
+            _uiMessage.value = "已删除 ${targets.size} 个失效订阅源（含其文章）"
         }
     }
 
@@ -260,7 +338,7 @@ class SubscriptionsViewModel @Inject constructor(
             }
             // 刻意**不**清除已生成的摘要：旧摘要是按旧提示词写的，但内容依然忠实于原文，
             // 清掉等于逼用户重新花钱生成一遍。用户在阅读页点"重新生成"即可套用新提示词。
-            uiMessage = if (normalized == null) "已改用内置摘要提示词" else "已保存该订阅源的摘要提示词"
+            _uiMessage.value = if (normalized == null) "已改用内置摘要提示词" else "已保存该订阅源的摘要提示词"
         }
     }
 
@@ -285,7 +363,7 @@ class SubscriptionsViewModel @Inject constructor(
     private fun markAllRead() {
         viewModelScope.launch {
             repository.markAllRead()
-            uiMessage = "已全部标记为已读"
+            _uiMessage.value = "已全部标记为已读"
         }
     }
 
@@ -298,32 +376,32 @@ class SubscriptionsViewModel @Inject constructor(
     /** 新建分组：仅注册表加名；已有同名返回 false。 */
     private fun createGroup(name: String) {
         val ok = groupStore.addGroup(name)
-        uiMessage = if (ok) "已创建分组「${name.trim()}」" else "分组已存在或名称为空"
+        _uiMessage.value = if (ok) "已创建分组「${name.trim()}」" else "分组已存在或名称为空"
     }
 
     /** 重命名分组：注册表改名 + feeds.groupName 批量改。 */
     private fun renameGroup(oldName: String, newName: String) {
         val ok = groupStore.renameGroup(oldName, newName)
         if (!ok) {
-            uiMessage = "新名称无效或已存在"
+            _uiMessage.value = "新名称无效或已存在"
             return
         }
         viewModelScope.launch {
             repository.renameGroup(oldName, newName.trim())
-            uiMessage = "已重命名为「${newName.trim()}」"
+            _uiMessage.value = "已重命名为「${newName.trim()}」"
         }
     }
 
     /** 删除分组：注册表删名 + 该组 feed 移回默认组。 */
     private fun deleteGroup(name: String) {
         if (name == DEFAULT_GROUP) {
-            uiMessage = "默认分组不可删除"
+            _uiMessage.value = "默认分组不可删除"
             return
         }
         groupStore.removeGroup(name)
         viewModelScope.launch {
             repository.deleteGroup(name)
-            uiMessage = "已删除分组「$name」，其中的订阅移入默认分组"
+            _uiMessage.value = "已删除分组「$name」，其中的订阅移入默认分组"
         }
     }
 
@@ -331,7 +409,7 @@ class SubscriptionsViewModel @Inject constructor(
     private fun moveFeed(feedId: Long, targetGroup: String) {
         viewModelScope.launch {
             repository.moveFeed(feedId, targetGroup)
-            uiMessage = "已移动订阅"
+            _uiMessage.value = "已移动订阅"
         }
     }
 
@@ -359,7 +437,7 @@ class SubscriptionsViewModel @Inject constructor(
         if (group !in groupStore.getGroups()) groupStore.addGroup(group)
         viewModelScope.launch {
             repository.moveFeedsToGroup(ids, group)
-            uiMessage = "已移动 ${ids.size} 个订阅到「$group」"
+            _uiMessage.value = "已移动 ${ids.size} 个订阅到「$group」"
         }
     }
 
@@ -371,7 +449,7 @@ class SubscriptionsViewModel @Inject constructor(
         if (ids.isEmpty()) return
         viewModelScope.launch {
             repository.deleteFeeds(ids)
-            uiMessage = "已删除 ${ids.size} 个订阅源（含其文章）"
+            _uiMessage.value = "已删除 ${ids.size} 个订阅源（含其文章）"
         }
     }
 
@@ -379,13 +457,34 @@ class SubscriptionsViewModel @Inject constructor(
 
     private fun clearFeedArticles(feedId: Long, feedTitle: String) {
         viewModelScope.launch {
-            uiMessage = clearMessage(repository.clearFeedArticles(feedId), "「$feedTitle」")
+            _uiMessage.value = clearMessage(repository.clearFeedArticles(feedId), "「$feedTitle」")
         }
     }
 
     private fun clearGroupArticles(group: String) {
         viewModelScope.launch {
-            uiMessage = clearMessage(repository.clearGroupArticles(group), "「$group」")
+            _uiMessage.value = clearMessage(repository.clearGroupArticles(group), "「$group」")
+        }
+    }
+
+    /**
+     * 删除分组内全部订阅源。两处刻意与既有做法对齐：
+     * - **删除清单执行时从 DB 现取**（不走 UI 传回的名单 / 任何 WhileSubscribed 的 StateFlow）：
+     *   确认弹窗停留期间列表可能已经变了，按弹窗那一刻的快照删会删错。
+     * - **分组归属按 [groupFeeds] 的同一套归一**（空串 = 默认分组）：判据只此一份，
+     *   否则列表里归在「默认」的源会逃过这次删除。
+     * 分组本身保留在注册表里（删完只是空了）——「删除分组」是另一件事，见 [deleteGroup]。
+     */
+    private fun deleteGroupFeeds(group: String) {
+        viewModelScope.launch {
+            val targets = repository.observeFeeds().first()
+                .filter { groupOfFeed(it) == group }
+            if (targets.isEmpty()) {
+                _uiMessage.value = "「$group」里没有订阅源"
+                return@launch
+            }
+            repository.deleteFeeds(targets.map { it.id })
+            _uiMessage.value = "已删除「$group」的 ${targets.size} 个订阅源（含其文章）"
         }
     }
 
@@ -405,7 +504,7 @@ class SubscriptionsViewModel @Inject constructor(
     private fun setFullContentEnabled(feedId: Long, enabled: Boolean) {
         viewModelScope.launch {
             repository.setFullContentEnabled(feedId, enabled)
-            uiMessage = if (enabled) {
+            _uiMessage.value = if (enabled) {
                 "已开启全文抓取，详情页会自动抓原网页正文"
             } else {
                 "已关闭全文抓取，详情页只显示订阅源自带内容"
@@ -416,12 +515,12 @@ class SubscriptionsViewModel @Inject constructor(
     /** 重命名订阅源标题。 */
     private fun renameFeed(feedId: Long, title: String) {
         if (title.isBlank()) {
-            uiMessage = "标题不能为空"
+            _uiMessage.value = "标题不能为空"
             return
         }
         viewModelScope.launch {
             repository.renameFeed(feedId, title.trim())
-            uiMessage = "已重命名"
+            _uiMessage.value = "已重命名"
         }
     }
 
@@ -429,7 +528,7 @@ class SubscriptionsViewModel @Inject constructor(
     private fun deleteFeed(feedId: Long, feedTitle: String) {
         viewModelScope.launch {
             repository.deleteFeed(feedId)
-            uiMessage = "已删除「$feedTitle」"
+            _uiMessage.value = "已删除「$feedTitle」"
         }
     }
 
@@ -437,7 +536,7 @@ class SubscriptionsViewModel @Inject constructor(
     private fun setSyncEnabled(feedId: Long, enabled: Boolean) {
         viewModelScope.launch {
             repository.setSyncEnabled(feedId, enabled)
-            uiMessage = if (enabled) "已参与自动同步" else "已屏蔽自动同步（手动刷新不受影响）"
+            _uiMessage.value = if (enabled) "已参与自动同步" else "已屏蔽自动同步（手动刷新不受影响）"
         }
     }
 
@@ -450,19 +549,19 @@ class SubscriptionsViewModel @Inject constructor(
             val result = try {
                 val stream = appContext.contentResolver.openInputStream(uri)
                     ?: run {
-                        uiMessage = "无法读取所选文件"
+                        _uiMessage.value = "无法读取所选文件"
                         return@launch
                     }
                 stream.use { subscriptionFlow.importOpml(it) }
             } catch (_: IllegalArgumentException) {
-                uiMessage = "不是有效的 OPML 文件"
+                _uiMessage.value = "不是有效的 OPML 文件"
                 return@launch
             } catch (_: Exception) {
-                uiMessage = "导入失败，请重试"
+                _uiMessage.value = "导入失败，请重试"
                 return@launch
             }
             result.groups.forEach { groupStore.addGroup(it) }
-                uiMessage = if (result.skipped > 0) {
+                _uiMessage.value = if (result.skipped > 0) {
                 "已导入 ${result.imported} 个订阅源，跳过 ${result.skipped} 个重复"
             } else {
                 "已导入 ${result.imported} 个订阅源"
@@ -478,14 +577,14 @@ class SubscriptionsViewModel @Inject constructor(
     private fun setNotificationsEnabled(feedId: Long, enabled: Boolean) {
         viewModelScope.launch {
             repository.setNotificationsEnabled(feedId, enabled)
-            uiMessage = if (enabled) "已开启此源的通知" else "已关闭此源的通知"
+            _uiMessage.value = if (enabled) "已开启此源的通知" else "已关闭此源的通知"
         }
     }
 
     private fun setContentType(feedId: Long, contentType: Int) {
         viewModelScope.launch {
             repository.setContentType(feedId, contentType)
-            uiMessage = "内容类型已更新"
+            _uiMessage.value = "内容类型已更新"
         }
     }
 
@@ -502,7 +601,7 @@ class SubscriptionsViewModel @Inject constructor(
                     true
                 } ?: false
             }.getOrDefault(false)
-            uiMessage = if (written) "已导出 OPML" else "导出失败，请重试"
+            _uiMessage.value = if (written) "已导出 OPML" else "导出失败，请重试"
         }
     }
 
@@ -513,7 +612,7 @@ class SubscriptionsViewModel @Inject constructor(
         registered: List<String>,
         sort: FeedSortMode,
     ): List<GroupSectionUi> {
-        val byName = feeds.groupBy { it.groupName.ifBlank { DEFAULT_GROUP } }
+        val byName = feeds.groupBy { groupOfFeed(it) }
         // 注册表里没有 feed 的分组也要显示（空分组）
         val ordered = registered.distinct() + byName.keys.filterNot { it in registered }
         val sections = ordered.map { group ->

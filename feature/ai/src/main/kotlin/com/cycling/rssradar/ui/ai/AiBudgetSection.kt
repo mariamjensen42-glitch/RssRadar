@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -102,7 +103,7 @@ private fun UsageRow(label: String, value: String) {
 @Composable
 internal fun BudgetSection(
     budget: AiBudgetState,
-    viewModel: AiFeaturesViewModel,
+    onIntent: (AiFeaturesIntent) -> Unit,
 ) {
     val colors = radarColors()
     Surface(shape = RoundedCornerShape(14.dp), color = colors.surface1) {
@@ -127,7 +128,7 @@ internal fun BudgetSection(
                 options = listOf(0, 50, 100, 200, 500),
                 selected = budget.dailyLimit,
                 labelOf = { if (it == 0) unlimitedLabel else it.toString() },
-                onSelect = { viewModel.onIntent(AiFeaturesIntent.SetDailyLimit(it)) },
+                onSelect = { onIntent(AiFeaturesIntent.SetDailyLimit(it)) },
             )
             Spacer(Modifier.height(10.dp))
             ChipChoiceRow(
@@ -135,7 +136,7 @@ internal fun BudgetSection(
                 options = listOf(1, 2, 3, 4),
                 selected = budget.concurrentLimit,
                 labelOf = { it.toString() },
-                onSelect = { viewModel.onIntent(AiFeaturesIntent.SetConcurrent(it)) },
+                onSelect = { onIntent(AiFeaturesIntent.SetConcurrent(it)) },
             )
             Spacer(Modifier.height(10.dp))
             ChipChoiceRow(
@@ -143,7 +144,7 @@ internal fun BudgetSection(
                 options = listOf(0L, 500L, 1_200L, 3_000L),
                 selected = budget.minIntervalMs,
                 labelOf = { if (it == 0L) unlimitedLabel else "${it}ms" },
-                onSelect = { viewModel.onIntent(AiFeaturesIntent.SetMinInterval(it)) },
+                onSelect = { onIntent(AiFeaturesIntent.SetMinInterval(it)) },
             )
         }
     }
@@ -167,7 +168,9 @@ private fun <T> ChipChoiceRow(
                 Surface(
                     shape = RoundedCornerShape(50),
                     color = if (isSelected) colors.accent else colors.surface2,
-                    modifier = Modifier.clickable { onSelect(option) },
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .clickable { onSelect(option) },
                 ) {
                     Text(
                         text = labelOf(option),

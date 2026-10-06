@@ -9,42 +9,6 @@
     <!-- i18n batch 2: reading domain (ADR-0017) -->
     <string name="more_actions">更多操作</string>
     <string name="close">关闭</string>
-    <!-- i18n feature texts (ADR-0017) -->
-    <string name="ai_feature_summary_label">AI 摘要</string>
-    <string name="ai_feature_translate_label">文章翻译</string>
-    <string name="ai_feature_classify_label">智能分类</string>
-    <string name="ai_feature_tags_label">自动标签</string>
-    <string name="ai_feature_sentiment_label">情感分析</string>
-    <string name="ai_feature_keywords_label">关键词提取</string>
-    <string name="ai_feature_opinion_label">观点总结</string>
-    <string name="ai_feature_qa_label">文章问答与深度解析</string>
-    <string name="ai_feature_fulltext_label">AI 正文还原</string>
-    <string name="ai_feature_dedupe_label">智能去重</string>
-    <string name="ai_feature_quality_label">文章质量分析</string>
-    <string name="ai_feature_noise_label">智能降噪与内容评分</string>
-    <string name="ai_feature_outline_label">长文精读结构化</string>
-    <string name="ai_feature_credibility_label">信源可信度评估</string>
-    <string name="ai_feature_glossary_label">划词解释</string>
-    <string name="ai_feature_personal_feed_label">个性化内容推荐</string>
-    <string name="ai_feature_feed_recommend_label">智能订阅源推荐</string>
-    <string name="ai_feature_discover_label">发现模式</string>
-    <string name="ai_feature_topic_galaxy_label">话题星系浏览</string>
-    <string name="ai_feature_bubble_break_label">信息茧房破壁</string>
-    <string name="ai_feature_related_label">文章关联推荐</string>
-    <string name="ai_feature_aggregate_label">智能信息聚合</string>
-    <string name="ai_feature_interest_rank_label">个人兴趣排序</string>
-    <string name="ai_feature_event_merge_label">同源事件合并阅读</string>
-    <string name="ai_feature_cold_start_label">兴趣冷启动引导</string>
-    <string name="ai_feature_daily_brief_label">AI 每日简报</string>
-    <string name="ai_feature_share_copy_label">生成分享文案</string>
-    <string name="ai_feature_smart_notify_label">智能通知</string>
-    <string name="ai_feature_feed_health_label">订阅源健康监控</string>
-    <string name="ai_feature_habit_label">阅读习惯分析</string>
-    <string name="ai_feature_daily_report_label">每日阅读报告</string>
-    <string name="ai_feature_filter_rule_label">智能过滤规则生成</string>
-    <string name="ai_feature_usage_label">AI 用量看板</string>
-    <string name="ai_feature_task_queue_label">AI 任务队列</string>
-    <string name="ai_feature_prompt_template_label">提示词模板管理</string>
     <!-- i18n batch 3 -->
     <string name="back">返回</string>
     <string name="delete">删除</string>

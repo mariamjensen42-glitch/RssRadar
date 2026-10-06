@@ -41,5 +41,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
     implementation(libs.hilt.android)
+    // Destination 里用 hiltViewModel()：该符号由传递依赖 hilt-lifecycle-viewmodel-compose 提供，
+    // 只声明 hilt-android + hilt-compiler 拿不到——本地扁平 classpath 恰好有它，真 Gradle 没有，
+    // 症状就是 AS 报 Unresolved reference 'hilt'。
+    implementation(libs.androidx.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
+    debugImplementation(libs.androidx.compose.ui.tooling)
 }

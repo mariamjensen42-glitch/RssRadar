@@ -39,8 +39,8 @@ internal fun EmptyState(
     modifier: Modifier = Modifier,
 ) {
     // 分区空态（issue #75）优先：有源没文章走原 tab 空态，无源才走分区引导——
-    // 如实区分两种空。chip 行仍在上方，用户随时可切回「全部」，不阻塞。
-    val (title, hint) = if (partitionEmpty && selectedContentType != ContentTypeFilter.All) {
+    // 如实区分两种空。分区行仍在上方，用户随时可切到别的分区，不阻塞。
+    val (title, hint) = if (partitionEmpty) {
         val typeName = stringResource(selectedContentType.labelRes())
         stringResource(R.string.ctype_empty_title, typeName) to
             stringResource(R.string.ctype_empty_desc, typeName)

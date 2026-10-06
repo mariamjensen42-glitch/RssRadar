@@ -25,6 +25,7 @@ fun FetchFailure.uiRes(): Int = when (this) {
     FetchFailure.EMPTY_BODY -> R.string.fetch_empty_body
     FetchFailure.DECODE_ERROR -> R.string.fetch_decode_error
     FetchFailure.EXTRACT_FAILED -> R.string.fetch_extract_failed
+    FetchFailure.NOT_HTML -> R.string.fetch_not_html
 }
 
 /** 注意 `NONE` 映射到 issue_site_limit：正文没问题时，头部提示讲的是「站点限制」而不是「一切正常」。 */

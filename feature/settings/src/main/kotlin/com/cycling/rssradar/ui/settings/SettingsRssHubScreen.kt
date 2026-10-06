@@ -15,39 +15,58 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.core.model.rsshub.CatalogSource
 import com.cycling.rssradar.core.ui.R as UiR
-import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.core.ui.text.resolve
 import com.cycling.rssradar.core.ui.components.SectionHeader
 import com.cycling.rssradar.core.ui.components.SettingsSubPage
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
+import com.cycling.rssradar.core.ui.text.resolve
+import com.cycling.rssradar.core.ui.theme.RssRadarTheme
+import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
+
+@Composable
+fun SettingsRssHubDestination(
+    onBack: () -> Unit = {},
+    viewModel: RssHubSettingsViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    SettingsRssHubScreen(
+        state = state,
+        onBack = onBack,
+        onProbeNow = viewModel::probeNow,
+        onCustomInputChange = viewModel::onCustomInputChange,
+        onSaveCustomHost = viewModel::saveCustomHost,
+        onRefreshCatalog = viewModel::refreshCatalog,
+    )
+}
 
 @Composable
 fun SettingsRssHubScreen(
-    viewModel: RssHubSettingsViewModel = hiltViewModel(),
+    state: RssHubSettingsUiState,
     onBack: () -> Unit = {},
+    onProbeNow: () -> Unit = {},
+    onCustomInputChange: (String) -> Unit = {},
+    onSaveCustomHost: () -> Unit = {},
+    onRefreshCatalog: () -> Unit = {},
 ) {
-    val state by viewModel.state.collectAsState()
-
     SettingsSubPage(title = "RSSHub", onBack = onBack) {
         SectionHeader(
             stringResource(R.string.rsshub_instance),
-            stringResource(R.string.instance_desc),
+            description = stringResource(R.string.instance_desc),
         )
         Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(14.dp)) {
@@ -67,7 +86,7 @@ fun SettingsRssHubScreen(
                 }
                 Spacer(Modifier.height(12.dp))
                 Button(
-                    onClick = viewModel::probeNow,
+                    onClick = onProbeNow,
                     enabled = !state.probing,
                     modifier = Modifier.fillMaxWidth().height(44.dp),
                     shape = RoundedCornerShape(12.dp),
@@ -101,20 +120,12 @@ fun SettingsRssHubScreen(
         Spacer(Modifier.height(8.dp))
         OutlinedTextField(
             value = state.customInput,
-            onValueChange = viewModel::onCustomInputChange,
+            onValueChange = onCustomInputChange,
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("https://your-rsshub.example.com", color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = radarColors().surface2,
-                unfocusedContainerColor = radarColors().surface2,
-                focusedBorderColor = radarColors().accent,
-                unfocusedBorderColor = Color.Transparent,
-                focusedTextColor = radarColors().textPrimary,
-                unfocusedTextColor = radarColors().textPrimary,
-                cursorColor = radarColors().accent,
-            ),
+            colors = radarOutlinedTextFieldColors(),
         )
         Text(
             text = stringResource(R.string.custom_instance_hint),
@@ -122,19 +133,19 @@ fun SettingsRssHubScreen(
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 4.dp),
         )
-                Spacer(Modifier.height(10.dp))
-                // 主操作用实心按钮（UI 审计 G3）：文本链接样式地位不符、点击面积小
-                Button(
-                    onClick = viewModel::saveCustomHost,
-                    modifier = Modifier.fillMaxWidth().height(44.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = radarColors().accent,
-                        contentColor = radarColors().onAccent,
-                    ),
-                ) {
-                    Text(stringResource(UiR.string.save), style = MaterialTheme.typography.labelLarge)
-                }
+        Spacer(Modifier.height(10.dp))
+        // 主操作用实心按钮（UI 审计 G3）：文本链接样式地位不符、点击面积小
+        Button(
+            onClick = onSaveCustomHost,
+            modifier = Modifier.fillMaxWidth().height(44.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = radarColors().accent,
+                contentColor = radarColors().onAccent,
+            ),
+        ) {
+            Text(stringResource(UiR.string.save), style = MaterialTheme.typography.labelLarge)
+        }
 
         Spacer(Modifier.height(16.dp))
         Text(
@@ -150,7 +161,8 @@ fun SettingsRssHubScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 3.dp)
-                    .clickable { viewModel.onCustomInputChange(host) },
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onCustomInputChange(host) },
             ) {
                 Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -171,7 +183,7 @@ fun SettingsRssHubScreen(
         // 路由目录（issue #59）
         SectionHeader(
             stringResource(R.string.route_catalog),
-            stringResource(R.string.catalog_desc),
+            description = stringResource(R.string.catalog_desc),
         )
         Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(14.dp)) {
@@ -207,7 +219,7 @@ fun SettingsRssHubScreen(
                 }
                 Spacer(Modifier.height(12.dp))
                 Button(
-                    onClick = viewModel::refreshCatalog,
+                    onClick = onRefreshCatalog,
                     enabled = !state.catalogRefreshing,
                     modifier = Modifier.fillMaxWidth().height(44.dp),
                     shape = RoundedCornerShape(12.dp),
@@ -234,4 +246,25 @@ fun SettingsRssHubScreen(
     }
 }
 
-// —— 4. AI 与诊断：DeepSeek Key / 全文抓取诊断 / 崩溃日志 ——
+@Preview(showBackground = true, name = "RSSHub 实例 · 默认")
+@Composable
+private fun SettingsRssHubScreenPreview() {
+    RssRadarTheme(darkTheme = false) {
+        SettingsRssHubScreen(state = RssHubSettingsUiState(activeHost = "rsshub.app"))
+    }
+}
+
+@Preview(showBackground = true, name = "RSSHub 实例 · 探测中")
+@Composable
+private fun SettingsRssHubScreenProbingPreview() {
+    RssRadarTheme(darkTheme = true) {
+        SettingsRssHubScreen(
+            state = RssHubSettingsUiState(
+                activeHost = "rsshub.app",
+                probing = true,
+                catalogRouteCount = 8421,
+                catalogRefreshing = true,
+            ),
+        )
+    }
+}

@@ -59,4 +59,10 @@
     <string name="add_ok_duplicate">This feed is already subscribed</string>
     <string name="add_err_invalid_feed">Not a valid RSS/Atom feed</string>
     <string name="add_err_network_retry">Network error — check the link and try again</string>
+    <string name="add_content_type">Content type</string>
+    <string name="add_group">Group</string>
+    <string name="ctype_article">Articles</string>
+    <string name="ctype_image">Images</string>
+    <string name="ctype_video">Videos</string>
+    <string name="ctype_audio">Audio</string>
 </resources>

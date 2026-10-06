@@ -149,6 +149,18 @@ private fun RadarColors.withSystemScheme(context: Context, darkTheme: Boolean): 
  * M3 colorScheme 槽位由同一份 [RadarColors] 映射，供 M3 组件内部取色——
  * 因此开关动态取色时两边不会走偏。
  */
+/**
+ * RadarColors → M3 colorScheme。
+ *
+ * surfaceContainer 族必须显式映射：M3 组件的默认底色走的就是这几个 slot
+ * （DropdownMenu←Container、ModalBottomSheet←ContainerLow、BottomAppBar / SegmentedButton
+ * ←Container 系），不映射就会落到 [darkColorScheme] 的内置 baseline 色板（紫灰），
+ * 与项目配色脱节——表现成「菜单 / 底部抽屉看着像没适配过的默认组件」。
+ *
+ * 阶梯与 [withSystemScheme] 的反向对应保持一致：
+ * Lowest ← surface1 · Low ← articleCard · Container ← surface2 · Highest ← surface3。
+ * 项目只有四档，High 沿用 Container。
+ */
 private fun darkScheme(colors: RadarColors) = darkColorScheme(
     primary = colors.accent,
     onPrimary = colors.onAccent,
@@ -162,6 +174,11 @@ private fun darkScheme(colors: RadarColors) = darkColorScheme(
     onSurface = colors.textPrimary,
     surfaceVariant = colors.surface2,
     onSurfaceVariant = colors.textSecondary,
+    surfaceContainerLowest = colors.surface1,
+    surfaceContainerLow = colors.articleCard,
+    surfaceContainer = colors.surface2,
+    surfaceContainerHigh = colors.surface2,
+    surfaceContainerHighest = colors.surface3,
     outline = colors.divider,
     outlineVariant = colors.surface3,
     error = DarkError,
@@ -181,6 +198,11 @@ private fun lightScheme(colors: RadarColors) = lightColorScheme(
     onSurface = colors.textPrimary,
     surfaceVariant = colors.surface2,
     onSurfaceVariant = colors.textSecondary,
+    surfaceContainerLowest = colors.surface1,
+    surfaceContainerLow = colors.articleCard,
+    surfaceContainer = colors.surface2,
+    surfaceContainerHigh = colors.surface2,
+    surfaceContainerHighest = colors.surface3,
     outline = colors.divider,
     outlineVariant = colors.surface3,
     error = LightError,

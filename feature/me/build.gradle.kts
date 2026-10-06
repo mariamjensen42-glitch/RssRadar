@@ -45,4 +45,5 @@ dependencies {
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    debugImplementation(libs.androidx.compose.ui.tooling)
 }

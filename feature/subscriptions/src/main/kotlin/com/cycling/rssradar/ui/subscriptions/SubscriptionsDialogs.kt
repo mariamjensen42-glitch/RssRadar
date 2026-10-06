@@ -12,7 +12,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,7 +19,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Check
@@ -28,6 +26,7 @@ import com.composables.icons.lucide.Lucide
 import com.cycling.rssradar.core.ui.theme.radarColors
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
 
 /**
  * 批量移动的目标分组选择（issue #7）：单选一个已注册分组，确认后一次性移动全部勾选项。
@@ -115,15 +114,7 @@ internal fun TextInputDialog(
                 onValueChange = { value = it },
                 singleLine = true,
                 placeholder = { Text(placeholder, color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = radarColors().surface2,
-                    unfocusedContainerColor = radarColors().surface2,
-                    focusedBorderColor = radarColors().accent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = radarColors().textPrimary,
-                    unfocusedTextColor = radarColors().textPrimary,
-                    cursorColor = radarColors().accent,
-                ),
+                colors = radarOutlinedTextFieldColors(),
             )
         },
         confirmButton = {

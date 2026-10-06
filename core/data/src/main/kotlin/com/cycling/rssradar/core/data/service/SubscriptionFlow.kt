@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.io.InputStream
 import java.net.URL
+import com.cycling.rssradar.core.domain.concurrency.quietCatching
 import com.cycling.rssradar.core.domain.rss.FeedProbeResult
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import com.cycling.rssradar.core.domain.rss.normalizeHttpUrl
@@ -79,7 +80,7 @@ class SubscriptionFlow(
     suspend fun discoverFeeds(rawUrl: String): List<DiscoveredFeed> = withContext(ioDispatcher) {
         val url = normalizeHttpUrl(rawUrl) ?: return@withContext emptyList()
         // 1) 本身就是 feed
-        runCatching { engine.fetchAndParse(url) }.getOrNull()?.let { parsed ->
+        quietCatching { engine.fetchAndParse(url) }.getOrNull()?.let { parsed ->
             if (parsed.articles.isNotEmpty()) {
                 return@withContext listOf(
                     DiscoveredFeed(url = url, title = parsed.title, articleCount = parsed.articles.size),
@@ -101,7 +102,7 @@ class SubscriptionFlow(
 
     /** 校验一个候选地址：抓下来能解析出文章才算数。 */
     private suspend fun verifyFeed(url: String): DiscoveredFeed? {
-        val parsed = runCatching { engine.fetchAndParse(url) }.getOrNull() ?: return null
+        val parsed = quietCatching { engine.fetchAndParse(url) }.getOrNull() ?: return null
         if (parsed.articles.isEmpty()) return null
         return DiscoveredFeed(url = url, title = parsed.title, articleCount = parsed.articles.size)
     }
@@ -116,7 +117,7 @@ class SubscriptionFlow(
     suspend fun probeFeed(rawUrl: String): FeedProbeResult = withContext(ioDispatcher) {
         val url = normalizeHttpUrl(rawUrl)
             ?: return@withContext FeedProbeResult.InvalidUrl
-        runCatching { fetchParsed(url) }.fold(
+        quietCatching { fetchParsed(url) }.fold(
             onSuccess = { FeedProbeResult.Valid(it.articles.size) },
             onFailure = FeedProbeResult::from,
         )
@@ -129,10 +130,17 @@ class SubscriptionFlow(
     private suspend fun fetchParsed(url: String): RssParser.ParsedFeed =
         retryOnSlowResponse { engine.fetchAndParse(url) }
 
+    /**
+     * 添加订阅。
+     *
+     * [contentType] 为 null 时交给 [FeedContentTypeGuesser] 按 URL/标题信号预判（默认路径）；
+     * 传入具体值表示用户在订阅前显式选了，覆盖预判。
+     */
     suspend fun addFeed(
         rawUrl: String,
         groupName: String = DEFAULT_GROUP,
         sourceType: Int = FeedEntity.SOURCE_TYPE_RSS,
+        contentType: Int? = null,
     ): AddFeedResult = withContext(ioDispatcher) {
         val url = normalizeHttpUrl(rawUrl) ?: return@withContext AddFeedResult.InvalidFeed
 
@@ -154,7 +162,7 @@ class SubscriptionFlow(
                 createdAt = now,
                 groupName = groupName.ifBlank { DEFAULT_GROUP },
                 sourceType = sourceType,
-                contentType = FeedContentTypeGuesser.guess(url, parsed.title),
+                contentType = contentType ?: FeedContentTypeGuesser.guess(url, parsed.title),
             ),
         )
         val resolvedFeedId = feedId.takeIf { it != -1L } ?: feedDao.findIdByUrl(url) ?: return@withContext AddFeedResult.Duplicate

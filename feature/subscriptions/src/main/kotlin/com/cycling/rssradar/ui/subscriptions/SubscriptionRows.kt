@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -129,6 +130,7 @@ internal fun FeedRow(
         modifier = Modifier
             .fillMaxWidth()
             .pressScale(interactionSource)
+            .clip(RoundedCornerShape(12.dp))
             // 整行点击进「订阅源文章列表」（issue #51）；管理入口仍是行尾"⋯"
             .clickable(interactionSource = interactionSource, onClick = onClick),
     ) {
@@ -230,6 +232,7 @@ internal fun CreateGroupRow(onClick: () -> Unit) {
         color = radarColors().surface1,
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
     ) {
         Row(

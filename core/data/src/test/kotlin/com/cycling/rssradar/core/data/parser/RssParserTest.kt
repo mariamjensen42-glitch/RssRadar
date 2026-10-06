@@ -409,6 +409,61 @@ class RssParserTest {
     }
 
     @Test
+    fun `sanitize keeps audio with src as a media card`() {
+        val html = """<p>前文</p><audio src="https://cdn.example.com/ep1.mp3" controls></audio>"""
+
+        val out = RssParser.sanitizeHtml(html)
+
+        assertTrue(out.contains("media-card-audio"))
+        assertTrue(out.contains("href=\"https://cdn.example.com/ep1.mp3\""))
+        assertTrue(out.contains("音频 · cdn.example.com"))
+        assertFalse(out.contains("<audio"))
+    }
+
+    @Test
+    fun `sanitize uses nested source element of audio`() {
+        val html = """<audio controls><source src="https://cdn.example.com/ep2.m4a" type="audio/mp4"></audio>"""
+
+        val out = RssParser.sanitizeHtml(html)
+
+        assertTrue(out.contains("media-card-audio"))
+        assertTrue(out.contains("href=\"https://cdn.example.com/ep2.m4a\""))
+        assertFalse(out.contains("<audio"))
+    }
+
+    @Test
+    fun `sanitize drops audio without http src entirely`() {
+        val html = """<audio src="/local/ep.mp3"></audio><p>ok</p>"""
+
+        val out = RssParser.sanitizeHtml(html)
+
+        assertFalse(out.contains("<audio"))
+        assertFalse(out.contains("media-card"))
+        assertTrue(out.contains("<p>ok</p>"))
+    }
+
+    @Test
+    fun `sanitize tags each media card with its kind`() {
+        val video = RssParser.sanitizeHtml("""<video src="https://a.com/v.mp4"></video>""")
+        val audio = RssParser.sanitizeHtml("""<audio src="https://a.com/a.mp3"></audio>""")
+        val embed = RssParser.sanitizeHtml("""<iframe src="https://a.com/e"></iframe>""")
+
+        assertTrue(video.contains("media-card-video"))
+        assertTrue(audio.contains("media-card-audio"))
+        assertTrue(embed.contains("media-card-embed"))
+    }
+
+    @Test
+    fun `sanitize drops unknown tokens smuggled into the media card class`() {
+        val html = """<a class="media-card media-card-audio evil" href="https://a.com/x.mp3">x</a>"""
+
+        val out = RssParser.sanitizeHtml(html)
+
+        assertTrue(out.contains("media-card-audio"))
+        assertFalse(out.contains("evil"))
+    }
+
+    @Test
     fun `sanitize drops iframe without http src entirely`() {
         val html = """<iframe src="/local/embed"></iframe><p>ok</p>"""
 

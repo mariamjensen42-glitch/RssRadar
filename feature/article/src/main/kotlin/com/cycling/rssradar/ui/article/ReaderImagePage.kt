@@ -57,6 +57,7 @@ import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
+import com.cycling.rssradar.core.ui.components.rememberImageLoadState
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.crossfadeMotion
 import com.composables.icons.lucide.Download
@@ -281,7 +282,7 @@ private fun ZoomableImage(
     }
     LaunchedEffect(scale) { onZoomedChange(scale > 1f) }
 
-    var loading by remember(url) { mutableStateOf(true) }
+    val imageLoadState = rememberImageLoadState(url)
     // 显式解码尺寸：全屏 Dialog 里只靠布局约束降采样不可靠，Coil 可能按原图解码出
     // 100MB+ 的 bitmap 直接撞 Canvas 上限崩溃。按屏幕 2 倍解码兼顾捏合放大清晰度，
     // clampDecodeSize 的像素预算封顶（放大超过约 2× 后清晰度渐降，可接受）。
@@ -324,9 +325,9 @@ private fun ZoomableImage(
             contentDescription = null,
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize(),
-            onState = { loading = it is AsyncImagePainter.State.Loading },
+            onState = imageLoadState::onState,
         )
-        if (loading) {
+        if (imageLoadState.loading) {
             CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
         }
     }

@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -108,10 +109,20 @@ internal fun PreviewResult(
         ValidationBanner(info = state.validation)
         if (state.validation is ValidationInfo.Valid) {
             Spacer(Modifier.height(6.dp))
+            FieldLabel(stringResource(R.string.add_group))
+            Spacer(Modifier.height(6.dp))
             GroupChips(
                 options = state.groupOptions,
                 selected = state.selectedGroup,
                 onSelect = { viewModel.onIntent(AddSubscriptionIntent.GroupSelected(it)) },
+            )
+            Spacer(Modifier.height(12.dp))
+            // 与目录步同一套：选中态读 effectiveContentType，没挑过就是地址预判结果
+            FieldLabel(stringResource(R.string.add_content_type))
+            Spacer(Modifier.height(6.dp))
+            ContentTypeChips(
+                selected = state.effectiveContentType,
+                onSelect = { viewModel.onIntent(AddSubscriptionIntent.ContentTypeSelected(it)) },
             )
             Spacer(Modifier.height(12.dp))
             PrimaryButton(
@@ -150,7 +161,9 @@ internal fun ExamplePicker(
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = radarColors().surface2,
-                    modifier = Modifier.clickable { onSelect(example) },
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onSelect(example) },
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                         Text(

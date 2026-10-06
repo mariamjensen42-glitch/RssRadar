@@ -14,7 +14,7 @@ AiFeature 是唯一注册表，"加一项功能 = 加一行枚举 + 一个 promp
 
 两条检查
 --------
-A. UI 出口：每项功能必须在 UI 模块（app/src/main/java）被引用，或属于
+A. UI 出口：每项功能必须在 UI 模块（app 的 Java 源集与各 feature 的 main 源集）被引用，或属于
    早于枚举就存在的旧 UI（见 LEGACY_UI，逐项写明依据）。
 B. 渲染分支：阅读页 AI 面板（AiArticleSheet）展示的每个功能，其产物类型
    必须在 AiResultCard 的 when 里有分支。缺分支的后果是一张只有标题的空白卡，
@@ -34,11 +34,16 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-FEATURE_FILE = ROOT / "core/data/src/main/kotlin/com/cycling/rssradar/core/data/ai/AiFeature.kt"
-SHEET_FILE = ROOT / "app/src/main/java/com/cycling/rssradar/ui/article/AiArticleSheet.kt"
-PARSERS_FILE = ROOT / "core/data/src/main/kotlin/com/cycling/rssradar/core/data/ai/AiParsers.kt"
-BUTTONS_FILE = ROOT / "app/src/main/java/com/cycling/rssradar/ui/article/ArticleDetailViewModel.kt"
-UI_DIR = ROOT / "app/src/main/java"
+CORE_AI = ROOT / "core/data/src/main/kotlin/com/cycling/rssradar/core/data/ai"
+FEATURE_FILE = ROOT / "core/model/src/main/kotlin/com/cycling/rssradar/core/model/AiFeature.kt"
+SPECS_FILE = CORE_AI / "AiFeatureSpecs.kt"
+PARSERS_FILE = CORE_AI / "AiParsers.kt"
+ARTICLE_UI = ROOT / "feature/article/src/main/kotlin/com/cycling/rssradar/ui/article"
+BUTTONS_FILE = ARTICLE_UI / "ArticleDetailViewModel.kt"
+GENERIC_TRIGGER_FILE = ROOT / "feature/ai/src/main/kotlin/com/cycling/rssradar/ui/ai/AiFeaturesViewModel.kt"
+
+# 模块化（core:*/feature:*）之后 UI 全部不在 app 里，扫描面必须是所有 feature 的 main 源集。
+UI_DIRS = [ROOT / "app/src/main/java", ROOT / "feature", ROOT / "core/ui"]
 
 # 早于 AiFeature 枚举就存在的 UI，因此 UI 代码里不会写 `AiFeature.XXX`。
 # 每一项都必须能指出具体落点，否则就是给自己开后门。
@@ -65,10 +70,20 @@ def parse_features() -> list[str]:
     return names
 
 
+def ui_files():
+    """UI 侧 Kotlin 文件：app 的 Java 源集 + 各 feature 的 main 源集（排除测试与 build）。"""
+    yield from UI_DIRS[0].rglob("*.kt")
+    for base in UI_DIRS[1:]:
+        for p in base.rglob("*.kt"):
+            parts = p.as_posix()
+            if "/src/main/" in parts and "/build/" not in parts:
+                yield p
+
+
 def ui_references() -> set[str]:
     """UI 模块里出现过的 AiFeature.X 引用。"""
     hits: set[str] = set()
-    for kt in UI_DIR.rglob("*.kt"):
+    for kt in ui_files():
         hits.update(re.findall(r"AiFeature\.([A-Z][A-Z0-9_]*)", read(kt)))
     return hits
 
@@ -83,7 +98,7 @@ def has_generic_viewer() -> bool:
     只是没有专属入口与排版。所以未接线项从 error 降级为 warning：
     仍然提醒开发者"这项功能目前只有兜底出口"，但不再把整条流水线卡红。
     """
-    for kt in UI_DIR.rglob("*.kt"):
+    for kt in ui_files():
         src = read(kt).lower()
         if "aiartifactrepository" in src and ("browse(" in src or "overview(" in src):
             return True
@@ -97,10 +112,9 @@ def has_generic_trigger() -> bool:
     批处理功能有了它就不再"只能等每日任务"；配合产物中心的按功能筛选，
     「开关 → 触发 → 看结果」这条最小闭环对每项批处理功能都成立。
     """
-    vm = ROOT / "app/src/main/java/com/cycling/rssradar/ui/me/AiFeaturesViewModel.kt"
-    if not vm.exists():
+    if not GENERIC_TRIGGER_FILE.exists():
         return False
-    return "RunFeature" in read(vm)
+    return "RunFeature" in read(GENERIC_TRIGGER_FILE)
 
 
 def sheet_render_branches() -> set[str]:
@@ -110,11 +124,11 @@ def sheet_render_branches() -> set[str]:
     所以这里在整个 ui/article 下搜内容而不是钉死某个路径——钉死路径在拆分后
     会 IndexError，看着像脚本坏了，其实是它找不到文件了。
     """
-    for kt in (ROOT / "app/src/main/java/com/cycling/rssradar/ui/article").rglob("*.kt"):
+    for kt in ARTICLE_UI.rglob("*.kt"):
         src = read(kt)
         if "AI_RESULT_RENDERS: Map<AiFeature," in src:
             table = src.split("AI_RESULT_RENDERS: Map<AiFeature,", 1)[1]
-            table = table.split("\n}", 1)[0]
+            table = table.split("\n)", 1)[0]
             return set(re.findall(r"as (Ai[A-Za-z]*Payload)", table))
     raise SystemExit(
         "未找到 AI_RESULT_RENDERS 注册表：ui/article 下已无该声明，"
@@ -128,20 +142,24 @@ def payload_type_of() -> dict[str, str]:
 
     刻意不去猜 `Ai<PascalCase>Payload`——SHARE_COPY 的真实类型是 AiSharePayload，
     猜名字会造出假红。这里顺着 spec 的 parse = AiParsers::fn 走到解析函数签名上取返回类型。
+
+    注意 spec 的 prompt 位置参数里含 `)`（lambda 体），用 `[^)]*?` 会永远匹配不上、
+    让整条检查静默空转。而跨行非贪婪同样不行：SUMMARY / TRANSLATE 用的是默认 parse
+    （原样返回 String），不带 `parse =`，跨行匹配会一路吃到下一条 spec 的 parse 上，
+    把 SUMMARY 认成 AiClassifyPayload。所以这里按 `spec(AiFeature.` 切块，块内找 parse。
     """
-    specs = read(PARSERS_FILE)
-    parsers = read(ROOT / "core/data/src/main/kotlin/com/cycling/rssradar/core/data/ai/AiParsers.kt")
+    specs = read(SPECS_FILE)
+    parsers = read(PARSERS_FILE)
 
-    # spec 登记表：AiFeature.X -> parse 指向的解析函数名
     dispatch: dict[str, str] = {}
-    for m in re.finditer(
-        r"spec\(\s*AiFeature\.([A-Z][A-Z0-9_]*)[^)]*?parse\s*=\s*AiParsers::([a-zA-Z0-9_]+)",
-        specs,
-        re.S,
-    ):
-        dispatch[m.group(1)] = m.group(2)
+    for chunk in re.split(r"(?=spec\(AiFeature\.)", specs):
+        head = re.match(r"spec\(AiFeature\.([A-Z][A-Z0-9_]*)", chunk)
+        if not head:
+            continue
+        hit = re.search(r"parse\s*=\s*AiParsers::([a-zA-Z0-9_]+)", chunk)
+        if hit:
+            dispatch[head.group(1)] = hit.group(1)
 
-    # 各解析函数的返回类型
     returns = dict(
         re.findall(r"fun\s+([a-zA-Z0-9_]+)\s*\(\s*raw:\s*String\s*\)\s*:\s*([A-Za-z0-9_]+)", parsers)
     )
@@ -155,13 +173,16 @@ def payload_type_of() -> dict[str, str]:
 
 
 def sheet_features() -> list[str]:
-    """面板会展示产物的功能清单（ARTICLE_AI_BUTTONS + QA + GLOSSARY）。"""
+    """面板会展示产物的功能清单（ARTICLE_AI_BUTTONS + QA + GLOSSARY）。
+
+    第二段清单是**换行续写**（`val X: List<AiFeature> =` 独占一行，值在下一行），
+    原先按 `=` 后取本行会得到空串，等于静默漏掉 QA 与 GLOSSARY 两个分支。
+    """
     src = read(BUTTONS_FILE)
-    block = src.split("val ARTICLE_AI_BUTTONS: List<AiFeature> = listOf(", 1)[1]
-    block = block.split(")", 1)[0]
+    block = src.split("val ARTICLE_AI_BUTTONS: List<AiFeature> = listOf(", 1)[1].split("\n)", 1)[0]
     names = re.findall(r"AiFeature\.([A-Z][A-Z0-9_]*)", block)
-    extra = src.split("val ARTICLE_AI_FEATURES: List<AiFeature> =", 1)[1].split("\n", 1)[0]
-    names += re.findall(r"AiFeature\.([A-Z][A-Z0-9_]*)", extra)
+    tail = src.split("val ARTICLE_AI_FEATURES: List<AiFeature> =", 1)[1].split("\n\n", 1)[0]
+    names += re.findall(r"AiFeature\.([A-Z][A-Z0-9_]*)", tail)
     return names
 
 

@@ -28,6 +28,7 @@ import com.composables.icons.lucide.Headphones
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Star
+import com.composables.icons.lucide.Video
 import com.cycling.rssradar.core.ui.theme.radarColors
 
 @Composable
@@ -45,6 +46,8 @@ internal fun ArticleActionsBar(
     onOpenAi: () -> Unit = {},
     /** 打开播放页；null = 这篇没有可播的音频（入口整个不出现，不留一个点不动的按钮）。 */
     onPlayAudio: (() -> Unit)? = null,
+    /** 全屏播放视频；null = 这篇没有可播的视频直链（同上，不给假入口）。 */
+    onPlayVideo: (() -> Unit)? = null,
 ) {
     val insets = WindowInsets.navigationBars.asPaddingValues()
     Surface(color = radarColors().bgRoot) {
@@ -76,6 +79,16 @@ internal fun ArticleActionsBar(
                 onClick = onNext,
             )
             Spacer(Modifier.weight(1f))
+            onPlayVideo?.let { play ->
+                ActionIcon(
+                    icon = Lucide.Video,
+                    checked = false,
+                    contentDescription = stringResource(R.string.player_open_video),
+                    size = 40.dp,
+                    onClick = play,
+                )
+                Spacer(Modifier.width(8.dp))
+            }
             onPlayAudio?.let { play ->
                 ActionIcon(
                     icon = Lucide.Headphones,

@@ -14,7 +14,7 @@ import com.cycling.rssradar.core.model.MarkAsReadCondition
  * 资源引用的是本模块 R（namespace 与 package 同为 ui.feed，裸名可用）。
  */
 fun ContentTypeFilter.labelRes(): Int = when (this) {
-    ContentTypeFilter.All -> R.string.filter_all
+    ContentTypeFilter.Article -> R.string.ctype_article
     ContentTypeFilter.Image -> R.string.ctype_image
     ContentTypeFilter.Video -> R.string.ctype_video
     ContentTypeFilter.Audio -> R.string.ctype_audio

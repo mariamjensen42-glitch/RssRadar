@@ -25,7 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,8 +37,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
+import com.cycling.rssradar.core.ui.components.rememberSlowLoad
 import com.cycling.rssradar.core.ui.theme.radarColors
-import androidx.compose.runtime.setValue
 
 /**
  * 兴趣画像页（ADR-0013）：推荐流"为什么推这些"的答案，只读。
@@ -47,11 +47,20 @@ import androidx.compose.runtime.setValue
  * 数字一律来自真实统计，收藏了几篇、打开过几次都是库里查出来的，不做估算。
  */
 @Composable
-fun InterestProfileScreen(
+fun InterestProfileDestination(
+    onBack: () -> Unit = {},
     viewModel: InterestProfileViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    InterestProfileScreen(state = state, onBack = onBack)
+}
+
+@Composable
+fun InterestProfileScreen(
+    state: InterestProfileUiState,
     onBack: () -> Unit = {},
 ) {
-    val state by viewModel.state.collectAsState()
+    val slowLoad = rememberSlowLoad(state.loading)
 
     Column(
         modifier = Modifier
@@ -91,8 +100,10 @@ fun InterestProfileScreen(
 
             when {
                 state.loading -> {
-                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                    if (slowLoad) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
                 state.isColdStart -> {

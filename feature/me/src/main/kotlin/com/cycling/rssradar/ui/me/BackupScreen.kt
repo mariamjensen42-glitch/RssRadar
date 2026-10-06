@@ -13,12 +13,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,32 +26,54 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.ShieldCheck
 import com.cycling.rssradar.core.data.backup.ConflictPolicy
 import com.cycling.rssradar.core.data.backup.ImportStrategy
 import com.cycling.rssradar.core.ui.components.ConfirmDialog
-import com.cycling.rssradar.core.ui.components.OptionPickerSheet
-import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.core.ui.text.resolve
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.ShieldCheck
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import com.cycling.rssradar.core.ui.components.NavigateRow
+import com.cycling.rssradar.core.ui.components.OptionPickerSheet
 import com.cycling.rssradar.core.ui.components.OptionRow
 import com.cycling.rssradar.core.ui.components.SectionHeader
 import com.cycling.rssradar.core.ui.components.SettingSwitchRow
 import com.cycling.rssradar.core.ui.components.SettingsSubPage
+import com.cycling.rssradar.core.ui.text.resolve
+import com.cycling.rssradar.core.ui.theme.RssRadarTheme
+import com.cycling.rssradar.core.ui.theme.radarColors
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+@Composable
+fun BackupDestination(
+    onBack: () -> Unit = {},
+    viewModel: BackupViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    BackupScreen(
+        state = state,
+        onBack = onBack,
+        onSetIncludeContent = viewModel::setIncludeContent,
+        onExport = viewModel::export,
+        onImport = viewModel::import,
+        onRebuildIndex = viewModel::rebuildIndex,
+    )
+}
 
 /** 备份与恢复：全量导出 / 导入，外加检索索引重建。API Key 永不导出。 */
 @Composable
 fun BackupScreen(
-    viewModel: BackupViewModel = hiltViewModel(),
+    state: BackupViewModel.UiState,
     onBack: () -> Unit = {},
+    onSetIncludeContent: (Boolean) -> Unit = {},
+    onExport: (android.net.Uri) -> Unit = {},
+    onImport: (android.net.Uri, ImportStrategy, ConflictPolicy) -> Unit = { _, _, _ -> },
+    onRebuildIndex: () -> Unit = {},
 ) {
-    val state by viewModel.state.collectAsState()
     var showStrategySheet by remember { mutableStateOf(false) }
     var showOverwriteConfirm by remember { mutableStateOf(false) }
     var pendingStrategy by remember { mutableStateOf(ImportStrategy.MERGE) }
@@ -60,22 +82,22 @@ fun BackupScreen(
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
     ) { uri ->
-        uri?.let(viewModel::export)
+        uri?.let(onExport)
     }
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        uri?.let { viewModel.import(it, pendingStrategy, conflict) }
+        uri?.let { onImport(it, pendingStrategy, conflict) }
     }
 
     SettingsSubPage(title = stringResource(R.string.backup_title), onBack = onBack) {
-        SectionHeader(stringResource(R.string.backup_export), stringResource(R.string.backup_export_desc))
+        SectionHeader(stringResource(R.string.backup_export), description = stringResource(R.string.backup_export_desc))
         Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 SettingSwitchRow(
                     label = stringResource(R.string.backup_include_content),
                     checked = state.includeContent,
-                    onChange = viewModel::setIncludeContent,
+                    onChange = onSetIncludeContent,
                     subtitle = stringResource(R.string.backup_include_content_desc),
                 )
                 Spacer(Modifier.height(4.dp))
@@ -90,7 +112,7 @@ fun BackupScreen(
         }
         Spacer(Modifier.height(24.dp))
 
-        SectionHeader(stringResource(R.string.backup_import), stringResource(R.string.backup_import_desc))
+        SectionHeader(stringResource(R.string.backup_import), description = stringResource(R.string.backup_import_desc))
         Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 OptionRow(
@@ -116,12 +138,12 @@ fun BackupScreen(
         }
         Spacer(Modifier.height(24.dp))
 
-        SectionHeader(stringResource(R.string.backup_maintain), stringResource(R.string.backup_rebuild_index_desc))
+        SectionHeader(stringResource(R.string.backup_maintain), description = stringResource(R.string.backup_rebuild_index_desc))
         Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 NavigateRow(
                     label = stringResource(R.string.backup_rebuild_index),
-                    onClick = viewModel::rebuildIndex,
+                    onClick = onRebuildIndex,
                 )
             }
         }
@@ -163,7 +185,7 @@ fun BackupScreen(
 
         Spacer(Modifier.height(24.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            androidx.compose.material3.Icon(
+            Icon(
                 imageVector = Lucide.ShieldCheck,
                 contentDescription = null,
                 tint = radarColors().textTertiary,
@@ -229,6 +251,24 @@ private fun conflictLabel(policy: ConflictPolicy): String = stringResource(
         ConflictPolicy.KEEP_BACKUP -> R.string.backup_conflict_keep_backup
     },
 )
+
+@Preview(showBackground = true, name = "备份与恢复 · 空闲")
+@Composable
+private fun BackupScreenPreview() {
+    RssRadarTheme(darkTheme = false) {
+        BackupScreen(state = BackupViewModel.UiState())
+    }
+}
+
+@Preview(showBackground = true, name = "备份与恢复 · 导出中")
+@Composable
+private fun BackupScreenRunningPreview() {
+    RssRadarTheme(darkTheme = true) {
+        BackupScreen(
+            state = BackupViewModel.UiState(running = true, done = 42, total = 130),
+        )
+    }
+}
 
 private val FILE_MIME = arrayOf("application/json", "text/plain", "*/*")
 

@@ -41,8 +41,8 @@ data class FeedListUiState(
     val selectedTab: FeedTab = FeedTab.All,
     /** 分组筛选：null = 全部。常规 tab 下沉 DB 查询（issue #74），推荐流内存过滤推荐序。 */
     val selectedGroup: String? = null,
-    /** 内容分区筛选（issue #75）：与 selectedGroup 叠加，均下沉 DB 查询，推荐流内存过滤推荐序。 */
-    val selectedContentType: ContentTypeFilter = ContentTypeFilter.All,
+    /** 内容分区筛选（issue #75）：默认「文章」；与 selectedGroup 叠加，均下沉 DB 查询，推荐流内存过滤推荐序。 */
+    val selectedContentType: ContentTypeFilter = ContentTypeFilter.Article,
     /**
      * 空分区空态（issue #75）：选中分区且库里没有任何该类型订阅源
      * （区别于「有源但没文章」——后者维持各 tab 原空态文案）。
@@ -144,6 +144,9 @@ class FeedListViewModel @Inject constructor(
     override val uiState: StateFlow<FeedListUiState> = _uiState.asStateFlow()
 
     private var loadMoreJob: Job? = null
+
+    /** 在途的切筛选任务：新选择进来时取消旧的，保证「最后一次点选胜出」。 */
+    private var filterJob: Job? = null
 
     /**
      * 推荐流的排序结果（进 tab 时实时算一次，ADR-0013）。
@@ -258,8 +261,8 @@ class FeedListViewModel @Inject constructor(
 
     private fun selectTab(tab: FeedTab) {
         if (_uiState.value.selectedTab == tab) return
-        update { it.copy(selectedTab = tab) }
-        viewModelScope.launch { loadFirstPage(cancelPendingLoadMore = true) }
+        val state = _uiState.value
+        launchFilter(tab, state.selectedGroup, state.selectedContentType)
     }
 
     /**
@@ -268,8 +271,8 @@ class FeedListViewModel @Inject constructor(
      */
     private fun selectGroup(group: String?) {
         if (_uiState.value.selectedGroup == group) return
-        update { it.copy(selectedGroup = group) }
-        viewModelScope.launch { loadFirstPage(cancelPendingLoadMore = true) }
+        val state = _uiState.value
+        launchFilter(state.selectedTab, group, state.selectedContentType)
     }
 
     /**
@@ -278,11 +281,77 @@ class FeedListViewModel @Inject constructor(
      */
     private fun selectContentType(type: ContentTypeFilter) {
         if (_uiState.value.selectedContentType == type) return
-        update { it.copy(selectedContentType = type, partitionEmpty = false) }
-        viewModelScope.launch {
-            loadFirstPage(cancelPendingLoadMore = true)
-            recheckPartitionEmpty()
+        val state = _uiState.value
+        launchFilter(state.selectedTab, state.selectedGroup, type, resetPartitionEmpty = true)
+    }
+
+    /**
+     * 切筛选的启动点：[filterJob] 只保留最后一次选择。连点两个 chip 时两次查询并发，
+     * 先发的若后返回就会把列表写回上一个筛选——chip 停在最新选择、列表却是旧的，
+     * 又是一次「对不上」的闪。取消在途任务即可，最后一次点选必然胜出。
+     */
+    private fun launchFilter(
+        tab: FeedTab,
+        group: String?,
+        contentType: ContentTypeFilter,
+        resetPartitionEmpty: Boolean = false,
+    ) {
+        filterJob?.cancel()
+        filterJob = viewModelScope.launch { applyFilter(tab, group, contentType, resetPartitionEmpty) }
+    }
+
+    /**
+     * 切筛选（tab / 分组 / 分区）的唯一落地路径：目标条件的第一页与总数先算完，
+     * 再连同选中项一次性写入 UiState。
+     *
+     * 为什么必须原子：旧做法先落 chip 再异步重查，中间会留下一帧「新 chip + 旧列表」——
+     * 上方 chip 已跳到新筛选，下方列表还挂着上一个筛选的内容；等查询返回，整份列表
+     * 又是一次性替换，LazyColumn 按 key 逐项增删（animateItem 的淡出留在原位、其余项
+     * 瞬时归位），两层变化叠起来就是「点一下闪一下」。合并成一次提交后 chip 与内容同帧
+     * 到位，既不闪也不会变慢——本地查询只有几十毫秒。
+     *
+     * 推荐流是唯一例外：它的排序在内存里现算（几百 ms），chip 必须先落，否则
+     * [FeedListUiState.isRanking] 驱动的 loading 会顶在旧 tab 上。
+     *
+     * [resetPartitionEmpty]：只有内容分区换了才需要——分区空态是「库里没有该类型源」
+     * 的结论，换分区后若不同帧清掉，空列表会先顶着上一个分区的文案（issue #75 的
+     * 原始做法是选中即置 false，这里必须跟页数据同帧落地，否则中间又有一帧旧结论）。
+     * 置 false 只是过渡，随后 [recheckPartitionEmpty] 给出真实结论。
+     * 换 tab / 换分组不动它：那个结论只与分区有关，与列表被哪个 tab 筛出来无关。
+     */
+    private suspend fun applyFilter(
+        tab: FeedTab,
+        group: String?,
+        contentType: ContentTypeFilter,
+        resetPartitionEmpty: Boolean = false,
+    ) {
+        loadMoreJob?.cancel()
+        if (tab == FeedTab.Recommended) {
+            update {
+                it.copy(
+                    selectedTab = tab,
+                    selectedGroup = group,
+                    selectedContentType = contentType,
+                    isRanking = true,
+                )
+            }
         }
+        val page = loadTabPage(tab, group, contentType, PAGE_SIZE, 0)
+        val total = countTabPage(tab, group, contentType)
+        update {
+            it.copy(
+                selectedTab = tab,
+                selectedGroup = group,
+                selectedContentType = contentType,
+                articles = page,
+                hasMore = hasMoreAfter(tab, 0, page.size),
+                totalCount = total,
+                partitionEmpty = if (resetPartitionEmpty) false else it.partitionEmpty,
+                isFirstLoad = false,
+                isRanking = false,
+            )
+        }
+        if (resetPartitionEmpty) recheckPartitionEmpty()
     }
 
     /**
@@ -293,7 +362,7 @@ class FeedListViewModel @Inject constructor(
     private suspend fun recheckPartitionEmpty() {
         val state = _uiState.value
         val type = state.selectedContentType
-        val dbValue = type.dbValue ?: return
+        val dbValue = type.dbValue
         val empty = state.articles.isEmpty() && !repository.hasFeedsOfType(dbValue)
         update { it.copy(partitionEmpty = empty) }
     }
@@ -401,12 +470,13 @@ class FeedListViewModel @Inject constructor(
         if (loadMoreJob?.isActive == true) return
         loadMoreJob = viewModelScope.launch {
             update { it.copy(isLoadingMore = true) }
-            val offset = _uiState.value.articles.size
-            val page = loadTabPage(PAGE_SIZE, offset)
+            val state = _uiState.value
+            val offset = state.articles.size
+            val page = loadTabPage(state.selectedTab, state.selectedGroup, state.selectedContentType, PAGE_SIZE, offset)
             update {
                 it.copy(
                     articles = PagedSnapshot.append(it.articles, page, keyOf = ::idOf),
-                    hasMore = hasMoreAfter(offset, page.size),
+                    hasMore = hasMoreAfter(state.selectedTab, offset, page.size),
                     isLoadingMore = false,
                 )
             }
@@ -417,52 +487,59 @@ class FeedListViewModel @Inject constructor(
      * 是否还有下一页：推荐流的排序结果已在内存里，直接看游标；
      * 其余 tab 靠"上一页是否拉满"判断（SQL LIMIT/OFFSET 分页的常规做法）。
      */
-    private fun hasMoreAfter(offset: Int, loaded: Int): Boolean =
-        if (_uiState.value.selectedTab == FeedTab.Recommended) {
+    private fun hasMoreAfter(tab: FeedTab, offset: Int, loaded: Int): Boolean =
+        if (tab == FeedTab.Recommended) {
             offset + loaded < rankedIds.size
         } else {
             loaded == PAGE_SIZE
         }
 
     /**
-     * 按当前 tab 取一页。选中分组/分区时走 DB 级组合查询（issue #74 + #75）——
+     * 按 tab + 筛选条件取一页。选中分组/分区时走 DB 级组合查询（issue #74 + #75）——
      * 两个过滤维度合成一条 Filtered 调用，分页、hasMore 与「全部」共用同一套
      * LIMIT/OFFSET +「上一页拉满」约定；「全部」不加过滤开销。
+     *
+     * 条件由调用方显式传入而非读 UiState：切筛选时查询条件必须先于状态落地生效，
+     * 否则查到的是上一个筛选的页（原子提交的前提，见 [applyFilter]）。
      */
-    private suspend fun loadTabPage(limit: Int, offset: Int): List<ArticleWithFeed> {
-        val state = _uiState.value
-        val group = state.selectedGroup
-        val contentType = state.selectedContentType.dbValue
-        return when (state.selectedTab) {
-            FeedTab.All -> repository.loadArticlesPageFiltered(group, contentType, limit, offset)
-            FeedTab.Unread -> repository.loadUnreadPageFiltered(group, contentType, limit, offset)
-            FeedTab.Starred -> repository.loadStarredPageFiltered(group, contentType, limit, offset)
-            FeedTab.Bookmarked -> repository.loadBookmarkedPageFiltered(group, contentType, limit, offset)
-            FeedTab.Recommended -> loadRecommendationsPage(limit, offset)
+    private suspend fun loadTabPage(
+        tab: FeedTab,
+        group: String?,
+        contentType: ContentTypeFilter,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed> {
+        val type = contentType.dbValue
+        return when (tab) {
+            FeedTab.All -> repository.loadArticlesPageFiltered(group, type, limit, offset)
+            FeedTab.Unread -> repository.loadUnreadPageFiltered(group, type, limit, offset)
+            FeedTab.Starred -> repository.loadStarredPageFiltered(group, type, limit, offset)
+            FeedTab.Bookmarked -> repository.loadBookmarkedPageFiltered(group, type, limit, offset)
+            FeedTab.Recommended -> loadRecommendationsPage(group, contentType, limit, offset)
         }
     }
 
     /**
      * 推荐流分页（ADR-0013）：首屏现算一次排序，之后按游标切片、批量还原文章。
      * 排序不落库——候选池受「未读 + 时间窗」约束，规模可控，落库的失效维护是无底洞。
+     * 打分在内存里做、耗时可见，loading 由 [applyFilter] 负责置位（本函数只算数据）。
      */
-    private suspend fun loadRecommendationsPage(limit: Int, offset: Int): List<ArticleWithFeed> {
+    private suspend fun loadRecommendationsPage(
+        group: String?,
+        contentType: ContentTypeFilter,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed> {
         if (offset == 0) {
-            update { it.copy(isRanking = true) }
             rankedIds = recommendation.rank()
             // 分组筛选（issue #74）：推荐序在内存里，直接过滤 id 序（默认组含空串语义）。
             // rankedIds 过滤后 hasMore 的游标判定（rankedIds.size）自然保持正确。
-            val group = _uiState.value.selectedGroup
             if (group != null) {
                 rankedIds = recommendation.filterByGroup(rankedIds, group, DEFAULT_GROUP)
             }
             // 分区筛选（issue #75）：同上，在 group 过滤之后追加 id 序过滤。
             // rankedIds 过滤后 hasMore 的游标判定（rankedIds.size）自然保持正确。
-            val type = _uiState.value.selectedContentType.dbValue
-            if (type != null) {
-                rankedIds = recommendation.filterByContentType(rankedIds, type)
-            }
-            update { it.copy(isRanking = false) }
+            rankedIds = recommendation.filterByContentType(rankedIds, contentType.dbValue)
         }
         val slice = rankedIds.drop(offset).take(limit)
         if (slice.isEmpty()) return emptyList()
@@ -492,19 +569,19 @@ class FeedListViewModel @Inject constructor(
     }
 
     /**
-     * 重拉第一页。[cancelPendingLoadMore] 为 true 时先取消在途的 loadMore——
-     * 切 tab / 改分组后查询条件已变，在途分页若继续写入，offset（取自旧列表长度）
-     * 会与新条件错位一页（QA #74 遗留竞态）。
+     * 按当前筛选重拉第一页——刷新 / 撤销删除 / 新增订阅 / 负反馈后重排这类
+     * 「筛选没变、内容变了」的就地重载走这里（保留列表滚动位置与逐项增删动画）。
+     * 换筛选不走这里：那条路必须原子提交，见 [applyFilter]。
      */
-    private suspend fun loadFirstPage(cancelPendingLoadMore: Boolean = false) {
-        if (cancelPendingLoadMore) loadMoreJob?.cancel()
-        val page = loadTabPage(PAGE_SIZE, 0)
+    private suspend fun loadFirstPage() {
+        val state = _uiState.value
+        val page = loadTabPage(state.selectedTab, state.selectedGroup, state.selectedContentType, PAGE_SIZE, 0)
         // 总数与第一页同批取：切 tab/改筛选/刷新后一起刷新，翻页不重查
-        val total = countTabPage()
+        val total = countTabPage(state.selectedTab, state.selectedGroup, state.selectedContentType)
         update {
             it.copy(
                 articles = page,
-                hasMore = hasMoreAfter(0, page.size),
+                hasMore = hasMoreAfter(state.selectedTab, 0, page.size),
                 totalCount = total,
                 // 无论查到与否，第一次查询已落地，之后空列表就是真空态
                 isFirstLoad = false,
@@ -516,15 +593,13 @@ class FeedListViewModel @Inject constructor(
      * 当前 tab + 筛选条件下的文章总数（滚动指示条分母）。与 [loadTabPage] 的
      * 分支严格同构，谓词同源所以分母一致；推荐流不在 DB，返回 null 走兜底。
      */
-    private suspend fun countTabPage(): Int? {
-        val state = _uiState.value
-        val group = state.selectedGroup
-        val contentType = state.selectedContentType.dbValue
-        return when (state.selectedTab) {
-            FeedTab.All -> repository.countArticlesFiltered(group, contentType)
-            FeedTab.Unread -> repository.countUnreadFiltered(group, contentType)
-            FeedTab.Starred -> repository.countStarredFiltered(group, contentType)
-            FeedTab.Bookmarked -> repository.countBookmarkedFiltered(group, contentType)
+    private suspend fun countTabPage(tab: FeedTab, group: String?, contentType: ContentTypeFilter): Int? {
+        val type = contentType.dbValue
+        return when (tab) {
+            FeedTab.All -> repository.countArticlesFiltered(group, type)
+            FeedTab.Unread -> repository.countUnreadFiltered(group, type)
+            FeedTab.Starred -> repository.countStarredFiltered(group, type)
+            FeedTab.Bookmarked -> repository.countBookmarkedFiltered(group, type)
             FeedTab.Recommended -> null
         }
     }

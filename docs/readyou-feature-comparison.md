@@ -88,7 +88,7 @@
 | 17 | 排版细项：标题/小标题对齐+加粗+大写、字间距、正文对齐（RssRadar 只有字号/行距/边距/字体族四项）——**已补字间距 + 正文对齐；标题大写对中文无意义，不做** | `ReadingText*Preference.kt`、`ReadingTitle*Preference.kt` | ⚠️ 部分（2026-09-08） |
 | 18 | 粗体字符强调（类 Bionic Reading）——**主动不做**：按「词首若干字符加粗」实现，中文没有词内结构，逐字加粗等于没加粗；WebView 路还得到正文 HTML 里插 `<b>`，有破坏标签的风险 | `ReadingBoldCharactersPreference.kt` | ⛔ 主动不做 |
 | 19 | 图片圆角、图片最大化、图片全屏查看页 | `ReadingImage*Preference.kt`、`ReaderImagePage.kt` | ✅ 补标（issue #60） |
-| 20 | 视频/iframe 嵌入播放（YouTube）——原生路降级为「打开链接」卡片，WebView 路不渲染嵌入，均非嵌入播放 | `ui/component/reader/VideoTagHunter.kt` | — |
+| 20 | 视频/音频内嵌播放：**直链 `<video>`/`<audio>` 已内嵌播放**（原生路就地出画面 / 紧凑播放条，ADR-0018）；**iframe/YouTube 仍只给外跳占位卡**——正文里永不执行第三方页面脚本是既定约束，不因参考实现而放宽。订阅源级 enclosure 视频另有底栏全屏入口 | `ArticleMediaPlayer.kt`、`ReaderVideoPage.kt` | ⚠️ 部分（2026-10-05） |
 | 21 | TTS 朗读（**主动不做**，见文末不做清单） | `ui/page/home/reading/tts/TtsButton.kt` |
 | 22 | 工具栏随滚动自动隐藏（RssRadar 叫「自动隐藏工具栏」——与第 93 项内容降噪的「沉浸阅读」分开，两者在 ReadYou 里都叫 immersive） | `ReadingAutoHideToolbarPreference.kt` | ✅ 2026-09-08 |
 | 23 | 手势：列表条目左右滑动自定义动作**已做**；下拉/上拉切换上/下篇**已做**（默认关，只在整页滚动模式生效）；「下拉加载下一个 feed」**主动不做**——会悄悄换掉正在看的东西，是惊喜不是功能 | `PullToSwitchArticlePreference.kt`、`ui/component/swipe/`、`PullToLoadNextFeedPreference.kt` | ⚠️ 部分（2026-09-08） |

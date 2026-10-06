@@ -27,19 +27,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.cycling.rssradar.core.ui.theme.RssRadarTheme
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -62,32 +63,69 @@ import com.cycling.rssradar.core.ui.theme.Danger
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.effectsSpec
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
 import com.cycling.rssradar.core.ui.theme.spatialSpec
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
 @Composable
+fun SubscriptionsDestination(
+    onAddSubscription: () -> Unit = {},
+    onCreateGroup: () -> Unit = {},
+    onOpenFeed: (Long) -> Unit = {},
+    viewModel: SubscriptionsViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    SubscriptionsScreen(
+        state = state,
+        onIntent = viewModel::onIntent,
+        onAddSubscription = onAddSubscription,
+        onCreateGroup = onCreateGroup,
+        onOpenFeed = onOpenFeed,
+        groupActionSheet = { group, feedCount, onDismiss ->
+            GroupActionSheet(
+                group = group,
+                feedCount = feedCount,
+                viewModel = viewModel,
+                onDismiss = onDismiss,
+            )
+        },
+        feedActionSheet = { feedId, onDismiss ->
+            FeedActionDestination(feedId = feedId, viewModel = viewModel, onDismiss = onDismiss)
+        },
+    )
+}
+
+@Composable
 fun SubscriptionsScreen(
-    viewModel: SubscriptionsViewModel,
+    state: SubscriptionsUiState,
+    onIntent: (SubscriptionsIntent) -> Unit,
     onAddSubscription: () -> Unit = {},
     onCreateGroup: () -> Unit = {},
     /** 点击订阅源 → 进「订阅源文章列表」（issue #51）。 */
     onOpenFeed: (Long) -> Unit = {},
+    /**
+     * 分组操作底栏（重命名/清空分组文章/删除分组内全部订阅/删除分组）：由调用方注入带 VM 的实现。
+     * [feedCount] 是当前分组里的订阅源数，供面板如实报出影响范围（0 时"删除全部订阅"整条隐藏）。
+     */
+    groupActionSheet: @Composable (group: String, feedCount: Int, onDismiss: () -> Unit) -> Unit =
+        { _, _, _ -> },
+    /** 订阅源操作底栏：同上。 */
+    feedActionSheet: @Composable (feedId: Long, onDismiss: () -> Unit) -> Unit = { _, _ -> },
 ) {
-    val groups by viewModel.groups.collectAsState()
-    val expandedIds by viewModel.expandedGroupIds.collectAsState()
-    val totalUnread by viewModel.totalUnread.collectAsState()
-    val groupOptions by viewModel.groupsList.collectAsState()
-    val sortMode by viewModel.sortMode.collectAsState()
-    // 失效源筛选（#82）
-    val unhealthyOnly by viewModel.unhealthyOnly.collectAsState()
-    val unhealthyCount by viewModel.unhealthyCount.collectAsState()
-    val unhealthyFeeds by viewModel.unhealthyFeeds.collectAsState()
-    // 批量移动（issue #7）：多选模式与勾选集合在 ViewModel，弹层显隐是纯 UI 状态留在页面
-    val selectionMode by viewModel.selectionMode.collectAsState()
-    val selectedIds by viewModel.selectedFeedIds.collectAsState()
+    val groups = state.groups
+    val expandedIds = state.expandedIds
+    val totalUnread = state.totalUnread
+    val groupOptions = state.groupOptions
+    val sortMode = state.sortMode
+    val unhealthyOnly = state.unhealthyOnly
+    val unhealthyCount = state.unhealthyCount
+    val unhealthyFeeds = state.unhealthyFeeds
+    val selectionMode = state.selectionMode
+    val selectedIds = state.selectedIds
     val snackbarHostState = remember { SnackbarHostState() }
-    val message = viewModel.uiMessage
+    val message = state.message
 
     // 对话框状态
     var createGroupDialog by remember { mutableStateOf(false) }
@@ -119,20 +157,20 @@ fun SubscriptionsScreen(
     val opmlLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        uri?.let { viewModel.onIntent(SubscriptionsIntent.ImportOpml(it)) }
+        uri?.let { onIntent(SubscriptionsIntent.ImportOpml(it)) }
     }
     // OPML 导出（#4）：SAF 另存为，用户自己决定存哪/分享给谁。
     // 文件名固定带日期，避免多次导出互相覆盖。
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/x-opml"),
     ) { uri ->
-        uri?.let { viewModel.onIntent(SubscriptionsIntent.ExportOpml(it)) }
+        uri?.let { onIntent(SubscriptionsIntent.ExportOpml(it)) }
     }
 
     LaunchedEffect(message) {
         message?.let {
             snackbarHostState.showSnackbar(it)
-            viewModel.onIntent(SubscriptionsIntent.ConsumeMessage)
+            onIntent(SubscriptionsIntent.ConsumeMessage)
         }
     }
 
@@ -147,7 +185,7 @@ fun SubscriptionsScreen(
                     canMove = selectedIds.isNotEmpty(),
                     onMove = { batchMoveDialog = true },
                     onDelete = { showBatchDeleteConfirm = true },
-                    onCancel = { viewModel.onIntent(SubscriptionsIntent.ToggleSelectionMode) },
+                    onCancel = { onIntent(SubscriptionsIntent.ToggleSelectionMode) },
                 )
             } else {
                 SubscriptionsTopBar(
@@ -160,7 +198,7 @@ fun SubscriptionsScreen(
                         exportLauncher.launch("rssradar-subscriptions-${todayStamp()}.opml")
                     },
                     onSort = { showSortSheet = true },
-                    onBatchMove = { viewModel.onIntent(SubscriptionsIntent.ToggleSelectionMode) },
+                    onBatchMove = { onIntent(SubscriptionsIntent.ToggleSelectionMode) },
                     onAdd = onAddSubscription,
                     totalUnread = totalUnread,
                     onMarkAllRead = { showMarkAllReadConfirm = true },
@@ -197,15 +235,7 @@ fun SubscriptionsScreen(
                         }
                     },
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = radarColors().surface1,
-                        unfocusedContainerColor = radarColors().surface1,
-                        focusedBorderColor = radarColors().accent,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedTextColor = radarColors().textPrimary,
-                        unfocusedTextColor = radarColors().textPrimary,
-                        cursorColor = radarColors().accent,
-                    ),
+                    colors = radarOutlinedTextFieldColors(containerColor = radarColors().surface1),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -215,7 +245,7 @@ fun SubscriptionsScreen(
                 item(key = "unhealthy-filter", contentType = "filter") {
                     FilterChip(
                         selected = unhealthyOnly,
-                        onClick = { viewModel.onIntent(SubscriptionsIntent.ToggleUnhealthyFilter) },
+                        onClick = { onIntent(SubscriptionsIntent.ToggleUnhealthyFilter) },
                         label = {
                             Text(
                                 text = if (unhealthyOnly) "失效源 $unhealthyCount（点击取消筛选）" else "失效源 ($unhealthyCount)",
@@ -249,7 +279,7 @@ fun SubscriptionsScreen(
                             selected = feedItem.feed.id in selectedIds,
                             onClick = {
                                 if (selectionMode) {
-                                    viewModel.onIntent(SubscriptionsIntent.ToggleFeedSelected(feedItem.feed.id))
+                                    onIntent(SubscriptionsIntent.ToggleFeedSelected(feedItem.feed.id))
                                 } else {
                                     onOpenFeed(feedItem.feed.id)
                                 }
@@ -292,7 +322,7 @@ fun SubscriptionsScreen(
                             selected = feedItem.feed.id in selectedIds,
                             onClick = {
                                 if (selectionMode) {
-                                    viewModel.onIntent(SubscriptionsIntent.ToggleFeedSelected(feedItem.feed.id))
+                                    onIntent(SubscriptionsIntent.ToggleFeedSelected(feedItem.feed.id))
                                 } else {
                                     onOpenFeed(feedItem.feed.id)
                                 }
@@ -325,8 +355,8 @@ fun SubscriptionsScreen(
                             title = group.group,
                             feedCount = group.feeds.size,
                             expanded = group.group in expandedIds,
-                            onToggle = { viewModel.onIntent(SubscriptionsIntent.ToggleGroup(group.group)) },
-                            // 长按 → 分组操作底栏（重命名/清空文章/删除分组，issue #8）；
+                            onToggle = { onIntent(SubscriptionsIntent.ToggleGroup(group.group)) },
+                            // 长按 → 分组操作底栏（重命名/清空文章/删除组内全部订阅/删除分组，issue #8）；
                             // 行尾铅笔已移除——每个分组都挂一支铅笔是噪音，长按是不可发现性
                             // 与低频的合理交换（操作底栏也会在误触时有明确出口）
                             onEdit = { groupActionTarget = group.group },
@@ -350,7 +380,7 @@ fun SubscriptionsScreen(
                                     // 多选态整行点击 = 勾选；常规态 = 进订阅源文章列表
                                     onClick = {
                                         if (selectionMode) {
-                                            viewModel.onIntent(
+                                            onIntent(
                                                 SubscriptionsIntent.ToggleFeedSelected(feedItem.feed.id),
                                             )
                                         } else {
@@ -388,7 +418,7 @@ fun SubscriptionsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showMarkAllReadConfirm = false
-                    viewModel.onIntent(SubscriptionsIntent.MarkAllRead)
+                    onIntent(SubscriptionsIntent.MarkAllRead)
                 }) {
                     Text("标记已读", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
                 }
@@ -408,7 +438,7 @@ fun SubscriptionsScreen(
             confirmText = "创建",
             onDismiss = { createGroupDialog = false },
             onConfirm = { name ->
-                viewModel.onIntent(SubscriptionsIntent.CreateGroup(name))
+                onIntent(SubscriptionsIntent.CreateGroup(name))
                 createGroupDialog = false
             },
         )
@@ -421,7 +451,7 @@ fun SubscriptionsScreen(
             selectedCount = selectedIds.size,
             onDismiss = { batchMoveDialog = false },
             onConfirm = { group ->
-                viewModel.onIntent(SubscriptionsIntent.MoveSelectedFeeds(group))
+                onIntent(SubscriptionsIntent.MoveSelectedFeeds(group))
                 batchMoveDialog = false
             },
         )
@@ -439,7 +469,7 @@ fun SubscriptionsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showBatchDeleteConfirm = false
-                    viewModel.onIntent(SubscriptionsIntent.DeleteSelectedFeeds)
+                    onIntent(SubscriptionsIntent.DeleteSelectedFeeds)
                 }) {
                     Text("删除", color = Danger, fontWeight = FontWeight.SemiBold)
                 }
@@ -464,7 +494,7 @@ fun SubscriptionsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showDeleteUnhealthyConfirm = false
-                    viewModel.onIntent(SubscriptionsIntent.DeleteUnhealthyFeeds)
+                    onIntent(SubscriptionsIntent.DeleteUnhealthyFeeds)
                 }) {
                     Text("删除", color = Danger, fontWeight = FontWeight.SemiBold)
                 }
@@ -477,22 +507,17 @@ fun SubscriptionsScreen(
         )
     }
 
-    // 分组操作底栏：重命名 / 清空分组文章 / 删除分组（issue #8）
+    // 分组操作底栏：重命名 / 清空分组文章 / 删除分组内全部订阅 / 删除分组（issue #8）
+    // 订阅数从**当前状态**现取（不是长按那一刻的快照）：面板开着时列表变了，报出的数字也要跟着对
     groupActionTarget?.let { group ->
-        GroupActionSheet(
-            group = group,
-            viewModel = viewModel,
-            onDismiss = { groupActionTarget = null },
-        )
+        groupActionSheet(group, groups.firstOrNull { it.group == group }?.feeds?.size ?: 0) {
+            groupActionTarget = null
+        }
     }
 
     // 订阅源操作底栏：重命名 / 移动分组 / 删除等（原 nav 目的地，收回内联弹层）
     feedActionTarget?.let { feedId ->
-        FeedActionScreen(
-            feedId = feedId,
-            viewModel = viewModel,
-            onDismiss = { feedActionTarget = null },
-        )
+        feedActionSheet(feedId) { feedActionTarget = null }
     }
 
     // 订阅列表排序（按名称/最近更新/未读数）：选择即生效并持久化
@@ -509,7 +534,7 @@ fun SubscriptionsScreen(
                     FeedSortMode.BY_UNREAD -> "未读文章多的源排前面"
                 }
             },
-            onSelect = { mode -> viewModel.onIntent(SubscriptionsIntent.SelectSort(mode)) },
+            onSelect = { mode -> onIntent(SubscriptionsIntent.SelectSort(mode)) },
             onDismiss = { showSortSheet = false },
         )
     }
@@ -608,3 +633,20 @@ internal fun String.withoutScheme(): String = removePrefix("https://").removePre
 /** 导出文件名日期后缀：多次导出不互相覆盖。 */
 private fun todayStamp(): String =
     java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())
+
+
+@Preview(showBackground = true, name = "订阅 · 空态")
+@Composable
+private fun SubscriptionsScreenEmptyPreview() {
+    RssRadarTheme(darkTheme = false) {
+        SubscriptionsScreen(state = SubscriptionsUiState(), onIntent = {})
+    }
+}
+
+@Preview(showBackground = true, name = "订阅 · 深色")
+@Composable
+private fun SubscriptionsScreenDarkPreview() {
+    RssRadarTheme(darkTheme = true) {
+        SubscriptionsScreen(state = SubscriptionsUiState(), onIntent = {})
+    }
+}

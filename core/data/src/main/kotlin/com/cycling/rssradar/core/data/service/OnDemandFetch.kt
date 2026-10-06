@@ -12,6 +12,7 @@ import com.cycling.rssradar.core.data.db.dao.FeedDao
 import com.cycling.rssradar.core.data.db.projection.FetchHostStat
 import com.cycling.rssradar.core.data.parser.ArticleExtractor
 import com.cycling.rssradar.core.data.parser.ContentFetcher
+import com.cycling.rssradar.core.data.parser.FeedUrlResolver
 import com.cycling.rssradar.core.model.ExtractionIssue
 import com.cycling.rssradar.core.model.FetchFailure
 import com.cycling.rssradar.core.data.parser.FetchLogger
@@ -107,6 +108,12 @@ class OnDemandFetch(
         if (ContentQualification.hasUsableContent(item.article)) return@withContext OnDemandResult.AlreadyUsable
 
         val link = item.article.link
+        // 链接本身就是图片（必应每日壁纸这类源）时没有网页正文可抓：抓回来的是 JPEG 二进制，
+        // 只会以「响应不是网页」收场，把阅读页变成「空白 + 失败提示」。本来就没内容可抓，
+        // 这一趟纯属把体验做坏 —— 阅读页会把这张图直接当正文渲染（见 ReadingBody）。
+        if (FeedUrlResolver.imageUrlOrNull(link) != null) {
+            return@withContext OnDemandResult.AlreadyUsable
+        }
         val outcome = fetchOutcome(link)
         contentFetchLogDao.insert(outcome.toLog(link))
         when (outcome) {

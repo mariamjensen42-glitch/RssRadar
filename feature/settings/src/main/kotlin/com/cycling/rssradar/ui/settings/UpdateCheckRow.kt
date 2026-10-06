@@ -3,7 +3,6 @@ package com.cycling.rssradar.ui.settings
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,17 +11,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import com.cycling.rssradar.core.ui.theme.radarColors
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cycling.rssradar.core.data.platform.openUrl
-import androidx.compose.runtime.setValue
+import com.cycling.rssradar.core.ui.theme.RssRadarTheme
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 检查更新（ReadYou 差距表第 35 项）。
@@ -31,9 +32,19 @@ import androidx.compose.runtime.setValue
  * 「检查失败」这种无信息文案等于没做——用户不知道是该重试还是该换网络。
  */
 @Composable
-internal fun UpdateCheckRow(modifier: Modifier = Modifier) {
+internal fun UpdateCheckRowDestination(modifier: Modifier = Modifier) {
     val viewModel: UpdateViewModel = hiltViewModel()
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    UpdateCheckRow(state = state, onCheck = viewModel::check, modifier = modifier)
+}
+
+/** 纯展示：状态由调用方给，动作由 [onCheck] 回调。当前版本号从 [LocalContext] 自己取。 */
+@Composable
+internal fun UpdateCheckRow(
+    state: UpdateState,
+    onCheck: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     // AGP 8+ 默认不生成 BuildConfig（且不打算为此动构建脚本），版本走 PackageManager。
     val version = remember(context) { context.appVersionName() }
@@ -53,7 +64,7 @@ internal fun UpdateCheckRow(modifier: Modifier = Modifier) {
                 )
             }
             TextButton(
-                onClick = { viewModel.check(version.orEmpty()) },
+                onClick = { onCheck(version.orEmpty()) },
                 enabled = state !is UpdateState.Checking,
             ) {
                 Text(
@@ -94,6 +105,33 @@ private fun ResultLine(text: String) {
         style = MaterialTheme.typography.bodySmall,
         modifier = Modifier.padding(vertical = 2.dp),
     )
+}
+
+@Preview(showBackground = true, name = "更新 · 已是最新")
+@Composable
+private fun UpdateCheckRowUpToDatePreview() {
+    RssRadarTheme(darkTheme = false) {
+        UpdateCheckRow(state = UpdateState.UpToDate, onCheck = {})
+    }
+}
+
+@Preview(showBackground = true, name = "更新 · 有新版本")
+@Composable
+private fun UpdateCheckRowAvailablePreview() {
+    RssRadarTheme(darkTheme = false) {
+        UpdateCheckRow(
+            state = UpdateState.Available(version = "1.2.0", title = "RssRadar 1.2.0", url = "https://example.com"),
+            onCheck = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "更新 · 检查失败")
+@Composable
+private fun UpdateCheckRowFailedPreview() {
+    RssRadarTheme(darkTheme = false) {
+        UpdateCheckRow(state = UpdateState.Failed("网络不可用，请重试"), onCheck = {})
+    }
 }
 
 /** 已安装包版本名；拿不到返回 null（不猜、不显示占位版本）。 */

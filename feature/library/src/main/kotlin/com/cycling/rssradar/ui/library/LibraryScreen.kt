@@ -29,7 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -67,13 +67,46 @@ import com.composables.icons.lucide.X
  * 整理时要的是一屏看到更多、能勾选，不是阅读。
  */
 @Composable
-fun LibraryScreen(
+fun LibraryDestination(
     onBack: () -> Unit,
     onOpenArticle: (Long) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
-    val feeds by viewModel.feeds.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val feeds by viewModel.feeds.collectAsStateWithLifecycle()
+    LibraryScreen(
+        state = state,
+        feeds = feeds,
+        onBack = onBack,
+        onOpenArticle = onOpenArticle,
+        onSelectAll = viewModel::selectAll,
+        onSetShowBookmarked = viewModel::setShowBookmarked,
+        onSetSort = viewModel::setSort,
+        onSetRange = viewModel::setRange,
+        onSetFeedFilter = viewModel::setFeedFilter,
+        onClearSelection = viewModel::clearSelection,
+        onRemoveSelected = viewModel::removeSelected,
+        onToggleSelection = viewModel::toggleSelection,
+        onLoadMore = viewModel::loadMore,
+    )
+}
+
+@Composable
+fun LibraryScreen(
+    state: LibraryViewModel.LibraryUiState,
+    feeds: List<com.cycling.rssradar.core.data.db.entity.FeedEntity>,
+    onBack: () -> Unit,
+    onOpenArticle: (Long) -> Unit,
+    onSelectAll: () -> Unit = {},
+    onSetShowBookmarked: (Boolean) -> Unit = {},
+    onSetSort: (LibrarySort) -> Unit = {},
+    onSetRange: (LibraryRange) -> Unit = {},
+    onSetFeedFilter: (Long?) -> Unit = {},
+    onClearSelection: () -> Unit = {},
+    onRemoveSelected: () -> Unit = {},
+    onToggleSelection: (Long) -> Unit = {},
+    onLoadMore: () -> Unit = {},
+) {
     val colors = radarColors()
     val listState = rememberLazyListState()
 
@@ -96,7 +129,7 @@ fun LibraryScreen(
         }
     }
     LaunchedEffect(listState) {
-        snapshotFlow { reachedEnd }.collect { if (it) viewModel.loadMore() }
+        snapshotFlow { reachedEnd }.collect { if (it) onLoadMore() }
     }
 
     Column(
@@ -122,7 +155,7 @@ fun LibraryScreen(
                 modifier = Modifier.weight(1f),
             )
             if (state.selecting) {
-                TextButton(onClick = viewModel::selectAll) {
+                TextButton(onClick = onSelectAll) {
                     Text(stringResource(R.string.library_select_all))
                 }
             }
@@ -133,7 +166,7 @@ fun LibraryScreen(
             options = listOf(false, true),
             selected = state.showBookmarked,
             label = { bookmarked -> if (bookmarked) bookmarkedLabel else starredLabel },
-            onSelect = viewModel::setShowBookmarked,
+            onSelect = onSetShowBookmarked,
             modifier = Modifier.padding(horizontal = 20.dp),
         )
         Spacer(Modifier.height(10.dp))
@@ -149,13 +182,13 @@ fun LibraryScreen(
                 options = LibrarySort.entries,
                 selected = state.sort,
                 label = { sort -> sortLabels[sort].orEmpty() },
-                onSelect = viewModel::setSort,
+                onSelect = onSetSort,
             )
             SegmentedChips(
                 options = LibraryRange.entries,
                 selected = state.range,
                 label = { range -> rangeLabels[range].orEmpty() },
-                onSelect = viewModel::setRange,
+                onSelect = onSetRange,
             )
         }
         Spacer(Modifier.height(8.dp))
@@ -173,7 +206,7 @@ fun LibraryScreen(
                 options = feedOptions,
                 selected = state.feedId,
                 label = { id -> feedLabels[id].orEmpty() },
-                onSelect = viewModel::setFeedFilter,
+                onSelect = onSetFeedFilter,
             )
         }
         Spacer(Modifier.height(8.dp))
@@ -184,8 +217,8 @@ fun LibraryScreen(
                 unstarLabel = stringResource(
                     if (state.showBookmarked) R.string.library_unbookmark else R.string.library_unstar,
                 ),
-                onClear = viewModel::clearSelection,
-                onRemove = viewModel::removeSelected,
+            onClear = onClearSelection,
+                            onRemove = onRemoveSelected,
             )
         }
 
@@ -211,12 +244,12 @@ fun LibraryScreen(
                         showStarredAt = state.sort == LibrarySort.STARRED_AT,
                         onClick = {
                             if (state.selecting) {
-                                viewModel.toggleSelection(item.article.id)
+                                onToggleSelection(item.article.id)
                             } else {
                                 onOpenArticle(item.article.id)
                             }
                         },
-                        onLongClick = { viewModel.toggleSelection(item.article.id) },
+                        onLongClick = { onToggleSelection(item.article.id) },
                     )
                 }
                 if (state.articles.size < state.total) {

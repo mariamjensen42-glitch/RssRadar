@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.service.AddFeedResult
 import com.cycling.rssradar.core.data.service.DiscoveredFeed
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
+import com.cycling.rssradar.core.data.qualify.FeedContentTypeGuesser
+import com.cycling.rssradar.core.domain.concurrency.quietCatching
 import com.cycling.rssradar.core.domain.rss.FeedProbeResult
 import com.cycling.rssradar.core.data.service.SubscriptionFlow
 import com.cycling.rssradar.core.model.GROUP_DESIGN
@@ -65,6 +67,13 @@ data class AddSubscriptionUiState(
     val isValidating: Boolean = false,
     val validation: ValidationInfo = ValidationInfo.Idle,
     val selectedGroup: String = GROUP_TECH,
+    /**
+     * 用户显式挑的内容类型（ADR-0014）。null = 没挑过，交给 [FeedContentTypeGuesser] 预判。
+     *
+     * 刻意不用「默认选中文章」来表达未选：订阅 bilibili / 播客这类源时预判本来能猜对，
+     * 硬塞一个默认值反而把预判覆盖掉，是退步。
+     */
+    val selectedContentType: Int? = null,
     val isAdding: Boolean = false,
     val query: String = "",
     val category: String = RouteCategory.ALL,
@@ -90,6 +99,10 @@ data class AddSubscriptionUiState(
     /** 分组选项。原先硬编码三个常量，与订阅页读注册表各说各话，新建分组这里看不见。 */
     val groupOptions: List<String> = emptyList(),
 ) {
+    /** 当前生效的内容类型：用户挑过就用它，否则按当前地址预判。UI 选中态读这个。 */
+    val effectiveContentType: Int
+        get() = selectedContentType ?: FeedContentTypeGuesser.guess(url, "")
+
     /** 当前参数拼出来的完整地址；必填参数没填时为 null。 */
     val builtUrl: String? get() = selectedRoute?.let { RssHubRoutes.buildUrl(it, paramValues, host) }
     /** 还没填的必填参数（顺序与表单一致）。空 = 能生成。缺参数时必须说缺哪个，不能只把按钮置灰。 */
@@ -106,6 +119,8 @@ data class AddSubscriptionUiState(
 sealed interface AddSubscriptionIntent {
     data class UrlChange(val raw: String) : AddSubscriptionIntent
     data class GroupSelected(val group: String) : AddSubscriptionIntent
+
+    data class ContentTypeSelected(val contentType: Int) : AddSubscriptionIntent
     data class QueryChange(val query: String) : AddSubscriptionIntent
     data class CategoryChange(val category: String) : AddSubscriptionIntent
     data class RouteSelected(val route: RssHubRoute) : AddSubscriptionIntent
@@ -163,6 +178,7 @@ class AddSubscriptionViewModel @Inject constructor(
         when (intent) {
             is AddSubscriptionIntent.UrlChange -> urlChange(intent.raw)
             is AddSubscriptionIntent.GroupSelected -> groupSelected(intent.group)
+            is AddSubscriptionIntent.ContentTypeSelected -> contentTypeSelected(intent.contentType)
             is AddSubscriptionIntent.QueryChange -> queryChange(intent.query)
             is AddSubscriptionIntent.CategoryChange -> categoryChange(intent.category)
             is AddSubscriptionIntent.RouteSelected -> routeSelected(intent.route)
@@ -355,7 +371,7 @@ class AddSubscriptionViewModel @Inject constructor(
                 )
                 return@launch
             }
-            val probe = runCatching {
+            val probe = quietCatching {
                 withTimeoutOrNull(PROBE_TIMEOUT_MS) { subscriptionFlow.probeFeed(raw) }
             }.getOrNull()
             if (probe is FeedProbeResult.Valid) {
@@ -369,7 +385,7 @@ class AddSubscriptionViewModel @Inject constructor(
             // 手填不是 feed 地址 → 试着从站点里发现（#5）。贴个首页也能订阅，这是订阅体验的下限。
             if (!fromRoute) {
                 _state.value = _state.value.copy(isValidating = false, isDiscovering = true)
-                val found = runCatching { subscriptionFlow.discoverFeeds(raw) }.getOrDefault(emptyList())
+                val found = quietCatching { subscriptionFlow.discoverFeeds(raw) }.getOrDefault(emptyList())
                 _state.value = _state.value.copy(
                     isDiscovering = false,
                     discovered = found,
@@ -386,7 +402,7 @@ class AddSubscriptionViewModel @Inject constructor(
     }
 
     private suspend fun isReachable(host: String): Boolean =
-        runCatching { instanceStore.isReachable(host) }.getOrDefault(false)
+        quietCatching { instanceStore.isReachable(host) }.getOrDefault(false)
 
     /**
      * 探测结果 → 用户能照着做点什么的一句话。
@@ -437,7 +453,7 @@ class AddSubscriptionViewModel @Inject constructor(
         validationJob?.cancel()
         validationJob = viewModelScope.launch {
             _state.value = _state.value.copy(isValidating = true)
-            val probe = runCatching { subscriptionFlow.probeFeed(feed.url) }.getOrNull()
+            val probe = quietCatching { subscriptionFlow.probeFeed(feed.url) }.getOrNull()
             _state.value = _state.value.copy(
                 url = feed.url,
                 isValidating = false,
@@ -457,7 +473,16 @@ class AddSubscriptionViewModel @Inject constructor(
         _state.value = _state.value.copy(selectedGroup = group)
     }
 
-    /** 订阅成功后清空状态；抽屉关闭时由调用方走 [onDismissed]，下次打开从目录步开始。 */
+    private fun contentTypeSelected(contentType: Int) {
+        _state.value = _state.value.copy(selectedContentType = contentType)
+    }
+
+    /**
+     * 订阅成功后清空「一次添加流程」的状态，回到目录步。
+     *
+     * 页面关闭不需要它：VM 绑在加订阅路由的 backStackEntry 上，退出即销毁，
+     * 下次进入天然是干净实例（原先那套「Activity 作用域 + 手动 onDismissed」已随之删除）。
+     */
     private fun reset() {
         validationJob?.cancel()
         // 实例与目录信息不属于「一次添加流程」，重置时保留
@@ -470,11 +495,6 @@ class AddSubscriptionViewModel @Inject constructor(
             visibleRoutes = RouteCatalogQuery.search(allRoutes, "", RouteCategory.ALL),
         )
         _state.update { it.copy(uiMessage = null) }
-    }
-
-    /** 抽屉整体关闭（非流程内返回目录）：VM 是 Activity 作用域、不随弹层销毁，需手动重置。 */
-    fun onDismissed() {
-        reset()
     }
 
     /**
@@ -518,7 +538,13 @@ class AddSubscriptionViewModel @Inject constructor(
             } else {
                 FeedEntity.SOURCE_TYPE_RSS
             }
-            val result = subscriptionFlow.addFeed(state.url.trim(), state.selectedGroup, sourceType)
+            // 内容类型：用户没挑过就传 null，让 addFeed 用完整信号（含标题）再预判一次
+            val result = subscriptionFlow.addFeed(
+                rawUrl = state.url.trim(),
+                groupName = state.selectedGroup,
+                sourceType = sourceType,
+                contentType = state.selectedContentType,
+            )
             _state.value = _state.value.copy(isAdding = false)
             _state.update {
                 it.copy(

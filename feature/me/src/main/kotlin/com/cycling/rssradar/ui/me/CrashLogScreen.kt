@@ -4,6 +4,7 @@ import com.cycling.rssradar.core.ui.R as UiR
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,7 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.cycling.rssradar.core.data.maintenance.CrashLog
 import com.cycling.rssradar.core.data.maintenance.CrashRecord
 import com.cycling.rssradar.core.ui.theme.Danger
@@ -73,19 +75,28 @@ data class CrashDetail(val name: String, val head: String, val text: String)
  * release 断裂的第一现场。
  */
 @Composable
-fun CrashLogScreen(
-    viewModel: CrashLogViewModel,
+fun CrashLogDestination(
     onBack: () -> Unit,
+    viewModel: CrashLogViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    CrashLogScreen(state = state, onBack = onBack, onIntent = viewModel::onIntent)
+}
+
+@Composable
+fun CrashLogScreen(
+    state: CrashLogUiState,
+    onBack: () -> Unit,
+    onIntent: (CrashLogIntent, Context) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val uiState by viewModel.uiState.collectAsState()
-    val records = uiState.records
-    val detail = uiState.detail
+    val records = state.records
+    val detail = state.detail
     var confirmClear by remember { mutableStateOf(false) }
 
     // 进页面读一次磁盘；崩溃日志只在打开时变，不做轮询。
-    LaunchedEffect(Unit) { viewModel.onIntent(CrashLogIntent.Refresh, context) }
+    LaunchedEffect(Unit) { onIntent(CrashLogIntent.Refresh, context) }
 
     Column(
         modifier = modifier
@@ -134,7 +145,7 @@ fun CrashLogScreen(
         } else {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 records.forEach { record ->
-                    CrashRow(record) { viewModel.onIntent(CrashLogIntent.OpenDetail(record), context) }
+                    CrashRow(record) { onIntent(CrashLogIntent.OpenDetail(record), context) }
                     Spacer(Modifier.height(8.dp))
                 }
                 Spacer(Modifier.height(16.dp))
@@ -144,7 +155,7 @@ fun CrashLogScreen(
 
     detail?.let { crash ->
         AlertDialog(
-            onDismissRequest = { viewModel.onIntent(CrashLogIntent.CloseDetail, context) },
+            onDismissRequest = { onIntent(CrashLogIntent.CloseDetail, context) },
             title = {
                 Text(
                     text = crash.head,
@@ -171,7 +182,7 @@ fun CrashLogScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.onIntent(CrashLogIntent.CloseDetail, context) }) { Text(stringResource(UiR.string.close), color = radarColors().textSecondary) }
+                TextButton(onClick = { onIntent(CrashLogIntent.CloseDetail, context) }) { Text(stringResource(UiR.string.close), color = radarColors().textSecondary) }
             },
             containerColor = radarColors().surface1,
         )
@@ -186,7 +197,7 @@ fun CrashLogScreen(
                 TextButton(
                     onClick = {
                         confirmClear = false
-                        viewModel.onIntent(CrashLogIntent.Clear, context)
+                        onIntent(CrashLogIntent.Clear, context)
                     },
                 ) { Text(stringResource(R.string.clear), color = Danger, fontWeight = FontWeight.SemiBold) }
             },
@@ -206,6 +217,7 @@ private fun CrashRow(record: CrashRecord, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
     ) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {

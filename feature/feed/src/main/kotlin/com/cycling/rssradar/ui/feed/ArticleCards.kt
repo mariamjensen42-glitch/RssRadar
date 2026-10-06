@@ -92,6 +92,17 @@ fun ArticleCard(
     val descColor = if (dimmed) radarColors().textTertiary else radarColors().textSecondary
     // 按压缩放（docs/motion.md #2）：source 与 combinedClickable 共用同一实例
     val interactionSource = remember { MutableInteractionSource() }
+    val menuActions = ArticleMenuActions(
+        isRead = item.article.isRead,
+        isStarred = item.article.isStarred,
+        isBookmarked = item.article.isBookmarked,
+        link = item.article.link,
+        onToggleRead = onToggleRead,
+        onToggleStarred = onToggleStarred,
+        onToggleBookmarked = onToggleBookmarked,
+        onDelete = onDelete,
+        onReduceSuch = onReduceSuch,
+    )
     Box {
         Surface(
             shape = RoundedCornerShape(14.dp),
@@ -118,7 +129,7 @@ fun ArticleCard(
                             pressPos = pressPos,
                             cardTopInWindowPx = cardTopInWindowPx,
                             cardHeightPx = cardHeightPx,
-                            menuItemCount = if (onReduceSuch != null) 8 else 7,
+                            menuItemCount = menuActions.itemCount,
                             windowHeightPx = windowHeightPx,
                             density = density,
                         )
@@ -203,17 +214,7 @@ fun ArticleCard(
         ArticleContextMenu(
             expanded = menuExpanded,
             offset = menuOffset,
-            actions = ArticleMenuActions(
-                isRead = item.article.isRead,
-                isStarred = item.article.isStarred,
-                isBookmarked = item.article.isBookmarked,
-                link = item.article.link,
-                onToggleRead = onToggleRead,
-                onToggleStarred = onToggleStarred,
-                onToggleBookmarked = onToggleBookmarked,
-                onDelete = onDelete,
-                onReduceSuch = onReduceSuch,
-            ),
+            actions = menuActions,
             onDismiss = { menuExpanded = false },
         )
     }
@@ -255,7 +256,12 @@ private fun CoverThumb(url: String?, mediaKind: Int = ArticleEntity.MEDIA_KIND_N
     }
 }
 
-/** 缩略图角上的媒体种类角标：小圆片 + 图标。align 作用域由调用方的 Box 提供。 */
+/**
+ * 缩略图角上的媒体种类角标：小圆片 + 图标。align 作用域由调用方的 Box 提供。
+ *
+ * 图标取固定白，不能用 onAccent：底色是固定的半透明黑（要压在任意缩略图上都成立），
+ * 而 onAccent 跟着强调色走——自定义主色挑到浅色时它会变成黑色，压在暗角标上就看不见了。
+ */
 @Composable
 
 internal fun MediaBadge(icon: ImageVector, label: String, modifier: Modifier = Modifier) {
@@ -268,7 +274,7 @@ internal fun MediaBadge(icon: ImageVector, label: String, modifier: Modifier = M
             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, contentDescription = label, tint = radarColors().onAccent, modifier = Modifier.size(10.dp))
+            Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(10.dp))
         }
     }
 }

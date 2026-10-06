@@ -1,6 +1,7 @@
 package com.cycling.rssradar.core.data.rsshub
 
 import android.content.Context
+import com.cycling.rssradar.core.domain.concurrency.quietCatching
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
 import com.cycling.rssradar.core.model.rsshub.CatalogSource
 import com.cycling.rssradar.core.model.rsshub.RouteCatalog
@@ -58,7 +59,7 @@ class RouteCatalogStore @Inject constructor(
      * @return 更新后的路由条数；失败时是异常（网络 / 解析 / 写入）。
      */
     suspend fun refresh(): Result<Int> = withContext(Dispatchers.IO) {
-        runCatching {
+        quietCatching {
             val remote = http.fetch(SOURCE_URL).use { stream -> decodeRemoteCatalog(stream) }
             val slim = RouteCatalogSlimmer.slim(remote, System.currentTimeMillis())
             require(slim.namespaces.isNotEmpty()) { "路由元数据为空" }

@@ -10,14 +10,23 @@ import kotlinx.serialization.Serializable
  * [FeedArticlesRoute] 为订阅源文章列表（从订阅源清单进入，单源浏览）。
  * Feed 操作底栏曾是 composable + ModalBottomSheet 目的地（ADR-0002 #31），
  * 已废弃：整页导航只为弹 sheet 没有必要，收回 SubscriptionsScreen 内联承载。
- * Group 对话框与加订阅抽屉都是纯弹层，不入路由（加订阅抽屉由
- * MainActivity 的局部布尔状态控制显隐，曾用 nav 目的地承载，已废弃）。
+ * Group 对话框是纯弹层，不入路由。
+ * 加订阅（[AddSubscriptionRoute]）2026-10-05 由 ModalBottomSheet 改回独立页面：
+ * 抽屉最高只到 92%，键盘顶起后路由目录与参数表单全挤在窄条里，而加订阅虽低频却要填表单，
+ * 全屏才够用。外部分享链接的预填改由 MainActivity 的一次性状态传入，不走路由参数——
+ * 导航对 String 参数需要编码处理，全仓没有先例，不值得为一条预填引入。
  *
  * NavHost 与各目的地的装配见后续提交。
  */
 @Serializable data object FeedRoute
 
 @Serializable data object SubscriptionsRoute
+
+/**
+ * 添加订阅（RSSHub 路由目录 → 填参数两步同页）。
+ * 入口：订阅管理的「+」、信息流空态、系统分享/选中文字。
+ */
+@Serializable data object AddSubscriptionRoute
 
 @Serializable data object SearchRoute
 

@@ -88,6 +88,22 @@ material3 锁 `1.5.0-alpha28`（Expressive 组件的唯一来源；1.4.0 只有�
 升级 material3 若默认高度变了，必须回来核对 `TabBarClearance`——**编译期查不出**，
 症状是列表最后一条内容被导航栏压住。涉及 `FeedListScreen`、`SearchScreen`、`SubscriptionsScreen`、`RssHubSettingsScreen`。
 
+### 5. 圆角容器上的涟漪必须显式 clip
+
+`clickable` 写在传给 `Surface` / `Card` 的 `modifier` 参数里时，它位于 M3 `Modifier.surface()`
+**之前**，也就是圆角裁剪之外——涟漪按矩形画，四角溢出（2026-10-05 全仓扫出 17 处，含首页
+「全部 / 未读」chip、设置跳转卡片、订阅行、搜索历史 chip）。正确写法是在 `clickable` 之前补
+`.clip(同一形状)`：官方 `Modifier.surface()` 末尾本来就是 `clip(shape)`，补上即与其结构一致，
+视觉只改涟漪形状、布局零位移。
+
+**为什么不是直接换官方 `Surface(onClick = …)`**：M3 三个可点击重载都会加
+`minimumInteractiveComponentSize()`（源码 `Surface.kt:225/359/494`），即强制 48dp 触摸目标。
+本仓 chip 只高约 28dp、不少卡片约 44dp，一换就整体长高。判定规则：**紧凑控件补 `clip`；
+天然 ≥48dp 且不需要长按的卡片才换 `Surface(onClick = …)`**（要长按只能用 `combinedClickable`，
+官方没有对应重载）。
+
+扫描脚本 `.scratch/scan-ripple-clip.py`（只报不改）：新增可点圆角容器后跑一遍，应报 0。
+
 ## 五、避坑清单（本项目已踩）
 
 - Coil 3 必须加 `coil-network-okhttp`，否则网络图全空白（封面空白根因）。

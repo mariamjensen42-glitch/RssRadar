@@ -27,6 +27,7 @@
     <string name="fetch_empty_body">Response body was empty</string>
     <string name="fetch_decode_error">Failed to decode content</string>
     <string name="fetch_extract_failed">Body extraction failed</string>
+    <string name="fetch_not_html">Response is not a web page</string>
     <string name="issue_site_limit">Site restriction or dynamic loading</string>
     <string name="issue_too_short">Body too short</string>
     <string name="issue_no_paragraph">No body paragraphs found</string>

@@ -31,7 +31,10 @@ data class AiArtifactDetail(
 
 
 data class AiArtifactsUiState(
+    /** 首次加载：此时页面上还没有任何内容，等待期内不该谎报「没有产物」。 */
     val loading: Boolean = true,
+    /** 已有内容时的后台重查（切筛选 / 手动刷新 / 删除后）：旧内容留在原地，只转顶栏图标。 */
+    val refreshing: Boolean = false,
     /** 按功能聚合的概览，筛选用的功能条由它得出。 */
     val groups: List<AiArtifactGroup> = emptyList(),
     val items: List<AiArtifactItem> = emptyList(),
@@ -75,34 +78,48 @@ class AiArtifactsViewModel @Inject constructor(
     val state: StateFlow<AiArtifactsUiState> = _state.asStateFlow()
 
     init {
-        refresh()
+        load()
     }
 
     fun onIntent(intent: AiArtifactsIntent) {
         when (intent) {
             is AiArtifactsIntent.SelectKind -> {
                 if (_state.value.selectedKind == intent.kind) return
-                _state.update { it.copy(selectedKind = intent.kind) }
-                refresh()
+                load(intent.kind)
             }
 
             is AiArtifactsIntent.OpenDetail -> openDetail(intent.item)
             AiArtifactsIntent.DismissDetail -> _state.update { it.copy(detail = null) }
 
             is AiArtifactsIntent.Delete -> delete(intent.item)
-            AiArtifactsIntent.Refresh -> refresh()
+            AiArtifactsIntent.Refresh -> load()
             AiArtifactsIntent.ConsumeMessage -> _state.update { it.copy(message = null) }
         }
     }
 
-    private fun refresh() {
+    /**
+     * 查询概览与列表，并把选中项与结果**一次提交**。
+     *
+     * 三条刻意约束：
+     * 1. 选中项跟着结果一起 update——先改 chip 再查会漏出「新 chip + 旧列表」的一帧。
+     * 2. 只有首次加载走整屏等待。之后的每次重查都保留旧内容（`refreshing` 只驱动顶栏图标），
+     *    因为这是本地 Room 查询，几十毫秒内就换掉列表，整屏 spinner 只会闪一下。
+     * 3. 概览与列表分开查：概览要全部功能的计数，列表受当前筛选影响。
+     */
+    private fun load(kind: Int? = _state.value.selectedKind) {
         viewModelScope.launch {
-            _state.update { it.copy(loading = true) }
-            val kind = _state.value.selectedKind
-            // 概览与列表分开查：概览要全部功能的计数，列表受当前筛选影响。
+            if (!_state.value.loading) _state.update { it.copy(refreshing = true) }
             val groups = quiet(emptyList()) { artifacts.overview() }
             val items = quiet(emptyList()) { artifacts.browse(kind = kind) }
-            _state.update { it.copy(loading = false, groups = groups, items = items) }
+            _state.update {
+                it.copy(
+                    loading = false,
+                    refreshing = false,
+                    groups = groups,
+                    items = items,
+                    selectedKind = kind,
+                )
+            }
         }
     }
 
@@ -152,7 +169,7 @@ class AiArtifactsViewModel @Inject constructor(
             // 删掉的正是当前打开的这条时，面板要一起关，否则会停在一个已不存在的数据上。
             val wasOpen = _state.value.detail?.item === item
             if (wasOpen) _state.update { it.copy(detail = null) }
-            refresh()
+            load()
         }
     }
 }

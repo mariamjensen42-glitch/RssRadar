@@ -24,7 +24,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,7 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -45,6 +44,7 @@ import com.cycling.rssradar.core.model.AiFeature
 import com.cycling.rssradar.core.ui.theme.radarColors
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
 
 /**
  * 阅读页的 AI 面板：触发按钮 + 已生成产物的展示 + 文章问答。
@@ -239,7 +239,9 @@ private fun FeatureButtonGrid(
             Surface(
                 shape = RoundedCornerShape(50),
                 color = bg,
-                modifier = Modifier.clickable(enabled = !busy) { onRun(feature) },
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .clickable(enabled = !busy) { onRun(feature) },
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
@@ -320,15 +322,7 @@ private fun QuestionBar(
             },
             maxLines = 3,
             shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = colors.surface2,
-                unfocusedContainerColor = colors.surface2,
-                focusedBorderColor = colors.accent,
-                unfocusedBorderColor = Color.Transparent,
-                focusedTextColor = colors.textPrimary,
-                unfocusedTextColor = colors.textPrimary,
-                cursorColor = colors.accent,
-            ),
+            colors = radarOutlinedTextFieldColors(),
         )
         Spacer(Modifier.width(8.dp))
         TextButton(enabled = !askRunning, onClick = onAsk) {

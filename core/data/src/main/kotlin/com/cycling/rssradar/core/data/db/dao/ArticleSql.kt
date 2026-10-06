@@ -47,8 +47,10 @@ internal const val GROUP_FILTER_PREDICATE_NULLABLE =
     "(:group IS NULL OR (feeds.groupName = :group OR (:isDefaultGroup = 1 AND feeds.groupName = '')))"
 
 /**
- * 内容分区（issue #75）的 WHERE 片段：选中分区时按 feeds.contentType 过滤。
- * 「全部」分区 = :contentType 传 null，谓词恒真，不加过滤开销（与分组谓词同一思路）。
+ * 内容分区（issue #75）的 WHERE 片段：按 feeds.contentType 过滤。
+ * 保留 :contentType 可空（传 null 时谓词恒真）是因为仓库层是通用入口、别处仍可能传 null；
+ * **UI 侧已不含「不过滤」那一档** —— 2026-10-06 用「文章」替掉「全部」，四个分区各自都带
+ * 确定的类型值，所以首页这条查询总会带上这个条件、拿不到空短路的省。
  * 绑定参数由仓库层从 UI 枚举换算（ContentTypeFilter.dbValue），DAO 不依赖 UI 类型。
  */
 internal const val CONTENT_TYPE_FILTER_PREDICATE =

@@ -6,7 +6,7 @@
     <string name="add_feed_success">Subscribed</string>
     <string name="cd_cover">Cover thumbnail</string>
     <string name="cd_selected">Selected</string>
-    <string name="content_type">Content type</string>
+    <string name="ctype_article">Articles</string>
     <string name="ctype_audio">Audio</string>
     <string name="ctype_empty_desc">Subscribe to %1$s feeds and they\'ll gather here</string>
     <string name="ctype_empty_title">Nothing in the "%1$s" section yet</string>
@@ -43,7 +43,6 @@
     <string name="feed_refresh_failed">Refresh failed — showing what was loaded before</string>
     <string name="feed_refreshed">Updated %1$s feed(s)</string>
     <string name="filter_all">All</string>
-    <string name="filter_title">Filter</string>
     <string name="group_filter">Group filter</string>
     <string name="group_filter_active">Group filter · on</string>
     <string name="group_title">Group</string>
@@ -78,7 +77,7 @@
     <string name="view_mode_title">Layout</string>
     <string name="view_mode_value">Layout · %1$s</string>
     <string name="vm_card_desc">Cards with a thumbnail on the right</string>
-    <string name="vm_grid_desc">Grid: column count adapts to screen width</string>
+    <string name="vm_grid_desc">Staggered grid: heights follow each cover</string>
     <string name="vm_list_desc">Single column: title + summary</string>
     <string name="vm_magazine_desc">Magazine: the first item gets a large image</string>
     <string name="weekday_1">Mon</string>

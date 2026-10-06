@@ -22,8 +22,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.cycling.rssradar.core.ui.theme.RssRadarTheme
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -45,17 +49,38 @@ import com.cycling.rssradar.core.ui.theme.LocalListDisplay
 
 @Composable
 
-fun FeedListScreen(
-    viewModel: FeedListViewModel,
+fun FeedListDestination(
     onOpenSearch: () -> Unit = {},
     onOpenArticle: (ArticleWithFeed) -> Unit = {},
     /** 空态「添加订阅源」直达入口（新用户第一分钟不该被卡在找入口上）。 */
     onAddFeed: () -> Unit = {},
     /** 新用户空态「导入 OPML」入口：跳订阅页（SAF 入口在订阅页顶栏菜单）。 */
     onOpenSubscriptions: () -> Unit = {},
+    viewModel: FeedListViewModel = hiltViewModel(),
 ) {
     // MVI 候选 C（ADR-0003）：单一 UiState 快照驱动渲染
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    FeedListScreen(
+        uiState = uiState,
+        onOpenSearch = onOpenSearch,
+        onOpenArticle = onOpenArticle,
+        onAddFeed = onAddFeed,
+        onOpenSubscriptions = onOpenSubscriptions,
+        onIntent = viewModel::onIntent,
+    )
+}
+
+@Composable
+fun FeedListScreen(
+    uiState: FeedListUiState,
+    onOpenSearch: () -> Unit = {},
+    onOpenArticle: (ArticleWithFeed) -> Unit = {},
+    /** 空态「添加订阅源」直达入口（新用户第一分钟不该被卡在找入口上）。 */
+    onAddFeed: () -> Unit = {},
+    /** 新用户空态「导入 OPML」入口：跳订阅页（SAF 入口在订阅页顶栏菜单）。 */
+    onOpenSubscriptions: () -> Unit = {},
+    onIntent: (FeedListIntent) -> Unit = {},
+) {
     val groupOptions = uiState.groupOptions
     val unreadCount = uiState.unreadCount
     val recommendationEnabled = uiState.recommendationEnabled
@@ -73,7 +98,7 @@ fun FeedListScreen(
     LaunchedEffect(message) {
         message?.let {
             snackbarHostState.showSnackbar(it.resolve(context))
-            viewModel.onIntent(FeedListIntent.ConsumeMessage)
+            onIntent(FeedListIntent.ConsumeMessage)
         }
     }
 
@@ -91,8 +116,8 @@ fun FeedListScreen(
                 duration = SnackbarDuration.Short,
             )
             when (result) {
-                SnackbarResult.ActionPerformed -> viewModel.onIntent(FeedListIntent.UndoReduceSuch)
-                SnackbarResult.Dismissed -> viewModel.onIntent(FeedListIntent.DiscardUndoReduce)
+                SnackbarResult.ActionPerformed -> onIntent(FeedListIntent.UndoReduceSuch)
+                SnackbarResult.Dismissed -> onIntent(FeedListIntent.DiscardUndoReduce)
             }
         }
     }
@@ -108,8 +133,8 @@ fun FeedListScreen(
                 duration = SnackbarDuration.Short,
             )
             when (result) {
-                SnackbarResult.ActionPerformed -> viewModel.onIntent(FeedListIntent.UndoDeleteArticle)
-                SnackbarResult.Dismissed -> viewModel.onIntent(FeedListIntent.DiscardUndo)
+                SnackbarResult.ActionPerformed -> onIntent(FeedListIntent.UndoDeleteArticle)
+                SnackbarResult.Dismissed -> onIntent(FeedListIntent.DiscardUndo)
             }
         }
     }
@@ -128,8 +153,13 @@ fun FeedListScreen(
                 onMarkAllRead = { showMarkReadSheet = true },
                 onOpenViewMode = { showViewModeSheet = true },
                 viewMode = viewMode,
-                // 分组或内容类型任一生效即亮点（内容类型已收进筛选弹层，首页不再常驻一行 chip）
-                filterActive = uiState.selectedGroup != null || uiState.selectedContentType != ContentTypeFilter.All,
+                // 只判分组：内容类型已常驻首页一行且选中态自明，不必再借 ⋮ 菜单里的一行文案提示
+                filterActive = uiState.selectedGroup != null,
+                selectedTab = uiState.selectedTab,
+                unreadCount = unreadCount,
+                // 推荐流开关（ADR-0013）：关掉就不渲染「推荐」
+                tabs = if (recommendationEnabled) FeedTab.entries else FeedTab.entries.filter { it != FeedTab.Recommended },
+                onSelectTab = { onIntent(FeedListIntent.SelectTab(it)) },
             )
         },
     ) { padding ->
@@ -138,12 +168,9 @@ fun FeedListScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            FeedListTabRow(
-                selected = uiState.selectedTab,
-                unreadCount = unreadCount,
-                // 推荐流开关（ADR-0013）：关掉就不渲染「推荐」tab
-                tabs = if (recommendationEnabled) FeedTab.entries else FeedTab.entries.filter { it != FeedTab.Recommended },
-                onSelect = { viewModel.onIntent(FeedListIntent.SelectTab(it)) },
+            ContentTypeFilterRow(
+                selected = uiState.selectedContentType,
+                onSelect = { onIntent(FeedListIntent.SelectContentType(it)) },
             )
             // 刷新进度（真机反馈缺口）：708 源全量刷新可达数十分钟，
             // 一个孤零零的转圈分不清「在跑」还是「卡死」——细进度条 + 计数，不抢一整行
@@ -168,7 +195,7 @@ fun FeedListScreen(
             Spacer(Modifier.height(4.dp))
             PullToRefreshBox(
                 isRefreshing = uiState.isRefreshing,
-                onRefresh = { viewModel.onIntent(FeedListIntent.Refresh) },
+                onRefresh = { onIntent(FeedListIntent.Refresh) },
                 modifier = Modifier.fillMaxSize(),
             ) {
                 if (uiState.isRanking) {
@@ -187,37 +214,46 @@ fun FeedListScreen(
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
-                    ArticleCardList(
-                        articles = currentList,
-                        onArticleClick = { item ->
-                            viewModel.onIntent(FeedListIntent.MarkRead(item.article.id))
-                            onOpenArticle(item)
-                        },
-                        onToggleRead = { id, read ->
-                            viewModel.onIntent(FeedListIntent.SetRead(id, read))
-                        },
-                        onToggleStarred = { id ->
-                            viewModel.onIntent(FeedListIntent.ToggleStarred(id))
-                        },
-                        onToggleBookmarked = { id ->
-                            viewModel.onIntent(FeedListIntent.ToggleBookmarked(id))
-                        },
-                        onDelete = { id ->
-                            viewModel.onIntent(FeedListIntent.DeleteArticle(id))
-                        },
-                        // 推荐 tab 才有「减少此类」：只有这里的排序由画像决定
-                        onReduceSuch = if (uiState.selectedTab == FeedTab.Recommended) {
-                            { id -> viewModel.onIntent(FeedListIntent.ReduceSuch(id)) }
-                        } else {
-                            null
-                        },
-                        // 各 tab 均分页；滚动到底自动加载下一页
-                        onScrolledToEnd = { viewModel.onIntent(FeedListIntent.LoadMore) },
-                        markReadPassed = { ids ->
-                            viewModel.onIntent(FeedListIntent.MarkReadPassed(ids))
-                        },
-                        totalCount = uiState.totalCount,
-                    )
+                    /**
+                     * 换筛选 = 整份列表换人，所以按筛选身份建 key 让 LazyColumn 整体重建，
+                     * 而不是按 item key 逐项增删：后者会把被移除的卡片留在原位淡出
+                     * （animateItem 的 fadeOut 本是给单篇删除用的），与瞬时上移的卡片
+                     * 叠出一层重影——切 tab 时那一闪就是这么来的。重建顺带把滚动位置
+                     * 归零，免得停在上一个筛选的深度上（新列表更短时会被夹到末尾，像跳了一下）。
+                     */
+                    key(uiState.selectedTab, uiState.selectedGroup, uiState.selectedContentType) {
+                        ArticleCardList(
+                            articles = currentList,
+                            onArticleClick = { item ->
+                                onIntent(FeedListIntent.MarkRead(item.article.id))
+                                onOpenArticle(item)
+                            },
+                            onToggleRead = { id, read ->
+                                onIntent(FeedListIntent.SetRead(id, read))
+                            },
+                            onToggleStarred = { id ->
+                                onIntent(FeedListIntent.ToggleStarred(id))
+                            },
+                            onToggleBookmarked = { id ->
+                                onIntent(FeedListIntent.ToggleBookmarked(id))
+                            },
+                            onDelete = { id ->
+                                onIntent(FeedListIntent.DeleteArticle(id))
+                            },
+                            // 推荐 tab 才有「减少此类」：只有这里的排序由画像决定
+                            onReduceSuch = if (uiState.selectedTab == FeedTab.Recommended) {
+                                { id -> onIntent(FeedListIntent.ReduceSuch(id)) }
+                            } else {
+                                null
+                            },
+                            // 各 tab 均分页；滚动到底自动加载下一页
+                            onScrolledToEnd = { onIntent(FeedListIntent.LoadMore) },
+                            markReadPassed = { ids ->
+                                onIntent(FeedListIntent.MarkReadPassed(ids))
+                            },
+                            totalCount = uiState.totalCount,
+                        )
+                    }
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -241,10 +277,8 @@ fun FeedListScreen(
         GroupFilterSheet(
             groups = groupOptions,
             selected = uiState.selectedGroup,
-            contentType = uiState.selectedContentType,
-            onSelectContentType = { viewModel.onIntent(FeedListIntent.SelectContentType(it)) },
             onSelect = { group ->
-                viewModel.onIntent(FeedListIntent.SelectGroup(group))
+                onIntent(FeedListIntent.SelectGroup(group))
                 showGroupSheet = false
             },
             onDismiss = { showGroupSheet = false },
@@ -268,7 +302,7 @@ fun FeedListScreen(
             selected = viewMode,
             label = { viewModeLabels.getValue(it) },
             subtitle = { viewModeSubtitles.getValue(it) },
-            onSelect = { mode -> viewModel.onIntent(FeedListIntent.SetViewMode(mode)) },
+            onSelect = { mode -> onIntent(FeedListIntent.SetViewMode(mode)) },
             onDismiss = { showViewModeSheet = false },
         )
     }
@@ -289,8 +323,25 @@ fun FeedListScreen(
             selected = null,
             label = { markReadLabels.getValue(it) },
             subtitle = { markReadSubtitles.getValue(it) },
-            onSelect = { condition -> viewModel.onIntent(FeedListIntent.MarkAllRead(condition)) },
+            onSelect = { condition -> onIntent(FeedListIntent.MarkAllRead(condition)) },
             onDismiss = { showMarkReadSheet = false },
         )
+    }
+}
+
+
+@Preview(showBackground = true, name = "信息流 · 首屏未加载")
+@Composable
+private fun FeedListScreenFirstLoadPreview() {
+    RssRadarTheme(darkTheme = false) {
+        FeedListScreen(uiState = FeedListUiState())
+    }
+}
+
+@Preview(showBackground = true, name = "信息流 · 深色空态")
+@Composable
+private fun FeedListScreenDarkPreview() {
+    RssRadarTheme(darkTheme = true) {
+        FeedListScreen(uiState = FeedListUiState(isFirstLoad = false))
     }
 }

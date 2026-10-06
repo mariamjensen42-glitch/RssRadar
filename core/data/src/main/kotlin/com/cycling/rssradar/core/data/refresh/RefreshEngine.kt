@@ -31,6 +31,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicInteger
 import com.cycling.rssradar.core.data.qualify.ContentQualification
+import com.cycling.rssradar.core.data.parser.FeedUrlResolver
 
 /**
  * 刷新子系统深模块（深化自原 FeedRepository）：订阅源刷新的全部规则都沉在这里，
@@ -144,7 +145,7 @@ class RefreshEngine(
      * 失败抛 [IllegalArgumentException]（非法 feed）或 [IOException]（网络），调用方转 UI 提示。
      */
     suspend fun fetchAndParse(url: String): RssParser.ParsedFeed = withContext(ioDispatcher) {
-        http.fetch(url).use { parser.parse(it) }
+        http.fetch(url).use { parser.parse(it) }.let { FeedUrlResolver.resolveFeed(it, url) }
     }
 
     /**
@@ -340,7 +341,16 @@ class RefreshEngine(
         if (articles.isEmpty()) return
         transactionRunner.inTransaction {
             // 一次查询建 link→id 映射，替代逐篇 findIdByLink（#48：消除 N+1 写放大）
-            val existing = articleDao.getIdLinkPairsByFeed(feedId).associate { it.link to it.id }
+            // 相对链接按 feed 地址归一化后再比对：库里可能存着旧版本原样落库的相对 link，
+            // 匹配侧不归一化就会把同一篇文章当成新文章再插一遍（必应每日壁纸就是相对 link）。
+            // 链接本来就是绝对的源（绝大多数）拿到的 base 是空串，absolutize 恒等、行为不变。
+            val base = if (articles.any { !it.link.startsWith("http") }) {
+                feedDao.getById(feedId)?.url.orEmpty()
+            } else {
+                ""
+            }
+            val existing = articleDao.getIdLinkPairsByFeed(feedId)
+                .associate { FeedUrlResolver.absolutize(it.link, base) to it.id }
             // 墓碑过滤（归档/清空真删的文章）：feed XML 还挂着它们，不跳过就会「删了又回来」
             val tombstoned = articleDao.getTombstonedLinks(feedId).toHashSet()
             // 过滤规则只对新文章生效（已在库的文章不动用户状态），规则整源取一次
@@ -358,7 +368,7 @@ class RefreshEngine(
                     article.contentHtml,
                     article.contentText,
                 )
-                val existingId = existing[article.link]
+                val existingId = existing[FeedUrlResolver.absolutize(article.link, base)]
                 if (existingId == null) {
                     // 规则命中的动作在**入库时**一次落定：已读/加星/加稍后读直接写进实体，
                     // 隐藏则整篇不入库。不写墓碑——规则是声明式的，删掉规则就该能正常入库，
@@ -400,6 +410,7 @@ class RefreshEngine(
                 } else {
                     articleDao.updateContentState(
                         id = existingId,
+                        link = article.link,
                         title = article.title,
                         summary = article.summary,
                         content = article.contentHtml,

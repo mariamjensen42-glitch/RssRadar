@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -36,7 +37,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,6 +46,7 @@ import coil3.request.ImageRequest
 import com.cycling.rssradar.core.model.ReadingImageState
 import com.cycling.rssradar.core.model.ReadingStyleState
 import com.cycling.rssradar.core.ui.components.ShimmerOverlay
+import com.cycling.rssradar.core.ui.components.rememberImageLoadState
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.crossfadeMotion
 import com.cycling.rssradar.core.ui.theme.radarColors
@@ -56,6 +57,35 @@ internal const val BLOCK_GAP_DP = 12
 
 /** 图片显示高度上限（dp），与 NodeImage 的 heightIn 同源。 */
 private const val IMAGE_MAX_HEIGHT_DP = 4000
+
+/**
+ * 图片 HTML 未声明尺寸时的占位高度。
+ *
+ * 比例无从预知，只能垫固定一块——这类图加载完仍会有位移，是占位方案的固有代价。
+ * 声明了尺寸的图走 [imagePlaceholderSize]：占位高度与真图一致，加载完成不产生位移。
+ */
+private const val IMAGE_PLACEHOLDER_HEIGHT_DP = 220
+
+/**
+ * 加载中占位块的尺寸。
+ *
+ * 声明了原始像素尺寸的图按比例撑开，占位高度 = 真图高度 ⇒ 整段内容不上下跳；
+ * 没声明（或声明残缺）的退回固定高度。
+ *
+ * 这只约束**占位块**，不碰真图自身的尺寸约束：`<img>` 声明的尺寸偶尔与实物不符
+ * （响应式图常见），拿它去卡真图会裁切或留白。
+ */
+private fun imagePlaceholderSize(node: NodeImage): Modifier {
+    val w = node.width
+    val h = node.height
+    return if (w != null && h != null && h > 0) {
+        Modifier
+            .aspectRatio(w.toFloat() / h)
+            .heightIn(max = IMAGE_MAX_HEIGHT_DP.dp)
+    } else {
+        Modifier.height(IMAGE_PLACEHOLDER_HEIGHT_DP.dp)
+    }
+}
 
 // ———————————————————————————————————————————————
 // 图片解码防线
@@ -205,9 +235,11 @@ internal fun RenderNode(
                 LocalConfiguration.current.screenWidthDp.dp.roundToPx()
             }
             val maxHeightPx = with(LocalDensity.current) { IMAGE_MAX_HEIGHT_DP.dp.roundToPx() }
-            // 加载态驱动 shimmer 占位：图片高度未知，加载中先垫一块固定高度扫光，
-            // 成功后替换成真图（高度跳变是加载占位的固有代价，好过空白后突然弹出）
-            var imageLoading by remember(node.src) { mutableStateOf(true) }
+            // 加载态驱动 shimmer 占位：声明了尺寸的图按比例撑开（占位与真图等高，加载完不跳），
+            // 没声明的只能垫固定高度（那种图加载完仍会有位移）。
+            // 判定收敛到 ImageLoadState：正文按需抓取完成后整篇重建，图片节点会跟着重新请求，
+            // 而 shimmer 是不透明底 —— 回退一次就把已显示的图整块盖住（「一闪又没了」的成因）。
+            val imageLoadState = rememberImageLoadState(node.src)
             val model = remember(node.src, screenWidthPx, maxHeightPx, reducedMotion) {
                 ImageRequest.Builder(context)
                     .data(node.src)
@@ -221,26 +253,25 @@ internal fun RenderNode(
                     model = model,
                     contentDescription = node.alt,
                     contentScale = ContentScale.FillWidth,
-                    onState = { state ->
-                        imageLoading = state is AsyncImagePainter.State.Empty ||
-                            state is AsyncImagePainter.State.Loading
-                    },
+                    onState = imageLoadState::onState,
                     modifier = Modifier
                         .fillMaxWidth()
                         // 极端长图（1×N 像素的追踪图/长条图）会把整屏撑爆，给个上限
                         .heightIn(max = 4000.dp)
+                        // 块间距必须留在 clip 之外：padding 落在裁剪内层时，图片底边被推离
+                        // 圆角区，会变成只有上面两角圆、下面两角直角
+                        .padding(bottom = bottomPadding)
                         .clip(RoundedCornerShape(image.cornerRadius.dp))
                         .then(formulaBg)
-                        .then(click)
-                        .padding(bottom = bottomPadding),
+                        .then(click),
                 )
-                if (imageLoading && !reducedMotion) {
+                if (imageLoadState.loading && !reducedMotion) {
                     ShimmerOverlay(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(220.dp)
-                            .clip(RoundedCornerShape(image.cornerRadius.dp))
-                            .padding(bottom = bottomPadding),
+                            .then(imagePlaceholderSize(node))
+                            .padding(bottom = bottomPadding)
+                            .clip(RoundedCornerShape(image.cornerRadius.dp)),
                     )
                 }
             }
@@ -347,33 +378,9 @@ internal fun RenderNode(
                 }
             }
         }
-        is NodeMediaCard -> {
-            Surface(
-                color = radarColors().surface2,
-                shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, radarColors().divider),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onLinkClick(node.url) }
-                    .padding(bottom = bottomPadding),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(12.dp),
-                ) {
-                    Text("▶", color = radarColors().accent, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = node.label,
-                        color = radarColors().textPrimary,
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-        }
+        // 正文媒体（ADR-0018）：直链 video/audio 内嵌播放，iframe 保持外跳卡。
+        // 分派全在 InlineMediaNode 里，这里只透传块间距与外链出口。
+        is NodeMediaCard -> InlineMediaNode(node, onLinkClick, bottomPadding)
         is NodeTable -> {
             if (node.rows.isNotEmpty()) {
                 Box(

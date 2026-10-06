@@ -16,7 +16,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -34,28 +34,39 @@ import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
 import com.cycling.rssradar.core.ui.theme.Danger
 import com.composables.icons.lucide.Eraser
+import com.composables.icons.lucide.FolderX
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Trash2
 import com.cycling.rssradar.core.ui.theme.radarColors
-
+import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
 
 /**
- * 分组操作底栏（issue #8）：重命名 / 清空分组文章 / 删除分组。
+ * 分组操作底栏（issue #8）：重命名 / 清空分组文章 / 删除分组内全部订阅 / 删除分组。
+ *
+ * 四条动作的语义各不相同，文案里必须说清删的是什么：
+ * - 清空文章：保源、保分组，只删文章；
+ * - 删除分组内全部订阅：删源（文章级联），**分组保留**；
+ * - 删除分组：**只把订阅移进默认分组**，一个都不删。
  *
  * 与 [FeedActionScreen] 同一套形态（composable + ModalBottomSheet，ADR-0002 #31）：
  * 纯弹层不进导航栈，关闭统一走 onDismiss。
- * 清空与删除都要二次确认——清空删的是文章，删除动的是订阅归属，均无撤销。
+ * 除重命名外都要二次确认——它们动的分别是文章、订阅源、订阅归属，均无撤销。
+ *
+ * [feedCount] 由调用方按当前分组现算（列表状态派生），用于如实报出影响范围、
+ * 并在空分组时**整个隐藏**「删除全部订阅」——没有意义的按钮不该存在。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GroupActionSheet(
     group: String,
+    feedCount: Int,
     viewModel: SubscriptionsViewModel,
     onDismiss: () -> Unit,
 ) {
     var renameTarget by remember { mutableStateOf<String?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
+    var confirmDeleteFeeds by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
@@ -77,13 +88,25 @@ fun GroupActionSheet(
                 title = "重命名分组",
                 onClick = { renameTarget = group },
             )
-            Spacer(Modifier.height(8.dp))
-            ActionRow(
-                icon = { Icon(Lucide.Eraser, contentDescription = null, tint = radarColors().textSecondary, modifier = Modifier.size(18.dp)) },
-                title = "清空分组文章",
-                subtitle = "删除本组所有订阅的文章，收藏与稍后读保留",
-                onClick = { confirmClear = true },
-            )
+            // 空分组时下面两条整块不出现：没有订阅源就没有文章可清，
+            // "删除 0 个"的按钮没有意义（UI 铁律）。两条一起门禁，不留一条在一条不在。
+            if (feedCount > 0) {
+                Spacer(Modifier.height(8.dp))
+                ActionRow(
+                    icon = { Icon(Lucide.Eraser, contentDescription = null, tint = radarColors().textSecondary, modifier = Modifier.size(18.dp)) },
+                    title = "清空分组文章",
+                    subtitle = "删除本组所有订阅的文章，收藏与稍后读保留",
+                    onClick = { confirmClear = true },
+                )
+                Spacer(Modifier.height(8.dp))
+                ActionRow(
+                    icon = { Icon(Lucide.FolderX, contentDescription = null, tint = Danger, modifier = Modifier.size(18.dp)) },
+                    title = "删除分组内全部订阅",
+                    subtitle = "删除本组 $feedCount 个订阅源及其文章，分组保留",
+                    titleColor = Danger,
+                    onClick = { confirmDeleteFeeds = true },
+                )
+            }
             // 默认分组是 feed 的兜底归属，删掉它没有语义
             if (group != DEFAULT_GROUP) {
                 Spacer(Modifier.height(8.dp))
@@ -117,15 +140,7 @@ fun GroupActionSheet(
                     value = value,
                     onValueChange = { value = it },
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = radarColors().surface2,
-                        unfocusedContainerColor = radarColors().surface2,
-                        focusedBorderColor = radarColors().accent,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedTextColor = radarColors().textPrimary,
-                        unfocusedTextColor = radarColors().textPrimary,
-                        cursorColor = radarColors().accent,
-                    ),
+                    colors = radarOutlinedTextFieldColors(),
                 )
             },
             confirmButton = {
@@ -159,6 +174,20 @@ fun GroupActionSheet(
         )
     }
 
+    if (confirmDeleteFeeds) {
+        ConfirmDialog(
+            title = "删除分组内全部订阅",
+            text = "将删除「$group」下的 $feedCount 个订阅源及其全部文章，此操作不可撤销。",
+            confirmText = "全部删除",
+            onDismiss = { confirmDeleteFeeds = false },
+            onConfirm = {
+                viewModel.onIntent(SubscriptionsIntent.DeleteGroupFeeds(group))
+                confirmDeleteFeeds = false
+                onDismiss()
+            },
+        )
+    }
+
     if (confirmDelete) {
         ConfirmDialog(
             title = "删除分组",
@@ -187,6 +216,7 @@ private fun ActionRow(
         color = radarColors().surface2,
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
     ) {
         Row(

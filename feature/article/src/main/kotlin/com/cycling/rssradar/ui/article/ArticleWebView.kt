@@ -36,6 +36,14 @@ private class WebViewRestoreState {
 }
 
 /**
+ * 到顶 / 到底请求的已消费序号。按序号判重而不是按目标比值：连点两次「到底」时比值都是 1f，
+ * 按比值判重会把第二次当成重复请求吞掉。
+ */
+private class WebViewJumpState {
+    var consumedSeq = -1L
+}
+
+/**
  * 当前还能滚多少：内容总高（CSS px × 缩放）减去视口高。
  *
  * 不用 `computeVerticalScrollRange()/Extent()`——WebView 把它们标成了 protected，
@@ -92,6 +100,8 @@ internal fun ArticleWebView(
     onFindCount: (Int) -> Unit = {},
     /** 视口模式要恢复的阅读位置（比例）。整页模式不传——那时 WebView 自己不滚动。 */
     restoreRatio: Float? = null,
+    /** 到顶 / 到底的跳转请求。同样只对视口模式有意义：整页模式的滚动归外层 Compose。 */
+    jumpRequest: JumpRequest? = null,
 ) {
     // 颜色读自 radarColors()（CompositionLocal），主题切换自动重组
     val bg = toCssColor(radarColors().bgRoot)
@@ -127,6 +137,7 @@ internal fun ArticleWebView(
     val currentOnFindCount by rememberUpdatedState(onFindCount)
     val findState = remember { WebViewFindState() }
     val restoreState = remember { WebViewRestoreState() }
+    val jumpState = remember { WebViewJumpState() }
     // 闪烁修复（用户反馈）：AndroidView 的 update 在每次父重组时都会跑，而 ArticleWebView
     // 的父（ReadingBody）会因顶栏 showTitle 翻转而重组 → 不加守卫就会每帧 reload 整页 HTML。
     // 用非 State 容器记住"已加载的 HTML 串"，只有内容真变才 reload。
@@ -242,6 +253,12 @@ internal fun ArticleWebView(
                 webView.post { webView.restoreToRatio(restoreRatio) }
                 webView.postDelayed({ webView.restoreToRatio(restoreRatio) }, 300)
                 webView.postDelayed({ webView.restoreToRatio(restoreRatio) }, 900)
+            }
+            // 到顶 / 到底：复用 restoreToRatio（它就是「滚到全文的某个比例」）。
+            // 判重按 seq 而不是比值 —— 连点两次「到底」比值都是 1f，按比值判重会吞掉第二次。
+            if (jumpRequest != null && jumpState.consumedSeq != jumpRequest.seq) {
+                jumpState.consumedSeq = jumpRequest.seq
+                webView.post { webView.restoreToRatio(jumpRequest.ratio) }
             }
         },
         modifier = modifier,

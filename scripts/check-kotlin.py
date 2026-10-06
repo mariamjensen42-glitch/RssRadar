@@ -66,6 +66,7 @@ DEPS = [
     ("androidx.lifecycle", "lifecycle-runtime-android", ""),
     ("androidx.lifecycle", "lifecycle-viewmodel-android", ""),
     ("androidx.lifecycle", "lifecycle-viewmodel-compose-android", ""),
+    ("androidx.lifecycle", "lifecycle-runtime-compose-android", ""),
     ("androidx.lifecycle", "lifecycle-viewmodel-savedstate-android", ""),
     ("androidx.lifecycle", "lifecycle-common", ""),
     ("androidx.lifecycle", "lifecycle-common-jvm", ""),
@@ -151,6 +152,16 @@ DEPS = [
     ("com.google.guava", "guava", "33.3.1-android"),
     ("junit", "junit", "4"),
     ("org.hamcrest", "hamcrest-core", "1.3"),
+    # UI 测试（app/src/androidTest）：Compose 语义树定位 + AndroidX Test / Espresso 基础。
+    # 这些 jar 都在 gradle 缓存里（app 模块已声明 androidTestImplementation）。收进来之后
+    # check-kotlin.py 能给 UI 测试源码做类型检查，否则写错只能等 AS/CI 才发现。
+    ("androidx.compose.ui", "ui-test-junit4-android", COMPOSE_VERSION),
+    ("androidx.compose.ui", "ui-test-android", COMPOSE_VERSION),
+    ("androidx.test.ext", "junit", ""),
+    ("androidx.test.espresso", "espresso-core", ""),
+    ("androidx.test", "core", ""),
+    ("androidx.test", "monitor", ""),
+    ("androidx.test", "runner", ""),
 ]
 
 VERSION_DIR = re.compile(r"^\d+(\.\d+)*$")
@@ -408,6 +419,9 @@ def main() -> int:
             # 本地每次都「全绿」——core:model 的那几个此前一直没被收（2026-10-05 补上）。
             files += sources(ROOT / "core/model/src/test")
             files += sources(ROOT / "core/domain/src/test")
+            # UI 测试：Screen 已全部拆成纯 UI（只收 state + 回调 + 插槽），androidTest 里的
+            # createComposeRule 断言可以直接喂模拟状态。收进来做类型检查；运行仍需设备。
+            files += sources(ROOT / "app/src/androidTest/java")
 
     out = WORK / "out"
     # 不清空 out：全量删除会触发沙箱的批量删除保护（2000+ 文件）。

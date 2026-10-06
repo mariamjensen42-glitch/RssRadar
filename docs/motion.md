@@ -54,6 +54,7 @@
 
 - **订阅列表**：`animateItem()` 全量（增删 + placement），规格取 `effectsSpec()` / `spatialSpec()`。
 - **文章列表**：仅删除淡出（`effectsSpec()`），不加 placement——数万条列表的 placement 动画在低端机是帧率杀手。
+- **切换筛选（tab / 分组 / 内容分区）不做逐项过渡**：整份列表换人时按 item key 逐个增删，会把被移除的卡片留在原位淡出、与瞬时归位的卡片叠出重影。做法是列表按筛选身份建 key 整体重建（`FeedListScreen`），滚动位置一并归零；数据落地也必须与选中项同帧提交（`FeedListViewModel.applyFilter`），否则先落 chip 再异步重查会留下「新 chip + 旧列表」的中间帧。
 - **降级**：reduce-motion 时跳过动画，直接增删。
 
 ### 5. 弹层

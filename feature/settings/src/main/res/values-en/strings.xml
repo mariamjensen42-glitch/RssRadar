@@ -13,7 +13,7 @@
     <string name="ai_key_cleared">API key cleared</string>
     <string name="ai_key_saved">API key saved</string>
     <string name="ai_not_configured">Not configured</string>
-    <string name="annotations_entry_summary">Select text while reading to highlight it or add a note</string>
+    <string name="annotations_entry_summary">Highlight and annotate text</string>
     <string name="article_cleanup">Article cleanup</string>
     <string name="auto_probe">Probe for a working instance</string>
     <string name="auto_sync">Auto sync</string>
@@ -62,7 +62,7 @@
     <string name="language_follow_system">Follow system</string>
     <string name="language_subtitle">Display language of the interface, applied immediately</string>
     <string name="last_7_days">Last 7 days</string>
-    <string name="library_entry_summary">Sort by time or source, then tidy up in bulk</string>
+    <string name="library_entry_summary">Sort and tidy up in bulk</string>
     <string name="lightness">Lightness</string>
     <string name="link_share">Links &amp; sharing</string>
     <string name="link_share_desc">How external links open and what sharing includes. Share from the reader top bar.</string>
@@ -110,7 +110,7 @@
     <string name="rule_deleted">Deleted</string>
     <string name="rule_edit">Edit rule</string>
     <string name="rule_empty">No rules yet. Rules run automatically when feeds refresh.</string>
-    <string name="rule_entry_summary">Auto-handle articles by keyword or regex</string>
+    <string name="rule_entry_summary">Auto-handle matched articles</string>
     <string name="rule_field_author">Author</string>
     <string name="rule_field_content">Content</string>
     <string name="rule_field_summary">Summary</string>

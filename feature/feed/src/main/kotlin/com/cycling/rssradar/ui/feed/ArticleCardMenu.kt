@@ -32,7 +32,6 @@ import com.cycling.rssradar.core.ui.components.articleMenuOffset
 @Composable
 
 internal fun ArticleMenuBox(
-    itemCount: Int,
     actions: ArticleMenuActions,
     content: @Composable (() -> Unit) -> Unit,
 ) {
@@ -63,7 +62,7 @@ internal fun ArticleMenuBox(
                     pressPos = pressPos,
                     cardTopInWindowPx = cardTopInWindowPx,
                     cardHeightPx = cardHeightPx,
-                    menuItemCount = itemCount,
+                    menuItemCount = actions.itemCount,
                     windowHeightPx = windowHeightPx,
                     density = density,
                 )

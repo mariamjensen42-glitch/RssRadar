@@ -15,9 +15,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.model.rsshub.RouteCategory
 import com.cycling.rssradar.core.ui.theme.radarColors
 
@@ -69,7 +71,9 @@ internal fun FilterChipLight(label: String, selected: Boolean, onClick: () -> Un
     Surface(
         shape = RoundedCornerShape(50),
         color = if (selected) radarColors().accent else radarColors().surface2,
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .clickable(onClick = onClick),
     ) {
         Text(
             text = label,
@@ -90,6 +94,35 @@ internal fun GroupChips(
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { name ->
             FilterChipLight(label = name, selected = name == selected, onClick = { onSelect(name) })
+        }
+    }
+}
+
+/**
+ * 内容类型（ADR-0014）：决定这个源在列表里的浏览形态。
+ *
+ * [selected] 传 VM 的 `effectiveContentType`——用户没挑过时它等于地址预判的结果，
+ * 于是这里天然显示「这个源会被当成什么」，而不是一个凭空默认的「文章」。
+ */
+@Composable
+
+internal fun ContentTypeChips(
+    selected: Int,
+    onSelect: (Int) -> Unit,
+) {
+    val options = listOf(
+        FeedEntity.CONTENT_TYPE_ARTICLE to R.string.ctype_article,
+        FeedEntity.CONTENT_TYPE_IMAGE to R.string.ctype_image,
+        FeedEntity.CONTENT_TYPE_VIDEO to R.string.ctype_video,
+        FeedEntity.CONTENT_TYPE_AUDIO to R.string.ctype_audio,
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { (type, labelRes) ->
+            FilterChipLight(
+                label = stringResource(labelRes),
+                selected = type == selected,
+                onClick = { onSelect(type) },
+            )
         }
     }
 }

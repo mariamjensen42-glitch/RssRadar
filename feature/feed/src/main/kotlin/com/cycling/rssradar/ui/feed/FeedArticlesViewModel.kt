@@ -4,6 +4,10 @@ import com.cycling.rssradar.core.ui.text.UiText
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -35,6 +39,17 @@ sealed interface FeedArticlesIntent {
  * 单源全部文章的分页快照，管线与信息流完全一致（ADR-0006）：
  * LIMIT/OFFSET 每页 30 条、滚动到底预加载、卡片状态 mutateLocal 原地更新。
  */
+/**
+ * 订阅源文章列表的渲染输入快照，唯一产出点是 [FeedArticlesViewModel.uiState]。
+ */
+data class FeedArticlesUiState(
+    val feed: FeedEntity? = null,
+    val articles: List<ArticleWithFeed> = emptyList(),
+    val isLoadingMore: Boolean = false,
+    val isRefreshing: Boolean = false,
+    val uiMessage: UiText? = null,
+)
+
 @HiltViewModel
 class FeedArticlesViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -70,6 +85,23 @@ class FeedArticlesViewModel @Inject constructor(
         private set
 
     private var loadMoreJob: Job? = null
+
+    /**
+     * 订阅源文章列表的渲染输入快照，UI 只订阅这一条。
+     *
+     * 本 VM 的状态是 Compose `mutableStateOf`（快照感知），用 [snapshotFlow] 把它们桥接成
+     * 一条 StateFlow：既保留「赋值即触发」的写法，又满足「UI 从 StateFlow 收集状态」的契约。
+     * `hasMore` 是分页内部判据，Screen 不消费，故不进快照。
+     */
+    val uiState: StateFlow<FeedArticlesUiState> = snapshotFlow {
+        FeedArticlesUiState(
+            feed = feed,
+            articles = articles,
+            isLoadingMore = isLoadingMore,
+            isRefreshing = isRefreshing,
+            uiMessage = uiMessage,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FeedArticlesUiState())
 
     init {
         viewModelScope.launch {

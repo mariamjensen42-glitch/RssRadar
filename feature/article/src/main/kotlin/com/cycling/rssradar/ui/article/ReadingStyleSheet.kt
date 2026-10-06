@@ -20,7 +20,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -47,6 +46,7 @@ import com.cycling.rssradar.core.model.coerceLineHeight
 import com.cycling.rssradar.core.model.coercePadding
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.components.SyncedSlider
+import com.cycling.rssradar.core.ui.theme.radarSwitchColors
 import kotlin.math.roundToInt
 
 /**
@@ -121,6 +121,7 @@ internal fun ReadingStyleSheet(
                             color = if (selected) radarColors().accent else radarColors().surface2,
                             modifier = Modifier
                                 .weight(1f)
+                                .clip(RoundedCornerShape(50))
                                 .clickable { onPreferSummary(isSummary) },
                         ) {
                             Text(
@@ -159,6 +160,7 @@ internal fun ReadingStyleSheet(
                         color = if (selected) radarColors().accent else radarColors().surface2,
                         modifier = Modifier
                             .weight(1f)
+                            .clip(RoundedCornerShape(50))
                             .clickable { onReadingTheme(theme) },
                     ) {
                         Text(
@@ -195,6 +197,7 @@ internal fun ReadingStyleSheet(
                         color = if (selected) radarColors().accent else radarColors().surface2,
                         modifier = Modifier
                             .weight(1f)
+                            .clip(RoundedCornerShape(50))
                             .clickable { onRenderer(r) },
                     ) {
                         Text(
@@ -318,6 +321,7 @@ internal fun ReadingStyleSheet(
                         color = if (selected) radarColors().accent else radarColors().surface2,
                         modifier = Modifier
                             .weight(1f)
+                            .clip(RoundedCornerShape(50))
                             .clickable { onTextAlign(align) },
                     ) {
                         Text(
@@ -399,10 +403,7 @@ internal fun ReadingStyleSheet(
                 Switch(
                     checked = image.maximizeOnTap,
                     onCheckedChange = onImageMaximize,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = radarColors().onAccent,
-                        checkedTrackColor = radarColors().accent,
-                    ),
+                    colors = radarSwitchColors(),
                 )
             }
 
@@ -426,10 +427,7 @@ internal fun ReadingStyleSheet(
                 Switch(
                     checked = prefs.immersive,
                     onCheckedChange = onImmersive,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = radarColors().onAccent,
-                        checkedTrackColor = radarColors().accent,
-                    ),
+                    colors = radarSwitchColors(),
                 )
             }
 
@@ -456,10 +454,7 @@ internal fun ReadingStyleSheet(
                 Switch(
                     checked = autoHideBars,
                     onCheckedChange = onAutoHideBars,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = radarColors().onAccent,
-                        checkedTrackColor = radarColors().accent,
-                    ),
+                    colors = radarSwitchColors(),
                 )
             }
 
@@ -486,10 +481,7 @@ internal fun ReadingStyleSheet(
                 Switch(
                     checked = prefs.pullToSwitchArticle,
                     onCheckedChange = onPullToSwitch,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = radarColors().onAccent,
-                        checkedTrackColor = radarColors().accent,
-                    ),
+                    colors = radarSwitchColors(),
                 )
             }
         }

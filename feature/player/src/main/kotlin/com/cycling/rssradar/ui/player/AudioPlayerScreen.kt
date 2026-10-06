@@ -25,7 +25,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cycling.rssradar.core.playback.PlaybackState
+import com.cycling.rssradar.core.playback.PlaybackTrack
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,18 +72,43 @@ private const val SKIP_MILLIS = 15_000L
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun AudioPlayerScreen(
+fun AudioPlayerDestination(
     articleId: Long,
     onBack: () -> Unit,
     viewModel: AudioPlayerViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.playback.state.collectAsState()
-    val missing by viewModel.missing.collectAsState()
-    val queue by viewModel.queue.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(articleId) { viewModel.open(articleId) }
+    AudioPlayerScreen(
+        state = uiState.playback,
+        missing = uiState.missing,
+        queue = uiState.queue,
+        onBack = onBack,
+        onSeek = viewModel.playback::seekTo,
+        onPrevious = viewModel.playback::previous,
+        onSkipBy = viewModel.playback::skipBy,
+        onTogglePlayPause = viewModel.playback::togglePlayPause,
+        onNext = viewModel.playback::next,
+        onSetSpeed = viewModel.playback::setSpeed,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun AudioPlayerScreen(
+    state: PlaybackState,
+    missing: Boolean,
+    queue: List<PlaybackTrack>,
+    onBack: () -> Unit,
+    onSeek: (Long) -> Unit = {},
+    onPrevious: () -> Unit = {},
+    onSkipBy: (Long) -> Unit = {},
+    onTogglePlayPause: () -> Unit = {},
+    onNext: () -> Unit = {},
+    onSetSpeed: (Float) -> Unit = {},
+) {
     val colors = radarColors()
     val context = LocalContext.current
-
-    LaunchedEffect(articleId) { viewModel.open(articleId) }
 
     // 拖动进度条期间用本地值，松手才 seek——否则轮询会把手指按着的位置一直拽回去
     var scrubbing by remember { mutableStateOf<Float?>(null) }
@@ -205,7 +232,7 @@ fun AudioPlayerScreen(
                 onValueChange = { scrubbing = it },
                 onValueChangeFinished = {
                     val target = scrubbing
-                    if (target != null && duration > 0) viewModel.playback.seekTo((target * duration).toLong())
+                    if (target != null && duration > 0) onSeek((target * duration).toLong())
                     scrubbing = null
                 },
                 enabled = duration > 0,
@@ -232,10 +259,10 @@ fun AudioPlayerScreen(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = viewModel.playback::previous, enabled = queue.size > 1) {
+            IconButton(onClick = onPrevious, enabled = queue.size > 1) {
                 Icon(Lucide.SkipBack, contentDescription = stringResource(R.string.player_previous), tint = colors.textPrimary)
             }
-            IconButton(onClick = { viewModel.playback.skipBy(-SKIP_MILLIS) }) {
+            IconButton(onClick = { onSkipBy(-SKIP_MILLIS) }) {
                 Icon(Lucide.RotateCcw, contentDescription = stringResource(R.string.player_back_15), tint = colors.textPrimary)
             }
             Spacer(Modifier.size(8.dp))
@@ -244,7 +271,7 @@ fun AudioPlayerScreen(
                 color = colors.accent,
                 modifier = Modifier.size(64.dp),
             ) {
-                IconButton(onClick = viewModel.playback::togglePlayPause) {
+                IconButton(onClick = onTogglePlayPause) {
                     Icon(
                         if (state.playing) Lucide.Pause else Lucide.Play,
                         contentDescription = stringResource(
@@ -256,10 +283,10 @@ fun AudioPlayerScreen(
                 }
             }
             Spacer(Modifier.size(8.dp))
-            IconButton(onClick = { viewModel.playback.skipBy(SKIP_MILLIS) }) {
+            IconButton(onClick = { onSkipBy(SKIP_MILLIS) }) {
                 Icon(Lucide.RotateCw, contentDescription = stringResource(R.string.player_forward_15), tint = colors.textPrimary)
             }
-            IconButton(onClick = viewModel.playback::next, enabled = queue.size > 1) {
+            IconButton(onClick = onNext, enabled = queue.size > 1) {
                 Icon(Lucide.SkipForward, contentDescription = stringResource(R.string.player_next), tint = colors.textPrimary)
             }
         }
@@ -276,7 +303,7 @@ fun AudioPlayerScreen(
                 options = SPEEDS,
                 selected = SPEEDS.minByOrNull { kotlin.math.abs(it - state.speed) } ?: 1.0f,
                 label = { speed -> speedLabels[speed].orEmpty() },
-                onSelect = viewModel.playback::setSpeed,
+                onSelect = onSetSpeed,
             )
         }
 

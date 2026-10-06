@@ -27,6 +27,7 @@
     <string name="fetch_empty_body">返回内容为空</string>
     <string name="fetch_decode_error">内容解码失败</string>
     <string name="fetch_extract_failed">正文提取失败</string>
+    <string name="fetch_not_html">响应不是网页</string>
     <string name="issue_site_limit">站点限制或动态加载</string>
     <string name="issue_too_short">正文过短</string>
     <string name="issue_no_paragraph">未找到正文段落</string>

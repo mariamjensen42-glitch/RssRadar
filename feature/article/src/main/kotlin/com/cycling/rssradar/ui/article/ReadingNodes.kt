@@ -34,6 +34,15 @@ object ReadingNodes {
     /** sanitize 生成的媒体占位卡类名。 */
     const val MEDIA_CARD_CLASS = "media-card"
 
+    /**
+     * 媒体占位卡的类型后缀，与 `RssParser` 的同名常量逐字对齐（那边生成、这边消费）。
+     *
+     * 刻意不 import core:data 的常量：本对象只依赖 jsoup 是它的设计属性（纯 JVM 可测、
+     * 与数据层无耦合），为三个字符串常量拉进一个模块依赖不划算。
+     */
+    const val MEDIA_CARD_VIDEO = "media-card-video"
+    const val MEDIA_CARD_AUDIO = "media-card-audio"
+
     /** 块级标签：决定一个元素是「拆成子块」还是「当一段行内文本」。 */
     private val BLOCK_TAGS = setOf(
         "p", "div", "ul", "ol", "table", "pre", "blockquote",
@@ -56,8 +65,8 @@ object ReadingNodes {
     }
 
     /**
-     * 双语对照用：从原文侧剥掉"译文里一模一样"的块——图片（含公式图）、代码块、分隔线。
-     * 双语模式原文列与译文列并排，这类块翻不翻都一样，重复渲染两份纯属噪音
+     * 双语对照用：从原文侧剥掉"译文里一模一样"的块——图片（含公式图）、代码块、分隔线、
+     * 媒体卡。这类块翻不翻都一样，重复渲染两份纯属噪音
      * （用户反馈：同一张图出现两次）。剥空了的容器（只剩图的 group/引用）一并丢掉，
      * 调用方据此把该块退化为"只显示一份"。纯函数，JVM 可测。
      */
@@ -65,7 +74,9 @@ object ReadingNodes {
         val out = ArrayList<ReadingNode>(nodes.size)
         for (node in nodes) {
             when (node) {
-                is NodeImage, is NodeCode, is NodeRule -> Unit // 译文侧照原样出现，不再重复
+                // 译文侧照原样出现，不再重复。媒体卡一并剥掉：它是**有状态的播放单元**，
+                // 同一张卡出现两次 = 两个播放器抢同一个播放实例，画面只会落在最后一个上。
+                is NodeImage, is NodeCode, is NodeRule, is NodeMediaCard -> Unit
                 is NodeGroup -> stripVisualDuplicates(node.nodes)
                     .takeIf { it.isNotEmpty() }
                     ?.let { out.add(NodeGroup(it)) }
@@ -366,7 +377,15 @@ object ReadingNodes {
     private fun imageNode(el: Element, link: String?): NodeImage? {
         val src = absoluteUrl(el.attr("src")) ?: return null // 空 src / 相对路径：不渲染占位图
         val alt = el.attr("alt").trim().takeIf { it.isNotEmpty() }
-        return NodeImage(src, alt, link, isFormula = looksLikeFormula(src, alt))
+        return NodeImage(
+            src = src,
+            alt = alt,
+            href = link,
+            isFormula = looksLikeFormula(src, alt),
+            // width/height 可能是 "100%" 这类百分比：toIntOrNull 直接判空
+            width = el.attr("width").trim().toIntOrNull()?.takeIf { it > 0 },
+            height = el.attr("height").trim().toIntOrNull()?.takeIf { it > 0 },
+        )
     }
 
     /**
@@ -384,24 +403,63 @@ object ReadingNodes {
     // alt 里的 LaTeX 源码特征：$、反斜杠命令、^
     private val FORMULA_TEXT = Regex("(\\$|\\\\|\\(|\\[|\\^)")
 
-    /** sanitize 产出的占位卡：`<a class="media-card" href><span>▶</span>标签 · 域名</a>`。 */
+    /** sanitize 产出的占位卡：`<a class="media-card media-card-video" href><span>▶</span>标签</a>`。 */
     private fun mediaCard(el: Element): NodeMediaCard? {
         val url = absoluteUrl(el.attr("href")) ?: return null
         val label = el.text().trimStart('▶', ' ', '·').trim().ifEmpty { "嵌入内容" }
-        return NodeMediaCard(url, label)
+        return NodeMediaCard(url, label, mediaCardKind(el, label, url))
     }
 
-    /** 未净化输入里残留的 iframe/video/embed：拿得到 http 地址就补一张卡，否则丢掉。 */
+    /**
+     * 判媒体种类。**净化在入库前发生**（`RssParser` / `ArticleExtractor` 都把产物写进
+     * `article.content`），所以库里大量是**加后缀之前**的行——只认类名后缀的话，
+     * 存量文章的视频永远停在"点了跳浏览器"。故三级判定，先到先得：
+     *
+     * 1. 类名后缀：新数据的权威信号。
+     * 2. 标签前缀：旧数据唯一的类型线索。自家卡片文案就是「视频 · 域名」/「嵌入内容 · 域名」，
+     *    而那会儿音频压根没产出卡片，不会误判。
+     * 3. URL 后缀：两条都判不出时的兜底（CDN 直链常带扩展名）。
+     *
+     * 都判不出 ⇒ [MediaNodeKind.EMBED]，即安全侧：只给外跳卡，不给一个点不动的播放键。
+     */
+    private fun mediaCardKind(el: Element, label: String, url: String): MediaNodeKind = when {
+        el.hasClass(MEDIA_CARD_VIDEO) -> MediaNodeKind.VIDEO
+        el.hasClass(MEDIA_CARD_AUDIO) -> MediaNodeKind.AUDIO
+        label.startsWith("视频") -> MediaNodeKind.VIDEO
+        label.startsWith("音频") -> MediaNodeKind.AUDIO
+        else -> mediaKindOfUrl(url)
+    }
+
+    /** 直链文件后缀 → 播放种类。页面地址（`player.html` / `youtube.com/embed/x`）判不出 ⇒ EMBED。 */
+    private fun mediaKindOfUrl(url: String): MediaNodeKind {
+        val path = url.substringBefore('#').substringBefore('?').lowercase()
+        return when {
+            VIDEO_EXTENSIONS.any { path.endsWith(it) } -> MediaNodeKind.VIDEO
+            AUDIO_EXTENSIONS.any { path.endsWith(it) } -> MediaNodeKind.AUDIO
+            else -> MediaNodeKind.EMBED
+        }
+    }
+
+    private val VIDEO_EXTENSIONS = setOf(".mp4", ".m4v", ".webm", ".mov", ".mkv", ".m3u8", ".mpd")
+    private val AUDIO_EXTENSIONS = setOf(".mp3", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".wav", ".flac")
+
+    /** 未净化输入里残留的 iframe/video/audio/embed：拿得到 http 地址就补一张卡，否则丢掉。 */
     private fun embeddedCard(el: Element): NodeMediaCard? {
         val raw = el.attr("src").ifBlank { el.attr("data-src") }
             .ifBlank { el.selectFirst("source[src]")?.attr("src").orEmpty() }
         val url = absoluteUrl(raw) ?: return null
-        val label = when (el.tagName().lowercase()) {
-            "video" -> "视频"
-            "audio" -> "音频"
-            else -> "嵌入内容"
+        // 标签本身就有类型（video/audio）；iframe/embed/object 是页面地址，交给 URL 后缀兜底
+        val kind = when (el.tagName().lowercase()) {
+            "video" -> MediaNodeKind.VIDEO
+            "audio" -> MediaNodeKind.AUDIO
+            else -> mediaKindOfUrl(url)
         }
-        return NodeMediaCard(url, "$label · ${hostOf(url)}")
+        val label = when (kind) {
+            MediaNodeKind.VIDEO -> "视频"
+            MediaNodeKind.AUDIO -> "音频"
+            MediaNodeKind.EMBED -> "嵌入内容"
+        }
+        return NodeMediaCard(url, "$label · ${hostOf(url)}", kind)
     }
 
     // ———————————————————————————————————————————————
@@ -664,10 +722,37 @@ data class NodeImage(
     val isFormula: Boolean = false,
     /** figure/figcaption 的说明文字（纯文本），渲染在图片下方。 */
     val caption: String? = null,
+    /**
+     * HTML 里声明的原始像素尺寸（`<img width height>`），非数字 / 非正值一律为 null。
+     *
+     * 只给**加载前的占位块**用：声明值就是图片固有尺寸，按它撑开占位高度，
+     * 真图加载完高度一致，整段内容不上下跳。缺任一值就退回固定高度占位。
+     * 不用它约束真图本身的尺寸——声明值偶尔与实物不符（响应式图常见），
+     * 拿它去卡真图会裁切或留白。
+     */
+    val width: Int? = null,
+    val height: Int? = null,
 ) : ReadingNode
 /** 块级公式：整段只有一个 <math> 时升级成居中的独立块。 */
 data class NodeMath(val spans: List<MathSpan>) : ReadingNode
-data class NodeMediaCard(val url: String, val label: String) : ReadingNode
+
+/**
+ * 正文里的嵌入媒体（ADR-0018）。
+ *
+ * [kind] 决定渲染去向：`VIDEO`/`AUDIO` 指向的是**直链媒体文件**，App 侧用 ExoPlayer
+ * 就地播放（不经第三方页面、不执行脚本）；`EMBED` 是 iframe 这类第三方页面，
+ * 只能外跳（CONTEXT.md「媒体占位卡」的约束不变）。
+ *
+ * 默认 `EMBED` 是**安全侧**：判不出类型时宁可只给外跳卡，不给一个点不动的播放器。
+ */
+data class NodeMediaCard(
+    val url: String,
+    val label: String,
+    val kind: MediaNodeKind = MediaNodeKind.EMBED,
+) : ReadingNode
+
+/** 正文媒体的播放种类。 */
+enum class MediaNodeKind { VIDEO, AUDIO, EMBED }
 data class NodeTable(
     /** caption 文本，渲染在表格上方。 */
     val caption: String? = null,

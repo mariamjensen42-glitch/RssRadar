@@ -22,11 +22,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -35,6 +35,7 @@ import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide
 import com.cycling.rssradar.core.ui.R
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.theme.radarSwitchColors
 
 /**
  * 设置页通用行组件（二级页骨架 / 分组标题 / 开关行 / 跳转行 / 分段选择器）。
@@ -52,10 +53,11 @@ import com.cycling.rssradar.core.ui.theme.radarColors
 fun SettingsSubPage(
     title: String,
     onBack: () -> Unit,
+    modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .background(radarColors().bgRoot)
             .statusBarsPadding(),
@@ -89,12 +91,17 @@ fun SettingsSubPage(
 
 /** 分组小标题 + 说明文案（原长页同款）。 */
 @Composable
-fun SectionHeader(title: String, description: String? = null) {
+fun SectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    description: String? = null,
+) {
     Text(
         text = title,
         color = radarColors().textSecondary,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
+        modifier = modifier,
     )
     if (description != null) {
         Text(
@@ -117,11 +124,12 @@ fun SettingSwitchRow(
     label: String,
     checked: Boolean,
     onChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
     enabled: Boolean = true,
     subtitle: String? = null,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -145,10 +153,7 @@ fun SettingSwitchRow(
             checked = checked,
             onCheckedChange = onChange,
             enabled = enabled,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = radarColors().onAccent,
-                checkedTrackColor = radarColors().accent,
-            ),
+            colors = radarSwitchColors(),
         )
     }
 }
@@ -159,9 +164,10 @@ fun OptionRow(
     label: String,
     value: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(vertical = 10.dp),
@@ -191,12 +197,17 @@ fun OptionRow(
 
 /** 跳转行（无当前值），如「全文抓取诊断」「崩溃日志」。 */
 @Composable
-fun NavigateRow(label: String, onClick: () -> Unit) {
+fun NavigateRow(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = radarColors().surface1,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
     ) {
         Row(
@@ -219,7 +230,12 @@ fun NavigateRow(label: String, onClick: () -> Unit) {
     }
 }
 
-/** 通用分段选择器：胶囊 chip 一排，选中态 accent 填充。设置页与列表页多处共用，保证样式一致。 */
+/**
+ * 通用分段选择器：胶囊 chip 一排，选中态 accent 填充。设置页与列表页多处共用，保证样式一致。
+ *
+ * clickable 走上游的 modifier 参数，位于 `Modifier.surface` 自身裁剪**之外**，因此必须自己先
+ * `.clip(同一形状)`——否则按下瞬间的涟漪按矩形画、四角溢出胶囊。
+ */
 @Composable
 fun <T> SegmentedChips(
     options: List<T>,
@@ -234,7 +250,9 @@ fun <T> SegmentedChips(
             Surface(
                 shape = RoundedCornerShape(50),
                 color = if (isSelected) radarColors().accent else radarColors().surface2,
-                modifier = Modifier.clickable { onSelect(option) },
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .clickable { onSelect(option) },
             ) {
                 Text(
                     text = label(option),

@@ -4,12 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.repository.FeedRepository
 import com.cycling.rssradar.core.playback.PlaybackController
+import com.cycling.rssradar.core.playback.PlaybackState
 import com.cycling.rssradar.core.playback.PlaybackTrack
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -19,6 +23,15 @@ import kotlinx.coroutines.launch
  * 状态本身来自 [PlaybackController]——播放器活在服务里，本页只是个观察者；
  * 退出页面再进来不会打断播放，也不会重新起播。
  */
+/**
+ * 播放页的渲染输入快照，唯一产出点是 [AudioPlayerViewModel.uiState]。
+ */
+data class AudioPlayerUiState(
+    val playback: PlaybackState = PlaybackState(),
+    val missing: Boolean = false,
+    val queue: List<PlaybackTrack> = emptyList(),
+)
+
 @HiltViewModel
 class AudioPlayerViewModel @Inject constructor(
     private val repository: FeedRepository,
@@ -32,6 +45,15 @@ class AudioPlayerViewModel @Inject constructor(
 
     /** 这篇没有音频地址（或文章已不在库里）：页面要如实说，别转圈转到天荒地老。 */
     val missing: StateFlow<Boolean> = _missing.asStateFlow()
+
+    /** 播放器状态（活在服务里）+ 本页队列与缺失标记合成一份，UI 只订阅这一条。 */
+    val uiState: StateFlow<AudioPlayerUiState> = combine(
+        playback.state,
+        missing,
+        queue,
+    ) { pb, miss, q ->
+        AudioPlayerUiState(playback = pb, missing = miss, queue = q)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AudioPlayerUiState())
 
     private var openedFor: Long? = null
 

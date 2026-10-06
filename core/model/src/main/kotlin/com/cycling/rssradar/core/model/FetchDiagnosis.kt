@@ -20,6 +20,8 @@ enum class FetchFailure {
     EMPTY_BODY,
     DECODE_ERROR,
     EXTRACT_FAILED,
+    /** 响应不是网页（图片/PDF/压缩包等）：链接本身即资源的源会走到这里（如必应每日壁纸）。 */
+    NOT_HTML,
     ;
 
     /** 是否值得重试：401/403/404 重试无意义，只会浪费配额并招致更狠的封禁。 */
@@ -40,6 +42,7 @@ enum class FetchFailure {
             EMPTY_BODY -> "响应为空"
             DECODE_ERROR -> "编码解码失败"
             EXTRACT_FAILED -> "正文提取失败"
+            NOT_HTML -> "响应不是网页"
         }
 }
 

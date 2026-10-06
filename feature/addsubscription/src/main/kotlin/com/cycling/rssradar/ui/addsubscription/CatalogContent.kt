@@ -19,6 +19,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,10 +28,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Rss
-import com.composables.icons.lucide.X
 import com.cycling.rssradar.core.model.rsshub.RouteCategory
 import com.cycling.rssradar.core.model.rsshub.RssHubRoute
 import com.cycling.rssradar.core.ui.R as UiR
@@ -39,13 +40,21 @@ import com.cycling.rssradar.core.ui.theme.radarColors
 
 @Composable
 
-internal fun SheetHeader(title: String, subtitle: String?, onClose: () -> Unit) {
+internal fun CatalogHeader(title: String, subtitle: String?, onClose: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 8.dp, bottom = 10.dp),
+            .padding(start = 8.dp, end = 16.dp, top = 4.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // 页面语义用返回箭头（此前是抽屉的关闭 X）
+        IconButton(onClick = onClose) {
+            Icon(
+                imageVector = Lucide.ArrowLeft,
+                contentDescription = stringResource(UiR.string.back),
+                tint = radarColors().textPrimary,
+            )
+        }
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -75,9 +84,6 @@ internal fun SheetHeader(title: String, subtitle: String?, onClose: () -> Unit) 
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-        }
-        IconButton(onClick = onClose) {
-            Icon(Lucide.X, contentDescription = stringResource(UiR.string.close), tint = radarColors().textSecondary)
         }
     }
 }
@@ -135,10 +141,21 @@ internal fun ColumnScope.CatalogContent(
                 }
                 if (state.validation is ValidationInfo.Valid) {
                     Spacer(Modifier.height(10.dp))
+                    FieldLabel(stringResource(R.string.add_group))
+                    Spacer(Modifier.height(6.dp))
                     GroupChips(
                         options = state.groupOptions,
                         selected = state.selectedGroup,
                         onSelect = { viewModel.onIntent(AddSubscriptionIntent.GroupSelected(it)) },
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    // 内容类型：选中态用的是 effectiveContentType，没手动挑过时它就是地址预判的结果，
+                    // 所以这里显示的是「这个源会被当成什么」，用户改一下即可覆盖。
+                    FieldLabel(stringResource(R.string.add_content_type))
+                    Spacer(Modifier.height(6.dp))
+                    ContentTypeChips(
+                        selected = state.effectiveContentType,
+                        onSelect = { viewModel.onIntent(AddSubscriptionIntent.ContentTypeSelected(it)) },
                     )
                     Spacer(Modifier.height(12.dp))
                     PrimaryButton(
@@ -178,12 +195,16 @@ internal fun ColumnScope.CatalogContent(
             )
         }
 
-        item {
-            CategoryChips(
-                categories = RouteCategory.ORDER,
-                selected = state.category,
-                onSelect = { viewModel.onIntent(AddSubscriptionIntent.CategoryChange(it)) },
-            )
+        // 分类吸顶：路由目录动辄上百条，滑到中段还能就地切分类，不必先滚回顶部。
+        // 背景必须不透明，否则滚过的行会从下面透出来。
+        stickyHeader(key = "category-chips") {
+            Surface(color = radarColors().bgRoot) {
+                CategoryChips(
+                    categories = RouteCategory.ORDER,
+                    selected = state.category,
+                    onSelect = { viewModel.onIntent(AddSubscriptionIntent.CategoryChange(it)) },
+                )
+            }
         }
 
         item {

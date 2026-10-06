@@ -3,6 +3,7 @@ package com.cycling.rssradar.ui.article
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cycling.rssradar.core.domain.concurrency.quietCatching
 import com.cycling.rssradar.core.data.qualify.ContentQualification
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.data.repository.FeedRepository
@@ -34,7 +35,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 
@@ -129,6 +133,30 @@ val ARTICLE_AI_FEATURES: List<AiFeature> =
 
 /** 同源相邻文章 id（底栏上一篇/下一篇）。prev = 更早一篇，next = 更新一篇；列表尽头为 null。 */
 data class ArticleNeighbors(val prevId: Long?, val nextId: Long?)
+
+/**
+ * 阅读页的渲染输入快照，唯一产出点是 [ArticleDetailViewModel.uiState]。
+ * 定义在 VM 侧（而不是 Screen 侧）：状态是 VM 的契约，Screen 只是消费者。
+ */
+data class ArticleDetailUiState(
+    val article: ArticleWithFeed? = null,
+    val annotations: List<ArticleAnnotationEntity> = emptyList(),
+    val initialLoadDone: Boolean = false,
+    val isFetchingContent: Boolean = false,
+    val contentFetch: ContentFetchState = ContentFetchState.Idle,
+    val preferSummary: Boolean = false,
+    val aiSummaryState: AiSummaryState = AiSummaryState.Idle,
+    val translationState: TranslationState = TranslationState.None,
+    val neighbors: ArticleNeighbors = ArticleNeighbors(null, null),
+    val related: List<ArticleWithFeed> = emptyList(),
+    val aiArtifacts: Map<Int, Any> = emptyMap(),
+    val aiRunning: Set<Int> = emptySet(),
+    val aiMessage: String? = null,
+    val aiEnabledFeatures: AiFeatureSettings = AiFeatureSettings(),
+    val aiKeyConfigured: Boolean = false,
+    val readingPrefs: ReadingPrefs = ReadingPrefs(),
+    val linkShare: LinkShareState = LinkShareState(),
+)
 
 /** AI 摘要生成状态。摘要本体在 article.aiSummary，这里只管过程。 */
 sealed interface AiSummaryState {
@@ -298,6 +326,69 @@ class ArticleDetailViewModel @Inject constructor(
 
     /** 外链打开方式与分享格式（#26）：阅读页分享/打开链接时按此偏好执行。 */
     val linkShare: StateFlow<LinkShareState> = linkStore.state
+
+    /**
+     * 阅读页的单一状态快照：17 条流在这里合成一份，UI 侧只订阅这一条。
+     *
+     * 原先 UI 一次 collect 17 个流（docs/perf/compose-performance.md P0-2），
+     * 任一发射都会触发整页作用域重组；合成后订阅点只剩一个，重组扇出随之收敛。
+     * 分组 combine 是因为 Flow 的 combine 最多接 5 个流，分组只影响构造、不改对外语义。
+     */
+    val uiState: StateFlow<ArticleDetailUiState> = combine(
+        combine(article, initialLoadDone, isFetchingContent, contentFetch, preferSummary, ::CoreInputs),
+        combine(aiSummaryState, translationState, aiArtifacts, aiRunning, aiMessage, ::AiInputs),
+        combine(neighbors, related, annotations, ::MetaInputs),
+        combine(readingPrefs, linkShare, aiEnabledFeatures, aiKeyConfigured, ::PrefsInputs),
+    ) { core, ai, meta, prefs ->
+        ArticleDetailUiState(
+            article = core.article,
+            initialLoadDone = core.initialLoadDone,
+            isFetchingContent = core.isFetchingContent,
+            contentFetch = core.contentFetch,
+            preferSummary = core.preferSummary,
+            aiSummaryState = ai.aiSummaryState,
+            translationState = ai.translationState,
+            aiArtifacts = ai.aiArtifacts,
+            aiRunning = ai.aiRunning,
+            aiMessage = ai.aiMessage,
+            neighbors = meta.neighbors,
+            related = meta.related,
+            annotations = meta.annotations,
+            readingPrefs = prefs.readingPrefs,
+            linkShare = prefs.linkShare,
+            aiEnabledFeatures = prefs.aiEnabledFeatures,
+            aiKeyConfigured = prefs.aiKeyConfigured,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ArticleDetailUiState())
+
+    private data class CoreInputs(
+        val article: ArticleWithFeed?,
+        val initialLoadDone: Boolean,
+        val isFetchingContent: Boolean,
+        val contentFetch: ContentFetchState,
+        val preferSummary: Boolean,
+    )
+
+    private data class AiInputs(
+        val aiSummaryState: AiSummaryState,
+        val translationState: TranslationState,
+        val aiArtifacts: Map<Int, Any>,
+        val aiRunning: Set<Int>,
+        val aiMessage: String?,
+    )
+
+    private data class MetaInputs(
+        val neighbors: ArticleNeighbors,
+        val related: List<ArticleWithFeed>,
+        val annotations: List<ArticleAnnotationEntity>,
+    )
+
+    private data class PrefsInputs(
+        val readingPrefs: ReadingPrefs,
+        val linkShare: LinkShareState,
+        val aiEnabledFeatures: AiFeatureSettings,
+        val aiKeyConfigured: Boolean,
+    )
 
     init {
         // articleId 来自 nav args（类型安全路由写入 SavedStateHandle，issue #32）。
@@ -506,9 +597,12 @@ class ArticleDetailViewModel @Inject constructor(
         }
         _isFetchingContent.value = true
         _contentFetch.value = ContentFetchState.Loading
-        val result = runCatching { onDemandFetch.fetchWithResult(articleId) }
-            .getOrElse { OnDemandResult.Failed(FetchFailure.NETWORK) }
-        _isFetchingContent.value = false
+        val result = try {
+            quietCatching { onDemandFetch.fetchWithResult(articleId) }
+                .getOrElse { OnDemandResult.Failed(FetchFailure.NETWORK) }
+        } finally {
+            _isFetchingContent.value = false
+        }
         _contentFetch.value = result.toState()
         _article.value = repository.getArticle(articleId)
     }

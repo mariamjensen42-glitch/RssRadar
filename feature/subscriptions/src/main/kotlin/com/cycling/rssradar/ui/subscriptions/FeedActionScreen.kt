@@ -17,16 +17,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,7 +34,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,7 +47,8 @@ import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Trash2
 import com.cycling.rssradar.core.data.ai.AiPrompts
 import com.cycling.rssradar.core.ui.theme.radarColors
-
+import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
+import com.cycling.rssradar.core.ui.theme.radarSwitchColors
 
 /**
  * 订阅源操作（重命名 / 移动分组 / 删除）的内联底部弹层（ADR-0002 #31 目的地形态已废弃：
@@ -58,19 +58,40 @@ import com.cycling.rssradar.core.ui.theme.radarColors
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FeedActionScreen(
+fun FeedActionDestination(
     feedId: Long,
-    viewModel: SubscriptionsViewModel,
     onDismiss: () -> Unit,
+    viewModel: SubscriptionsViewModel = hiltViewModel(),
 ) {
     // getFeed/observeFeedAiProfile 每次 fun 调用都会新建 StateFlow（初始值 null），
     // 直接在 Composable 里调用会随重组重建 flow、把 feed 打回 null，
     // 导致 ModalBottomSheet 被反复卸载（空白且无法返回）。必须 remember 固定实例。
-    val feed by remember(feedId) { viewModel.getFeed(feedId) }.collectAsState()
-    val groupOptions by remember { viewModel.groupsList }.collectAsState()
-    val aiProfile by remember(feedId) { viewModel.observeFeedAiProfile(feedId) }.collectAsState()
-    // 未单独配置时跟随全局开关（全局默认开摘要），与 FeedAiProfile.resolve 的三态语义一致
-    val autoSummary = aiProfile?.autoSummary ?: true
+    val feed by remember(feedId) { viewModel.getFeed(feedId) }.collectAsStateWithLifecycle()
+    val groupOptions by remember { viewModel.groupsList }.collectAsStateWithLifecycle()
+    val aiProfile by remember(feedId) { viewModel.observeFeedAiProfile(feedId) }.collectAsStateWithLifecycle()
+    FeedActionScreen(
+        feedId = feedId,
+        feed = feed,
+        groupOptions = groupOptions,
+        // 未单独配置时跟随全局开关（全局默认开摘要），与 FeedAiProfile.resolve 的三态语义一致
+        autoSummary = aiProfile?.autoSummary ?: true,
+        aiProfile = aiProfile,
+        onDismiss = onDismiss,
+        onIntent = viewModel::onIntent,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FeedActionScreen(
+    feedId: Long,
+    feed: FeedEntity?,
+    groupOptions: List<String>,
+    autoSummary: Boolean,
+    aiProfile: com.cycling.rssradar.core.data.db.FeedAiProfileEntity? = null,
+    onDismiss: () -> Unit,
+    onIntent: (SubscriptionsIntent) -> Unit,
+) {
     var renameTarget by remember { mutableStateOf<String?>(null) }
     var aiPromptTarget by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
@@ -127,7 +148,9 @@ fun FeedActionScreen(
                                 Surface(
                                     shape = RoundedCornerShape(50),
                                     color = if (selected) radarColors().accent else radarColors().surface2,
-                                    modifier = Modifier.clickable { viewModel.onIntent(SubscriptionsIntent.MoveFeed(f.id, group)); onDismiss() },
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .clickable { onIntent(SubscriptionsIntent.MoveFeed(f.id, group)); onDismiss() },
                                 ) {
                                     Text(
                                         text = group,
@@ -153,7 +176,7 @@ fun FeedActionScreen(
                     subtitle = "关闭后此订阅源不再后台自动刷新",
                     checked = f.syncEnabled,
                     onCheckedChange = { v ->
-                        viewModel.onIntent(SubscriptionsIntent.SetSyncEnabled(f.id, v))
+                        onIntent(SubscriptionsIntent.SetSyncEnabled(f.id, v))
                     },
                 )
                 Spacer(Modifier.height(4.dp))
@@ -163,7 +186,7 @@ fun FeedActionScreen(
                     subtitle = "关闭后详情页只显示订阅源自带内容",
                     checked = f.fullContentEnabled,
                     onCheckedChange = { v ->
-                        viewModel.onIntent(SubscriptionsIntent.SetFullContentEnabled(f.id, v))
+                        onIntent(SubscriptionsIntent.SetFullContentEnabled(f.id, v))
                     },
                 )
                 Spacer(Modifier.height(4.dp))
@@ -173,7 +196,7 @@ fun FeedActionScreen(
                     subtitle = "关闭后此订阅源的新文章不进系统通知",
                     checked = f.notificationsEnabled,
                     onCheckedChange = { v ->
-                        viewModel.onIntent(SubscriptionsIntent.SetNotificationsEnabled(f.id, v))
+                        onIntent(SubscriptionsIntent.SetNotificationsEnabled(f.id, v))
                     },
                 )
                 Spacer(Modifier.height(12.dp))
@@ -195,9 +218,11 @@ fun FeedActionScreen(
                         Surface(
                             shape = RoundedCornerShape(50),
                             color = if (selected) radarColors().accent else radarColors().surface2,
-                            modifier = Modifier.clickable {
-                                viewModel.onIntent(SubscriptionsIntent.SetContentType(f.id, type))
-                            },
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .clickable {
+                                    onIntent(SubscriptionsIntent.SetContentType(f.id, type))
+                                },
                         ) {
                             Text(
                                 text = label,
@@ -221,6 +246,7 @@ fun FeedActionScreen(
                     color = radarColors().surface2,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
                         .clickable { aiPromptTarget = true },
                 ) {
                     Row(
@@ -244,7 +270,7 @@ fun FeedActionScreen(
                     subtitle = "关闭后此订阅源的新文章不自动跑 AI 摘要",
                     checked = autoSummary,
                     onCheckedChange = { v ->
-                        viewModel.onIntent(SubscriptionsIntent.SetFeedAutoSummary(f.id, v))
+                        onIntent(SubscriptionsIntent.SetFeedAutoSummary(f.id, v))
                     },
                 )
                 Spacer(Modifier.height(16.dp))
@@ -253,6 +279,7 @@ fun FeedActionScreen(
                     color = radarColors().surface2,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
                         .clickable { renameTarget = f.title },
                 ) {
                     Row(
@@ -271,6 +298,7 @@ fun FeedActionScreen(
                     color = radarColors().surface2,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
                         .clickable { confirmClear = true },
                 ) {
                     Row(
@@ -289,6 +317,7 @@ fun FeedActionScreen(
                     color = Danger.copy(alpha = 0.10f),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
                         .clickable { confirmDelete = true },
                 ) {
                     Row(
@@ -317,19 +346,11 @@ fun FeedActionScreen(
                     value = value,
                     onValueChange = { value = it },
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = radarColors().surface2,
-                        unfocusedContainerColor = radarColors().surface2,
-                        focusedBorderColor = radarColors().accent,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedTextColor = radarColors().textPrimary,
-                        unfocusedTextColor = radarColors().textPrimary,
-                        cursorColor = radarColors().accent,
-                    ),
+                    colors = radarOutlinedTextFieldColors(),
                 )
             },
             confirmButton = {
-                TextButton(onClick = { viewModel.onIntent(SubscriptionsIntent.RenameFeed(feedId, value)); renameTarget = null; onDismiss() }) {
+                TextButton(onClick = { onIntent(SubscriptionsIntent.RenameFeed(feedId, value)); renameTarget = null; onDismiss() }) {
                     Text("保存", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
                 }
             },
@@ -373,22 +394,14 @@ fun FeedActionScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = radarColors().surface2,
-                            unfocusedContainerColor = radarColors().surface2,
-                            focusedBorderColor = radarColors().accent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedTextColor = radarColors().textPrimary,
-                            unfocusedTextColor = radarColors().textPrimary,
-                            cursorColor = radarColors().accent,
-                        ),
+                        colors = radarOutlinedTextFieldColors(),
                     )
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.onIntent(SubscriptionsIntent.SetFeedSummaryPrompt(feedId, value))
+                        onIntent(SubscriptionsIntent.SetFeedSummaryPrompt(feedId, value))
                         aiPromptTarget = false
                     },
                 ) {
@@ -421,7 +434,7 @@ fun FeedActionScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.onIntent(SubscriptionsIntent.ClearFeedArticles(feedId, title))
+                        onIntent(SubscriptionsIntent.ClearFeedArticles(feedId, title))
                         confirmClear = false
                         onDismiss()
                     },
@@ -453,7 +466,7 @@ fun FeedActionScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.onIntent(SubscriptionsIntent.DeleteFeed(feedId, title))
+                        onIntent(SubscriptionsIntent.DeleteFeed(feedId, title))
                         confirmDelete = false
                         onDismiss()
                     },
@@ -487,10 +500,7 @@ private fun SwitchRow(
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = radarColors().onAccent,
-                checkedTrackColor = radarColors().accent,
-            ),
+            colors = radarSwitchColors(),
         )
     }
 }

@@ -27,7 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.cycling.rssradar.core.data.service.OnDemandFetch
 import com.cycling.rssradar.core.data.db.entity.ContentFetchLogEntity
 import com.cycling.rssradar.core.data.db.projection.FetchHostStat
@@ -49,6 +50,7 @@ import com.composables.icons.lucide.Trash
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -78,7 +80,22 @@ class FetchDiagnosticsViewModel @Inject constructor(
     fun clear() {
         viewModelScope.launch { onDemandFetch.clearLogs() }
     }
+
+    /**
+     * 诊断页的渲染输入快照：失败清单与按站点聚合合成一份，UI 只订阅这一条。
+     */
+    val uiState: StateFlow<FetchDiagnosticsUiState> = combine(problems, hostStats) { problems, stats ->
+        FetchDiagnosticsUiState(problems = problems, hostStats = stats)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FetchDiagnosticsUiState())
 }
+
+/**
+ * 全文抓取诊断页的渲染输入快照，唯一产出点是 [FetchDiagnosticsViewModel.uiState]。
+ */
+data class FetchDiagnosticsUiState(
+    val problems: List<ContentFetchLogEntity> = emptyList(),
+    val hostStats: List<FetchHostStat> = emptyList(),
+)
 
 /**
  * 全文抓取诊断（ADR-0012 可观测性）。
@@ -88,13 +105,29 @@ class FetchDiagnosticsViewModel @Inject constructor(
  * 以前这些信息只存在于一次静默的 null 里。
  */
 @Composable
-fun FetchDiagnosticsScreen(
-    viewModel: FetchDiagnosticsViewModel,
+fun FetchDiagnosticsDestination(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: FetchDiagnosticsViewModel = hiltViewModel(),
 ) {
-    val problems by viewModel.problems.collectAsState()
-    val hostStats by viewModel.hostStats.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    FetchDiagnosticsScreen(
+        problems = state.problems,
+        hostStats = state.hostStats,
+        onBack = onBack,
+        onClear = viewModel::clear,
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun FetchDiagnosticsScreen(
+    problems: List<ContentFetchLogEntity>,
+    hostStats: List<FetchHostStat>,
+    onBack: () -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
 
     Column(
         modifier = modifier
@@ -121,7 +154,7 @@ fun FetchDiagnosticsScreen(
                 modifier = Modifier.weight(1f),
             )
             if (problems.isNotEmpty()) {
-                IconButton(onClick = viewModel::clear) {
+                IconButton(onClick = onClear) {
                     Icon(Lucide.Trash, contentDescription = stringResource(R.string.diag_clear), tint = radarColors().textSecondary)
                 }
             }

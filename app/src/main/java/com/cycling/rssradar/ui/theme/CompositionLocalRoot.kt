@@ -3,7 +3,7 @@ package com.cycling.rssradar.ui.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
@@ -39,12 +39,12 @@ fun CompositionLocalRoot(content: @Composable () -> Unit) {
     val themeStore = entryPoint.themeStore()
     val readingPrefsStore = entryPoint.readingPrefsStore()
     val listDisplayStore = entryPoint.listDisplayStore()
-    val themeMode by themeStore.mode.collectAsState()
+    val themeMode by themeStore.mode.collectAsStateWithLifecycle()
     // 强调色（#27 动态取色 / #29 自定义主色）：自定义优先于系统取色
-    val dynamicColor by themeStore.dynamicColor.collectAsState()
-    val customAccent by themeStore.customAccent.collectAsState()
-    val readingPrefs by readingPrefsStore.state.collectAsState()
-    val listDisplay by listDisplayStore.state.collectAsState()
+    val dynamicColor by themeStore.dynamicColor.collectAsStateWithLifecycle()
+    val customAccent by themeStore.customAccent.collectAsStateWithLifecycle()
+    val readingPrefs by readingPrefsStore.state.collectAsStateWithLifecycle()
+    val listDisplay by listDisplayStore.state.collectAsStateWithLifecycle()
     val systemDark = isSystemInDarkTheme()
     val darkTheme = when (themeMode) {
         ThemeMode.SYSTEM -> systemDark

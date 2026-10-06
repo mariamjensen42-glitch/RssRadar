@@ -24,14 +24,12 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,6 +39,7 @@ import com.composables.icons.lucide.Zap
 import com.cycling.rssradar.core.model.rsshub.RouteParam
 import com.cycling.rssradar.core.model.rsshub.RssHubRoute
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
 
 @Composable
 
@@ -222,15 +221,7 @@ private fun ParamField(
             },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = radarColors().surface2,
-                unfocusedContainerColor = radarColors().surface2,
-                focusedBorderColor = radarColors().accent,
-                unfocusedBorderColor = Color.Transparent,
-                focusedTextColor = radarColors().textPrimary,
-                unfocusedTextColor = radarColors().textPrimary,
-                cursorColor = radarColors().accent,
-            ),
+            colors = radarOutlinedTextFieldColors(),
         )
         // 说明与标签重复时不再啰嗦一遍
         if (param.description.isNotBlank() && param.description != param.label) {

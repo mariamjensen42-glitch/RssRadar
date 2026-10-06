@@ -60,6 +60,10 @@ fun tabBarBottomClearance(): Dp {
  * 通过 [WindowInsets.navigationBars] 适配系统手势条。
  * 选中态由 [currentRoute] 决定（来自 NavController 当前目的地，route 即单一真相源）。
  *
+ * 选中态文字取 textPrimary 而不是 onAccent：[NavigationBarItem] 的 indicator 只铺在图标背后，
+ * label 是直接画在 NavigationBar 的 containerColor 上的，用 onAccent（浅色主题下即白字）
+ * 会落成「白字画浅色底」而看不见。图标在 accent 胶囊之内，取 onAccent 才正确。
+ *
  * 函数名保留 [FloatingBottomBar] 是历史遗留：它已不是 floating 形态，
  * 但改名要动 MainActivity 的调用点，收益不抵风险，故不改。语义看 KDoc。
  */
@@ -82,7 +86,7 @@ fun FloatingBottomBar(
                 alwaysShowLabel = true,
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = radarColors().onAccent,
-                    selectedTextColor = radarColors().onAccent,
+                    selectedTextColor = radarColors().textPrimary,
                     indicatorColor = radarColors().accent,
                     unselectedIconColor = radarColors().textTertiary,
                     unselectedTextColor = radarColors().textSecondary,

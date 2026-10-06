@@ -50,7 +50,6 @@ internal fun ArticleListItem(
         return
     }
     ArticleMenuBox(
-        itemCount = if (onReduceSuch != null) 8 else 7,
         actions = ArticleMenuActions(
             isRead = item.article.isRead,
             isStarred = item.article.isStarred,

@@ -61,8 +61,8 @@ fun ArticleCardList(
      */
     markReadPassed: (List<Long>) -> Unit = {},
     /**
-     * 当前筛选下的文章总数（滚动指示条分母）：翻页追加时不变，thumb 稳定。
-     * null = 总数未知（推荐流/单源页），退回按已加载量估算。
+     * 当前筛选下的文章总数（滚动指示条的位置分母）：翻页不改它，thumb 才不会在
+     * 加载更多时跳。null = 总数未知（推荐流 / 单源页），退回按已加载量估算。
      */
     totalCount: Int? = null,
     modifier: Modifier = Modifier,
@@ -73,7 +73,7 @@ fun ArticleCardList(
             viewMode = viewModeOverride ?: it.viewMode,
         )
     }
-    // 网格模式是独立容器（LazyVerticalGrid），走自己的渲染分支；粘性日期头与
+    // 网格模式是独立容器（LazyVerticalStaggeredGrid 瀑布流），走自己的渲染分支；粘性日期头与
     // 滚动标已读都是 LazyColumn 槽位逻辑，网格里不适用（与图片画廊同规则）。
     if (display.viewMode == ListViewMode.GRID) {
         ArticleAdaptiveGrid(

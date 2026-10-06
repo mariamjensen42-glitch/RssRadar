@@ -9,6 +9,8 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,14 +22,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.cycling.rssradar.core.ui.theme.RssRadarTheme
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
@@ -36,8 +43,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.ArrowDownToLine
+import com.composables.icons.lucide.ArrowUpToLine
+import com.composables.icons.lucide.Lucide
+import com.cycling.rssradar.core.data.db.ArticleAnnotationEntity
 import com.cycling.rssradar.core.data.db.entity.ArticleEntity
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import com.cycling.rssradar.core.model.AiFeatureSettings
+import com.cycling.rssradar.core.model.LinkShareState
+import com.cycling.rssradar.core.model.ReadingPrefs
 import com.cycling.rssradar.core.model.ReadingRenderer
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.theme.LocalRadarColors
@@ -48,6 +62,8 @@ import com.cycling.rssradar.core.data.platform.shareArticle
 import com.cycling.rssradar.core.ui.theme.ApplySystemBarIcons
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 
 /**
  * 全屏查看页的入参（issue #60）：本文图片列表 + 起始下标。
@@ -62,9 +78,58 @@ private data class ImageViewer(val images: List<String>, val index: Int)
  * 卡片、正文、WebView 注入的 CSS 全读它），逐处改必然漏。这里整页覆盖
  * [LocalRadarColors]，下游零改动自动跟随；系统栏图标也跟着阅读页底色翻。
  */
+/** 阅读页的全部命令出口：Screen 不持有 VM，只从 [ArticleDetailActions] 发起动作。 */
+class ArticleDetailActions(
+    val onIntent: (ArticleDetailIntent) -> Unit,
+    val onLoad: (Long) -> Unit,
+    val onReadingRatio: (Long) -> Float?,
+    val onRememberReadingRatio: (Long, Float) -> Unit,
+    val onUpdateReadingPrefs: ((ReadingPrefs) -> ReadingPrefs) -> Unit,
+    val onAddAnnotations: (List<String>, Int, String?) -> Unit,
+)
+
+@Composable
+fun ArticleDetailDestination(
+    articleId: Long,
+    onBack: () -> Unit,
+    onOpenOriginal: (String) -> Unit = {},
+    /** 相关阅读卡片点击跳转（AiFeature.RELATED）。 */
+    onOpenArticle: (Long) -> Unit = {},
+    /** 标注列表页入口（顶栏溢出菜单）。 */
+    onOpenAnnotations: () -> Unit = {},
+    /** 打开音频播放页（有音频地址的文章才有入口）。 */
+    onOpenAudio: (Long) -> Unit = {},
+    viewModel: ArticleDetailViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    val actions = remember(viewModel) {
+        ArticleDetailActions(
+            onIntent = viewModel::onIntent,
+            onLoad = viewModel::load,
+            onReadingRatio = viewModel::readingRatio,
+            onRememberReadingRatio = viewModel::rememberReadingRatio,
+            onUpdateReadingPrefs = viewModel::updateReadingPrefs,
+            onAddAnnotations = viewModel::addAnnotations,
+        )
+    }
+
+    ArticleDetailScreen(
+        state = state,
+        actions = actions,
+        articleId = articleId,
+        onBack = onBack,
+        onOpenOriginal = onOpenOriginal,
+        onOpenArticle = onOpenArticle,
+        onOpenAnnotations = onOpenAnnotations,
+        onOpenAudio = onOpenAudio,
+    )
+}
+
 @Composable
 fun ArticleDetailScreen(
-    viewModel: ArticleDetailViewModel,
+    state: ArticleDetailUiState,
+    actions: ArticleDetailActions,
     articleId: Long,
     onBack: () -> Unit,
     onOpenOriginal: (String) -> Unit = {},
@@ -75,7 +140,7 @@ fun ArticleDetailScreen(
     /** 打开音频播放页（有音频地址的文章才有入口）。 */
     onOpenAudio: (Long) -> Unit = {},
 ) {
-    val readingPrefs by viewModel.readingPrefs.collectAsState()
+    val readingPrefs = state.readingPrefs
     val appColors = radarColors()
     val pageColors = remember(readingPrefs.readingTheme, appColors) {
         readingPrefs.readingTheme.pageColors(appColors)
@@ -83,13 +148,20 @@ fun ArticleDetailScreen(
     // 深色模式下开「纸张」时状态栏图标必须变深色，否则一片糊。
     // 退出阅读页由 ApplySystemBarIcons 的 onDispose 还原成应用主题。
     ApplySystemBarIcons(darkTheme = !pageColors.isLightBackground())
-    val annotations by viewModel.annotations.collectAsState()
+    val annotations = state.annotations
+    // 正文媒体播放器（ADR-0018）：页面级唯一实例，延迟创建。挂在这一层是为了让
+    // 正文渲染（RenderNode 递归深处）、底栏视频入口、全屏播放页三者共用同一个播放器。
+    val media = rememberArticleMediaPlayer()
+    // 换篇即停：播放器是页面级的，不留上一篇的媒体在新文章里继续出声
+    LaunchedEffect(articleId) { media.stop() }
     CompositionLocalProvider(
         LocalRadarColors provides pageColors,
         LocalReadingAnnotations provides annotations,
+        LocalArticleMediaPlayer provides media,
     ) {
         ArticleDetailBody(
-            viewModel = viewModel,
+            state = state,
+            actions = actions,
             articleId = articleId,
             onBack = onBack,
             onOpenOriginal = onOpenOriginal,
@@ -102,7 +174,8 @@ fun ArticleDetailScreen(
 
 @Composable
 private fun ArticleDetailBody(
-    viewModel: ArticleDetailViewModel,
+    state: ArticleDetailUiState,
+    actions: ArticleDetailActions,
     articleId: Long,
     onBack: () -> Unit,
     onOpenOriginal: (String) -> Unit = {},
@@ -113,21 +186,22 @@ private fun ArticleDetailBody(
     /** 打开音频播放页（有音频地址的文章才有入口）。 */
     onOpenAudio: (Long) -> Unit = {},
 ) {
-    val article by viewModel.article.collectAsState()
-    val initialLoadDone by viewModel.initialLoadDone.collectAsState()
-    val isFetchingContent by viewModel.isFetchingContent.collectAsState()
-    val contentFetchState by viewModel.contentFetch.collectAsState()
-    val preferSummary by viewModel.preferSummary.collectAsState()
-    val aiSummaryState by viewModel.aiSummaryState.collectAsState()
-    val translationState by viewModel.translationState.collectAsState()
-    val neighbors by viewModel.neighbors.collectAsState()
-    val readingPrefs by viewModel.readingPrefs.collectAsState()
-    val linkShare by viewModel.linkShare.collectAsState()
-    val aiArtifacts by viewModel.aiArtifacts.collectAsState()
-    val aiRunning by viewModel.aiRunning.collectAsState()
-    val aiMessage by viewModel.aiMessage.collectAsState()
-    val aiEnabledFeatures by viewModel.aiEnabledFeatures.collectAsState()
-    val aiKeyConfigured by viewModel.aiKeyConfigured.collectAsState()
+    val article = state.article
+    val media = LocalArticleMediaPlayer.current
+    val initialLoadDone = state.initialLoadDone
+    val isFetchingContent = state.isFetchingContent
+    val contentFetchState = state.contentFetch
+    val preferSummary = state.preferSummary
+    val aiSummaryState = state.aiSummaryState
+    val translationState = state.translationState
+    val neighbors = state.neighbors
+    val readingPrefs = state.readingPrefs
+    val linkShare = state.linkShare
+    val aiArtifacts = state.aiArtifacts
+    val aiRunning = state.aiRunning
+    val aiMessage = state.aiMessage
+    val aiEnabledFeatures = state.aiEnabledFeatures
+    val aiKeyConfigured = state.aiKeyConfigured
     // 分享文章（#26）需要 Context 起系统分享面板
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -154,6 +228,9 @@ private fun ArticleDetailBody(
     var selectionAnchor by remember { mutableStateOf(PRESET_BOTTOM_ANCHOR) }
     // 整页滚动状态提升到 Screen：顶栏标题「滚出视口才出现」需要读滚动量
     val scrollState = rememberScrollState()
+    // 到顶 / 到底（右下角悬浮按钮）：用递增序号而不是裸目标 —— 连点两次同一个目标时
+    // 目标值不变，下游按值判重会把它当成重复请求吞掉。
+    var jumpRequest by remember { mutableStateOf<JumpRequest?>(null) }
     // 视口模式（有图文章）的头部折叠量 = WebView 内部滚动量，同样驱动顶栏补位标题
     var headerScrollY by remember { mutableStateOf(0) }
     // 视口模式的可滚动上限（WebView 内部滚动范围）：与 headerScrollY 一起算阅读位置比例
@@ -170,6 +247,29 @@ private fun ArticleDetailBody(
     // 且只在「显隐翻转」时更新——每帧都写会在滚动中引发无谓的重组。
     val autoHideBars = readingPrefs.autoHideBars
     var barsVisible by remember { mutableStateOf(true) }
+    // 「到顶 / 到底」按钮的方向：往下读就给「到底」，往上翻就给「到顶」。
+    // 单开一个监听、不复用下面那个 —— 那个在关掉 autoHideBars 时会直接 return，
+    // 方向判定不能跟着一起失效（关掉自动隐藏只该让工具栏常显）。
+    var jumpTarget by remember { mutableStateOf(JumpTarget.BOTTOM) }
+    // 只在滚动时浮出、静置一会儿就收 —— 常驻会一直压在右下角的正文上。
+    var jumpVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        var lastJumpY = 0
+        snapshotFlow { maxOf(scrollState.value, headerScrollY) }
+            // collectLatest：下一个滚动值一到就取消这里的 delay，于是「停下来静置」才会计时到点
+            // 收起。不用额外记一个"最后滚动时刻"（那会让每帧都写 state、每帧重组）。
+            .collectLatest { y ->
+                jumpVisible = true
+                val delta = y - lastJumpY
+                when {
+                    delta > BARS_SCROLL_SLOP -> jumpTarget = JumpTarget.TOP
+                    delta < -BARS_SCROLL_SLOP -> jumpTarget = JumpTarget.BOTTOM
+                }
+                lastJumpY = y
+                delay(JUMP_AUTO_HIDE_MS)
+                jumpVisible = false
+            }
+    }
     LaunchedEffect(autoHideBars) {
         if (!autoHideBars) {
             barsVisible = true
@@ -185,7 +285,7 @@ private fun ArticleDetailBody(
     }
     val reducedMotion = LocalReducedMotion.current
     LaunchedEffect(articleId) {
-        viewModel.load(articleId)
+        actions.onLoad(articleId)
         scrollState.scrollTo(0)
         headerScrollY = 0
         headerMaxScroll = 0
@@ -196,7 +296,7 @@ private fun ArticleDetailBody(
         findCursor = 0
         findCount = 0
         // 阅读位置记忆：换文章时取一次上次读到的位置，交给正文区按自己的滚动宿主恢复
-        restoreRatio = viewModel.readingRatio(articleId)
+        restoreRatio = actions.onReadingRatio(articleId)
     }
     // 翻译失败走 Snackbar（spec #44：正文保持原文，报错可重试）；按状态实例触发，不会重复弹
     LaunchedEffect(translationState) {
@@ -211,6 +311,30 @@ private fun ArticleDetailBody(
     Scaffold(
         containerColor = radarColors().bgRoot,
         snackbarHost = { AppSnackbarHost(snackbarHostState) },
+        // 到顶 / 到底：走 Scaffold 的 FAB 槽位 —— 它会自动避让 bottomBar 与系统栏，
+        // 且位于 content 之上。自己往内容区里摆会落到操作栏底下，点不到。
+        floatingActionButton = {
+            AnimatedVisibility(
+                visible = jumpVisible,
+                enter = if (reducedMotion) {
+                    EnterTransition.None
+                } else {
+                    fadeIn() + scaleIn(initialScale = 0.85f)
+                },
+                exit = if (reducedMotion) {
+                    ExitTransition.None
+                } else {
+                    fadeOut() + scaleOut(targetScale = 0.85f)
+                },
+            ) {
+                ReadingJumpButton(
+                    target = jumpTarget,
+                    onClick = {
+                        jumpRequest = JumpRequest((jumpRequest?.seq ?: 0L) + 1L, jumpTarget)
+                    },
+                )
+            }
+        },
         topBar = {
             // 收起用 shrink/expand 而不是 slide：Scaffold 的 content padding 按这两个
             // 槽位的实测高度算，只有高度真的动画到 0，正文区才平滑地吃掉这块空间；
@@ -247,13 +371,13 @@ private fun ArticleDetailBody(
                         )
                     }
                 },
-                onToggleTranslation = { viewModel.onIntent(ArticleDetailIntent.ToggleTranslation) },
+                onToggleTranslation = { actions.onIntent(ArticleDetailIntent.ToggleTranslation) },
                 isShowingTranslation = translationState is TranslationState.Shown ||
                     translationState is TranslationState.Progressing,
                 isGeneratingTranslation = translationState is TranslationState.Progressing,
                 aiSummary = article?.article?.aiSummary,
                 aiSummaryState = aiSummaryState,
-                onGenerateSummary = { viewModel.onIntent(ArticleDetailIntent.GenerateSummary) },
+                onGenerateSummary = { actions.onIntent(ArticleDetailIntent.GenerateSummary) },
             )
             }
         },
@@ -277,10 +401,10 @@ private fun ArticleDetailBody(
                     isBookmarked = item.article.isBookmarked,
                     hasPrev = neighbors.prevId != null,
                     hasNext = neighbors.nextId != null,
-                    onPrev = { neighbors.prevId?.let(viewModel::load) },
-                    onNext = { neighbors.nextId?.let(viewModel::load) },
-                    onStar = { viewModel.onIntent(ArticleDetailIntent.ToggleStarred) },
-                    onBookmark = { viewModel.onIntent(ArticleDetailIntent.ToggleBookmarked) },
+                    onPrev = { neighbors.prevId?.let(actions.onLoad) },
+                    onNext = { neighbors.nextId?.let(actions.onLoad) },
+                    onStar = { actions.onIntent(ArticleDetailIntent.ToggleStarred) },
+                    onBookmark = { actions.onIntent(ArticleDetailIntent.ToggleBookmarked) },
                     onOpenOriginal = { onOpenOriginal(item.article.link) },
                     onOpenAi = { showAiSheet = true },
                     // 只有真的拿到音频地址才给入口：mediaKind 说有音频但地址没落库时，
@@ -288,6 +412,12 @@ private fun ArticleDetailBody(
                     onPlayAudio = item.article.mediaUrl
                         ?.takeIf { it.isNotBlank() && item.article.mediaKind == ArticleEntity.MEDIA_KIND_AUDIO }
                         ?.let { { onOpenAudio(item.article.id) } },
+                    // 视频同理（ADR-0018）：拿到直链才给入口，点开是全屏播放页。
+                    // 正文里的视频另有内嵌播放，这条只覆盖订阅源级 enclosure 视频——
+                    // 它不在正文 HTML 里，正文区没有它的位置。
+                    onPlayVideo = item.article.mediaUrl
+                        ?.takeIf { it.isNotBlank() && item.article.mediaKind == ArticleEntity.MEDIA_KIND_VIDEO }
+                        ?.let { url -> media?.let { player -> { player.requestFullscreen(url) } } },
                 )
             }
             }
@@ -320,6 +450,16 @@ private fun ArticleDetailBody(
         val translationActive = translationState is TranslationState.Shown ||
             translationState is TranslationState.Progressing
         val viewportBody = shouldUseViewport(BodyMode.WEBVIEW, current.article.content)
+        // 整页模式的跳转在这里执行；视口模式由 WebView 自己消费同一个 request
+        //（那条路上滚动宿主是 WebView，外层 Compose 的 scrollState 根本不动）。
+        LaunchedEffect(jumpRequest?.seq) {
+            val request = jumpRequest ?: return@LaunchedEffect
+            if (!viewportBody) {
+                scrollState.animateScrollTo(
+                    if (request.target == JumpTarget.TOP) 0 else scrollState.maxValue,
+                )
+            }
+        }
         val findLimit = when {
             translationActive -> FindLimit.UNSUPPORTED
             readingPrefs.renderer != ReadingRenderer.NATIVE && !viewportBody -> FindLimit.NO_AUTO_SCROLL
@@ -340,8 +480,8 @@ private fun ArticleDetailBody(
                         hasNext = neighbors.nextId != null,
                         onSwitch = { target ->
                             when (target) {
-                                PullTarget.PREVIOUS -> neighbors.prevId?.let(viewModel::load)
-                                PullTarget.NEXT -> neighbors.nextId?.let(viewModel::load)
+                                PullTarget.PREVIOUS -> neighbors.prevId?.let(actions.onLoad)
+                                PullTarget.NEXT -> neighbors.nextId?.let(actions.onLoad)
                                 PullTarget.NONE -> Unit
                             }
                         },
@@ -389,10 +529,10 @@ private fun ArticleDetailBody(
                         article = current,
                         isFetchingContent = isFetchingContent,
                         contentFetchState = contentFetchState,
-                        onRetryFetch = { viewModel.onIntent(ArticleDetailIntent.RetryFetch) },
+                        onRetryFetch = { actions.onIntent(ArticleDetailIntent.RetryFetch) },
                         preferSummary = preferSummary,
                         onShowFullContent = {
-                            viewModel.onIntent(ArticleDetailIntent.SetPreferSummary(false))
+                            actions.onIntent(ArticleDetailIntent.SetPreferSummary(false))
                         },
                         aiSummaryState = aiSummaryState,
                         translationState = translationState,
@@ -400,17 +540,18 @@ private fun ArticleDetailBody(
                         headerScrollY = headerScrollY,
                         headerMaxScroll = headerMaxScroll,
                         restoreRatio = restoreRatio,
+                        jumpRequest = jumpRequest,
                         onHeaderScroll = { y, max ->
                             headerScrollY = y
                             headerMaxScroll = max
                         },
-                        onPositionChange = { viewModel.rememberReadingRatio(articleId, it) },
+                        onPositionChange = { actions.onRememberReadingRatio(articleId, it) },
                         onTitleMeasured = { titleHideOffset = it },
-                        onGenerateSummary = { viewModel.onIntent(ArticleDetailIntent.GenerateSummary) },
-                        onRetranslate = { viewModel.onIntent(ArticleDetailIntent.RetranslateArticle) },
-                        onShowOriginal = { viewModel.onIntent(ArticleDetailIntent.ToggleTranslation) },
+                        onGenerateSummary = { actions.onIntent(ArticleDetailIntent.GenerateSummary) },
+                        onRetranslate = { actions.onIntent(ArticleDetailIntent.RetranslateArticle) },
+                        onShowOriginal = { actions.onIntent(ArticleDetailIntent.ToggleTranslation) },
                         onTranslationDisplayChange = { next ->
-                            viewModel.updateReadingPrefs { it.copy(translation = next) }
+                            actions.onUpdateReadingPrefs { it.copy(translation = next) }
                         },
                         onImageClick = { url -> imageViewer = openImageViewer(current, url) },
                         findQuery = if (findActive) findQuery else "",
@@ -421,17 +562,20 @@ private fun ArticleDetailBody(
                 }
                 // 相关阅读（AiFeature.RELATED）：横滑卡片条，仅在有候选时出现——
                 // 空态不占高度，阅读区恢复满屏。
-                val related by viewModel.related.collectAsState()
+                val related = state.related
                 if (related.isNotEmpty()) {
                     RelatedArticlesStrip(items = related, onOpen = onOpenArticle)
                 }
             }
+            // 到顶 / 到底的按钮不在这里 —— 它挂在 Scaffold 的 floatingActionButton 槽位，
+            // 那个位置天生避让 bottomBar 且在 content 之上；放在本 Box 里会落到操作栏下面
+            //（Scaffold 的 bottomBar 绘制在 content 之上），点了没反应。
             if (selectionBlocks.isNotEmpty()) {
                 ReaderSelectionBar(
                     anchor = selectionAnchor,
                     modifier = Modifier.fillMaxSize(),
                     onHighlight = { colorIndex, note ->
-                        viewModel.addAnnotations(selectionBlocks, colorIndex, note)
+                        actions.onAddAnnotations(selectionBlocks, colorIndex, note)
                         selectionState.clear()
                     },
                     onCopy = {
@@ -452,6 +596,19 @@ private fun ArticleDetailBody(
         )
     }
 
+    // 全屏播放（ADR-0018）：与全屏看图一样是阅读页之上的瞬时 UI，不进路由。
+    // 退出语义由播放器定：正文里有这条媒体的画面 ⇒ 只退出全屏、退回正文继续播；
+    // 没有（订阅源级视频）⇒ 停掉，免得留下"看不见的声音"。
+    media?.fullscreenUrl?.let { url ->
+        ReaderVideoPage(
+            url = url,
+            title = article?.article?.title,
+            media = media,
+            resumeInline = media.hasInlineRenderer(url),
+            onDismiss = { media.exitFullscreen() },
+        )
+    }
+
     if (showAiSheet) {
         AiArticleSheet(
             artifacts = aiArtifacts,
@@ -459,14 +616,14 @@ private fun ArticleDetailBody(
             message = aiMessage,
             enabled = aiEnabledFeatures.enabled,
             keyConfigured = aiKeyConfigured,
-            onRun = { feature -> viewModel.onIntent(ArticleDetailIntent.RunAi(feature)) },
-            onAsk = { question -> viewModel.onIntent(ArticleDetailIntent.AskArticle(question)) },
-            onExplain = { term -> viewModel.onIntent(ArticleDetailIntent.ExplainTerm(term)) },
-            onConsumeMessage = { viewModel.onIntent(ArticleDetailIntent.ConsumeAiMessage) },
+            onRun = { feature -> actions.onIntent(ArticleDetailIntent.RunAi(feature)) },
+            onAsk = { question -> actions.onIntent(ArticleDetailIntent.AskArticle(question)) },
+            onExplain = { term -> actions.onIntent(ArticleDetailIntent.ExplainTerm(term)) },
+            onConsumeMessage = { actions.onIntent(ArticleDetailIntent.ConsumeAiMessage) },
             onDismiss = {
                 showAiSheet = false
                 // 关掉面板就清掉提示，免得下次打开先看到一条过期的失败原因
-                viewModel.onIntent(ArticleDetailIntent.ConsumeAiMessage)
+                actions.onIntent(ArticleDetailIntent.ConsumeAiMessage)
             },
         )
     }
@@ -474,39 +631,39 @@ private fun ArticleDetailBody(
     if (showStyleSheet) {
         ReadingStyleSheet(
             prefs = readingPrefs,
-            onRenderer = { r -> viewModel.updateReadingPrefs { it.copy(renderer = r) } },
-            onFontSize = { v -> viewModel.updateReadingPrefs { it.copy(style = it.style.copy(fontSize = v)) } },
-            onLineHeight = { v -> viewModel.updateReadingPrefs { it.copy(style = it.style.copy(lineHeight = v)) } },
+            onRenderer = { r -> actions.onUpdateReadingPrefs { it.copy(renderer = r) } },
+            onFontSize = { v -> actions.onUpdateReadingPrefs { it.copy(style = it.style.copy(fontSize = v)) } },
+            onLineHeight = { v -> actions.onUpdateReadingPrefs { it.copy(style = it.style.copy(lineHeight = v)) } },
             onPadding = { v ->
-                viewModel.updateReadingPrefs { it.copy(style = it.style.copy(horizontalPadding = v)) }
+                actions.onUpdateReadingPrefs { it.copy(style = it.style.copy(horizontalPadding = v)) }
             },
             onFontFamily = { v ->
-                viewModel.updateReadingPrefs { it.copy(style = it.style.copy(fontFamily = v)) }
+                actions.onUpdateReadingPrefs { it.copy(style = it.style.copy(fontFamily = v)) }
             },
             onLetterSpacing = { v ->
-                viewModel.updateReadingPrefs { it.copy(style = it.style.copy(letterSpacing = v)) }
+                actions.onUpdateReadingPrefs { it.copy(style = it.style.copy(letterSpacing = v)) }
             },
             onTextAlign = { v ->
-                viewModel.updateReadingPrefs { it.copy(style = it.style.copy(textAlign = v)) }
+                actions.onUpdateReadingPrefs { it.copy(style = it.style.copy(textAlign = v)) }
             },
             onImageCornerRadius = { v ->
-                viewModel.updateReadingPrefs { it.copy(image = it.image.copy(cornerRadius = v)) }
+                actions.onUpdateReadingPrefs { it.copy(image = it.image.copy(cornerRadius = v)) }
             },
             onImageMaximize = { v ->
-                viewModel.updateReadingPrefs { it.copy(image = it.image.copy(maximizeOnTap = v)) }
+                actions.onUpdateReadingPrefs { it.copy(image = it.image.copy(maximizeOnTap = v)) }
             },
             onImmersive = { v ->
-                viewModel.updateReadingPrefs { it.copy(immersive = v) }
+                actions.onUpdateReadingPrefs { it.copy(immersive = v) }
             },
             autoHideBars = readingPrefs.autoHideBars,
             onAutoHideBars = { v ->
-                viewModel.updateReadingPrefs { it.copy(autoHideBars = v) }
+                actions.onUpdateReadingPrefs { it.copy(autoHideBars = v) }
             },
             onReadingTheme = { v ->
-                viewModel.updateReadingPrefs { it.copy(readingTheme = v) }
+                actions.onUpdateReadingPrefs { it.copy(readingTheme = v) }
             },
             onPullToSwitch = { v ->
-                viewModel.updateReadingPrefs { it.copy(pullToSwitchArticle = v) }
+                actions.onUpdateReadingPrefs { it.copy(pullToSwitchArticle = v) }
             },
             // 正文/摘要：只在两者实质不同时给（canSwitchToSummary），否则点了等于没点
             canSwitchToSummary = canSwitchToSummary(
@@ -515,7 +672,7 @@ private fun ArticleDetailBody(
             ),
             preferSummary = preferSummary,
             onPreferSummary = { v ->
-                viewModel.onIntent(ArticleDetailIntent.SetPreferSummary(v))
+                actions.onIntent(ArticleDetailIntent.SetPreferSummary(v))
             },
             onDismiss = { showStyleSheet = false },
         )
@@ -538,5 +695,85 @@ private fun openImageViewer(article: ArticleWithFeed, url: String): ImageViewer 
         ImageViewer(images, images.indexOf(url))
     } else {
         ImageViewer(listOf(url), 0)
+    }
+}
+
+
+@Preview(showBackground = true, name = "阅读页 · 加载中")
+@Composable
+private fun ArticleDetailScreenLoadingPreview() {
+    RssRadarTheme(darkTheme = false) {
+        ArticleDetailScreen(
+            state = ArticleDetailUiState(),
+            actions = ArticleDetailActions(
+                onIntent = {},
+                onLoad = {},
+                onReadingRatio = { null },
+                onRememberReadingRatio = { _, _ -> },
+                onUpdateReadingPrefs = {},
+                onAddAnnotations = { _, _, _ -> },
+            ),
+            articleId = 1L,
+            onBack = {},
+        )
+    }
+}
+
+/**
+ * 停止滚动后多久收起跳转按钮。
+ *
+ * 取一个「够看见、又立刻让开」的值：滚动中手指常有几百毫秒的自然停顿，
+ * 定长了按钮会一直挂在正文上（用户反馈「不要那么长」）。600ms 够完成一次点击，
+ * 停顿一结束就不挡内容。
+ */
+private const val JUMP_AUTO_HIDE_MS = 600L
+
+/**
+ * 阅读页右下角的跳转悬浮按钮：**只有一个**，图标与目标随滚动方向切换 ——
+ * 往下读时指向「到顶」，往上翻时指向「到底」。
+ *
+ * 挂在 Scaffold 的 `floatingActionButton` 槽位上，所以这里不写位置与 inset：
+ * 槽位自己会避让底部操作栏和系统导航栏。**常驻，不跟随自动隐藏的工具栏一起收** ——
+ * 这个按钮恰恰在「刚滚完一段、工具栏已经收起」时最需要按到，跟栏一起消失等于没有。
+ */
+@Composable
+private fun ReadingJumpButton(
+    target: JumpTarget,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val toTop = target == JumpTarget.TOP
+    SmallFloatingActionButton(
+        onClick = onClick,
+        containerColor = radarColors().surface1,
+        contentColor = radarColors().textSecondary,
+        modifier = modifier,
+    ) {
+        Icon(
+            imageVector = if (toTop) Lucide.ArrowUpToLine else Lucide.ArrowDownToLine,
+            contentDescription = stringResource(
+                if (toTop) R.string.reader_jump_top else R.string.reader_jump_bottom,
+            ),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "阅读页 · 深色加载中")
+@Composable
+private fun ArticleDetailScreenDarkLoadingPreview() {
+    RssRadarTheme(darkTheme = true) {
+        ArticleDetailScreen(
+            state = ArticleDetailUiState(),
+            actions = ArticleDetailActions(
+                onIntent = {},
+                onLoad = {},
+                onReadingRatio = { null },
+                onRememberReadingRatio = { _, _ -> },
+                onUpdateReadingPrefs = {},
+                onAddAnnotations = { _, _, _ -> },
+            ),
+            articleId = 1L,
+            onBack = {},
+        )
     }
 }

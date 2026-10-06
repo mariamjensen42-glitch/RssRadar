@@ -94,11 +94,15 @@ class ArchiveReinsertTest {
                 }
             }
             "updateContentState" -> {
+                // 索引与 ArticleWriteDao.updateContentState 的参数顺序一一对应 ——
+                // 那侧增删参数，这里必须跟着挪，否则取到的会是隔壁字段（`as Long` 撞上
+                // 字符串参数会直接抛类型转换异常，不算静默错，但一样是红的）
                 val id = args[0] as Long
                 val current = mem.articles[id] ?: return@daoProxy null
                 mem.articles[id] = current.copy(
-                    title = args[1] as String,
-                    fetchedAt = args[10] as Long,
+                    link = args[1] as String,
+                    title = args[2] as String,
+                    fetchedAt = args[11] as Long,
                 )
                 null
             }

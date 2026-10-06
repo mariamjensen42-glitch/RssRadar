@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -15,66 +16,86 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cycling.rssradar.core.domain.filter.KeywordMatcher
+import com.cycling.rssradar.core.domain.notify.NotifyPrefs
 import com.cycling.rssradar.core.ui.R as UiR
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.components.OptionRow
 import com.cycling.rssradar.core.ui.components.SectionHeader
 import com.cycling.rssradar.core.ui.components.SettingSwitchRow
 import com.cycling.rssradar.core.ui.components.SettingsSubPage
+import com.cycling.rssradar.core.ui.theme.RssRadarTheme
+import com.cycling.rssradar.core.ui.theme.radarColors
+
+@Composable
+fun NotificationSettingsDestination(
+    onBack: () -> Unit = {},
+    viewModel: NotificationViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    NotificationSettingsScreen(
+        state = state,
+        onBack = onBack,
+        onSetDnd = viewModel::setDnd,
+        onSetIncludeKeywords = viewModel::setIncludeKeywords,
+        onSetExcludeKeywords = viewModel::setExcludeKeywords,
+    )
+}
 
 /** 勿扰时段与关键词通知。判定链在 core/domain 的 NotifyDecision，这里只管采集。 */
 @Composable
 fun NotificationSettingsScreen(
-    viewModel: NotificationViewModel = hiltViewModel(),
+    state: NotifyPrefs,
     onBack: () -> Unit = {},
+    onSetDnd: (Int?, Int?) -> Unit = { _, _ -> },
+    onSetIncludeKeywords: (List<String>) -> Unit = {},
+    onSetExcludeKeywords: (List<String>) -> Unit = {},
 ) {
-    val prefs by viewModel.state.collectAsState()
     var editingStart by remember { mutableStateOf(false) }
     var editingEnd by remember { mutableStateOf(false) }
-    var includeDraft by remember(prefs.includeKeywords) {
-        mutableStateOf(prefs.includeKeywords.joinToString(KEYWORD_SEPARATOR))
+    var includeDraft by remember(state.includeKeywords) {
+        mutableStateOf(state.includeKeywords.joinToString(KEYWORD_SEPARATOR))
     }
-    var excludeDraft by remember(prefs.excludeKeywords) {
-        mutableStateOf(prefs.excludeKeywords.joinToString(KEYWORD_SEPARATOR))
+    var excludeDraft by remember(state.excludeKeywords) {
+        mutableStateOf(state.excludeKeywords.joinToString(KEYWORD_SEPARATOR))
     }
 
     SettingsSubPage(title = stringResource(R.string.settings_notification), onBack = onBack) {
         SectionHeader(
             stringResource(R.string.notify_dnd),
-            stringResource(R.string.notify_dnd_desc),
+            description = stringResource(R.string.notify_dnd_desc),
         )
         Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 SettingSwitchRow(
                     label = stringResource(R.string.notify_dnd_enabled),
-                    checked = prefs.dndEnabled,
+                    checked = state.dndEnabled,
                     onChange = { enabled ->
                         if (enabled) {
-                            viewModel.setDnd(DEFAULT_DND_START, DEFAULT_DND_END)
+                            onSetDnd(DEFAULT_DND_START, DEFAULT_DND_END)
                         } else {
-                            viewModel.setDnd(null, null)
+                            onSetDnd(null, null)
                         }
                     },
                 )
-                if (prefs.dndEnabled) {
+                if (state.dndEnabled) {
                     OptionRow(
                         label = stringResource(R.string.notify_dnd_start),
-                        value = formatMinuteOfDay(prefs.dndStartMinute),
+                        value = formatMinuteOfDay(state.dndStartMinute),
                         onClick = { editingStart = true },
                     )
                     OptionRow(
                         label = stringResource(R.string.notify_dnd_end),
-                        value = formatMinuteOfDay(prefs.dndEndMinute),
+                        value = formatMinuteOfDay(state.dndEndMinute),
                         onClick = { editingEnd = true },
                     )
                 }
@@ -84,7 +105,7 @@ fun NotificationSettingsScreen(
 
         SectionHeader(
             stringResource(R.string.notify_keyword),
-            stringResource(R.string.notify_keyword_desc),
+            description = stringResource(R.string.notify_keyword_desc),
         )
         Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
@@ -96,7 +117,7 @@ fun NotificationSettingsScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                TextButton(onClick = { viewModel.setIncludeKeywords(KeywordMatcher.parseKeywords(includeDraft)) }) {
+                TextButton(onClick = { onSetIncludeKeywords(KeywordMatcher.parseKeywords(includeDraft)) }) {
                     Text(stringResource(R.string.action_save))
                 }
                 Spacer(Modifier.height(4.dp))
@@ -108,7 +129,7 @@ fun NotificationSettingsScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                TextButton(onClick = { viewModel.setExcludeKeywords(KeywordMatcher.parseKeywords(excludeDraft)) }) {
+                TextButton(onClick = { onSetExcludeKeywords(KeywordMatcher.parseKeywords(excludeDraft)) }) {
                     Text(stringResource(R.string.action_save))
                 }
             }
@@ -118,16 +139,16 @@ fun NotificationSettingsScreen(
         Text(
             text = stringResource(R.string.notify_keyword_note),
             color = radarColors().textTertiary,
-            style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodySmall,
         )
     }
 
     if (editingStart) {
         MinutePickerDialog(
-            initial = prefs.dndStartMinute ?: DEFAULT_DND_START,
+            initial = state.dndStartMinute ?: DEFAULT_DND_START,
             title = stringResource(R.string.notify_dnd_start),
             onConfirm = { minute ->
-                viewModel.setDnd(minute, prefs.dndEndMinute ?: DEFAULT_DND_END)
+                onSetDnd(minute, state.dndEndMinute ?: DEFAULT_DND_END)
                 editingStart = false
             },
             onDismiss = { editingStart = false },
@@ -135,10 +156,10 @@ fun NotificationSettingsScreen(
     }
     if (editingEnd) {
         MinutePickerDialog(
-            initial = prefs.dndEndMinute ?: DEFAULT_DND_END,
+            initial = state.dndEndMinute ?: DEFAULT_DND_END,
             title = stringResource(R.string.notify_dnd_end),
             onConfirm = { minute ->
-                viewModel.setDnd(prefs.dndStartMinute ?: DEFAULT_DND_START, minute)
+                onSetDnd(state.dndStartMinute ?: DEFAULT_DND_START, minute)
                 editingEnd = false
             },
             onDismiss = { editingEnd = false },
@@ -172,6 +193,28 @@ private fun MinutePickerDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
+}
+
+@Preview(showBackground = true, name = "通知 · 勿扰关闭")
+@Composable
+private fun NotificationSettingsScreenPreview() {
+    RssRadarTheme(darkTheme = false) {
+        NotificationSettingsScreen(state = NotifyPrefs())
+    }
+}
+
+@Preview(showBackground = true, name = "通知 · 勿扰开启")
+@Composable
+private fun NotificationSettingsScreenDndPreview() {
+    RssRadarTheme(darkTheme = true) {
+        NotificationSettingsScreen(
+            state = NotifyPrefs(
+                dndStartMinute = DEFAULT_DND_START,
+                dndEndMinute = DEFAULT_DND_END,
+                includeKeywords = listOf("Kotlin", "Compose"),
+            ),
+        )
+    }
 }
 
 private const val DEFAULT_DND_START = 22 * 60

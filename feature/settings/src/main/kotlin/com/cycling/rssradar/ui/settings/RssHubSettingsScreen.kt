@@ -22,22 +22,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.ui.settings.RssHubSettingsViewModel
-import com.cycling.rssradar.core.model.ThemeMode
-import com.cycling.rssradar.core.ui.R as UiR
-import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
-import com.cycling.rssradar.core.ui.theme.radarColors
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.Activity
 import com.composables.icons.lucide.Bell
 import com.composables.icons.lucide.Bookmark
@@ -50,7 +48,13 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Palette
 import com.composables.icons.lucide.RefreshCw
 import com.composables.icons.lucide.Server
-import androidx.compose.runtime.setValue
+import com.cycling.rssradar.core.model.SyncInterval
+import com.cycling.rssradar.core.model.SyncState
+import com.cycling.rssradar.core.model.ThemeMode
+import com.cycling.rssradar.core.ui.R as UiR
+import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
+import com.cycling.rssradar.core.ui.theme.RssRadarTheme
+import com.cycling.rssradar.core.ui.theme.radarColors
 
 @Composable
 private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
@@ -59,13 +63,45 @@ private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
     ThemeMode.DARK -> stringResource(R.string.theme_dark)
 }
 
+@Composable
+fun RssHubSettingsDestination(
+    modifier: Modifier = Modifier,
+    onOpenGeneral: () -> Unit = {},
+    onOpenSync: () -> Unit = {},
+    onOpenRssHub: () -> Unit = {},
+    onOpenAiDiag: () -> Unit = {},
+    onOpenReadingStats: () -> Unit = {},
+    onOpenFilterRules: () -> Unit = {},
+    onOpenBackup: () -> Unit = {},
+    onOpenNotification: () -> Unit = {},
+    onOpenAnnotations: () -> Unit = {},
+    onOpenLibrary: () -> Unit = {},
+    viewModel: RssHubSettingsViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    RssHubSettingsScreen(
+        state = state,
+        modifier = modifier,
+        onOpenGeneral = onOpenGeneral,
+        onOpenSync = onOpenSync,
+        onOpenRssHub = onOpenRssHub,
+        onOpenAiDiag = onOpenAiDiag,
+        onOpenReadingStats = onOpenReadingStats,
+        onOpenFilterRules = onOpenFilterRules,
+        onOpenBackup = onOpenBackup,
+        onOpenNotification = onOpenNotification,
+        onOpenAnnotations = onOpenAnnotations,
+        onOpenLibrary = onOpenLibrary,
+    )
+}
+
 /**
  * 「我的」页主页：只放分组入口，具体设置收进四个二级页（SettingsSubPages.kt）。
  * 之前 12+ 个分组平铺一屏滚不到底，现按 iOS 设置的分组导航收敛。
  */
 @Composable
 fun RssHubSettingsScreen(
-    viewModel: RssHubSettingsViewModel,
+    state: RssHubSettingsUiState,
     modifier: Modifier = Modifier,
     onOpenGeneral: () -> Unit = {},
     onOpenSync: () -> Unit = {},
@@ -78,8 +114,6 @@ fun RssHubSettingsScreen(
     onOpenAnnotations: () -> Unit = {},
     onOpenLibrary: () -> Unit = {},
 ) {
-    val state by viewModel.state.collectAsState()
-
     Scaffold(
         containerColor = radarColors().bgRoot,
         topBar = {
@@ -246,6 +280,7 @@ internal fun SettingsEntryCard(
         color = radarColors().surface1,
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
     ) {
         Row(
@@ -275,5 +310,35 @@ internal fun SettingsEntryCard(
                 modifier = Modifier.size(18.dp),
             )
         }
+    }
+}
+
+@Preview(showBackground = true, name = "我的 · 浅色")
+@Composable
+private fun RssHubSettingsScreenPreview() {
+    RssRadarTheme(darkTheme = false) {
+        RssHubSettingsScreen(
+            state = RssHubSettingsUiState(
+                activeHost = "rsshub.app",
+                feedCount = 618,
+                unreadCount = 3090,
+                sync = SyncState(interval = SyncInterval.EVERY_1_HOUR),
+            ),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "我的 · 深色")
+@Composable
+private fun RssHubSettingsScreenDarkPreview() {
+    RssRadarTheme(darkTheme = true) {
+        RssHubSettingsScreen(
+            state = RssHubSettingsUiState(
+                activeHost = "rsshub.app",
+                aiKeyConfigured = true,
+                feedCount = 24,
+                unreadCount = 128,
+            ),
+        )
     }
 }

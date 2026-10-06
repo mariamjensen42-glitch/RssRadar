@@ -34,10 +34,15 @@ fun <T> OptionPickerSheet(
     label: (T) -> String,
     onSelect: (T) -> Unit,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
     /** 选项下方的说明（如"1 天前 = 早于该时间的未读文章"），可空。 */
     subtitle: ((T) -> String?)? = null,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = radarColors().surface1) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = radarColors().surface1,
+        modifier = modifier,
+    ) {
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
             Text(
                 text = title,

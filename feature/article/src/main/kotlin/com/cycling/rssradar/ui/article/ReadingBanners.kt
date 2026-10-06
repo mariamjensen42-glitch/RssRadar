@@ -212,7 +212,7 @@ internal fun NoContentBody(
     }
 }
 
-/** 摘要折叠阈值的近似字符数：超过才出现「展开全文」，3 行 bodyMedium 中文约 60-70 字/3 行 ×2 缓冲。 */
+/** 摘要折叠阈值的近似字符数：超过才给标题行的展开/收起入口，3 行 bodyMedium 中文约 60-70 字/3 行 ×2 缓冲。 */
 internal const val SUMMARY_COLLAPSE_CHARS = 120
 
 /**

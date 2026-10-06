@@ -12,9 +12,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -50,7 +54,6 @@ import com.cycling.rssradar.core.ui.components.ArticleMenuActions
 import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.core.ui.components.articleMenuOffset
 import com.cycling.rssradar.core.ui.components.pressScale
-import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.ui.search.R
 import androidx.compose.runtime.getValue
@@ -85,12 +88,12 @@ internal fun SearchResults(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            // 底部让位悬浮 TabBar（含导航栏 inset）
+            // 搜索页已不挂底部 TabBar（二级页），底部只需让开系统导航栏
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
                 top = 8.dp,
-                bottom = tabBarBottomClearance(),
+                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -179,6 +182,7 @@ private fun SearchResultRow(
                         pressPos = awaitFirstDown(requireUnconsumed = false).position
                     }
                 }
+                .clip(RoundedCornerShape(12.dp))
                 .combinedClickable(
                     interactionSource = interactionSource,
                     onClick = onClick,

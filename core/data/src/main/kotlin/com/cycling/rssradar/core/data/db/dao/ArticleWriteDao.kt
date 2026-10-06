@@ -14,11 +14,15 @@ interface ArticleWriteDao {
     /**
      * 增量刷新：只更新内容状态（标题/时间/摘要/正文），绝不触碰用户状态
      * （isRead/isStarred/isBookmarked）。见 CONTEXT.md「用户状态」。
+     *
+     * **link 也在这里更新**：它是去重键（RefreshEngine 按它匹配已有文章），但旧版本
+     * 可能把相对链接原样存了进来（必应每日壁纸的 `/th?id=...`）。匹配侧归一化之后
+     * 认出了是同一条，就得把库里的地址一并修正，否则那条链接永远点不开。
      */
     @Query(
         """
         UPDATE articles SET
-            title = :title, summary = :summary, content = :content, contentText = :contentText,
+            link = :link, title = :title, summary = :summary, content = :content, contentText = :contentText,
             author = :author, publishedAt = :publishedAt, coverUrl = :coverUrl,
             readingMinutes = :readingMinutes, contentSource = :contentSource, fetchedAt = :fetchedAt,
             mediaKind = :mediaKind, mediaUrl = :mediaUrl, searchText = :searchText
@@ -27,6 +31,7 @@ interface ArticleWriteDao {
     )
     suspend fun updateContentState(
         id: Long,
+        link: String,
         title: String,
         summary: String?,
         content: String?,

@@ -49,6 +49,8 @@ internal fun BodyContent(
      * Compose，由 [ReadingBody] 自己恢复；WebView 只在自己滚动的视口模式里滚得动。
      */
     restoreRatio: Float? = null,
+    /** 到顶 / 到底的跳转请求：同样只对视口模式有意义，整页模式由外层 Compose 滚。 */
+    jumpRequest: JumpRequest? = null,
 ) {
     val context = LocalContext.current
     when (plan.mode) {
@@ -66,6 +68,7 @@ internal fun BodyContent(
             passThroughTouch = !viewport,
             onScroll = if (viewport) onHeaderScroll else null,
             restoreRatio = if (viewport) restoreRatio else null,
+            jumpRequest = if (viewport) jumpRequest else null,
             onImageClick = onImageClick,
             findQuery = find.query,
             findCursor = find.cursor,
@@ -88,6 +91,7 @@ internal fun BodyContent(
             passThroughTouch = !viewport,
             onScroll = if (viewport) onHeaderScroll else null,
             restoreRatio = if (viewport) restoreRatio else null,
+            jumpRequest = if (viewport) jumpRequest else null,
             onImageClick = onImageClick,
             findQuery = find.query,
             findCursor = find.cursor,

@@ -30,8 +30,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.getValue
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import com.cycling.rssradar.core.ui.text.UiText
 import com.cycling.rssradar.core.model.ListViewMode
 import com.cycling.rssradar.core.ui.R as UiR
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
@@ -48,19 +52,43 @@ import com.cycling.rssradar.core.ui.theme.LocalListDisplay
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FeedArticlesScreen(
-    viewModel: FeedArticlesViewModel,
+fun FeedArticlesDestination(
     onBack: () -> Unit,
     onOpenArticle: (Long) -> Unit,
+    viewModel: FeedArticlesViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    FeedArticlesScreen(
+        feed = state.feed,
+        articles = state.articles,
+        isLoadingMore = state.isLoadingMore,
+        isRefreshing = state.isRefreshing,
+        uiMessage = state.uiMessage,
+        onBack = onBack,
+        onOpenArticle = onOpenArticle,
+        onIntent = viewModel::onIntent,
+    )
+}
+
+@Composable
+fun FeedArticlesScreen(
+    feed: FeedEntity?,
+    articles: List<ArticleWithFeed>,
+    isLoadingMore: Boolean,
+    isRefreshing: Boolean,
+    uiMessage: UiText?,
+    onBack: () -> Unit,
+    onOpenArticle: (Long) -> Unit,
+    onIntent: (FeedArticlesIntent) -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
-    val message = viewModel.uiMessage
+    val message = uiMessage
 
     LaunchedEffect(message) {
         message?.let {
             snackbarHostState.showSnackbar(it.resolve(context))
-            viewModel.onIntent(FeedArticlesIntent.ConsumeMessage)
+            onIntent(FeedArticlesIntent.ConsumeMessage)
         }
     }
 
@@ -71,7 +99,7 @@ fun FeedArticlesScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = viewModel.feed?.title ?: stringResource(R.string.feed_articles_title),
+                        text = feed?.title ?: stringResource(R.string.feed_articles_title),
                         color = radarColors().textPrimary,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -85,8 +113,8 @@ fun FeedArticlesScreen(
                 },
                 actions = {
                     // 单源刷新秒级完成；进行中把图标换成转圈
-                    IconButton(onClick = { viewModel.onIntent(FeedArticlesIntent.Refresh) }) {
-                        if (viewModel.isRefreshing) {
+                    IconButton(onClick = { onIntent(FeedArticlesIntent.Refresh) }) {
+                        if (isRefreshing) {
                             CircularProgressIndicator(
                                 color = radarColors().textSecondary,
                                 strokeWidth = 2.dp,
@@ -101,7 +129,7 @@ fun FeedArticlesScreen(
             )
         },
     ) { padding ->
-        if (viewModel.articles.isEmpty() && !viewModel.isRefreshing) {
+        if (articles.isEmpty() && !isRefreshing) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -113,45 +141,45 @@ fun FeedArticlesScreen(
                     Text(stringResource(R.string.feed_articles_empty), color = radarColors().textSecondary)
                     Spacer(Modifier.height(12.dp))
                     FilledTonalButton(
-                        onClick = { viewModel.onIntent(FeedArticlesIntent.Refresh) },
+                        onClick = { onIntent(FeedArticlesIntent.Refresh) },
                         shape = RoundedCornerShape(12.dp),
                     ) {
                         Text(stringResource(R.string.feed_articles_refresh_now))
                     }
                 }
             }
-        } else if (viewModel.feed?.contentType == FeedEntity.CONTENT_TYPE_IMAGE) {
+        } else if (feed?.contentType == FeedEntity.CONTENT_TYPE_IMAGE) {
             // 图片类源（ADR-0014）：两列画廊网格，点击仍走详情
             ImageGalleryGrid(
-                articles = viewModel.articles,
+                articles = articles,
                 onArticleClick = { item ->
-                    viewModel.onIntent(FeedArticlesIntent.MarkRead(item.article.id))
+                    onIntent(FeedArticlesIntent.MarkRead(item.article.id))
                     onOpenArticle(item.article.id)
                 },
-                onScrolledToEnd = { viewModel.onIntent(FeedArticlesIntent.LoadMore) },
+                onScrolledToEnd = { onIntent(FeedArticlesIntent.LoadMore) },
                 bottomPadding = 16.dp,
                 modifier = Modifier.padding(padding),
             )
         } else {
             ArticleCardList(
-                articles = viewModel.articles,
+                articles = articles,
                 onArticleClick = { item ->
-                    viewModel.onIntent(FeedArticlesIntent.MarkRead(item.article.id))
+                    onIntent(FeedArticlesIntent.MarkRead(item.article.id))
                     onOpenArticle(item.article.id)
                 },
                 onToggleRead = { id, read ->
-                    viewModel.onIntent(FeedArticlesIntent.SetRead(id, read))
+                    onIntent(FeedArticlesIntent.SetRead(id, read))
                 },
                 onToggleStarred = { id ->
-                    viewModel.onIntent(FeedArticlesIntent.ToggleStarred(id))
+                    onIntent(FeedArticlesIntent.ToggleStarred(id))
                 },
                 onToggleBookmarked = { id ->
-                    viewModel.onIntent(FeedArticlesIntent.ToggleBookmarked(id))
+                    onIntent(FeedArticlesIntent.ToggleBookmarked(id))
                 },
                 onDelete = { id ->
-                    viewModel.onIntent(FeedArticlesIntent.DeleteArticle(id))
+                    onIntent(FeedArticlesIntent.DeleteArticle(id))
                 },
-                onScrolledToEnd = { viewModel.onIntent(FeedArticlesIntent.LoadMore) },
+                onScrolledToEnd = { onIntent(FeedArticlesIntent.LoadMore) },
                 // 单源页强制隐藏订阅源名称（issue #56）：同源卡片重复源名是纯噪音
                 showFeedName = false,
                 // 单源文章量少（个位数常见），全局网格模式在这里只有大片留白——
@@ -171,7 +199,7 @@ fun FeedArticlesScreen(
                     .padding(vertical = 16.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                if (viewModel.isLoadingMore) {
+                if (isLoadingMore) {
                     CircularProgressIndicator(
                         color = radarColors().accent,
                         strokeWidth = 2.dp,

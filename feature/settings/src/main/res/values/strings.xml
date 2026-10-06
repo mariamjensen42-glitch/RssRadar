@@ -13,7 +13,7 @@
     <string name="ai_key_cleared">已清除 API Key</string>
     <string name="ai_key_saved">API Key 已保存</string>
     <string name="ai_not_configured">未配置</string>
-    <string name="annotations_entry_summary">选中正文里的文字即可高亮或记笔记</string>
+    <string name="annotations_entry_summary">选中文字即可标注</string>
     <string name="article_cleanup">文章清理</string>
     <string name="auto_probe">自动探测可用实例</string>
     <string name="auto_sync">自动同步</string>
@@ -62,7 +62,7 @@
     <string name="language_follow_system">跟随系统</string>
     <string name="language_subtitle">界面显示语言，立即生效</string>
     <string name="last_7_days">近 7 天</string>
-    <string name="library_entry_summary">按时间、来源排序，批量整理</string>
+    <string name="library_entry_summary">排序与批量整理</string>
     <string name="lightness">明度</string>
     <string name="link_share">链接与分享</string>
     <string name="link_share_desc">外链怎么打开、分享文章时带哪些内容。阅读页顶栏可分享本文。</string>
@@ -110,7 +110,7 @@
     <string name="rule_deleted">已删除</string>
     <string name="rule_edit">编辑规则</string>
     <string name="rule_empty">还没有规则。规则会在刷新订阅源时自动执行。</string>
-    <string name="rule_entry_summary">关键词或正则命中后自动处理文章</string>
+    <string name="rule_entry_summary">命中后自动处理文章</string>
     <string name="rule_field_author">作者</string>
     <string name="rule_field_content">正文</string>
     <string name="rule_field_summary">摘要</string>

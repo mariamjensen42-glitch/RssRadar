@@ -22,10 +22,9 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +41,7 @@ import com.cycling.rssradar.core.data.ai.AiPayloadText
 import com.cycling.rssradar.core.model.AiScope
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.components.EmptyState
+import com.cycling.rssradar.core.ui.components.rememberSlowLoad
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.text.resolve
 import java.text.SimpleDateFormat
@@ -64,13 +64,38 @@ import java.util.Locale
  *    数字 id 对人没有意义，看不出这条结果挂在哪篇文章上。
  * 3. **原文可展开**。模型输出是唯一的原始证据，"AI 说它做了什么"和"模型实际说了什么"
  *    必须都能看到，否则排查时只能靠猜。
+ *
+ * 加载表现上同样有一条刻意决定：这是本地 Room 查询，首次查询通常一两帧就回来，
+ * 所以**首屏等待期内先给空白，超过 200ms 才换 spinner**——
+ * 当场画一个 spinner 会「闪一下就没」，看着像卡顿，实际什么都没耽误。
+ * 内容已有之后的重查（切筛选 / 手动刷新 / 删除）连 spinner 都不给：
+ * 旧内容留在原地，只把顶栏的刷新图标换成转圈，避免整屏闪白。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 
 @Composable
 
-fun AiArtifactsScreen(
+fun AiArtifactsDestination(
+    onBack: () -> Unit,
+    onOpenArticle: (Long) -> Unit = {},
+    onOpenFeed: (Long) -> Unit = {},
+    initialFeatureDbValue: Int? = null,
     viewModel: AiArtifactsViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    AiArtifactsScreen(
+        state = state,
+        onBack = onBack,
+        onOpenArticle = onOpenArticle,
+        onOpenFeed = onOpenFeed,
+        initialFeatureDbValue = initialFeatureDbValue,
+        onIntent = viewModel::onIntent,
+    )
+}
+
+@Composable
+fun AiArtifactsScreen(
+    state: AiArtifactsUiState,
     onBack: () -> Unit,
     /** 文章级产物跳详情；不传则该按钮不出现（不让用户点一个没有落点的按钮）。 */
     onOpenArticle: (Long) -> Unit = {},
@@ -82,22 +107,23 @@ fun AiArtifactsScreen(
      * 默认创建的，不知道路由；而筛选一次即可，不该把路由耦合进 VM 生命周期。
      */
     initialFeatureDbValue: Int? = null,
+    onIntent: (AiArtifactsIntent) -> Unit,
 ) {
-    val state by viewModel.state.collectAsState()
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     val timeFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
+    val slowLoad = rememberSlowLoad(state.loading)
 
     LaunchedEffect(initialFeatureDbValue) {
         if (initialFeatureDbValue != null) {
-            viewModel.onIntent(AiArtifactsIntent.SelectKind(initialFeatureDbValue))
+            onIntent(AiArtifactsIntent.SelectKind(initialFeatureDbValue))
         }
     }
 
     LaunchedEffect(state.message) {
         val message = state.message ?: return@LaunchedEffect
         snackbar.showSnackbar(message.resolve(context))
-        viewModel.onIntent(AiArtifactsIntent.ConsumeMessage)
+        onIntent(AiArtifactsIntent.ConsumeMessage)
     }
 
     Scaffold(
@@ -125,12 +151,20 @@ fun AiArtifactsScreen(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = { viewModel.onIntent(AiArtifactsIntent.Refresh) }) {
-                    Icon(
-                        imageVector = Lucide.RotateCw,
-                        contentDescription = stringResource(R.string.refresh),
-                        tint = radarColors().textSecondary,
-                    )
+                IconButton(onClick = { onIntent(AiArtifactsIntent.Refresh) }) {
+                    if (state.refreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = radarColors().textSecondary,
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Lucide.RotateCw,
+                            contentDescription = stringResource(R.string.refresh),
+                            tint = radarColors().textSecondary,
+                        )
+                    }
                 }
             }
         },
@@ -152,15 +186,17 @@ fun AiArtifactsScreen(
                 FeatureFilterRow(
                     groups = state.groups,
                     selected = state.selectedKind,
-                    onSelect = { viewModel.onIntent(AiArtifactsIntent.SelectKind(it)) },
+                    onSelect = { onIntent(AiArtifactsIntent.SelectKind(it)) },
                 )
                 Spacer(Modifier.height(12.dp))
             }
 
             when {
-                state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                state.loading && slowLoad -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = radarColors().accent)
                 }
+
+                state.loading -> Spacer(Modifier.weight(1f))
 
                 state.items.isEmpty() -> EmptyState(
                     icon = Lucide.Sparkles,
@@ -177,7 +213,7 @@ fun AiArtifactsScreen(
                 else -> ArtifactList(
                     items = state.items,
                     timeFormat = timeFormat,
-                    onOpen = { viewModel.onIntent(AiArtifactsIntent.OpenDetail(it)) },
+                    onOpen = { onIntent(AiArtifactsIntent.OpenDetail(it)) },
                     // weight 只能在这一层给：ArtifactList 是独立的 @Composable，
                     // 它函数体内拿不到 ColumnScope，在里面写 Modifier.weight 编译不过。
                     modifier = Modifier.weight(1f),
@@ -192,8 +228,8 @@ fun AiArtifactsScreen(
             timeFormat = timeFormat,
             onOpenArticle = onOpenArticle,
             onOpenFeed = onOpenFeed,
-            onDelete = { viewModel.onIntent(AiArtifactsIntent.Delete(detail.item)) },
-            onDismiss = { viewModel.onIntent(AiArtifactsIntent.DismissDetail) },
+            onDelete = { onIntent(AiArtifactsIntent.Delete(detail.item)) },
+            onDismiss = { onIntent(AiArtifactsIntent.DismissDetail) },
         )
     }
 }

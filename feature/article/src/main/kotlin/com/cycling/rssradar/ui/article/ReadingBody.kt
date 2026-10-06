@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import com.cycling.rssradar.core.data.parser.FeedUrlResolver
 import com.cycling.rssradar.core.model.ReadingPosition
 import com.cycling.rssradar.core.model.TranslationDisplayState
 import com.cycling.rssradar.core.domain.reading.FindIndex
@@ -47,7 +48,7 @@ internal data class ReadingFind(
 
 @Composable
 
-fun ReadingBody(
+internal fun ReadingBody(
     article: ArticleWithFeed,
     isFetchingContent: Boolean,
     /**
@@ -72,6 +73,8 @@ fun ReadingBody(
     onHeaderScroll: (Int, Int) -> Unit,
     /** 本次打开要恢复的阅读位置（比例）；null = 不恢复（没读过、读过又回顶部、或已读完）。 */
     restoreRatio: Float? = null,
+    /** 到顶 / 到底的跳转请求（右下角悬浮按钮）。 */
+    jumpRequest: JumpRequest? = null,
     /** 阅读位置变化出口（已归一成比例）：上层只管写库，不必知道滚动宿主是哪一个。 */
     onPositionChange: (Float) -> Unit = {},
     onTitleMeasured: (Int) -> Unit,
@@ -116,10 +119,18 @@ fun ReadingBody(
     // 以前在 remember 里同步跑，正好砸在导航动画的帧上——表现为动画期间空白卡顿、
     // 正文"加载完才蹦出来"。改为后台线程计算，头部（源名/标题）立即渲染，解析完
     // 正文无缝接上；null = 还在算，正文区暂时留白。
+    // 这里**不把翻译状态放进 key**：translationSegments 每翻完一段就换成新列表，
+    // translationUi 也是每次重建的实例，任一个进 key 都会把 plan 反复清成 null
+    // ⇒ 正文每段都整体消失一次再出现（用户报的「翻一段闪一下」，一直到翻完）。
+    // 翻译 / 退出翻译 / 渐进更新都交给下面的 LaunchedEffect 重算后替换 plan，
+    // 重算期间保持上一版内容，因此只有真的换了整篇（content / summary / 渲染设置）才清空。
+    // 链接本身就是图片的文章：feed 既不给摘要也不给正文，唯一的「内容」就是那张图。
+    // 合成一个只含该图的最小 HTML，让它走正常的图片节点渲染（等比缩放、可点开大图），
+    // 同时 OnDemandFetch 那边也会因为「没有网页可抓」而跳过 ——— 两边都别把这类文章
+    // 当成「正文缺失」来处理。
+    val bodyContent = article.article.content ?: imageOnlyContentOf(article)
     var plan by remember(
-        translationUi,
-        translationSegments,
-        article.article.content,
+        bodyContent,
         article.article.summary,
         renderer,
         immersive,
@@ -130,7 +141,7 @@ fun ReadingBody(
     LaunchedEffect(
         translationUi,
         translationSegments,
-        article.article.content,
+        bodyContent,
         article.article.summary,
         renderer,
         immersive,
@@ -140,7 +151,7 @@ fun ReadingBody(
             resolveBodyPlan(
                 translationActive = translationUi != null,
                 translationSegments = translationSegments,
-                content = article.article.content,
+                content = bodyContent,
                 summary = article.article.summary,
                 renderer = renderer,
                 preferSummary = preferSummary,
@@ -170,7 +181,7 @@ fun ReadingBody(
     // 只有含图的 WebView 路受限，原生路与译文路没有这个约束。
     // 摘要模式下「当前正文」是 summary 而不是 content：视口判定与图片列表都得换源，
     // 否则会出现「按 content 判定无图 → 整页 WebView，实际渲染的是带图的摘要」这种错位。
-    val bodyHtml = if (resolvedPlan.summaryMode) article.article.summary else article.article.content
+    val bodyHtml = if (resolvedPlan.summaryMode) article.article.summary else bodyContent
     val viewport = shouldUseViewport(resolvedPlan.mode, bodyHtml)
 
     // 阅读位置记忆（一）恢复：整页模式由外层 Compose 滚，等正文高度落定（连续两次相同）再滚，
@@ -316,6 +327,7 @@ fun ReadingBody(
                 find = find,
                 onFindCount = onFindCount,
                 restoreRatio = restoreRatio,
+                jumpRequest = jumpRequest,
             )
             Spacer(Modifier.height(12.dp)) // 避让底部操作栏
         }
@@ -364,10 +376,26 @@ fun ReadingBody(
                 find = find,
                 onFindCount = onFindCount,
                 restoreRatio = restoreRatio,
+                jumpRequest = jumpRequest,
             )
             Spacer(Modifier.height(12.dp)) // 避让底部操作栏
         }
     }
+}
+
+/**
+ * 给「链接本身就是图片」的文章合成正文（必应每日壁纸这类源）。
+ *
+ * 这类源的条目：feed 既不给摘要也不给正文，`link` 直指一张 JPEG —— 没有网页可抓。
+ * 唯一的「内容」就是那张图，所以合成一个只含它的小 HTML，让渲染器按正常图片节点处理
+ * （等比缩放、可点开大图）。不这么做，正文区就是空树，阅读页只剩一行「抓取失败」。
+ *
+ * 只在 content 与 summary 都为空时才合成；有内容就用内容。
+ */
+private fun imageOnlyContentOf(article: ArticleWithFeed): String? {
+    val a = article.article
+    if (!a.content.isNullOrBlank() || !a.summary.isNullOrBlank()) return null
+    return FeedUrlResolver.imageUrlOrNull(a.link)?.let { """<img src="$it">""" }
 }
 
 /** 恢复前的等待上限：等正文高度"连续两次不变"，避免图片 reflow 后位置漂走。 */

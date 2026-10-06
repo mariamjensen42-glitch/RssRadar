@@ -25,7 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,13 +55,33 @@ import com.composables.icons.lucide.Trash2
  * 每条的左侧色条就是它被划下时的颜色，与正文里的底色同源（[AnnotationPalette]）。
  */
 @Composable
-fun AnnotationsScreen(
+fun AnnotationsDestination(
     onBack: () -> Unit,
     onOpenArticle: (Long) -> Unit,
     viewModel: AnnotationsViewModel = hiltViewModel(),
 ) {
-    val items by viewModel.items.collectAsState()
-    val pending by viewModel.pendingDelete.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    AnnotationsScreen(
+        items = state.items,
+        pending = state.pendingDelete,
+        onBack = onBack,
+        onOpenArticle = onOpenArticle,
+        onAskDelete = viewModel::askDelete,
+        onConfirmDelete = viewModel::confirmDelete,
+        onCancelDelete = viewModel::cancelDelete,
+    )
+}
+
+@Composable
+fun AnnotationsScreen(
+    items: List<AnnotationWithArticle>,
+    pending: AnnotationWithArticle?,
+    onBack: () -> Unit,
+    onOpenArticle: (Long) -> Unit,
+    onAskDelete: (AnnotationWithArticle) -> Unit = {},
+    onConfirmDelete: () -> Unit = {},
+    onCancelDelete: () -> Unit = {},
+) {
     val colors = radarColors()
 
     Column(
@@ -101,7 +121,7 @@ fun AnnotationsScreen(
                     AnnotationCard(
                         item = item,
                         onOpen = { onOpenArticle(item.annotation.articleId) },
-                        onDelete = { viewModel.askDelete(item) },
+                        onDelete = { onAskDelete(item) },
                     )
                 }
             }
@@ -115,8 +135,8 @@ fun AnnotationsScreen(
             confirmText = stringResource(UiR.string.delete),
             dismissText = stringResource(UiR.string.cancel),
             destructive = true,
-            onConfirm = viewModel::confirmDelete,
-            onDismiss = viewModel::cancelDelete,
+            onConfirm = onConfirmDelete,
+            onDismiss = onCancelDelete,
         )
     }
 }

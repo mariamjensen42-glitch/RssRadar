@@ -125,21 +125,21 @@ class TranslationSegmentsTest {
     }
 
     @Test
-    fun `pair - model returns fewer blocks leaves the tail untranslated`() {
+    fun `pair - fewer translated blocks falls back to whole-chunk pairing`() {
         val pairs = pairOf("<p>a</p><p>b</p><p>c</p>", "<p>甲</p>")
-        assertEquals(3, pairs.size)
+        // 块数对不上就整段一对：按索引硬配会让 b、c 永远等不到译文
+        assertEquals(1, pairs.size)
+        assertEquals("<p>a</p><p>b</p><p>c</p>", pairs[0].originalHtml)
         assertEquals("<p>甲</p>", pairs[0].translatedHtml)
-        assertEquals(null, pairs[1].translatedHtml)
-        assertEquals(null, pairs[2].translatedHtml)
     }
 
     @Test
-    fun `pair - model returns more blocks keeps extra translations at the tail`() {
+    fun `pair - extra translated blocks falls back to whole-chunk pairing`() {
         val pairs = pairOf("<p>a</p>", "<p>甲</p><p>乙</p>")
-        assertEquals(2, pairs.size)
-        assertEquals("<p>甲</p>", pairs[0].translatedHtml)
-        assertEquals("<p>乙</p>", pairs[1].translatedHtml)
-        assertEquals("", pairs[1].originalHtml) // 多出的译文没有对应原文，不凭空造原文
+        // 模型把一段拆成两块：整段兜住，否则原文块只拿到半截译文（句子看着被截断）
+        assertEquals(1, pairs.size)
+        assertEquals("<p>a</p>", pairs[0].originalHtml)
+        assertEquals("<p>甲</p><p>乙</p>", pairs[0].translatedHtml)
     }
 
     @Test

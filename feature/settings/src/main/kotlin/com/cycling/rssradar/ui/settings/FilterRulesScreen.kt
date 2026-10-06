@@ -17,37 +17,64 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import com.cycling.rssradar.core.domain.filter.FilterRule
-import com.cycling.rssradar.core.ui.theme.Danger
-import com.cycling.rssradar.core.ui.theme.radarColors
-import com.cycling.rssradar.core.ui.text.resolve
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.ArrowDown
 import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Trash2
+import com.cycling.rssradar.core.domain.filter.FilterRule
 import com.cycling.rssradar.core.ui.components.SettingsSubPage
-import androidx.compose.runtime.setValue
+import com.cycling.rssradar.core.ui.text.resolve
+import com.cycling.rssradar.core.ui.theme.Danger
+import com.cycling.rssradar.core.ui.theme.RssRadarTheme
+import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.theme.radarSwitchColors
+
+@Composable
+fun FilterRulesDestination(
+    onBack: () -> Unit = {},
+    viewModel: FilterRulesViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    FilterRulesScreen(
+        state = state,
+        onBack = onBack,
+        onStartCreate = viewModel::startCreate,
+        onStartEdit = viewModel::startEdit,
+        onCancelEdit = viewModel::cancelEdit,
+        onToggle = viewModel::toggle,
+        onMove = viewModel::move,
+        onDelete = viewModel::delete,
+        onPreview = viewModel::preview,
+        onSave = viewModel::save,
+    )
+}
 
 /** 本地关键词过滤规则：规则命中后的动作由 FilterRuleEngine 在刷新链与通知链执行。 */
 @Composable
 fun FilterRulesScreen(
-    viewModel: FilterRulesViewModel = hiltViewModel(),
+    state: FilterRulesViewModel.UiState,
     onBack: () -> Unit = {},
+    onStartCreate: () -> Unit = {},
+    onStartEdit: (FilterRule) -> Unit = {},
+    onCancelEdit: () -> Unit = {},
+    onToggle: (FilterRule, Boolean) -> Unit = { _, _ -> },
+    onMove: (FilterRule, Int) -> Unit = { _, _ -> },
+    onDelete: (Long) -> Unit = {},
+    onPreview: (FilterRule) -> Unit = {},
+    onSave: (FilterRule) -> Unit = {},
 ) {
-    val state by viewModel.state.collectAsState()
-
     Box(modifier = Modifier.fillMaxSize()) {
         SettingsSubPage(title = stringResource(R.string.rule_title), onBack = onBack) {
             if (state.rules.isEmpty()) {
@@ -63,11 +90,11 @@ fun FilterRulesScreen(
                         rule = rule,
                         canMoveUp = index > 0,
                         canMoveDown = index < state.rules.lastIndex,
-                        onToggle = { viewModel.toggle(rule, it) },
-                        onEdit = { viewModel.startEdit(rule) },
-                        onMoveUp = { viewModel.move(rule, -1) },
-                        onMoveDown = { viewModel.move(rule, 1) },
-                        onDelete = { viewModel.delete(rule.id) },
+                        onToggle = { onToggle(rule, it) },
+                        onEdit = { onStartEdit(rule) },
+                        onMoveUp = { onMove(rule, -1) },
+                        onMoveDown = { onMove(rule, 1) },
+                        onDelete = { onDelete(rule.id) },
                     )
                 }
             }
@@ -83,7 +110,7 @@ fun FilterRulesScreen(
         }
 
         FloatingActionButton(
-            onClick = viewModel::startCreate,
+            onClick = onStartCreate,
             containerColor = radarColors().accent,
             contentColor = radarColors().onAccent,
             modifier = Modifier
@@ -100,10 +127,10 @@ fun FilterRulesScreen(
             feeds = state.feeds,
             groups = state.groups,
             previewCount = state.previewCount,
-            onPreview = viewModel::preview,
-            onSave = viewModel::save,
-            onDelete = viewModel::delete,
-            onDismiss = viewModel::cancelEdit,
+            onPreview = onPreview,
+            onSave = onSave,
+            onDelete = onDelete,
+            onDismiss = onCancelEdit,
         )
     }
 }
@@ -152,10 +179,7 @@ private fun RuleCard(
                 Switch(
                     checked = rule.enabled,
                     onCheckedChange = onToggle,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = radarColors().onAccent,
-                        checkedTrackColor = radarColors().accent,
-                    ),
+                    colors = radarSwitchColors(),
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -193,5 +217,28 @@ private fun RuleCard(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true, name = "过滤规则 · 空态")
+@Composable
+private fun FilterRulesScreenEmptyPreview() {
+    RssRadarTheme(darkTheme = false) {
+        FilterRulesScreen(state = FilterRulesViewModel.UiState())
+    }
+}
+
+@Preview(showBackground = true, name = "过滤规则 · 有规则")
+@Composable
+private fun FilterRulesScreenPreview() {
+    RssRadarTheme(darkTheme = true) {
+        FilterRulesScreen(
+            state = FilterRulesViewModel.UiState(
+                rules = listOf(
+                    FilterRule(name = "隐藏剧透", pattern = "剧透"),
+                    FilterRule(name = "屏蔽广告", pattern = "广告", enabled = false),
+                ),
+            ),
+        )
     }
 }

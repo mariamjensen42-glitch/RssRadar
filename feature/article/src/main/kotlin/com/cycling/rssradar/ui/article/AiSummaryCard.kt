@@ -1,7 +1,7 @@
 package com.cycling.rssradar.ui.article
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,10 +21,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.ChevronDown
+import com.composables.icons.lucide.ChevronUp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
 import com.cycling.rssradar.core.ui.theme.radarColors
@@ -35,8 +38,9 @@ import androidx.compose.runtime.setValue
  * AI 摘要常驻卡片（issue #44）：空态给生成按钮不藏功能；生成中转圈；
  * 有摘要显示内容；失败显示原因并可重试。空态/失败引导统一由 VM 给中文文案。
  *
- * 摘要默认折叠为 3 行（真机反馈：长摘要全量铺开霸屏，正文被顶出首屏），
- * 点「展开」看全文；折叠态下卡片高度稳定，阅读动线不被摘要劫持。
+ * 摘要默认折叠为 3 行（真机反馈：长摘要全量铺开霸屏，正文被顶出首屏）。展开/收起的入口
+ * 固定在**标题行**（整行可点 + 行尾箭头），位置与展开与否无关；折叠态下卡片高度稳定，
+ * 阅读动线不被摘要劫持。
  */
 @Composable
 internal fun AiSummaryCard(
@@ -46,6 +50,9 @@ internal fun AiSummaryCard(
 ) {
     // 逐篇独立记忆；换文章（summary 变化）回到折叠态
     var expanded by remember(summary) { mutableStateOf(false) }
+    // 摘要够长才需要折叠。切换入口固定在标题行——原先放在摘要下方的 TextButton，
+    // 展开后会被全文推到卡片底部，得滚到底才收得起来（用户反馈「收起和展开不方便」）。
+    val collapsible = summary != null && summary.length > SUMMARY_COLLAPSE_CHARS
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = radarColors().surface1,
@@ -54,7 +61,21 @@ internal fun AiSummaryCard(
             .padding(horizontal = 20.dp),
     ) {
         Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (collapsible) {
+                            Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { expanded = !expanded }
+                                .padding(vertical = 6.dp)
+                        } else {
+                            Modifier
+                        },
+                    ),
+            ) {
                 Icon(Lucide.Sparkles, contentDescription = null, tint = radarColors().accent, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(
@@ -66,6 +87,17 @@ internal fun AiSummaryCard(
                 )
                 if (state is AiSummaryState.Generating) {
                     CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+                }
+                if (collapsible) {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        imageVector = if (expanded) Lucide.ChevronUp else Lucide.ChevronDown,
+                        contentDescription = stringResource(
+                            if (expanded) R.string.collapse else R.string.expand_full,
+                        ),
+                        tint = radarColors().accent,
+                        modifier = Modifier.size(18.dp),
+                    )
                 }
             }
             when {
@@ -87,25 +119,10 @@ internal fun AiSummaryCard(
                         text = summary,
                         color = radarColors().textPrimary,
                         style = MaterialTheme.typography.bodyMedium,
-                        // 折叠态 3 行截断；展开后全文
+                        // 折叠态 3 行截断；展开后全文。切换入口在标题行，不再压在正文末尾
                         maxLines = if (expanded) Int.MAX_VALUE else 3,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    // 摘要超过 3 行才给切换；短摘要不出现多余按钮
-                    if (summary.length > SUMMARY_COLLAPSE_CHARS) {
-                        TextButton(
-                            onClick = { expanded = !expanded },
-                            contentPadding = PaddingValues(horizontal = 8.dp),
-                            modifier = Modifier.padding(top = 2.dp),
-                        ) {
-                            Text(
-                                text = if (expanded) stringResource(R.string.collapse) else stringResource(R.string.expand_full),
-                                color = radarColors().accent,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                    }
                 }
                 else -> {
                     Spacer(Modifier.height(8.dp))

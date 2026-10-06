@@ -23,7 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +37,7 @@ import com.composables.icons.lucide.Lucide
 import com.cycling.rssradar.core.data.db.dao.ArticleDao
 import com.cycling.rssradar.core.data.db.projection.FeedOpenStat
 import com.cycling.rssradar.core.domain.stats.ReadingStatsDashboard
+import com.cycling.rssradar.core.ui.components.rememberSlowLoad
 import com.cycling.rssradar.core.ui.theme.radarColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -44,7 +45,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import androidx.compose.runtime.setValue
 
 /** 统计仪表盘 UiState（#83）：所有数字来自 DB 真实计算，一个都不许编。 */
 data class ReadingStatsUiState(
@@ -70,14 +70,23 @@ data class ReadingStatsUiState(
  * 统计仪表盘 VM（#83）：编排 SQL 原料与 [AiReadingStats] 纯函数。
  * 纯函数管算法，DAO 管取数，这里只拼装——保证每个数字都能回溯到一条查询。
  */
-/** 统计仪表盘页（#83）：一屏卡片，近 7 天滚动窗，无切换。 */
 @Composable
-fun ReadingStatsScreen(
+fun ReadingStatsDestination(
     onBack: () -> Unit,
     viewModel: ReadingStatsViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    ReadingStatsScreen(state = state, onBack = onBack)
+}
+
+/** 统计仪表盘页（#83）：一屏卡片，近 7 天滚动窗，无切换。 */
+@Composable
+fun ReadingStatsScreen(
+    state: ReadingStatsUiState,
+    onBack: () -> Unit,
+) {
     val colors = radarColors()
+    val slowLoad = rememberSlowLoad(!state.loaded)
 
     Column(
         modifier = Modifier
@@ -107,11 +116,13 @@ fun ReadingStatsScreen(
         Spacer(Modifier.height(16.dp))
 
         if (!state.loaded) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                CircularProgressIndicator(color = colors.accent)
+            if (slowLoad) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    CircularProgressIndicator(color = colors.accent)
+                }
             }
             return@Column
         }

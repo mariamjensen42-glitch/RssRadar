@@ -16,21 +16,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide
 import com.cycling.rssradar.core.model.AppLanguage
 import com.cycling.rssradar.core.model.LinkOpenMode
+import com.cycling.rssradar.core.model.LinkShareState
 import com.cycling.rssradar.core.model.ListDescMode
+import com.cycling.rssradar.core.model.ListDisplayState
 import com.cycling.rssradar.core.model.ListViewMode
 import com.cycling.rssradar.core.model.ShareContentFormat
 import com.cycling.rssradar.core.model.ThemeMode
@@ -42,17 +46,44 @@ import com.cycling.rssradar.core.ui.components.SegmentedChips
 import com.cycling.rssradar.core.ui.components.SettingSwitchRow
 import com.cycling.rssradar.core.ui.components.SettingsSubPage
 import com.cycling.rssradar.core.ui.labels.labelRes
+import com.cycling.rssradar.core.ui.theme.RssRadarTheme
 import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.supportsDynamicColor
-import androidx.compose.runtime.setValue
+
+@Composable
+fun SettingsGeneralDestination(
+    onBack: () -> Unit = {},
+    onOpenInterestProfile: () -> Unit = {},
+    viewModel: RssHubSettingsViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    SettingsGeneralScreen(
+        state = state,
+        onBack = onBack,
+        onOpenInterestProfile = onOpenInterestProfile,
+        onSetThemeMode = viewModel::setThemeMode,
+        onSetAppLanguage = viewModel::setAppLanguage,
+        onSetDynamicColor = viewModel::setDynamicColor,
+        onSetCustomAccent = viewModel::setCustomAccent,
+        onUpdateListDisplay = viewModel::updateListDisplay,
+        onSetRecommendationEnabled = viewModel::setRecommendationEnabled,
+        onUpdateLinkShare = viewModel::updateLinkShare,
+    )
+}
 
 @Composable
 fun SettingsGeneralScreen(
-    viewModel: RssHubSettingsViewModel = hiltViewModel(),
+    state: RssHubSettingsUiState,
     onBack: () -> Unit = {},
     onOpenInterestProfile: () -> Unit = {},
+    onSetThemeMode: (ThemeMode) -> Unit = {},
+    onSetAppLanguage: (AppLanguage) -> Unit = {},
+    onSetDynamicColor: (Boolean) -> Unit = {},
+    onSetCustomAccent: (Long?) -> Unit = {},
+    onUpdateListDisplay: ((ListDisplayState) -> ListDisplayState) -> Unit = {},
+    onSetRecommendationEnabled: (Boolean) -> Unit = {},
+    onUpdateLinkShare: ((LinkShareState) -> LinkShareState) -> Unit = {},
 ) {
-    val state by viewModel.state.collectAsState()
     var showLinkModeSheet by remember { mutableStateOf(false) }
     var showShareFormatSheet by remember { mutableStateOf(false) }
 
@@ -77,7 +108,7 @@ fun SettingsGeneralScreen(
                             options = ThemeMode.entries.toList(),
                             selected = state.themeMode,
                             label = { themeLabels.getValue(it) },
-                            onSelect = { viewModel.setThemeMode(it) },
+                            onSelect = onSetThemeMode,
                         )
                     }
                 }
@@ -110,7 +141,7 @@ fun SettingsGeneralScreen(
                             selected = state.appLanguage,
                             label = { languageLabels.getValue(it) },
                             onSelect = { language ->
-                                viewModel.setAppLanguage(language)
+                                onSetAppLanguage(language)
                                 if (com.cycling.rssradar.core.data.platform.AppLocales.apply(context, language)) {
                                     (context as? ComponentActivity)?.let { activity ->
                                         activity.recreate()
@@ -131,7 +162,7 @@ fun SettingsGeneralScreen(
                 SettingSwitchRow(
                     label = stringResource(R.string.dynamic_color),
                     checked = state.dynamicColor,
-                    onChange = { viewModel.setDynamicColor(it) },
+                    onChange = onSetDynamicColor,
                     enabled = dynamicSupported,
                     subtitle = if (dynamicSupported) {
                         stringResource(R.string.dynamic_color_desc)
@@ -143,7 +174,7 @@ fun SettingsGeneralScreen(
                 // 自定义强调色（#29）：与动态取色互斥，选了颜色即关掉跟随壁纸
                 AccentPicker(
                     customAccent = state.customAccent,
-                    onSelect = { viewModel.setCustomAccent(it) },
+                    onSelect = onSetCustomAccent,
                 )
             }
         }
@@ -153,7 +184,7 @@ fun SettingsGeneralScreen(
         // 列表显示（issue #56）
         SectionHeader(
             stringResource(R.string.list_display),
-            stringResource(R.string.list_display_desc),
+            description = stringResource(R.string.list_display_desc),
         )
         Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
@@ -175,29 +206,29 @@ fun SettingsGeneralScreen(
                             options = ListViewMode.entries.toList(),
                             selected = display.viewMode,
                             label = { viewModeLabels.getValue(it) },
-                            onSelect = { mode -> viewModel.updateListDisplay { it.copy(viewMode = mode) } },
+                            onSelect = { mode -> onUpdateListDisplay { it.copy(viewMode = mode) } },
                         )
                     }
                 }
                 SettingSwitchRow(
                     label = stringResource(R.string.show_feed_icon),
                     checked = display.showFeedIcon,
-                    onChange = { v -> viewModel.updateListDisplay { it.copy(showFeedIcon = v) } },
+                    onChange = { v -> onUpdateListDisplay { it.copy(showFeedIcon = v) } },
                 )
                 SettingSwitchRow(
                     label = stringResource(R.string.show_feed_name),
                     checked = display.showFeedName,
-                    onChange = { v -> viewModel.updateListDisplay { it.copy(showFeedName = v) } },
+                    onChange = { v -> onUpdateListDisplay { it.copy(showFeedName = v) } },
                 )
                 SettingSwitchRow(
                     label = stringResource(R.string.show_date),
                     checked = display.showDate,
-                    onChange = { v -> viewModel.updateListDisplay { it.copy(showDate = v) } },
+                    onChange = { v -> onUpdateListDisplay { it.copy(showDate = v) } },
                 )
                 SettingSwitchRow(
                     label = stringResource(R.string.show_thumbnail),
                     checked = display.showThumbnail,
-                    onChange = { v -> viewModel.updateListDisplay { it.copy(showThumbnail = v) } },
+                    onChange = { v -> onUpdateListDisplay { it.copy(showThumbnail = v) } },
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
@@ -215,26 +246,26 @@ fun SettingsGeneralScreen(
                             options = ListDescMode.entries.toList(),
                             selected = display.descMode,
                             label = { descModeLabels.getValue(it) },
-                            onSelect = { mode -> viewModel.updateListDisplay { it.copy(descMode = mode) } },
+                            onSelect = { mode -> onUpdateListDisplay { it.copy(descMode = mode) } },
                         )
                     }
                 }
                 SettingSwitchRow(
                     label = stringResource(R.string.sticky_date_header),
                     checked = display.stickyDateHeader,
-                    onChange = { v -> viewModel.updateListDisplay { it.copy(stickyDateHeader = v) } },
+                    onChange = { v -> onUpdateListDisplay { it.copy(stickyDateHeader = v) } },
                 )
                 SettingSwitchRow(
                     label = stringResource(R.string.dim_read),
                     checked = display.dimRead,
-                    onChange = { v -> viewModel.updateListDisplay { it.copy(dimRead = v) } },
+                    onChange = { v -> onUpdateListDisplay { it.copy(dimRead = v) } },
                 )
                 // 滚动自动标记已读（#11）：卡片滚出视口顶部即标为已读。默认关——
                 // 会改变用户数据，必须显式选择。
                 SettingSwitchRow(
                     label = stringResource(R.string.mark_read_on_scroll),
                     checked = display.markReadOnScroll,
-                    onChange = { v -> viewModel.updateListDisplay { it.copy(markReadOnScroll = v) } },
+                    onChange = { v -> onUpdateListDisplay { it.copy(markReadOnScroll = v) } },
                 )
             }
         }
@@ -244,14 +275,14 @@ fun SettingsGeneralScreen(
         // 推荐流（ADR-0013）
         SectionHeader(
             stringResource(R.string.recommendation),
-            stringResource(R.string.recommendation_desc),
+            description = stringResource(R.string.recommendation_desc),
         )
         Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 SettingSwitchRow(
                     label = stringResource(R.string.show_recommend_tab),
                     checked = state.recommendationEnabled,
-                    onChange = viewModel::setRecommendationEnabled,
+                    onChange = onSetRecommendationEnabled,
                 )
                 if (state.recommendationEnabled) {
                     Row(
@@ -283,7 +314,7 @@ fun SettingsGeneralScreen(
         // 链接与分享（#26）
         SectionHeader(
             stringResource(R.string.link_share),
-            stringResource(R.string.link_share_desc),
+            description = stringResource(R.string.link_share_desc),
         )
         Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
@@ -310,10 +341,10 @@ fun SettingsGeneralScreen(
 
         // 检查更新（#35）：只查 latest release，不自动下载安装——装包必须过用户这一关，
         // 这里只负责把「有新版本」和去 Release 页的链接摆出来。
-        SectionHeader(stringResource(R.string.about), stringResource(R.string.about_desc))
+        SectionHeader(stringResource(R.string.about), description = stringResource(R.string.about_desc))
         Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                UpdateCheckRow()
+                UpdateCheckRowDestination()
             }
         }
         Spacer(Modifier.height(24.dp))
@@ -326,7 +357,7 @@ fun SettingsGeneralScreen(
             options = LinkOpenMode.entries.toList(),
             selected = state.linkShare.linkOpenMode,
             label = { linkModeLabels.getValue(it) },
-            onSelect = { mode -> viewModel.updateLinkShare { it.copy(linkOpenMode = mode) } },
+            onSelect = { mode -> onUpdateLinkShare { it.copy(linkOpenMode = mode) } },
             onDismiss = { showLinkModeSheet = false },
         )
     }
@@ -338,10 +369,24 @@ fun SettingsGeneralScreen(
             options = ShareContentFormat.entries.toList(),
             selected = state.linkShare.shareFormat,
             label = { shareFormatLabels.getValue(it) },
-            onSelect = { format -> viewModel.updateLinkShare { it.copy(shareFormat = format) } },
+            onSelect = { format -> onUpdateLinkShare { it.copy(shareFormat = format) } },
             onDismiss = { showShareFormatSheet = false },
         )
     }
 }
 
-// —— 2. 同步与清理：自动同步 / 文章清理 / 新文章通知 ——
+@Preview(showBackground = true, name = "通用设置 · 浅色")
+@Composable
+private fun SettingsGeneralScreenPreview() {
+    RssRadarTheme(darkTheme = false) {
+        SettingsGeneralScreen(state = RssHubSettingsUiState())
+    }
+}
+
+@Preview(showBackground = true, name = "通用设置 · 深色")
+@Composable
+private fun SettingsGeneralScreenDarkPreview() {
+    RssRadarTheme(darkTheme = true) {
+        SettingsGeneralScreen(state = RssHubSettingsUiState())
+    }
+}

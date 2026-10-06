@@ -43,7 +43,7 @@
 | 28 | 分组筛选（下沉 DB 查询） | issue #74 |
 | 29 | 分页加载（30 / 页） | `PagedSnapshot` |
 | 30 | 下拉全量刷新 + n/N 进度 | `FeedListScreen` |
-| 31 | 视图模式 4 种（列表 / 卡片 / 杂志 / 网格） | `ListViewMode` |
+| 31 | 视图模式 4 种（列表 / 卡片 / 杂志 / 网格＝瀑布流） | `ListViewMode` |
 | 32 | 列表显示项 7 项可配（图标 / 名称 / 日期 / 缩略图 / 描述 / 粘性日期头 / 已读进度） | `ListDisplayStore`（issue #56） |
 | 33 | 摘要行数 3 档（关 / 短 / 长） | `ListDescMode` |
 | 34 | 已读灰显 | `dimRead` |

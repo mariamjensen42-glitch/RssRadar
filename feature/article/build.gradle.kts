@@ -47,6 +47,14 @@ dependencies {
     // 正文渲染（ReadingNodes / ReadingDenoise）直接在 UI 侧解析 HTML。
     implementation(libs.jsoup)
 
+    // 正文媒体内嵌播放（ADR-0018）：ExoPlayer 解码直链视频/音频，PlayerSurface 出画面。
+    // 不复用 core:playback 的后台播放链（那是播客语义：MediaSession + 前台服务 + 通知栏，
+    // 退出页面继续响），正文媒体是页面内的一次性播放，两条链生命周期相反。
+    implementation(libs.androidx.media3.common)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui.compose)
+
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    debugImplementation(libs.androidx.compose.ui.tooling)
 }

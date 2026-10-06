@@ -107,7 +107,11 @@ class AiRepository(
         }
 
     /**
-     * 生成 AI 摘要并入库。来源优先正文纯文本、退回摘要；两者皆无则拒绝生成——不编造。
+     * 生成 AI 摘要并入库（阅读页「生成摘要」走这条）。来源优先正文纯文本、退回摘要；
+     * 两者皆无则拒绝生成——不编造。
+     *
+     * 提示词取 [DEFAULT_SUMMARY_SYSTEM]，与 [AiFeatureRunner] 那条自动摘要路径**共用同一份**：
+     * 这里原先带一份内容重复的私有副本，改 prompt 时极易只改一处、另一处照旧生效。
      */
     suspend fun generateSummary(articleId: Long): SummaryOutcome {
         if (!featureStore.isEnabled(AiFeature.SUMMARY)) {
@@ -121,7 +125,7 @@ class AiRepository(
         val (input, truncated) = AiText.truncateForPrompt(source)
         return try {
             // 低 temperature 压发散：摘要要忠实原文，不要模型自由发挥
-            val text = chatGuarded(SUMMARY_SYSTEM, input, 0.4)
+            val text = chatGuarded(DEFAULT_SUMMARY_SYSTEM, input, 0.4)
                 ?: return SummaryOutcome.OutOfBudget
             val summary = if (truncated) text + AiText.truncationNote(input.length) else text
             // 入库前截断（CursorWindow 防线）：列表流会连 aiSummary 一起查出，
@@ -199,25 +203,6 @@ class AiRepository(
     }
 
     companion object {
-        // 提示词设计（用户反馈"摘要不好"后的优化）：
-        // - 先一句核心结论再列要点，信息密度优先，禁止"本文介绍了"式套话；
-        // - 要点行用「· 」前缀，摘要卡片按纯文本多行渲染，视觉上即分点；
-        // - 低信息量文章（公告/短讯）允许只输出一句，不硬凑；
-        // - 忠实原文 + 保留数字与专名，延续 AI 不捏造原则（ADR-0005）。
-        private const val SUMMARY_SYSTEM =
-            "你是 RSS 阅读器里的中文导读编辑。基于用户提供的文章内容写一份摘要，" +
-                "让读者不点开全文也能抓住重点。\n" +
-                "要求：\n" +
-                "1. 第一行用一句话点明文章的核心结论或主旨，直接陈述，" +
-                "禁止用「本文介绍了」「这篇文章讲述了」之类的套话开头。\n" +
-                "2. 之后用 2 到 4 行以「· 」开头的要点，每行一个关键信息" +
-                "（事实、数据、观点或结论），按重要性排序。\n" +
-                "3. 忠实于原文：只使用文中真实出现的信息，数字、人名、专有名词照原文写，" +
-                "禁止编造、禁止推测、禁止添加文中没有的内容。\n" +
-                "4. 信息密度优先：宁短勿空，不复述显而易见的废话，不为凑句数注水。\n" +
-                "5. 若文章本身信息量很少（如简短公告、快讯），只输出第一行那一句话即可。\n" +
-                "6. 直接输出摘要本身，不要任何前缀、标题或解释。"
-
         // 逐块配对（双语一一对应）的前提：译文块数/块序必须与原文严格一致，
         // 否则 UI 侧按索引配对就会错位。因此把"不合并、不拆分、不增删块"写成硬约束。
         private const val TRANSLATE_SYSTEM =

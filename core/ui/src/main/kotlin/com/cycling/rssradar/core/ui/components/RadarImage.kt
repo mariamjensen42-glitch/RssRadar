@@ -5,10 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -40,10 +37,12 @@ fun RadarImage(
     contentScale: ContentScale = ContentScale.Crop,
     fallback: ImageVector? = null,
     fallbackSize: Dp = 18.dp,
+    /** 解码成功后回报像素尺寸（供瀑布流按原始比例定高）。同一 url 可能被调多次，调用方自行按 url 去重。 */
+    onImageSize: ((width: Int, height: Int) -> Unit)? = null,
 ) {
-    var failed by remember(url) { mutableStateOf(false) }
-    // Loading 态驱动 shimmer：首帧即视为加载中（缓存命中时 coil 首个 onState 会立刻纠正）
-    var loading by remember(url) { mutableStateOf(true) }
+    val loadState = rememberImageLoadState(url)
+    val failed = loadState.failed
+    val loading = loadState.loading
     val context = LocalContext.current
     val reducedMotion = LocalReducedMotion.current
     Box(
@@ -72,9 +71,11 @@ fun RadarImage(
                 contentDescription = contentDescription,
                 contentScale = contentScale,
                 onState = { state ->
-                    failed = state is coil3.compose.AsyncImagePainter.State.Error
-                    loading = state is coil3.compose.AsyncImagePainter.State.Empty ||
-                        state is coil3.compose.AsyncImagePainter.State.Loading
+                    loadState.onState(state)
+                    if (state is coil3.compose.AsyncImagePainter.State.Success) {
+                        val image = state.result.image
+                        onImageSize?.invoke(image.width, image.height)
+                    }
                 },
                 modifier = Modifier.matchParentSize(),
             )

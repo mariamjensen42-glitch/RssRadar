@@ -27,16 +27,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -55,6 +55,7 @@ import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.text.resolve
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import com.cycling.rssradar.core.ui.theme.radarSwitchColors
 
 /**
  * AI 智能功能总览：35 项功能的独立开关、用量看板、任务队列与预算设置。
@@ -68,8 +69,7 @@ import androidx.compose.runtime.setValue
  * 3. **分组标题带 n/m 与一键全开全关**：先整组关掉再逐个试，是这类功能最省心的上手方式。
  */
 @Composable
-fun AiFeaturesScreen(
-    viewModel: AiFeaturesViewModel = hiltViewModel(),
+fun AiFeaturesDestination(
     onBack: () -> Unit,
     /**
      * 打开 AI 产物中心。参数是预选功能的 dbValue（null = 全部）。
@@ -79,15 +79,38 @@ fun AiFeaturesScreen(
      * 藏深了等于又一次"跑成功了但看不到结果"。
      */
     onOpenArtifacts: (Int?) -> Unit = { _ -> },
+    viewModel: AiFeaturesViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    AiFeaturesScreen(
+        state = state,
+        onBack = onBack,
+        onOpenArtifacts = onOpenArtifacts,
+        onIntent = viewModel::onIntent,
+    )
+}
+
+@Composable
+fun AiFeaturesScreen(
+    state: AiFeaturesUiState,
+    onBack: () -> Unit,
+    /**
+     * 打开 AI 产物中心。参数是预选功能的 dbValue（null = 全部）。
+     *
+     * 入口刻意放在这一页而不是只放在设置页：用户开启功能后第一反应是回来找结果，
+     * 而一部分功能没有专属展示位——产物中心（按功能筛选）是它们的出口，
+     * 藏深了等于又一次"跑成功了但看不到结果"。
+     */
+    onOpenArtifacts: (Int?) -> Unit = { _ -> },
+    onIntent: (AiFeaturesIntent) -> Unit,
+) {
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(state.message) {
         val message = state.message ?: return@LaunchedEffect
         snackbar.showSnackbar(message.resolve(context))
-        viewModel.onIntent(AiFeaturesIntent.ConsumeMessage)
+        onIntent(AiFeaturesIntent.ConsumeMessage)
     }
 
     Scaffold(
@@ -152,8 +175,8 @@ fun AiFeaturesScreen(
             contentPadding = PaddingValues(bottom = 96.dp),
         ) {
             item { UsageCard(state.budget) }
-            item { BudgetSection(state.budget, viewModel) }
-            item { QueueSection(state.queue, state.running, viewModel) }
+            item { BudgetSection(state.budget, onIntent) }
+            item { QueueSection(state.queue, state.running, onIntent) }
 
             AiCategory.entries.forEach { category ->
                 item {
@@ -161,7 +184,7 @@ fun AiFeaturesScreen(
                         category = category,
                         settings = state.settings,
                         onSetAll = { enabled ->
-                            viewModel.onIntent(AiFeaturesIntent.SetCategory(category, enabled))
+                            onIntent(AiFeaturesIntent.SetCategory(category, enabled))
                         },
                     )
                 }
@@ -170,8 +193,8 @@ fun AiFeaturesScreen(
                         feature = feature,
                         enabled = state.settings.isEnabled(feature),
                         running = state.running,
-                        onToggle = { viewModel.onIntent(AiFeaturesIntent.Toggle(feature)) },
-                        onRun = { viewModel.onIntent(AiFeaturesIntent.RunFeature(feature)) },
+                        onToggle = { onIntent(AiFeaturesIntent.Toggle(feature)) },
+                        onRun = { onIntent(AiFeaturesIntent.RunFeature(feature)) },
                         onOpenResults = { onOpenArtifacts(feature.dbValue) },
                     )
                 }
@@ -182,10 +205,10 @@ fun AiFeaturesScreen(
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    TextButton(onClick = { viewModel.onIntent(AiFeaturesIntent.ResetDefaults) }) {
+                    TextButton(onClick = { onIntent(AiFeaturesIntent.ResetDefaults) }) {
                         Text(stringResource(R.string.restore_defaults), color = radarColors().textSecondary)
                     }
-                    TextButton(onClick = { viewModel.onIntent(AiFeaturesIntent.DisableAllPaid) }) {
+                    TextButton(onClick = { onIntent(AiFeaturesIntent.DisableAllPaid) }) {
                         Text(stringResource(R.string.disable_all_paid), color = radarColors().textSecondary)
                     }
                 }
@@ -276,7 +299,10 @@ private fun FeatureRow(
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = colors.surface1,
-        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { expanded = !expanded },
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -298,10 +324,7 @@ private fun FeatureRow(
                 Switch(
                     checked = enabled,
                     onCheckedChange = onToggle,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = colors.onAccent,
-                        checkedTrackColor = colors.accent,
-                    ),
+                    colors = radarSwitchColors(),
                 )
             }
 

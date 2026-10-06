@@ -93,7 +93,17 @@ data class ArticleMenuActions(
      * 在推荐流里降权。只有推荐流传这个回调——常规列表不做推荐负反馈。
      */
     val onReduceSuch: (() -> Unit)? = null,
-)
+) {
+    /**
+     * 菜单实际渲染的项数：只有「减少此类」（ADR-0013）一个可选动作，所以是 7 或 8。
+     * 长按偏移 [articleMenuOffset] 要用它估算高度，而调用方不在本文件——写死两遍必然漂移。
+     */
+    val itemCount: Int get() = BASE_ITEM_COUNT + if (onReduceSuch != null) 1 else 0
+
+    private companion object {
+        const val BASE_ITEM_COUNT = 7
+    }
+}
 
 /**
  * 文章项长按上下文菜单（DropdownMenu，issue #46）。
@@ -105,6 +115,7 @@ fun ArticleContextMenu(
     expanded: Boolean,
     actions: ArticleMenuActions,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
     /**
      * 菜单相对锚点（卡片 Box）默认落点（左下角）的偏移。
      * 调用方传长按手指位置换算出的偏移，让菜单出现在手指处；
@@ -119,6 +130,7 @@ fun ArticleContextMenu(
         expanded = expanded,
         onDismissRequest = onDismiss,
         offset = offset,
+        modifier = modifier,
         shape = RoundedCornerShape(14.dp),
         containerColor = radarColors().surface1,
         tonalElevation = 0.dp,

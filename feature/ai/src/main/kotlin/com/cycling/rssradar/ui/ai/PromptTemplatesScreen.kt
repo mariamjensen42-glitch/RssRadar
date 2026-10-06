@@ -4,6 +4,7 @@ import com.cycling.rssradar.core.ui.R as UiR
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.res.stringResource
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
+import com.cycling.rssradar.core.ui.components.rememberSlowLoad
 import com.cycling.rssradar.core.ui.text.UiText
 import com.cycling.rssradar.core.ui.text.resolve
 import androidx.compose.foundation.layout.Arrangement
@@ -34,7 +35,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.platform.LocalContext
@@ -43,14 +43,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -66,6 +66,7 @@ import com.cycling.rssradar.core.data.db.FeedAiProfileDao
 import com.cycling.rssradar.core.data.db.FeedAiProfileEntity
 import com.cycling.rssradar.core.data.db.dao.FeedDao
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -87,13 +88,23 @@ import javax.inject.Inject
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PromptTemplatesScreen(
-    viewModel: PromptTemplatesViewModel = hiltViewModel(),
+fun PromptTemplatesDestination(
     onBack: () -> Unit,
+    viewModel: PromptTemplatesViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    PromptTemplatesScreen(state = state, onBack = onBack, onIntent = viewModel::onIntent)
+}
+
+@Composable
+fun PromptTemplatesScreen(
+    state: PromptTemplatesUiState,
+    onBack: () -> Unit,
+    onIntent: (PromptTemplatesIntent) -> Unit,
+) {
     var editing by remember { mutableStateOf<FeedPromptOverride?>(null) }
     var adding by remember { mutableStateOf(false) }
+    val slowLoad = rememberSlowLoad(state.loading)
     val colors = radarColors()
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
@@ -102,7 +113,7 @@ fun PromptTemplatesScreen(
     LaunchedEffect(state.message) {
         val message = state.message ?: return@LaunchedEffect
         snackbar.showSnackbar(message.resolve(context))
-        viewModel.onIntent(PromptTemplatesIntent.ConsumeMessage)
+        onIntent(PromptTemplatesIntent.ConsumeMessage)
     }
 
     Scaffold(
@@ -135,8 +146,10 @@ fun PromptTemplatesScreen(
         },
     ) { padding ->
         if (state.loading) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = colors.accent)
+            if (slowLoad) {
+                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = colors.accent)
+                }
             }
             return@Scaffold
         }
@@ -178,6 +191,7 @@ fun PromptTemplatesScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 8.dp)
+                            .clip(RoundedCornerShape(12.dp))
                             .clickable { editing = item },
                     ) {
                         Column(Modifier.padding(14.dp)) {
@@ -230,11 +244,11 @@ fun PromptTemplatesScreen(
             title = item.feedTitle,
             initial = item.prompt,
             onSave = { text ->
-                viewModel.onIntent(PromptTemplatesIntent.SavePrompt(item.feedId, text))
+                onIntent(PromptTemplatesIntent.SavePrompt(item.feedId, text))
                 editing = null
             },
             onClear = {
-                viewModel.onIntent(PromptTemplatesIntent.ClearPrompt(item.feedId))
+                onIntent(PromptTemplatesIntent.ClearPrompt(item.feedId))
                 editing = null
             },
             onDismiss = { editing = null },
@@ -294,15 +308,7 @@ private fun PromptEditSheet(
                 modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
                 placeholder = { Text(stringResource(R.string.prompt_save_hint), color = colors.textTertiary, style = MaterialTheme.typography.bodyMedium) },
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = colors.surface2,
-                    unfocusedContainerColor = colors.surface2,
-                    focusedBorderColor = colors.accent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = colors.textPrimary,
-                    unfocusedTextColor = colors.textPrimary,
-                    cursorColor = colors.accent,
-                ),
+                colors = radarOutlinedTextFieldColors(),
             )
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -352,15 +358,7 @@ private fun FeedPickSheet(
                 placeholder = { Text(stringResource(R.string.prompt_search_feed), color = colors.textTertiary, style = MaterialTheme.typography.bodyMedium) },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = colors.surface2,
-                    unfocusedContainerColor = colors.surface2,
-                    focusedBorderColor = colors.accent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = colors.textPrimary,
-                    unfocusedTextColor = colors.textPrimary,
-                    cursorColor = colors.accent,
-                ),
+                colors = radarOutlinedTextFieldColors(),
             )
             Spacer(Modifier.height(10.dp))
             val matched = remember(query, feeds) {
@@ -375,7 +373,10 @@ private fun FeedPickSheet(
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = colors.surface1,
-                        modifier = Modifier.fillMaxWidth().clickable { onPicked(option) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { onPicked(option) },
                     ) {
                         Text(
                             text = option.feedTitle,

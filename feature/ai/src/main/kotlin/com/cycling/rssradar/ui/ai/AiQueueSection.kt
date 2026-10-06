@@ -31,7 +31,7 @@ import androidx.compose.runtime.setValue
 internal fun QueueSection(
     queue: AiQueueSnapshot,
     running: Boolean,
-    viewModel: AiFeaturesViewModel,
+    onIntent: (AiFeaturesIntent) -> Unit,
 ) {
     val colors = radarColors()
     // 清空待执行是批量丢弃（UI 审计 M3）：二次确认，不一键直发
@@ -55,11 +55,11 @@ internal fun QueueSection(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(
                     enabled = !running,
-                    onClick = { viewModel.onIntent(AiFeaturesIntent.RunNow) },
+                    onClick = { onIntent(AiFeaturesIntent.RunNow) },
                 ) {
                     Text(if (running) stringResource(R.string.running_now) else stringResource(R.string.run_now), color = colors.accent)
                 }
-                TextButton(onClick = { viewModel.onIntent(AiFeaturesIntent.RetryFailed) }) {
+                TextButton(onClick = { onIntent(AiFeaturesIntent.RetryFailed) }) {
                     Text(stringResource(R.string.retry_failed), color = colors.textSecondary)
                 }
                 TextButton(onClick = { confirmClearPending = true }) {
@@ -79,7 +79,7 @@ internal fun QueueSection(
             confirmButton = {
                 TextButton(onClick = {
                     confirmClearPending = false
-                    viewModel.onIntent(AiFeaturesIntent.ClearPending)
+                    onIntent(AiFeaturesIntent.ClearPending)
                 }) {
                     Text(stringResource(R.string.clear), color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
                 }

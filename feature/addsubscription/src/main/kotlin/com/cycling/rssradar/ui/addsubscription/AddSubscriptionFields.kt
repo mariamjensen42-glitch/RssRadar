@@ -13,13 +13,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -29,6 +28,7 @@ import com.composables.icons.lucide.Rss
 import com.composables.icons.lucide.Search
 import com.cycling.rssradar.core.data.service.DiscoveredFeed
 import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
 
 @Composable
 internal fun UrlField(
@@ -61,15 +61,7 @@ internal fun UrlField(
             }
         },
         shape = RoundedCornerShape(12.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = radarColors().surface2,
-            unfocusedContainerColor = radarColors().surface2,
-            focusedBorderColor = radarColors().accent,
-            unfocusedBorderColor = Color.Transparent,
-            focusedTextColor = radarColors().textPrimary,
-            unfocusedTextColor = radarColors().textPrimary,
-            cursorColor = radarColors().accent,
-        ),
+        colors = radarOutlinedTextFieldColors(),
     )
 }
 
@@ -91,15 +83,7 @@ internal fun SearchField(
             Icon(Lucide.Search, contentDescription = null, tint = radarColors().textTertiary)
         },
         shape = RoundedCornerShape(12.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = radarColors().surface2,
-            unfocusedContainerColor = radarColors().surface2,
-            focusedBorderColor = radarColors().accent,
-            unfocusedBorderColor = Color.Transparent,
-            focusedTextColor = radarColors().textPrimary,
-            unfocusedTextColor = radarColors().textPrimary,
-            cursorColor = radarColors().accent,
-        ),
+        colors = radarOutlinedTextFieldColors(),
     )
 }
 
@@ -114,6 +98,7 @@ internal fun DiscoveredFeedRow(
         color = radarColors().surface1,
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
     ) {
         Row(
