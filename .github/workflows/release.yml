@@ -88,15 +88,21 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-dryrun
+          name: RssRadar-dryrun-${{ github.ref_name }}
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
       - name: Compute SHA-256
         id: checksum
         working-directory: app/build/outputs/apk/release
+        # 顺便把产物按版本号改名：`app-release.apk` 是 Gradle 的默认产物名，直接挂到
+        # Release 上，用户下载下来分不清是哪个版本。改名后 SHA-256 里记的也是新名字，
+        # 两边对得上（否则校验文件引用的会是个 release 上根本不存在的文件名）。
         run: |
-          sha256sum app-release.apk > SHA-256.txt
+          APK_NAME="RssRadar-${GITHUB_REF_NAME}.apk"
+          cp app-release.apk "$APK_NAME"
+          sha256sum "$APK_NAME" > SHA-256.txt
+          echo "apk_name=$APK_NAME" >> "$GITHUB_OUTPUT"
           echo "sha256=$(awk '{print $1}' SHA-256.txt)" >> "$GITHUB_OUTPUT"
 
       - name: Report APK size and R8 diagnostics
@@ -209,7 +215,7 @@ jobs:
         # （Release.target_commitish is invalid），所以这里给 SHA。
         run: |
           gh release create "${{ github.ref_name }}" \
-            app/build/outputs/apk/release/app-release.apk \
+            "app/build/outputs/apk/release/${{ steps.checksum.outputs.apk_name }}" \
             app/build/outputs/apk/release/SHA-256.txt \
             --target "$(git rev-parse HEAD)" \
             --title "RssRadar ${{ github.ref_name }}" \
