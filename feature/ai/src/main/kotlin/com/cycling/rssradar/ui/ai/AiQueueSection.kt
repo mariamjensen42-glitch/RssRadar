@@ -23,7 +23,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.ai.AiQueueSnapshot
-import com.cycling.rssradar.core.ui.theme.radarColors
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
@@ -33,23 +32,23 @@ internal fun QueueSection(
     running: Boolean,
     onIntent: (AiFeaturesIntent) -> Unit,
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     // 清空待执行是批量丢弃（UI 审计 M3）：二次确认，不一键直发
     var confirmClearPending by remember { mutableStateOf(false) }
-    Surface(shape = RoundedCornerShape(14.dp), color = colors.surface1) {
+    Surface(shape = RoundedCornerShape(14.dp), color = colors.surfaceContainerLowest) {
         Column(Modifier.padding(16.dp)) {
             Text(
                 stringResource(R.string.queue_title),
                 style = MaterialTheme.typography.titleSmall,
-                color = colors.textPrimary,
+                color = colors.onSurface,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth()) {
-                QueueStat(stringResource(R.string.status_pending), queue.pending, colors.textPrimary)
-                QueueStat(stringResource(R.string.status_running), queue.running, colors.accent)
-                QueueStat(stringResource(R.string.status_done), queue.done, colors.textTertiary)
-                QueueStat(stringResource(R.string.status_failed), queue.failed, colors.textTertiary)
+                QueueStat(stringResource(R.string.status_pending), queue.pending, colors.onSurface)
+                QueueStat(stringResource(R.string.status_running), queue.running, colors.primary)
+                QueueStat(stringResource(R.string.status_done), queue.done, colors.onSurfaceVariant)
+                QueueStat(stringResource(R.string.status_failed), queue.failed, colors.onSurfaceVariant)
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -57,13 +56,13 @@ internal fun QueueSection(
                     enabled = !running,
                     onClick = { onIntent(AiFeaturesIntent.RunNow) },
                 ) {
-                    Text(if (running) stringResource(R.string.running_now) else stringResource(R.string.run_now), color = colors.accent)
+                    Text(if (running) stringResource(R.string.running_now) else stringResource(R.string.run_now), color = colors.primary)
                 }
                 TextButton(onClick = { onIntent(AiFeaturesIntent.RetryFailed) }) {
-                    Text(stringResource(R.string.retry_failed), color = colors.textSecondary)
+                    Text(stringResource(R.string.retry_failed), color = colors.onSurfaceVariant)
                 }
                 TextButton(onClick = { confirmClearPending = true }) {
-                    Text(stringResource(R.string.clear_pending), color = colors.textSecondary)
+                    Text(stringResource(R.string.clear_pending), color = colors.onSurfaceVariant)
                 }
             }
         }
@@ -71,9 +70,9 @@ internal fun QueueSection(
     if (confirmClearPending) {
         AlertDialog(
             onDismissRequest = { confirmClearPending = false },
-            containerColor = colors.surface1,
-            titleContentColor = colors.textPrimary,
-            textContentColor = colors.textSecondary,
+            containerColor = colors.surfaceContainerLowest,
+            titleContentColor = colors.onSurface,
+            textContentColor = colors.onSurfaceVariant,
             title = { Text(stringResource(R.string.clear_pending), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
             text = { Text(stringResource(R.string.clear_pending_warning, queue.pending)) },
             confirmButton = {
@@ -81,12 +80,12 @@ internal fun QueueSection(
                     confirmClearPending = false
                     onIntent(AiFeaturesIntent.ClearPending)
                 }) {
-                    Text(stringResource(R.string.clear), color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.clear), color = colors.onSurface, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { confirmClearPending = false }) {
-                    Text(stringResource(UiR.string.cancel), color = colors.textTertiary)
+                    Text(stringResource(UiR.string.cancel), color = colors.onSurfaceVariant)
                 }
             },
         )
@@ -95,7 +94,7 @@ internal fun QueueSection(
 
 @Composable
 private fun QueueStat(label: String, value: Int, color: Color) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     Column(Modifier.padding(end = 18.dp)) {
         Text(
             value.toString(),
@@ -103,7 +102,7 @@ private fun QueueStat(label: String, value: Int, color: Color) {
             color = color,
             fontWeight = FontWeight.SemiBold,
         )
-        Text(label, style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
     }
 }
 

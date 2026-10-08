@@ -65,7 +65,6 @@ import com.cycling.rssradar.core.data.ai.AiPrompts
 import com.cycling.rssradar.core.data.db.FeedAiProfileDao
 import com.cycling.rssradar.core.data.db.FeedAiProfileEntity
 import com.cycling.rssradar.core.data.db.dao.FeedDao
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -78,7 +77,7 @@ import javax.inject.Inject
 /**
  * 提示词模板管理页（AiFeature.PROMPT_TEMPLATE 的专属出口）。
  *
- * 覆盖能力只有一条真实存在的路径：**订阅源级摘要提示词**（SUMMARY 是 35 项里
+ * 覆盖能力只有一条真实存在的路径：**订阅源级摘要提示词**（SUMMARY 是 16 项里
  * 唯一支持覆盖的功能——不同源的信息密度差得远，共用一套模板必然有一边不合适）。
  * 本页因此做三件事，且只做这三件：
  * 1. 集中管理已有覆盖（单源入口在订阅源操作页，那里有上下文；这里是全局视图）；
@@ -105,11 +104,11 @@ fun PromptTemplatesScreen(
     var editing by remember { mutableStateOf<FeedPromptOverride?>(null) }
     var adding by remember { mutableStateOf(false) }
     val slowLoad = rememberSlowLoad(state.loading)
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
 
-    // message 之前只置位不显示（反馈黑洞）；补 snackbar 消费（ADR-0017 顺带修复）
+    // message 之前只置位不显示（反馈黑洞）；补 snackbar 消费（顺带修复）
     LaunchedEffect(state.message) {
         val message = state.message ?: return@LaunchedEffect
         snackbar.showSnackbar(message.resolve(context))
@@ -117,7 +116,7 @@ fun PromptTemplatesScreen(
     }
 
     Scaffold(
-        containerColor = colors.bgRoot,
+        containerColor = colors.surface,
         snackbarHost = { AppSnackbarHost(snackbar) },
         topBar = {
             Row(
@@ -128,19 +127,19 @@ fun PromptTemplatesScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = colors.textPrimary)
+                    Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = colors.onSurface)
                 }
                 Text(
                     text = stringResource(R.string.prompt_title),
                     style = MaterialTheme.typography.titleMedium,
-                    color = colors.textPrimary,
+                    color = colors.onSurface,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { adding = true }) {
-                    Icon(Lucide.Plus, contentDescription = null, tint = colors.accent, modifier = Modifier.size(16.dp))
+                    Icon(Lucide.Plus, contentDescription = null, tint = colors.primary, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.prompt_add), color = colors.accent, style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.prompt_add), color = colors.primary, style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
@@ -148,7 +147,7 @@ fun PromptTemplatesScreen(
         if (state.loading) {
             if (slowLoad) {
                 Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = colors.accent)
+                    CircularProgressIndicator(color = colors.primary)
                 }
             }
             return@Scaffold
@@ -163,23 +162,23 @@ fun PromptTemplatesScreen(
             Text(
                 text = stringResource(R.string.prompt_page_desc, AiPrompts.summaryVariables().joinToString("，")),
                 style = MaterialTheme.typography.bodySmall,
-                color = colors.textTertiary,
+                color = colors.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp),
             )
 
             Text(
                 text = stringResource(R.string.prompt_overrides_count, state.overrides.size),
                 style = MaterialTheme.typography.titleSmall,
-                color = colors.textPrimary,
+                color = colors.onSurface,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(top = 10.dp, bottom = 6.dp),
             )
             if (state.overrides.isEmpty()) {
-                Surface(shape = RoundedCornerShape(12.dp), color = colors.surface1) {
+                Surface(shape = RoundedCornerShape(12.dp), color = colors.surfaceContainerLowest) {
                     Text(
                         text = stringResource(R.string.prompt_empty),
                         style = MaterialTheme.typography.bodySmall,
-                        color = colors.textSecondary,
+                        color = colors.onSurfaceVariant,
                         modifier = Modifier.padding(14.dp),
                     )
                 }
@@ -187,7 +186,7 @@ fun PromptTemplatesScreen(
                 state.overrides.forEach { item ->
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = colors.surface1,
+                        color = colors.surfaceContainerLowest,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 8.dp)
@@ -198,7 +197,7 @@ fun PromptTemplatesScreen(
                             Text(
                                 text = item.feedTitle.ifEmpty { stringResource(R.string.deleted_feed) },
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = colors.textPrimary,
+                                color = colors.onSurface,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -207,7 +206,7 @@ fun PromptTemplatesScreen(
                             Text(
                                 text = item.prompt,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = colors.textSecondary,
+                                color = colors.onSurfaceVariant,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -219,15 +218,15 @@ fun PromptTemplatesScreen(
             Text(
                 text = stringResource(R.string.prompt_builtin_tpl),
                 style = MaterialTheme.typography.titleSmall,
-                color = colors.textPrimary,
+                color = colors.onSurface,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
             )
-            Surface(shape = RoundedCornerShape(12.dp), color = colors.surface1) {
+            Surface(shape = RoundedCornerShape(12.dp), color = colors.surfaceContainerLowest) {
                 Text(
                     text = AiPrompts.builtInSummaryPrompt(),
                     style = MaterialTheme.typography.bodySmall,
-                    color = colors.textSecondary,
+                    color = colors.onSurfaceVariant,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 260.dp)
@@ -277,10 +276,10 @@ private fun PromptEditSheet(
     onClear: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     var text by remember { mutableStateOf(initial) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = colors.bgRoot) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = colors.surface) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -290,7 +289,7 @@ private fun PromptEditSheet(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                color = colors.textPrimary,
+                color = colors.onSurface,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -299,25 +298,25 @@ private fun PromptEditSheet(
             Text(
                 text = stringResource(R.string.prompt_variable_help, AiPrompts.summaryVariables().joinToString("，")),
                 style = MaterialTheme.typography.bodySmall,
-                color = colors.textTertiary,
+                color = colors.onSurfaceVariant,
             )
             Spacer(Modifier.height(10.dp))
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
-                placeholder = { Text(stringResource(R.string.prompt_save_hint), color = colors.textTertiary, style = MaterialTheme.typography.bodyMedium) },
+                placeholder = { Text(stringResource(R.string.prompt_save_hint), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium) },
                 shape = RoundedCornerShape(12.dp),
                 colors = radarOutlinedTextFieldColors(),
             )
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (initial.isNotBlank()) {
-                    TextButton(onClick = onClear) { Text(stringResource(R.string.prompt_clear), color = colors.textTertiary) }
+                    TextButton(onClick = onClear) { Text(stringResource(R.string.prompt_clear), color = colors.onSurfaceVariant) }
                 }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { onSave(text) }) {
-                    Text(stringResource(UiR.string.save), color = colors.accent, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(UiR.string.save), color = colors.primary, fontWeight = FontWeight.SemiBold)
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -333,10 +332,10 @@ private fun FeedPickSheet(
     onPicked: (FeedPickOption) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     var query by remember { mutableStateOf("") }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = colors.bgRoot) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = colors.surface) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -347,7 +346,7 @@ private fun FeedPickSheet(
             Text(
                 text = stringResource(R.string.prompt_pick_feed),
                 style = MaterialTheme.typography.titleMedium,
-                color = colors.textPrimary,
+                color = colors.onSurface,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(10.dp))
@@ -355,7 +354,7 @@ private fun FeedPickSheet(
                 value = query,
                 onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(stringResource(R.string.prompt_search_feed), color = colors.textTertiary, style = MaterialTheme.typography.bodyMedium) },
+                placeholder = { Text(stringResource(R.string.prompt_search_feed), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium) },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = radarOutlinedTextFieldColors(),
@@ -372,7 +371,7 @@ private fun FeedPickSheet(
                 items(matched, key = { it.feedId }) { option ->
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = colors.surface1,
+                        color = colors.surfaceContainerLowest,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
@@ -381,7 +380,7 @@ private fun FeedPickSheet(
                         Text(
                             text = option.feedTitle,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = colors.textPrimary,
+                            color = colors.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(12.dp),
