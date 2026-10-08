@@ -14,7 +14,7 @@ interface RecommendationFeedbackDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: RecommendationFeedbackEntity)
 
-    /** 撤销「减少此类」：整行删除，降权归零（ADR-0013）。 */
+    /** 撤销「减少此类」：整行删除，降权归零。 */
     @Query("DELETE FROM recommendation_feedback WHERE feedId = :feedId")
     suspend fun clear(feedId: Long)
 }

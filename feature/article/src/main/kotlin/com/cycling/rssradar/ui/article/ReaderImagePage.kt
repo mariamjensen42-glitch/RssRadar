@@ -85,7 +85,7 @@ private const val DOUBLE_TAP_SCALE = 2.5f
  * 缩放与翻页互斥——放大状态下 [HorizontalPager] 的滚动被关掉，避免拖图变成翻页。
  *
  * 图片仍是 Coil 懒加载，一次只有当前页（外加 pager 缓存的相邻页）在内存里，
- * 不会重演 ADR-0007 那种"整页 WebView 同时解码所有图片"的 OOM。
+ * 不会重演"整页 WebView 同时解码所有图片"的 OOM。
  */
 @Composable
 fun ReaderImagePage(

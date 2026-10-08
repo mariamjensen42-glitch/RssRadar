@@ -5,6 +5,7 @@ import com.cycling.rssradar.core.data.backup.SettingsSnapshot
 import com.cycling.rssradar.core.data.store.prefs.ArchiveStore
 import com.cycling.rssradar.core.data.store.prefs.FeedSortStore
 import com.cycling.rssradar.core.data.store.prefs.GroupStore
+import com.cycling.rssradar.core.data.store.prefs.RecommendationSeedStore
 import com.cycling.rssradar.core.data.store.prefs.LanguageStore
 import com.cycling.rssradar.core.data.store.prefs.LinkStore
 import com.cycling.rssradar.core.data.store.prefs.ListDisplayStore
@@ -31,12 +32,18 @@ object StoreModule {
     fun provideGroupStore(@ApplicationContext context: Context): GroupStore =
         GroupStore(SettingsPrefs.of(context))
 
+    /** 冷启动种子（推荐流手选领域）。 */
+    @Provides
+    @Singleton
+    fun provideRecommendationSeedStore(@ApplicationContext context: Context): RecommendationSeedStore =
+        RecommendationSeedStore(SettingsPrefs.of(context))
+
     @Provides
     @Singleton
     fun provideThemeStore(@ApplicationContext context: Context): ThemeStore =
         ThemeStore(SettingsPrefs.of(context))
 
-    /** 界面语言偏好（ADR-0017）。 */
+    /** 界面语言偏好。 */
     @Provides
     @Singleton
     fun provideLanguageStore(@ApplicationContext context: Context): LanguageStore =

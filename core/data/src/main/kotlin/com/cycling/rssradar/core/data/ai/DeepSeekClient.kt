@@ -28,7 +28,7 @@ sealed class AiException(message: String, val userMessage: String) : Exception(m
 }
 
 /**
- * DeepSeek Chat 手写 client（issue #44，ADR-0005）：
+ * DeepSeek Chat 手写 client（issue #44）：
  * OpenAI 兼容 `/chat/completions`，HttpURLConnection + kotlinx-serialization，零新依赖。
  * 模型固定 deepseek-chat（语言组织任务不需要 reasoner），readTimeout 60s（LLM 生成慢）。
  */

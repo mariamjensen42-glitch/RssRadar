@@ -19,7 +19,7 @@ data class CrashLogUiState(
     val detail: CrashDetail? = null,
 )
 
-/** 崩溃日志页事件（候选 A，ADR-0003）。 */
+/** 崩溃日志页事件（候选 A）。 */
 sealed interface CrashLogIntent {
     data object Refresh : CrashLogIntent
     data class OpenDetail(val record: CrashRecord) : CrashLogIntent

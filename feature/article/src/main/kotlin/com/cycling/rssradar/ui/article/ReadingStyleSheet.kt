@@ -44,7 +44,6 @@ import com.cycling.rssradar.core.model.coerceImageCornerRadius
 import com.cycling.rssradar.core.model.coerceLetterSpacing
 import com.cycling.rssradar.core.model.coerceLineHeight
 import com.cycling.rssradar.core.model.coercePadding
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.components.SyncedSlider
 import com.cycling.rssradar.core.ui.theme.radarSwitchColors
 import kotlin.math.roundToInt
@@ -87,7 +86,7 @@ internal fun ReadingStyleSheet(
     val style = prefs.style
     val image = prefs.image
     val renderer = prefs.renderer
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = radarColors().surface1) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -96,20 +95,20 @@ internal fun ReadingStyleSheet(
         ) {
             Text(
                 text = stringResource(R.string.typography_settings),
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(8.dp))
 
             // 本文：正文 / 摘要（ReadYou 的 renderFullContent/renderDescriptionContent 同款）。
-            // 只在两者实质不同时给这一块：ADR-0001 入库时取 description 与 content 的较长者，
+            // 只在两者实质不同时给这一块：入库时取 description 与 content 的较长者，
             // 大量源的 content 就是 summary——那时给个开关，点下去屏幕纹丝不动。
             // 没有意义的按钮不该存在，所以不成立时整块不渲染。
             if (canSwitchToSummary) {
                 Text(
                     text = stringResource(R.string.body_section),
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(bottom = 4.dp),
                 )
@@ -118,7 +117,7 @@ internal fun ReadingStyleSheet(
                         val selected = isSummary == preferSummary
                         Surface(
                             shape = RoundedCornerShape(50),
-                            color = if (selected) radarColors().accent else radarColors().surface2,
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer,
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(50))
@@ -126,7 +125,7 @@ internal fun ReadingStyleSheet(
                         ) {
                             Text(
                                 text = label,
-                                color = if (selected) radarColors().onAccent else radarColors().textSecondary,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodyMedium,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(vertical = 8.dp),
@@ -136,7 +135,7 @@ internal fun ReadingStyleSheet(
                 }
                 Text(
                     text = stringResource(R.string.summary_hint),
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 4.dp),
                 )
@@ -148,7 +147,7 @@ internal fun ReadingStyleSheet(
             // 就是为了在深色模式下也要米黄纸。
             Text(
                 text = stringResource(R.string.reading_theme),
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
@@ -157,7 +156,7 @@ internal fun ReadingStyleSheet(
                     val selected = theme == prefs.readingTheme
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = if (selected) radarColors().accent else radarColors().surface2,
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer,
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(50))
@@ -165,7 +164,7 @@ internal fun ReadingStyleSheet(
                     ) {
                         Text(
                             text = theme.label,
-                            color = if (selected) radarColors().onAccent else radarColors().textSecondary,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(vertical = 8.dp),
@@ -175,17 +174,17 @@ internal fun ReadingStyleSheet(
             }
             Text(
                 text = stringResource(R.string.reading_theme_hint),
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 4.dp),
             )
             Spacer(Modifier.height(12.dp))
 
-            // 正文渲染器：WebView / 原生 Compose 二选一（ADR-0009）。
+            // 正文渲染器：WebView / 原生 Compose 二选一。
             // 原生路对表格/视频/内联样式退化，仅建议被 WebView 滚动闪烁困扰时启用。
             Text(
                 text = stringResource(R.string.body_renderer),
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
@@ -194,7 +193,7 @@ internal fun ReadingStyleSheet(
                     val selected = r == renderer
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = if (selected) radarColors().accent else radarColors().surface2,
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer,
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(50))
@@ -202,7 +201,7 @@ internal fun ReadingStyleSheet(
                     ) {
                         Text(
                             text = r.label,
-                            color = if (selected) radarColors().onAccent else radarColors().textSecondary,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(vertical = 8.dp),
@@ -216,22 +215,22 @@ internal fun ReadingStyleSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(R.string.font_size),
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = { onFontSize(coerceFontSize(style.fontSize - 1)) }) {
-                    Icon(Lucide.Minus, contentDescription = stringResource(R.string.font_decrease), tint = radarColors().textPrimary, modifier = Modifier.size(18.dp))
+                    Icon(Lucide.Minus, contentDescription = stringResource(R.string.font_decrease), tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
                 }
                 Text(
                     text = "${style.fontSize}",
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.width(40.dp),
                 )
                 IconButton(onClick = { onFontSize(coerceFontSize(style.fontSize + 1)) }) {
-                    Icon(Lucide.Plus, contentDescription = stringResource(R.string.font_increase), tint = radarColors().textPrimary, modifier = Modifier.size(18.dp))
+                    Icon(Lucide.Plus, contentDescription = stringResource(R.string.font_increase), tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
                 }
             }
 
@@ -239,7 +238,7 @@ internal fun ReadingStyleSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(R.string.line_height),
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.width(72.dp),
                 )
@@ -251,7 +250,7 @@ internal fun ReadingStyleSheet(
                 )
                 Text(
                     text = "%.1f".format(style.lineHeight),
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.End,
                     modifier = Modifier.width(40.dp),
@@ -262,7 +261,7 @@ internal fun ReadingStyleSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(R.string.margin),
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.width(72.dp),
                 )
@@ -274,7 +273,7 @@ internal fun ReadingStyleSheet(
                 )
                 Text(
                     text = "${style.horizontalPadding}dp",
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.End,
                     modifier = Modifier.width(40.dp),
@@ -286,7 +285,7 @@ internal fun ReadingStyleSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(R.string.letter_spacing),
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.width(72.dp),
                 )
@@ -298,7 +297,7 @@ internal fun ReadingStyleSheet(
                 )
                 Text(
                     text = "%.1f".format(style.letterSpacing),
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.End,
                     modifier = Modifier.width(40.dp),
@@ -309,7 +308,7 @@ internal fun ReadingStyleSheet(
             // 正文里写死的居中/右对齐是内容的一部分，不该被全局偏好盖掉。
             Text(
                 text = stringResource(R.string.text_align),
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
@@ -318,7 +317,7 @@ internal fun ReadingStyleSheet(
                     val selected = align == style.textAlign
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = if (selected) radarColors().accent else radarColors().surface2,
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer,
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(50))
@@ -326,7 +325,7 @@ internal fun ReadingStyleSheet(
                     ) {
                         Text(
                             text = align.label,
-                            color = if (selected) radarColors().onAccent else radarColors().textSecondary,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.labelLarge,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(vertical = 8.dp),
@@ -342,7 +341,7 @@ internal fun ReadingStyleSheet(
                     val selected = family == style.fontFamily
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = if (selected) radarColors().accent else radarColors().surface2,
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer,
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(50))
@@ -350,7 +349,7 @@ internal fun ReadingStyleSheet(
                     ) {
                         Text(
                             text = family.label,
-                            color = if (selected) radarColors().onAccent else radarColors().textPrimary,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.labelLarge,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(vertical = 8.dp),
@@ -364,14 +363,14 @@ internal fun ReadingStyleSheet(
             // 正文不再把 <img> 包成链接，点图在 WebView 里自然无反应。
             Text(
                 text = stringResource(R.string.images),
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(R.string.corner_radius),
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.width(72.dp),
                 )
@@ -384,7 +383,7 @@ internal fun ReadingStyleSheet(
                 )
                 Text(
                     text = "${image.cornerRadius}dp",
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.End,
                     modifier = Modifier.width(40.dp),
@@ -396,7 +395,7 @@ internal fun ReadingStyleSheet(
             ) {
                 Text(
                     text = stringResource(R.string.tap_to_zoom),
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f),
                 )
@@ -415,12 +414,12 @@ internal fun ReadingStyleSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.immersive_mode),
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     Text(
                         text = stringResource(R.string.immersive_hint),
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -442,12 +441,12 @@ internal fun ReadingStyleSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.auto_hide_bars),
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     Text(
                         text = stringResource(R.string.auto_hide_hint),
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -469,12 +468,12 @@ internal fun ReadingStyleSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.pull_switch),
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     Text(
                         text = stringResource(R.string.pull_switch_hint),
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }

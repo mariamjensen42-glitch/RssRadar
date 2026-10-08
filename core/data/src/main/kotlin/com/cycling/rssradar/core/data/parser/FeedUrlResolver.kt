@@ -44,7 +44,6 @@ object FeedUrlResolver {
             return url
         }
         val query = noFragment.substringAfter('?', "").lowercase()
-        if (query.isEmpty()) return null
         return url.takeIf { IMAGE_EXTENSIONS.any { ext -> query.contains(".$ext") } }
     }
 

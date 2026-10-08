@@ -45,7 +45,7 @@ data class AiArtifactsUiState(
 )
 
 
-/** 产物中心的意图（ADR-0003 MVI 契约）。 */
+/** 产物中心的意图（MVI 契约）。 */
 sealed interface AiArtifactsIntent {
     data class SelectKind(val kind: Int?) : AiArtifactsIntent
     data class OpenDetail(val item: AiArtifactItem) : AiArtifactsIntent
@@ -59,13 +59,13 @@ sealed interface AiArtifactsIntent {
 /**
  * AI 产物中心的状态宿主。
  *
- * 这个页面存在的理由值得写下来：35 项 AI 功能里，只有一部分有专属展示位。
+ * 这个页面存在的理由值得写下来：16 项 AI 功能里，只有一部分有专属展示位。
  * 其余功能执行器照常跑、产物照常落 `ai_artifacts`，但用户在 App 里找不到任何
  * 地方能看到它们——表现为"跑成功了，结果呢？"。产物中心不挑功能、不认识
  * payload 的具体类型，把所有产物按功能摊开，让每一项功能至少有一个能看见结果的地方。
  *
  * 两个口径上的取舍：
- * 1. **只列真的产出过的功能**。把 35 项全列出来、其中一半是空的，
+ * 1. **只列真的产出过的功能**。把 16 项全列出来、其中一半是空的，
  *    用户只会得出"一半功能是坏的"这个错误结论。没产出的功能该去看开关与任务队列。
  * 2. **读取失败不抛**。这是诊断页，查询挂了也要给出原因，而不是闪退或白屏。
  */

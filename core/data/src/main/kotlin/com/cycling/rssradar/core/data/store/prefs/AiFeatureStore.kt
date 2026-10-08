@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * 35 项 AI 功能的独立开关。
+ * 16 项 AI 功能的独立开关。
  *
  * **为什么每个功能一个 key 而不是存一份集合快照**：见 [AiFeature.DEFAULT_ENABLED] 的说明——
  * 集合快照会把升级时刻冻住，新功能永远推不到老用户身上。逐项读 key、缺 key 回落默认值，

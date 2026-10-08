@@ -7,7 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * 在线更新链路的精简器（ADR-0010）。
+ * 在线更新链路的精简器。
  *
  * 内置快照由 python 脚本按同样规则生成，这里锁住 Kotlin 侧的行为——
  * 两边规则一旦漂移，用户更新目录后会得到与内置快照结构不一致的数据。

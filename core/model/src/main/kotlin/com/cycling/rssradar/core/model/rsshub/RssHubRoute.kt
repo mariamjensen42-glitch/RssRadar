@@ -8,7 +8,7 @@ import com.cycling.rssradar.core.model.GROUP_TECH
  * 路由目录的领域模型。
  *
  * 数据来自 RSSHub 官方路由元数据（docs.rsshub.app/routes.json，3800 条），
- * 由 [RouteCatalogFile] 反序列化后映射而来，见 ADR-0010。
+ * 由 [RouteCatalogFile] 反序列化后映射而来。
  *
  * 这里是「以 RSSHub 为核心」的地基：选路由 → 填参数 → 拼出完整 URL →
  * 走与普通 RSS 完全相同的校验 / 订阅流程。目录本身可离线浏览（内置快照），

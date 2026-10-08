@@ -49,7 +49,7 @@ interface ArticleWriteDao {
 
     /**
      * 抓取原网页正文后回填。同样不触碰用户状态；封面只在原本没有时才补 og:image。
-     * [contentIncomplete] 由抓取端判定（ADR-0012）：正文过短/无段落/JS 空壳/付费墙时置 1，
+     * [contentIncomplete] 由抓取端判定：正文过短/无段落/JS 空壳/付费墙时置 1，
      * 内容照写，但 UI 必须如实提示"不完整"。
      */
     @Query(

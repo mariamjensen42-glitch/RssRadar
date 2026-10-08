@@ -1,6 +1,5 @@
 package com.cycling.rssradar.ui.library
 
-import android.text.format.DateUtils
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -50,7 +49,7 @@ import com.cycling.rssradar.core.ui.R as UiR
 import com.cycling.rssradar.core.ui.components.EmptyState
 import com.cycling.rssradar.core.ui.components.SegmentedChips
 import com.cycling.rssradar.core.ui.labels.labelRes
-import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.text.relativeTime
 import com.cycling.rssradar.ui.library.R
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Bookmark
@@ -107,7 +106,7 @@ fun LibraryScreen(
     onToggleSelection: (Long) -> Unit = {},
     onLoadMore: () -> Unit = {},
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     val listState = rememberLazyListState()
 
     val sortLabels = LibrarySort.entries.associateWith { stringResource(it.labelRes()) }
@@ -135,7 +134,7 @@ fun LibraryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.bgRoot)
+            .background(colors.surface)
             .statusBarsPadding(),
     ) {
         Row(
@@ -145,11 +144,11 @@ fun LibraryScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = colors.textPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = colors.onSurface)
             }
             Text(
                 text = stringResource(R.string.library_title),
-                color = colors.textPrimary,
+                color = colors.onSurface,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
@@ -256,7 +255,7 @@ fun LibraryScreen(
                     item(key = "loading-more") {
                         Text(
                             text = stringResource(R.string.library_loading_more),
-                            color = colors.textTertiary,
+                            color = colors.onSurfaceVariant,
                             style = MaterialTheme.typography.labelSmall,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -277,25 +276,25 @@ private fun SelectionBar(
     onClear: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(colors.surface2)
+            .background(colors.surfaceContainer)
             .padding(horizontal = 20.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = stringResource(R.string.library_selected_count, count),
-            color = colors.textPrimary,
+            color = colors.onSurface,
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.weight(1f),
         )
         TextButton(onClick = onRemove) {
-            Text(unstarLabel, color = colors.accent)
+            Text(unstarLabel, color = colors.primary)
         }
         IconButton(onClick = onClear) {
-            Icon(Lucide.X, contentDescription = stringResource(R.string.library_clear_selection), tint = colors.textSecondary)
+            Icon(Lucide.X, contentDescription = stringResource(R.string.library_clear_selection), tint = colors.onSurfaceVariant)
         }
     }
 }
@@ -310,7 +309,7 @@ private fun LibraryRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(12.dp)
     val timestamp = if (showStarredAt) {
         item.article.starredAt ?: item.article.fetchedAt
@@ -318,7 +317,7 @@ private fun LibraryRow(
         item.article.publishedAt ?: item.article.fetchedAt
     }
     Surface(
-        color = if (selected) colors.surface2 else colors.surface1,
+        color = if (selected) colors.surfaceContainer else colors.surfaceContainerLowest,
         shape = shape,
         modifier = Modifier
             .fillMaxWidth()
@@ -336,7 +335,7 @@ private fun LibraryRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = item.article.title,
-                    color = if (item.article.isRead) colors.textSecondary else colors.textPrimary,
+                    color = if (item.article.isRead) colors.onSurfaceVariant else colors.onSurface,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (item.article.isRead) FontWeight.Normal else FontWeight.Medium,
                     maxLines = 2,
@@ -348,7 +347,7 @@ private fun LibraryRow(
                 ) {
                     Text(
                         text = item.feedTitle,
-                        color = colors.textTertiary,
+                        color = colors.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -358,11 +357,11 @@ private fun LibraryRow(
                         modifier = Modifier
                             .padding(start = 8.dp)
                             .size(3.dp)
-                            .background(colors.textTertiary, RoundedCornerShape(50)),
+                            .background(colors.onSurfaceVariant, RoundedCornerShape(50)),
                     )
                     Text(
                         text = relativeTime(timestamp),
-                        color = colors.textTertiary,
+                        color = colors.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(start = 8.dp),
                     )
@@ -372,9 +371,3 @@ private fun LibraryRow(
     }
 }
 
-private fun relativeTime(millis: Long): String =
-    DateUtils.getRelativeTimeSpanString(
-        millis,
-        System.currentTimeMillis(),
-        DateUtils.MINUTE_IN_MILLIS,
-    ).toString()

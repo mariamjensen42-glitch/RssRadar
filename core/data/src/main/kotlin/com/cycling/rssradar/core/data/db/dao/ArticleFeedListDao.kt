@@ -90,6 +90,21 @@ interface ArticleFeedListDao {
         """
         SELECT COUNT(*) FROM articles
         JOIN feeds ON articles.feedId = feeds.id
+        $AI_VALUE_JOIN
+        WHERE $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE AND $AI_VALUE_FILTER_PREDICATE
+        """,
+    )
+    suspend fun countAllWithFeedFilteredByValue(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+        minValue: Int?,
+    ): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
         WHERE articles.isRead = 0 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE
         """,
     )
@@ -97,6 +112,21 @@ interface ArticleFeedListDao {
         group: String?,
         isDefaultGroup: Boolean,
         contentType: Int?,
+    ): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        $AI_VALUE_JOIN
+        WHERE articles.isRead = 0 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE AND $AI_VALUE_FILTER_PREDICATE
+        """,
+    )
+    suspend fun countUnreadWithFeedFilteredByValue(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+        minValue: Int?,
     ): Int
 
     @Query(
@@ -116,6 +146,21 @@ interface ArticleFeedListDao {
         """
         SELECT COUNT(*) FROM articles
         JOIN feeds ON articles.feedId = feeds.id
+        $AI_VALUE_JOIN
+        WHERE articles.isStarred = 1 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE AND $AI_VALUE_FILTER_PREDICATE
+        """,
+    )
+    suspend fun countStarredWithFeedFilteredByValue(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+        minValue: Int?,
+    ): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
         WHERE articles.isBookmarked = 1 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE
         """,
     )
@@ -123,6 +168,21 @@ interface ArticleFeedListDao {
         group: String?,
         isDefaultGroup: Boolean,
         contentType: Int?,
+    ): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        $AI_VALUE_JOIN
+        WHERE articles.isBookmarked = 1 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE AND $AI_VALUE_FILTER_PREDICATE
+        """,
+    )
+    suspend fun countBookmarkedWithFeedFilteredByValue(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+        minValue: Int?,
     ): Int
 
     // —— 组合筛选变体（issue #74 分组 + issue #75 分区）：两个过滤维度收进同一条查询，
@@ -152,6 +212,27 @@ interface ArticleFeedListDao {
 
     @Query(
         """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl, $AI_VALUE_COLUMN
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        $AI_VALUE_JOIN
+        WHERE $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE AND $AI_VALUE_FILTER_PREDICATE
+        $AI_VALUE_ORDER_BY
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun loadAllWithFeedPagedFilteredByValue(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+        minValue: Int?,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed>
+
+    @Query(
+        """
         SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
@@ -165,6 +246,27 @@ interface ArticleFeedListDao {
         group: String?,
         isDefaultGroup: Boolean,
         contentType: Int?,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed>
+
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl, $AI_VALUE_COLUMN
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        $AI_VALUE_JOIN
+        WHERE articles.isRead = 0 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE AND $AI_VALUE_FILTER_PREDICATE
+        $AI_VALUE_ORDER_BY
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun loadUnreadWithFeedPagedFilteredByValue(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+        minValue: Int?,
         limit: Int,
         offset: Int,
     ): List<ArticleWithFeed>
@@ -190,6 +292,27 @@ interface ArticleFeedListDao {
 
     @Query(
         """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl, $AI_VALUE_COLUMN
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        $AI_VALUE_JOIN
+        WHERE articles.isStarred = 1 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE AND $AI_VALUE_FILTER_PREDICATE
+        $AI_VALUE_ORDER_BY
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun loadStarredWithFeedPagedFilteredByValue(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+        minValue: Int?,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed>
+
+    @Query(
+        """
         SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl
         FROM articles
         JOIN feeds ON articles.feedId = feeds.id
@@ -203,6 +326,27 @@ interface ArticleFeedListDao {
         group: String?,
         isDefaultGroup: Boolean,
         contentType: Int?,
+        limit: Int,
+        offset: Int,
+    ): List<ArticleWithFeed>
+
+    @Query(
+        """
+        SELECT $ARTICLE_LIST_COLUMNS, feeds.title AS feedTitle, feeds.groupName AS feedGroup, feeds.iconUrl AS feedIconUrl, $AI_VALUE_COLUMN
+        FROM articles
+        JOIN feeds ON articles.feedId = feeds.id
+        $AI_VALUE_JOIN
+        WHERE articles.isBookmarked = 1 AND $GROUP_FILTER_PREDICATE_NULLABLE AND $CONTENT_TYPE_FILTER_PREDICATE AND $AI_VALUE_FILTER_PREDICATE
+        $AI_VALUE_ORDER_BY
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    @Suppress("QUERY_MISMATCH")
+    suspend fun loadBookmarkedWithFeedPagedFilteredByValue(
+        group: String?,
+        isDefaultGroup: Boolean,
+        contentType: Int?,
+        minValue: Int?,
         limit: Int,
         offset: Int,
     ): List<ArticleWithFeed>

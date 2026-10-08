@@ -71,7 +71,7 @@ interface FeedDao {
     @Query("UPDATE feeds SET syncEnabled = :enabled WHERE id = :feedId")
     suspend fun updateSyncEnabled(feedId: Long, enabled: Boolean)
 
-    /** 内容类型（ADR-0014）：只影响列表浏览形态，不影响数据。 */
+    /** 内容类型：只影响列表浏览形态，不影响数据。 */
     @Query("UPDATE feeds SET contentType = :contentType WHERE id = :feedId")
     suspend fun updateContentType(feedId: Long, contentType: Int)
 

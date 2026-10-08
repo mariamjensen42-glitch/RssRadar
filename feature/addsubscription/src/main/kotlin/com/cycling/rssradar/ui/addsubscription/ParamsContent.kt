@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -38,7 +39,6 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Zap
 import com.cycling.rssradar.core.model.rsshub.RouteParam
 import com.cycling.rssradar.core.model.rsshub.RssHubRoute
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
 
 @Composable
@@ -74,7 +74,7 @@ internal fun ColumnScope.ParamsContent(
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = route.description,
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -85,7 +85,7 @@ internal fun ColumnScope.ParamsContent(
             item {
                 Text(
                     text = stringResource(R.string.add_no_params),
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -113,7 +113,7 @@ internal fun ColumnScope.ParamsContent(
                 // 结果由哪个实例解析，写在按钮上方：实例不可达时这是最先要核对的信息
                 Text(
                     text = stringResource(R.string.add_resolved_by, state.host),
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -128,10 +128,10 @@ internal fun ColumnScope.ParamsContent(
                         .height(50.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = radarColors().surface2,
-                        contentColor = radarColors().textPrimary,
-                        disabledContainerColor = radarColors().surface2.copy(alpha = 0.5f),
-                        disabledContentColor = radarColors().textTertiary,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f),
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
                 ) {
                     Icon(
@@ -152,7 +152,7 @@ internal fun ColumnScope.ParamsContent(
                         text = stringResource(R.string.add_still_need) + state.missingParams.joinToString("、") {
                             it.label.ifBlank { it.key }
                         },
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -182,7 +182,7 @@ private fun ParamField(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = "${param.label} · :${param.key}",
-                color = radarColors().textSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f, fill = false),
@@ -198,10 +198,10 @@ private fun ParamField(
             Spacer(Modifier.height(8.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(param.options, key = { it.value }) { option ->
-                    FilterChipLight(
-                        label = option.label,
+                    FilterChip(
                         selected = value == option.value,
                         onClick = { onChange(option.value) },
+                        label = { Text(option.label) },
                     )
                 }
             }
@@ -215,7 +215,7 @@ private fun ParamField(
             placeholder = {
                 Text(
                     text = param.fallback ?: stringResource(R.string.add_required),
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
@@ -228,7 +228,7 @@ private fun ParamField(
             Spacer(Modifier.height(4.dp))
             Text(
                 text = param.description,
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
@@ -242,12 +242,12 @@ private fun ParamField(
 private fun OptionalTag() {
     Box(
         modifier = Modifier
-            .background(radarColors().surface3, RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(4.dp))
             .padding(horizontal = 5.dp, vertical = 2.dp),
     ) {
         Text(
             text = stringResource(R.string.add_optional),
-            color = radarColors().textTertiary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelSmall,
         )
     }
@@ -258,7 +258,7 @@ private fun OptionalTag() {
 internal fun FieldLabel(text: String) {
     Text(
         text = text,
-        color = radarColors().textSecondary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
     )

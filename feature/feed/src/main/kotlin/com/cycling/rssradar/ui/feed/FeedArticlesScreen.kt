@@ -22,6 +22,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -42,7 +43,6 @@ import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.RefreshCw
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.LocalListDisplay
 
 /**
@@ -93,14 +93,14 @@ fun FeedArticlesScreen(
     }
 
     Scaffold(
-        containerColor = radarColors().bgRoot,
+        containerColor = MaterialTheme.colorScheme.surface,
         snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         text = feed?.title ?: stringResource(R.string.feed_articles_title),
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -108,7 +108,7 @@ fun FeedArticlesScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = radarColors().textPrimary)
+                        Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
                 actions = {
@@ -116,16 +116,16 @@ fun FeedArticlesScreen(
                     IconButton(onClick = { onIntent(FeedArticlesIntent.Refresh) }) {
                         if (isRefreshing) {
                             CircularProgressIndicator(
-                                color = radarColors().textSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 strokeWidth = 2.dp,
                                 modifier = Modifier.size(18.dp),
                             )
                         } else {
-                            Icon(Lucide.RefreshCw, contentDescription = stringResource(R.string.feed_articles_refresh), tint = radarColors().textPrimary)
+                            Icon(Lucide.RefreshCw, contentDescription = stringResource(R.string.feed_articles_refresh), tint = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = radarColors().bgRoot),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
     ) { padding ->
@@ -138,7 +138,7 @@ fun FeedArticlesScreen(
             ) {
                 // 空态带 CTA（UI 审计 F3）：用户最快的下一步就是刷新
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(R.string.feed_articles_empty), color = radarColors().textSecondary)
+                    Text(stringResource(R.string.feed_articles_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(12.dp))
                     FilledTonalButton(
                         onClick = { onIntent(FeedArticlesIntent.Refresh) },
@@ -149,7 +149,7 @@ fun FeedArticlesScreen(
                 }
             }
         } else if (feed?.contentType == FeedEntity.CONTENT_TYPE_IMAGE) {
-            // 图片类源（ADR-0014）：两列画廊网格，点击仍走详情
+            // 图片类源：两列画廊网格，点击仍走详情
             ImageGalleryGrid(
                 articles = articles,
                 onArticleClick = { item ->
@@ -201,7 +201,7 @@ fun FeedArticlesScreen(
             ) {
                 if (isLoadingMore) {
                     CircularProgressIndicator(
-                        color = radarColors().accent,
+                        color = MaterialTheme.colorScheme.primary,
                         strokeWidth = 2.dp,
                         modifier = Modifier.size(18.dp),
                     )

@@ -1,4 +1,4 @@
-// 纯 Kotlin/JVM 模块：导航路由契约（类型安全目的地标识，ADR-0002）。
+// 纯 Kotlin/JVM 模块：导航路由契约（类型安全目的地标识）。
 // 只声明「去哪」，不含任何 UI / Android 依赖 —— 各 feature 可放心依赖它。
 plugins {
     alias(libs.plugins.kotlin.jvm)

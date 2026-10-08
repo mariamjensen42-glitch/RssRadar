@@ -7,10 +7,13 @@ import com.cycling.rssradar.core.data.ai.AiText.truncationNote
  * 模型输入：一切 prompt 的公共上下文。
  *
  * @param body 已按 [AiText.truncateForPrompt] 截断的正文纯文本。
- *             统计类功能（阅读习惯、每日报告、订阅源健康）没有"正文"这一说，
+ *             统计类功能（订阅源健康、源推荐）没有"正文"这一说，
  *             它们的输入全在 [extra] 里，body 留空。
  * @param truncated 是否截断过。截断事实必须告诉模型，否则它会以为文章就这么短。
- * @param companions 伴生上下文：聚合/去重/事件合并时同时送进模型的其他文章。
+ * @param companions 伴生上下文：需要多篇文章作为输入时连同它们一起送进模型。
+ * @param summaryPrompt 订阅源级摘要提示词覆盖，为空则走内置模板。
+ *        只有 [AiFeature.SUMMARY] 会读它——16 项里唯一支持覆盖的功能，
+ *        不同源的信息密度差得远，共用一套模板必然有一边不合适。
  */
 data class AiPromptContext(
     val title: String,
@@ -20,6 +23,7 @@ data class AiPromptContext(
     val truncated: Boolean = false,
     val question: String? = null,
     val extra: String = "",
+    val summaryPrompt: String? = null,
     val companions: List<AiPromptCompanion> = emptyList(),
 )
 
@@ -28,11 +32,6 @@ data class AiPromptCompanion(
     val id: Long,
     val title: String,
     val feedTitle: String = "",
-)
-
-/** 提示词覆盖：订阅源级摘要提示词在此注入，为空则走内置模板。 */
-data class AiPromptOverrides(
-    val summaryPrompt: String? = null,
 )
 
 /** 一次调用所需的全部模型入参。 */
@@ -44,7 +43,7 @@ data class AiPrompt(
 
 
 /**
- * 35 项功能的提示词模板。
+ * 16 项功能的提示词模板。
  *
  * 三条贯穿全部模板的原则：
  * 1. **不捏造**——每条要求里都写明"只使用给定文本中出现的信息，没有就说没有"。
@@ -99,42 +98,17 @@ object AiPrompts {
     fun translate(context: AiPromptContext): AiPrompt =
         AiPrompt(TRANSLATE_SYSTEM, context.body, 0.3)
 
-    fun classify(context: AiPromptContext): AiPrompt =
-        AiPrompt(CLASSIFY_SYSTEM, articleBlock(context), 0.2)
-
-    fun tags(context: AiPromptContext): AiPrompt =
-        AiPrompt(TAGS_SYSTEM, articleBlock(context), 0.3)
-
-    fun sentiment(context: AiPromptContext): AiPrompt =
-        AiPrompt(SENTIMENT_SYSTEM, articleBlock(context), 0.2)
-
     fun keywords(context: AiPromptContext): AiPrompt =
         AiPrompt(KEYWORDS_SYSTEM, articleBlock(context), 0.2)
 
-    fun opinion(context: AiPromptContext): AiPrompt =
-        AiPrompt(OPINION_SYSTEM, articleBlock(context), 0.3)
-
     fun qa(context: AiPromptContext): AiPrompt =
         AiPrompt(QA_SYSTEM, articleBlock(context) + questionBlock(context), 0.3)
-
-    /** 全文提取喂的是原始 HTML 而不是纯文本——要的就是标签结构。 */
-    fun fulltext(context: AiPromptContext): AiPrompt =
-        AiPrompt(FULLTEXT_SYSTEM, context.body, 0.2)
-
-    fun dedupe(context: AiPromptContext): AiPrompt =
-        AiPrompt(DEDUPE_SYSTEM, articleBlock(context) + companionBlock(context), 0.2)
-
-    fun quality(context: AiPromptContext): AiPrompt =
-        AiPrompt(QUALITY_SYSTEM, articleBlock(context), 0.3)
 
     fun noise(context: AiPromptContext): AiPrompt =
         AiPrompt(NOISE_SYSTEM, articleBlock(context), 0.3)
 
     fun outline(context: AiPromptContext): AiPrompt =
         AiPrompt(OUTLINE_SYSTEM, articleBlock(context), 0.3)
-
-    fun credibility(context: AiPromptContext): AiPrompt =
-        AiPrompt(CREDIBILITY_SYSTEM, articleBlock(context), 0.3)
 
     fun glossary(context: AiPromptContext): AiPrompt =
         AiPrompt(GLOSSARY_SYSTEM, articleBlock(context) + questionBlock(context), 0.3)
@@ -144,46 +118,26 @@ object AiPrompts {
     fun feedRecommend(context: AiPromptContext): AiPrompt =
         AiPrompt(FEED_RECOMMEND_SYSTEM, context.extra.ifBlank { context.body }, 0.7)
 
-    fun discover(context: AiPromptContext): AiPrompt =
-        AiPrompt(DISCOVER_SYSTEM, context.extra.ifBlank { companionBlock(context) }, 0.6)
-
-    fun bubbleBreak(context: AiPromptContext): AiPrompt =
-        AiPrompt(BUBBLE_BREAK_SYSTEM, context.extra.ifBlank { context.body }, 0.7)
-
-    fun aggregate(context: AiPromptContext): AiPrompt =
-        AiPrompt(AGGREGATE_SYSTEM, companionBlock(context), 0.5)
-
-    fun interestRank(context: AiPromptContext): AiPrompt =
-        AiPrompt(INTEREST_RANK_SYSTEM, context.extra.ifBlank { context.body }, 0.5)
-
-    fun eventMerge(context: AiPromptContext): AiPrompt =
-        AiPrompt(EVENT_MERGE_SYSTEM, companionBlock(context), 0.4)
-
-    fun coldStart(context: AiPromptContext): AiPrompt =
-        AiPrompt(COLD_START_SYSTEM, context.extra.ifBlank { context.body }, 0.4)
-
     // ── 辅助推送 ────────────────────────────────────────────────────────────
-
-    fun dailyBrief(context: AiPromptContext): AiPrompt =
-        AiPrompt(DAILY_BRIEF_SYSTEM, companionBlock(context), 0.6)
 
     fun shareCopy(context: AiPromptContext): AiPrompt =
         AiPrompt(SHARE_COPY_SYSTEM, articleBlock(context), 0.8)
 
-    fun importance(context: AiPromptContext): AiPrompt =
-        AiPrompt(IMPORTANCE_SYSTEM, articleBlock(context), 0.2)
-
     fun feedHealth(context: AiPromptContext): AiPrompt =
         AiPrompt(FEED_HEALTH_SYSTEM, context.extra.ifBlank { context.body }, 0.3)
 
-    fun habit(context: AiPromptContext): AiPrompt =
-        AiPrompt(HABIT_SYSTEM, context.extra.ifBlank { context.body }, 0.6)
-
-    fun dailyReport(context: AiPromptContext): AiPrompt =
-        AiPrompt(DAILY_REPORT_SYSTEM, context.extra.ifBlank { companionBlock(context) }, 0.6)
-
+    /**
+     * 过滤规则生成：**候选标题清单 + 用户的自然语言描述**。
+     *
+     * 这里刻意**不用** [articleBlock]（单篇正文）：系统提示词要求 `hits` 逐字取自
+     * "用户给定的清单"，而单篇正文只给得出一个标题——那等于要求模型在只有一个候选的
+     * 情况下举出多条命中示例，它只能编。清单走 [companionBlock]，与跨文章功能同一形状。
+     *
+     * 正文一律不给：判断"标题里有没有这个词"不需要正文，给了反而让模型有素材去
+     * 生成清单外的示例（那正是本地复核要拦的东西）。
+     */
     fun filterRule(context: AiPromptContext): AiPrompt =
-        AiPrompt(FILTER_RULE_SYSTEM, articleBlock(context) + questionBlock(context), 0.4)
+        AiPrompt(FILTER_RULE_SYSTEM, companionBlock(context) + requestBlock(context), 0.4)
 
     // ── 输入包装 ────────────────────────────────────────────────────────────
 
@@ -223,5 +177,19 @@ object AiPrompts {
         appendLine()
         appendLine()
         appendLine("用户问题：$q")
+    }
+
+    /**
+     * 用户对本次生成的要求（[AiPromptContext.question] 的第二种用法）。
+     *
+     * 与 [questionBlock] 分开只为一件事：**标签要说对**。过滤规则这里是"我不想看到什么"的
+     * 指令而不是提问，套一句"用户问题："会让模型把它当成待回答的问题去解释，
+     * 而它该做的是转写成规则。
+     */
+    private fun requestBlock(context: AiPromptContext): String = buildString {
+        val request = context.question?.takeIf { it.isNotBlank() } ?: return@buildString
+        appendLine()
+        appendLine()
+        appendLine("用户的要求（他不想看到什么）：$request")
     }
 }

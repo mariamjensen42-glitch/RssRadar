@@ -2,16 +2,16 @@ package com.cycling.rssradar.core.model
 
 /**
  * 归档保留档位（issue #57）。days = 保留天数，0 表示永久保留。
- * 纯 JVM 枚举，可被单测；label 供设置页直接展示。
+ * 纯 JVM 枚举，可被单测。
  */
-enum class KeepArchived(val days: Long, val label: String) {
-    ALWAYS(0, "永久"),
-    ONE_DAY(1, "1 天"),
-    TWO_DAYS(2, "2 天"),
-    THREE_DAYS(3, "3 天"),
-    ONE_WEEK(7, "1 周"),
-    TWO_WEEKS(14, "2 周"),
-    ONE_MONTH(30, "1 个月"),
+enum class KeepArchived(val days: Long) {
+    ALWAYS(0),
+    ONE_DAY(1),
+    TWO_DAYS(2),
+    THREE_DAYS(3),
+    ONE_WEEK(7),
+    TWO_WEEKS(14),
+    ONE_MONTH(30),
     ;
 
     /**
@@ -23,9 +23,5 @@ enum class KeepArchived(val days: Long, val label: String) {
 
     companion object {
         const val MILLIS_PER_DAY = 86_400_000L
-
-        /** 持久化名反查：未知值回落 ALWAYS（宁可不删，不可误删）。 */
-        fun fromNameOrNull(name: String?): KeepArchived? =
-            name?.let { n -> entries.firstOrNull { it.name == n } }
     }
 }

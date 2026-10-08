@@ -57,6 +57,47 @@ internal const val CONTENT_TYPE_FILTER_PREDICATE =
     "(:contentType IS NULL OR feeds.contentType = :contentType)"
 
 /**
+ * 「按信息价值排序」专用：LEFT JOIN 产物表 + 取值列。
+ *
+ * **只被 by-value 变体的查询使用，默认时间排序的查询一行都不带。**
+ * 原因是本文件上方那条已经被踩出来的教训：ORDER BY 里一旦出现表达式
+ * （`CASE WHEN :sortByValue THEN score END`），SQLite 就再也走不了
+ * `index_articles_publishedAt_fetchedAt`，整条查询退化成全表外排序——
+ * 而这条查询是全 App 最热的一条。所以宁可多一组查询，也不把排序做成参数塞进热路径。
+ *
+ * 这个 JOIN 落在 ai_artifacts 的**主键位置**（主键 = subjectKind/subjectId/kind），
+ * 每行一次 PK 探测，不产生额外扫描。
+ *
+ * `ponytail:` ⚠️ 硬编码的 0 / 12 必须与 `AiScope.ARTICLE.dbValue` / `AiFeature.NOISE.dbValue` 一致
+ * （@Query 只吃编译期常量，用不了枚举的构造属性）；
+ * `AiValueSqlContractTest` 把这条绑定关系变成了会变红的测试。
+ * 天花板：枚举的 dbValue 一旦重排，这里不会自动跟着变（只有测试拦）；
+ * 升级路径：测试已经把它变成编译后的硬约束，暂时没有更便宜的做法。
+ */
+internal const val AI_VALUE_JOIN =
+    " LEFT JOIN ai_artifacts AS aiNoise ON aiNoise.subjectKind = 0 AND aiNoise.subjectId = articles.id AND aiNoise.kind = 12"
+
+/** 取值表达式：降噪写下的信息价值分。列、谓词、排序共用这一份，避免写出三种形态。 */
+internal const val AI_VALUE_EXPR = "aiNoise.score"
+
+/** 取值列：null = 这篇还没被评估过。 */
+internal const val AI_VALUE_COLUMN = "$AI_VALUE_EXPR AS aiValue"
+
+/** 按信息价值排序时的 ORDER BY：分数高的在前；没评估过的（NULL）在 SQLite 里天然沉底。 */
+internal const val AI_VALUE_ORDER_BY =
+    "ORDER BY $AI_VALUE_EXPR DESC, articles.publishedAt DESC, articles.fetchedAt DESC"
+
+/**
+ * 「只看值得读」的 WHERE 片段：低于阈值的不进列表。
+ *
+ * **未评估的（score 为 null）保留**——它们不是"低价值"而是"还没判"。
+ * 一起藏掉的话，刚打开这个开关列表会瞬间空掉，看起来像坏了。
+ * `:minValue` 传 null 时整个谓词恒真（「按信息价值排序」那一档不需要过滤）。
+ */
+internal const val AI_VALUE_FILTER_PREDICATE =
+    "(:minValue IS NULL OR $AI_VALUE_EXPR IS NULL OR $AI_VALUE_EXPR >= :minValue)"
+
+/**
  * 搜索的二次筛选谓词（源 / 时间范围 / 未读 / 收藏 / 稍后读）。
  * 时间基准沿用 `COALESCE(publishedAt, fetchedAt)`，与归档清理、批量标已读一致——
  * 否则无发布日期的文章会在筛选里凭空消失。

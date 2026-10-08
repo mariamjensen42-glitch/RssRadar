@@ -11,6 +11,7 @@ import com.cycling.rssradar.core.data.parser.ContentFetcher
 import com.cycling.rssradar.core.data.parser.FetchLogger
 import com.cycling.rssradar.core.data.recommend.Recommendation
 import com.cycling.rssradar.core.data.refresh.RefreshEngine
+import com.cycling.rssradar.core.data.refresh.TransactionRunner
 import com.cycling.rssradar.core.data.repository.FeedPromptOverrideRepository
 import com.cycling.rssradar.core.data.repository.FeedRepository
 import com.cycling.rssradar.core.data.repository.ReadingStatsRepository
@@ -36,7 +37,8 @@ object RepositoryModule {
     fun provideFeedRepository(
         db: AppDatabase,
         engine: RefreshEngine,
-    ): FeedRepository = FeedRepository(db, engine)
+        transactionRunner: TransactionRunner,
+    ): FeedRepository = FeedRepository(db, engine, transactionRunner)
 
     /** 阅读统计取数：UI 侧不再直连 ArticleDao。 */
     @Provides
@@ -62,7 +64,7 @@ object RepositoryModule {
     ): SubscriptionFlow = SubscriptionFlow(db, engine, http = http)
 
     /**
-     * 按需抓取（ADR-0001 + ADR-0012）：抓取正文与写抓取日志是一个模块的两半，
+     * 按需抓取：抓取正文与写抓取日志是一个模块的两半，
      * 诊断页与详情页都直连它，不经过 FeedRepository 转发。
      */
     @Provides
@@ -98,13 +100,13 @@ object RepositoryModule {
     @Singleton
     fun provideSearchIndexer(database: AppDatabase): SearchIndexer = SearchIndexer(database)
 
-    /** 推荐流开关（#推荐，ADR-0013）。 */
+    /** 推荐流开关（#推荐）。 */
     @Provides
     @Singleton
     fun provideRecommendationStore(@ApplicationContext context: Context): RecommendationStore =
         RecommendationStore(SettingsPrefs.of(context))
 
-    /** 推荐流（ADR-0013）：候选池加载 + 打分 + 负反馈的家。 */
+    /** 推荐流：候选池加载 + 打分 + 负反馈的家。 */
     @Provides
     @Singleton
     fun provideRecommendation(database: AppDatabase): Recommendation =

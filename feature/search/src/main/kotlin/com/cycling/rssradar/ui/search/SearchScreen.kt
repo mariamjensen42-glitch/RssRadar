@@ -54,11 +54,11 @@ import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.ui.R as UiR
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
 import com.cycling.rssradar.ui.search.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 fun SearchDestination(
@@ -66,10 +66,26 @@ fun SearchDestination(
     onOpenArticle: (ArticleWithFeed) -> Unit = {},
     /** 空态托底入口：跳订阅管理页（订阅源多的时候按源浏览比关键词更顺手）。 */
     onOpenSubscriptions: () -> Unit = {},
+    /**
+     * 带词进入搜索（AI 结果卡里的话题 / 标签 / 关键词点一下就落到这里）。
+     * 走一次性状态而不是路由参数：全仓对"预填一段文本"都是这个做法
+     * （加订阅页的分享链接预填同理），不为一条预填给路由引入 String 参数。
+     */
+    initialQuery: String? = null,
+    onInitialQueryConsumed: () -> Unit = {},
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val feeds by viewModel.feeds.collectAsStateWithLifecycle()
+
+    LaunchedEffect(initialQuery) {
+        val query = initialQuery ?: return@LaunchedEffect
+        viewModel.onIntent(SearchIntent.QueryChange(query))
+        // 直接提交：用户是带着一个具体的词来的，"填进去但等他再点一次搜索"没道理。
+        viewModel.onIntent(SearchIntent.Submit)
+        onInitialQueryConsumed()
+    }
+
     SearchScreen(
         state = state,
         feeds = feeds,
@@ -113,7 +129,7 @@ fun SearchScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(radarColors().bgRoot)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -126,7 +142,7 @@ fun SearchScreen(
                     Icon(
                         imageVector = Lucide.ArrowLeft,
                         contentDescription = stringResource(UiR.string.back),
-                        tint = radarColors().textPrimary,
+                        tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
                 SearchBar(
@@ -188,7 +204,7 @@ private fun SearchBar(
         placeholder = {
             Text(
                 stringResource(R.string.search_placeholder),
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
             )
         },
@@ -197,16 +213,16 @@ private fun SearchBar(
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
         leadingIcon = {
-            Icon(Lucide.Search, contentDescription = null, tint = radarColors().textTertiary, modifier = Modifier.size(18.dp))
+            Icon(Lucide.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
         },
         trailingIcon = {
             if (query.isNotEmpty()) {
                 IconButton(onClick = onClear) {
-                    Icon(Lucide.X, contentDescription = stringResource(R.string.search_clear), tint = radarColors().textTertiary, modifier = Modifier.size(18.dp))
+                    Icon(Lucide.X, contentDescription = stringResource(R.string.search_clear), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                 }
             }
         },
-        colors = radarOutlinedTextFieldColors(containerColor = radarColors().surface1, borderColor = radarColors().surface2),
+        colors = radarOutlinedTextFieldColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest, borderColor = MaterialTheme.colorScheme.surfaceContainer),
     )
 }
 
@@ -222,7 +238,7 @@ private fun RecentSearches(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = stringResource(R.string.search_recent),
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
@@ -231,7 +247,7 @@ private fun RecentSearches(
                 TextButton(onClick = onClear) {
                     Text(
                         text = stringResource(R.string.search_clear_history),
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -241,7 +257,7 @@ private fun RecentSearches(
         if (history.isEmpty()) {
             Text(
                 text = stringResource(R.string.search_no_history),
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
             )
         } else {
@@ -268,7 +284,7 @@ private fun RecentSearches(
 private fun IdleSuggestions(onOpenSubscriptions: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = radarColors().surface1,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = Modifier
             .padding(horizontal = 20.dp, vertical = 16.dp)
             .fillMaxWidth()
@@ -282,28 +298,28 @@ private fun IdleSuggestions(onOpenSubscriptions: () -> Unit) {
             Icon(
                 Lucide.FolderOpen,
                 contentDescription = null,
-                tint = radarColors().accent,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(22.dp),
             )
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     text = stringResource(R.string.search_browse_feeds),
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = stringResource(R.string.search_browse_feeds_hint),
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
             Icon(
                 Lucide.ChevronRight,
                 contentDescription = null,
-                tint = radarColors().textTertiary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
         }
@@ -314,7 +330,7 @@ private fun IdleSuggestions(onOpenSubscriptions: () -> Unit) {
 private fun HistoryChip(term: String, onClick: () -> Unit, onDelete: (String) -> Unit) {
     Surface(
         shape = RoundedCornerShape(50),
-        color = radarColors().surface1,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = Modifier
             .clip(RoundedCornerShape(50))
             .clickable(onClick = onClick),
@@ -322,7 +338,7 @@ private fun HistoryChip(term: String, onClick: () -> Unit, onDelete: (String) ->
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = term,
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(start = 14.dp),
             )
@@ -331,7 +347,7 @@ private fun HistoryChip(term: String, onClick: () -> Unit, onDelete: (String) ->
                 Icon(
                     Lucide.X,
                     contentDescription = stringResource(R.string.search_delete_history_item, term),
-                    tint = radarColors().textTertiary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(12.dp),
                 )
             }

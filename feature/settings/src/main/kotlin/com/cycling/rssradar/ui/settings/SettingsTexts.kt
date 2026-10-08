@@ -8,7 +8,7 @@ import com.cycling.rssradar.core.model.ShareContentFormat
 import com.cycling.rssradar.core.model.SyncInterval
 
 /**
- * 设置域枚举文案的资源映射（ADR-0017）：core 层的中文 label 是数据口径，
+ * 设置域枚举文案的资源映射：core 层的中文 label 是数据口径，
  * 界面展示一律走这里按当前语言取 res。label lambda 非 Composable 时
  * 先在 Composable 里取成 map（见 SettingsSubPages 的 languageLabels 模式）。
  */

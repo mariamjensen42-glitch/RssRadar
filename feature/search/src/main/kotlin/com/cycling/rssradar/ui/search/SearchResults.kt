@@ -54,7 +54,6 @@ import com.cycling.rssradar.core.ui.components.ArticleMenuActions
 import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.core.ui.components.articleMenuOffset
 import com.cycling.rssradar.core.ui.components.pressScale
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.ui.search.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -101,7 +100,7 @@ internal fun SearchResults(
                 Text(
                     // 报**总命中数**而不是已载入条数：分页下后者会随着滚动一直涨，不是结果规模
                     text = stringResource(R.string.search_result_count, state.hits, state.query),
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -124,7 +123,7 @@ internal fun SearchResults(
                             .padding(top = 32.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(stringResource(R.string.search_no_result), color = radarColors().textTertiary)
+                        Text(stringResource(R.string.search_no_result), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -132,7 +131,7 @@ internal fun SearchResults(
                 item(key = "more") {
                     Text(
                         text = stringResource(R.string.search_loading_more),
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -168,7 +167,7 @@ private fun SearchResultRow(
     Box {
         Surface(
             shape = RoundedCornerShape(12.dp),
-            color = radarColors().articleCard,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
             modifier = Modifier
                 .fillMaxWidth()
                 .pressScale(interactionSource)
@@ -202,7 +201,7 @@ private fun SearchResultRow(
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
                 text = article.article.title.highlight(query),
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
@@ -212,7 +211,7 @@ private fun SearchResultRow(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = summary.highlight(query),
-                    color = radarColors().textSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -224,17 +223,17 @@ private fun SearchResultRow(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = article.feedTitle,
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                 )
                 Spacer(Modifier.width(6.dp))
-                Text("·", color = radarColors().textTertiary)
+                Text("·", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = article.article.publishedAt?.let {
                         DateUtils.getRelativeTimeSpanString(it).toString()
                     } ?: "",
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                 )
             }

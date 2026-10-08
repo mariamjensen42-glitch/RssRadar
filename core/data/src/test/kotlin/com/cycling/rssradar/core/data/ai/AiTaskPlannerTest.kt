@@ -16,18 +16,18 @@ import org.junit.Test
  */
 class AiTaskPlannerTest {
 
-    private val enabled = setOf(AiFeature.TAGS, AiFeature.KEYWORDS, AiFeature.CLASSIFY)
+    private val enabled = setOf(AiFeature.NOISE, AiFeature.KEYWORDS)
 
     @Test
     fun `只排已开启且是批处理触发的功能`() {
         val specs = AiTaskPlanner.planArticles(
-            enabled = setOf(AiFeature.TAGS, AiFeature.GLOSSARY),
+            enabled = setOf(AiFeature.NOISE, AiFeature.GLOSSARY),
             candidates = listOf(1L),
             existingKeys = emptySet(),
             remainingBudget = 100,
         )
         // GLOSSARY 是 REALTIME 触发，不该被排进批处理队列
-        assertEquals(listOf(AiFeature.TAGS), specs.map { it.feature })
+        assertEquals(listOf(AiFeature.NOISE), specs.map { it.feature })
     }
 
     @Test
@@ -39,13 +39,13 @@ class AiTaskPlannerTest {
             remainingBudget = 4,
         )
         // 功能顺序取枚举声明序（稳定，不随传入的 Set 迭代序变），
-        // 关键是同一篇文章的三项连续排完，才轮到下一篇文章。
+        // 关键是同一篇文章的两项连续排完，才轮到下一篇文章。
         assertEquals(
             listOf(
-                AiFeature.CLASSIFY to 10L,
-                AiFeature.TAGS to 10L,
                 AiFeature.KEYWORDS to 10L,
-                AiFeature.CLASSIFY to 20L,
+                AiFeature.NOISE to 10L,
+                AiFeature.KEYWORDS to 20L,
+                AiFeature.NOISE to 20L,
             ),
             specs.map { it.feature to it.targetId },
         )
@@ -57,12 +57,12 @@ class AiTaskPlannerTest {
             enabled = enabled,
             candidates = listOf(1L),
             existingKeys = setOf(
-                AiTaskPlanner.artifactKey(AiFeature.TAGS, 1L),
+                AiTaskPlanner.artifactKey(AiFeature.NOISE, 1L),
                 AiTaskPlanner.artifactKey(AiFeature.KEYWORDS, 1L),
             ),
             remainingBudget = 100,
         )
-        assertEquals(listOf(AiFeature.CLASSIFY), specs.map { it.feature })
+        assertTrue(specs.isEmpty())
     }
 
     @Test
@@ -79,7 +79,7 @@ class AiTaskPlannerTest {
     @Test
     fun `优先级取自订阅源配置`() {
         val specs = AiTaskPlanner.planArticles(
-            enabled = setOf(AiFeature.TAGS),
+            enabled = setOf(AiFeature.NOISE),
             candidates = listOf(1L, 2L),
             existingKeys = emptySet(),
             remainingBudget = 10,
@@ -92,11 +92,11 @@ class AiTaskPlannerTest {
     @Test
     fun `全局任务优先级为零且每次都重排`() {
         val specs = AiTaskPlanner.planGlobal(
-            enabled = setOf(AiFeature.DAILY_BRIEF),
+            enabled = setOf(AiFeature.FEED_RECOMMEND),
             remainingBudget = 10,
         )
         assertEquals(1, specs.size)
-        assertEquals(AiFeature.DAILY_BRIEF, specs[0].feature)
+        assertEquals(AiFeature.FEED_RECOMMEND, specs[0].feature)
         assertEquals(0L, specs[0].targetId)
     }
 
@@ -113,7 +113,7 @@ class AiTaskPlannerTest {
     @Test
     fun `三段合并后总量不超预算`() {
         val specs = AiTaskPlanner.planAll(
-            enabled = setOf(AiFeature.TAGS, AiFeature.FEED_HEALTH, AiFeature.DAILY_BRIEF),
+            enabled = setOf(AiFeature.NOISE, AiFeature.FEED_HEALTH, AiFeature.FEED_RECOMMEND),
             articleIds = listOf(1L, 2L, 3L, 4L),
             feedIds = listOf(7L, 8L),
             existingKeys = emptySet(),
@@ -134,8 +134,8 @@ class AiTaskPlannerTest {
     fun `产物键与任务去重键同形`() {
         // 两者必须可对照，否则排程去重与队列去重会各说各话。
         assertEquals(
-            AiTaskPlanner.artifactKey(AiFeature.TAGS, 42L),
-            AiTaskEntity.dedupeKey(AiFeature.TAGS.dbValue, 42L),
+            AiTaskPlanner.artifactKey(AiFeature.NOISE, 42L),
+            AiTaskEntity.dedupeKey(AiFeature.NOISE.dbValue, 42L),
         )
     }
 }

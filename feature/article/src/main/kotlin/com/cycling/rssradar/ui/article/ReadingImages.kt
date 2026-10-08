@@ -9,11 +9,11 @@ import org.jsoup.Jsoup
  * 1. [extract]：按文档顺序列出正文图片地址（去重，只收 http(s)），供全屏查看页
  *    做多图翻页与"点的是第几张"的定位。
  * 2. [wrapForMaximize]：把每张未包在 `<a>` 里的 `<img>` 套一层指向自身的链接，
- *    让 **JS 已禁用** 的 WebView（ADR-0007）也能把"点图"当成"点链接"上报，
- *    由 WebViewClient 按地址是否命中图片集合分流到全屏查看页（ADR-0011）。
+ *    让 **JS 已禁用** 的 WebView 也能把"点图"当成"点链接"上报，
+ *    由 WebViewClient 按地址是否命中图片集合分流到全屏查看页。
  *    本来就是链接的图（`<a href=页面><img></a>`）保持原语义，不抢它的点击。
  *
- * 为什么不用 JS：ADR-0007 的 OOM 结论是"整页包高 WebView 同时解码所有图片"，
+ * 为什么不用 JS：OOM 结论是"整页包高 WebView 同时解码所有图片"，
  * 与 JS 无关，但开 JS 会把内存与攻击面一起放大；本方案零 JS 达成同样效果。
  */
 object ReadingImages {

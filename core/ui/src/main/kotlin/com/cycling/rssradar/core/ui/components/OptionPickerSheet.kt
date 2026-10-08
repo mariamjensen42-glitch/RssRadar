@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 通用档位选择弹层（原 RssHubSettingsScreen 内的私有组件抽出，供设置页与信息流页共用）。
@@ -40,13 +39,13 @@ fun <T> OptionPickerSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = radarColors().surface1,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = modifier,
     ) {
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
             Text(
                 text = title,
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
@@ -57,7 +56,7 @@ fun <T> OptionPickerSheet(
                     headlineContent = {
                         Text(
                             text = label(option),
-                            color = if (isSelected) radarColors().accent else radarColors().textPrimary,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodyLarge,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -67,7 +66,7 @@ fun <T> OptionPickerSheet(
                         {
                             Text(
                                 text = note,
-                                color = radarColors().textTertiary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
@@ -78,7 +77,7 @@ fun <T> OptionPickerSheet(
                             onClick = null,
                         )
                     },
-                    colors = ListItemDefaults.colors(containerColor = radarColors().surface1),
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {

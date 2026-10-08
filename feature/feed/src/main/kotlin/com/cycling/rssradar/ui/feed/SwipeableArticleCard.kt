@@ -37,7 +37,6 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Star
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.model.ListDisplayState
-import com.cycling.rssradar.core.ui.theme.radarColors
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
@@ -176,14 +175,14 @@ private fun SwipeActionBackground(
             Triple(
                 if (isStarred) stringResource(R.string.star_off) else stringResource(R.string.star_on),
                 Lucide.Star,
-                radarColors().accent,
+                MaterialTheme.colorScheme.primary,
             )
 
         SwipeDirection.LEFT ->
             Triple(
                 if (isRead) stringResource(R.string.mark_unread) else stringResource(R.string.mark_read),
                 Lucide.Check,
-                radarColors().textSecondary,
+                MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
         null -> return

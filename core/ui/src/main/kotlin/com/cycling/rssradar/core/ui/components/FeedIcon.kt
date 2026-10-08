@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 订阅源 / 站点图标：有 [iconUrl] 时用 Coil 加载真图（底下字母块常驻打底，
@@ -34,7 +33,7 @@ fun FeedIcon(
     cornerRadius: Dp = 7.dp,
 ) {
     // 无题名取主题灰；其余按 title 稳定 hash 取 12 色调色板
-    val bg = colorForTitle(title) ?: radarColors().surface3
+    val bg = colorForTitle(title) ?: MaterialTheme.colorScheme.surfaceContainerHighest
     val letter = title.trim().firstOrNull()?.toString()?.uppercase() ?: "?"
     Box(
         modifier = modifier
@@ -68,7 +67,7 @@ fun FeedIcon(
  */
 @Composable
 fun FeedLetterTile(title: String, modifier: Modifier = Modifier) {
-    val bg = colorForTitle(title) ?: radarColors().surface3
+    val bg = colorForTitle(title) ?: MaterialTheme.colorScheme.surfaceContainerHighest
     val letter = title.trim().firstOrNull()?.toString()?.uppercase() ?: "?"
     Box(
         modifier = modifier.background(bg),
@@ -80,24 +79,6 @@ fun FeedLetterTile(title: String, modifier: Modifier = Modifier) {
             fontWeight = FontWeight.SemiBold,
             style = MaterialTheme.typography.headlineMedium,
         )
-    }
-}
-
-/** 默认无图标时的灰色方块。 */
-@Composable
-fun FeedIconPlaceholder(
-    modifier: Modifier = Modifier,
-    size: Dp = 28.dp,
-    cornerRadius: Dp = 7.dp,
-) {
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(RoundedCornerShape(cornerRadius))
-            .background(radarColors().surface3),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text("?", color = radarColors().textTertiary, style = MaterialTheme.typography.labelMedium)
     }
 }
 

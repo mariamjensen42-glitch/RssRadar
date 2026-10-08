@@ -4,6 +4,7 @@ import android.content.Context
 import com.cycling.rssradar.core.data.ai.AiArtifactRepository
 import com.cycling.rssradar.core.data.ai.AiBatchProcessor
 import com.cycling.rssradar.core.data.ai.AiFeatureRunner
+import com.cycling.rssradar.core.data.ai.AiFilterRuleDrafter
 import com.cycling.rssradar.core.data.ai.AiRateLimiter
 import com.cycling.rssradar.core.data.ai.AiRepository
 import com.cycling.rssradar.core.data.ai.AiTaskQueue
@@ -47,7 +48,7 @@ object AiModule {
         featureStore: AiFeatureStore,
     ): AiRepository = AiRepository(db.articleDao(), client, limiter, featureStore)
 
-    /** 35 项功能的独立开关。 */
+    /** 16 项功能的独立开关。 */
     @Provides
     @Singleton
     fun provideAiFeatureStore(@ApplicationContext context: Context): AiFeatureStore =
@@ -101,6 +102,24 @@ object AiModule {
         artifacts = artifacts,
         limiter = limiter,
         featureStore = featureStore,
+    )
+
+    /**
+     * 过滤规则提案。
+     *
+     * 与批处理器分开提供一个入口，是因为它**不进队列**：用户在界面上等着结果，
+     * 走排程只会多一次「入队→消化」的往返与其间的状态不确定性。
+     */
+    @Provides
+    @Singleton
+    fun provideAiFilterRuleDrafter(
+        db: AppDatabase,
+        runner: AiFeatureRunner,
+    ): AiFilterRuleDrafter = AiFilterRuleDrafter(
+        runner = runner,
+        supportDao = db.aiSupportDao(),
+        feedDao = db.feedDao(),
+        articleDao = db.articleDao(),
     )
 
     @Provides

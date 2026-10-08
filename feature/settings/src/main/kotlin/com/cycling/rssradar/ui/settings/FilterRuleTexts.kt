@@ -6,7 +6,7 @@ import com.cycling.rssradar.core.domain.filter.RuleMatchType
 import com.cycling.rssradar.core.domain.filter.RuleScopeType
 
 /**
- * 过滤规则的枚举文案（ADR-0017：文案映射随领域走）。
+ * 过滤规则的枚举文案（文案映射随领域走）。
  *
  * 原先与备份策略的文案挤在 app/i18n/FeatureTexts.kt —— 那个文件是「按技术层归拢」的产物。
  * 模块化时按领域拆开：过滤随过滤规则页进本模块，备份的留在 app（等 feature:me 批次归位）。

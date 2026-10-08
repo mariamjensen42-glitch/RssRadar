@@ -2,6 +2,7 @@ package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
 import com.cycling.rssradar.core.model.ThemeMode
+import com.cycling.rssradar.core.model.enumValueOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,11 +18,10 @@ class ThemeStore(private val prefs: SharedPreferences) {
     val mode: StateFlow<ThemeMode> = _mode.asStateFlow()
 
     /**
-     * Material You 动态取色（对照表 #27）：整套配色跟随系统壁纸（表面 + 文字 + 强调色）。
+     * Material You 动态取色（对照表 #27）：整套 M3 色板跟随系统壁纸。
      *
-     * 2026-10-03 默认改为**开**：项目已弃用固定紫调色板，自动配色成为唯一来源，
-     * 关掉就等于退回被废弃的配色。非 Android 12 设备上本开关无效（见 supportsDynamicColor），
-     * 那时回退到固定色板以免出现不可读的配色。
+     * 默认**开**（2026-10-03）。关掉等于退回 M3 基线色板（紫调）。
+     * 非 Android 12 设备上本开关无效（见 supportsDynamicColor），那时也走基线色板。
      */
     private val _dynamicColor = MutableStateFlow(prefs.getBoolean(KEY_DYNAMIC_COLOR, true))
     val dynamicColor: StateFlow<Boolean> = _dynamicColor.asStateFlow()
@@ -53,7 +53,7 @@ class ThemeStore(private val prefs: SharedPreferences) {
 
     private fun readPersistedMode(): ThemeMode {
         val name = prefs.getString(KEY_THEME_MODE, null) ?: return ThemeMode.SYSTEM
-        return runCatching { ThemeMode.valueOf(name) }.getOrDefault(ThemeMode.SYSTEM)
+        return enumValueOrNull<ThemeMode>(name) ?: ThemeMode.SYSTEM
     }
 
     private fun readPersistedAccent(): Long? {

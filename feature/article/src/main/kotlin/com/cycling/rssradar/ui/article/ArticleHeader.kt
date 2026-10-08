@@ -21,7 +21,6 @@ import com.composables.icons.lucide.Sparkles
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.model.TranslationDisplayState
 import com.cycling.rssradar.core.ui.components.FeedIcon
-import com.cycling.rssradar.core.ui.theme.radarColors
 import kotlin.math.roundToInt
 
 /** 详情页头部：源名行 + 标题 + AI 摘要卡 + 译文横幅。两种正文渲染模式共用。 */
@@ -45,7 +44,7 @@ internal fun ArticleHeader(
         Spacer(Modifier.width(8.dp))
         Text(
             text = article.feedTitle,
-            color = radarColors().textPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
@@ -53,21 +52,21 @@ internal fun ArticleHeader(
             modifier = Modifier.weight(1f, fill = false),
         )
         Spacer(Modifier.width(8.dp))
-        Text("·", color = radarColors().textTertiary)
+        Text("·", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(8.dp))
         Text(
             text = formatDate(article.article.publishedAt),
-            color = radarColors().textTertiary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelMedium,
         )
         // 阅读时长：只有真实正文字数算出来的才显示。取不到就不显示，不虚构。
         article.article.readingMinutes?.let { minutes ->
             Spacer(Modifier.width(8.dp))
-            Text("·", color = radarColors().textTertiary)
+            Text("·", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(8.dp))
             Text(
                 text = stringResource(R.string.article_reading_time, minutes),
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelMedium,
             )
         }
@@ -77,7 +76,7 @@ internal fun ArticleHeader(
     Spacer(Modifier.height(10.dp))
     Text(
         text = article.article.title,
-        color = radarColors().textPrimary,
+        color = MaterialTheme.colorScheme.onSurface,
         style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Bold,
         modifier = Modifier

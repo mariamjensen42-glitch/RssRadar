@@ -1,19 +1,14 @@
 package com.cycling.rssradar.ui.feed
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -30,8 +25,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -47,11 +40,15 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Music
 import com.composables.icons.lucide.Newspaper
 import com.composables.icons.lucide.Search
+import com.composables.icons.lucide.ArrowDownWideNarrow
+import com.composables.icons.lucide.Check
+import com.composables.icons.lucide.Clock
+import com.composables.icons.lucide.Gauge
 import com.composables.icons.lucide.SlidersHorizontal
 import com.composables.icons.lucide.Video
+import com.cycling.rssradar.core.model.FeedValueMode
 import com.cycling.rssradar.core.model.ListViewMode
 import com.cycling.rssradar.core.ui.theme.RssRadarTheme
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.labels.labelRes
 
 @Composable
@@ -62,6 +59,9 @@ internal fun FeedListTopBar(
     onMarkAllRead: () -> Unit,
     onOpenViewMode: () -> Unit,
     viewMode: ListViewMode,
+    /** AI 价值档位：按时间 / 按信息价值 / 只看值得读。 */
+    valueMode: FeedValueMode = FeedValueMode.OFF,
+    onSelectValueMode: (FeedValueMode) -> Unit = {},
     filterActive: Boolean,
     selectedTab: FeedTab,
     unreadCount: Int,
@@ -71,6 +71,8 @@ internal fun FeedListTopBar(
     // 顶栏只留高频的搜索，其余低频操作（标记已读/视图模式/分组筛选）收进溢出菜单：
     // 4 个无标签图标并排的可发现性差，新用户不可能逐个试
     var menuExpanded by remember { mutableStateOf(false) }
+    // 档位文案是普通 lambda 用的 String，先在组合作用域取好（与视图模式同一处理）
+    val valueModeLabels = FeedValueMode.entries.associateWith { stringResource(it.labelRes()) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -80,7 +82,7 @@ internal fun FeedListTopBar(
     ) {
         Text(
             text = "RssRadar",
-            color = radarColors().textPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f),
@@ -92,11 +94,11 @@ internal fun FeedListTopBar(
             onSelect = onSelectTab,
         )
         IconButton(onClick = onOpenSearch) {
-            Icon(Lucide.Search, contentDescription = stringResource(R.string.action_search), tint = radarColors().textPrimary)
+            Icon(Lucide.Search, contentDescription = stringResource(R.string.action_search), tint = MaterialTheme.colorScheme.onSurface)
         }
         Box {
             IconButton(onClick = { menuExpanded = true }) {
-                Icon(Lucide.EllipsisVertical, contentDescription = stringResource(R.string.more_actions), tint = radarColors().textPrimary)
+                Icon(Lucide.EllipsisVertical, contentDescription = stringResource(R.string.more_actions), tint = MaterialTheme.colorScheme.onSurface)
             }
             DropdownMenu(
                 expanded = menuExpanded,
@@ -125,6 +127,43 @@ internal fun FeedListTopBar(
                         onOpenViewMode()
                     },
                 )
+                FeedValueMode.entries.forEach { mode ->
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(valueModeLabels.getValue(mode))
+                                // 越界的那一档会把内容藏起来，必须就地说明阈值与「未评估的保留」，
+                                // 否则用户看到列表忽然变短只会以为坏了。
+                                if (mode == FeedValueMode.ONLY_GOOD) {
+                                    Text(
+                                        text = stringResource(R.string.feed_value_only_good_hint),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        },
+                        leadingIcon = {
+                            Icon(
+                                when (mode) {
+                                    FeedValueMode.OFF -> Lucide.Clock
+                                    FeedValueMode.BY_VALUE -> Lucide.ArrowDownWideNarrow
+                                    FeedValueMode.ONLY_GOOD -> Lucide.Gauge
+                                },
+                                contentDescription = null,
+                            )
+                        },
+                        trailingIcon = if (mode == valueMode) {
+                            { Icon(Lucide.Check, contentDescription = null) }
+                        } else {
+                            null
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onSelectValueMode(mode)
+                        },
+                    )
+                }
                 DropdownMenuItem(
                     text = { Text(if (filterActive) stringResource(R.string.group_filter_active) else stringResource(R.string.group_filter)) },
                     leadingIcon = { Icon(Lucide.SlidersHorizontal, contentDescription = null) },
@@ -145,7 +184,7 @@ internal fun FeedListTopBar(
  * 刻意不做成「塞进 ⋮ 菜单的第 4~8 项」：未读计数是首页最该一直露在外面的信息，
  * 再藏一层就等于每次都要点开菜单才知道有没有新东西。这里当前视图名（含计数）常驻，
  * 点击就地下拉、不遮屏，切换同样两次点击但不必先找菜单。
- * tabs 由调用方传入（ADR-0013 推荐流可关）。
+ * tabs 由调用方传入（推荐流可关）。
  */
 @Composable
 
@@ -167,7 +206,7 @@ private fun FeedTabMenuButton(
         ) {
             Text(
                 text = feedTabLabel(selected, unreadCount),
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -175,7 +214,7 @@ private fun FeedTabMenuButton(
             Icon(
                 imageVector = Lucide.ChevronDown,
                 contentDescription = null,
-                tint = radarColors().textSecondary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -210,72 +249,6 @@ private fun feedTabLabel(tab: FeedTab, unreadCount: Int): String = when (tab) {
     FeedTab.Starred -> stringResource(R.string.tab_starred)
     FeedTab.Bookmarked -> stringResource(R.string.tab_read_later)
     FeedTab.Recommended -> stringResource(R.string.tab_recommended)
-}
-
-@Composable
-
-internal fun FeedListTabRow(
-    selected: FeedTab,
-    unreadCount: Int,
-    /** 实际渲染的 tab（推荐流可关，ADR-0013）。 */
-    tabs: List<FeedTab> = FeedTab.entries,
-    onSelect: (FeedTab) -> Unit,
-) {
-    // 5 个 tab 在 360dp 窄屏上约需 380dp，固定 Row 会把末尾 chip 裁掉（看着像少了一个 tab）。
-    // 改成横向滚动，只在还能往右滚时叠一层右侧渐隐，提示后面还有内容。
-    val scrollState = rememberScrollState()
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(scrollState)
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            tabs.forEach { tab ->
-                FilterChip(
-                    label = feedTabLabel(tab, unreadCount),
-                    selected = tab == selected,
-                    onClick = { onSelect(tab) },
-                )
-            }
-        }
-        if (scrollState.canScrollForward) {
-            Box(modifier = Modifier.matchParentSize()) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .fillMaxHeight()
-                        .width(28.dp)
-                        .background(Brush.horizontalGradient(listOf(Color.Transparent, radarColors().bgRoot))),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-
-internal fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    // 轻量化选中样式：选中 = 低透明度 accent 底 + accent 文字（不再整块实色填充），
-    // 未选中 = 透明底 + 次级文字，仅留可点区域。整体视觉重量比旧胶囊低一档。
-    val bg = if (selected) radarColors().accent.copy(alpha = 0.16f) else Color.Transparent
-    val fg = if (selected) radarColors().accent else radarColors().textSecondary
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = bg,
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .clickable(onClick = onClick),
-    ) {
-        Text(
-            text = label,
-            color = fg,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-        )
-    }
 }
 
 /**
@@ -330,7 +303,7 @@ private fun ContentTypeOption(
     if (selected) {
         Surface(
             shape = RoundedCornerShape(50),
-            color = radarColors().accent,
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier
                 .clip(RoundedCornerShape(50))
                 .clickable(onClick = onClick),
@@ -346,12 +319,12 @@ private fun ContentTypeOption(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = radarColors().onAccent,
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(20.dp),
                 )
                 Text(
                     text = label,
-                    color = radarColors().onAccent,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -361,7 +334,7 @@ private fun ContentTypeOption(
     } else {
         Surface(
             shape = ContentTypeOptionShape,
-            color = radarColors().surface2,
+            color = MaterialTheme.colorScheme.surfaceContainer,
             modifier = Modifier
                 .clip(ContentTypeOptionShape)
                 .clickable(onClick = onClick),
@@ -373,7 +346,7 @@ private fun ContentTypeOption(
                 Icon(
                     imageVector = icon,
                     contentDescription = label,
-                    tint = radarColors().textSecondary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(22.dp),
                 )
             }
@@ -391,7 +364,7 @@ private val CapsuleContentHeight = 20.dp
 private val ContentTypeOptionShape = RoundedCornerShape(13.dp)
 
 /**
- * 「文章」用报纸图标：contentType=0 与社媒源共用这一个值（ADR-0014 未单设社媒），
+ * 「文章」用报纸图标：contentType=0 与社媒源共用这一个值（未单设社媒），
  * 而这类源是列表里的绝对多数，用「文章」的正名比用列表/网格之类的抽象图标更好认。
  */
 private fun ContentTypeFilter.mediaIcon(): ImageVector = when (this) {

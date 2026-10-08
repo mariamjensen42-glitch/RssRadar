@@ -42,7 +42,6 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Trash2
 import com.cycling.rssradar.core.data.ai.AiPayloadLine
 import com.cycling.rssradar.core.model.AiScope
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.text.formatCount
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -60,7 +59,7 @@ internal fun AiArtifactDetailSheet(
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     val clipboard = LocalClipboard.current
     val clipboardScope = rememberCoroutineScope()
     var showRaw by remember(detail) { mutableStateOf(false) }
@@ -68,7 +67,7 @@ internal fun AiArtifactDetailSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = colors.bgRoot,
+        containerColor = colors.surface,
     ) {
         Column(
             // 用确定高度（屏高 92%）而不是 wrap + max：面板高度不定时，
@@ -82,14 +81,14 @@ internal fun AiArtifactDetailSheet(
             Text(
                 text = stringResource(item.feature.labelRes()),
                 style = MaterialTheme.typography.titleMedium,
-                color = colors.textPrimary,
+                color = colors.onSurface,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(4.dp))
             Text(
                 text = subjectLabel(item),
                 style = MaterialTheme.typography.bodySmall,
-                color = colors.textSecondary,
+                color = colors.onSurfaceVariant,
             )
             Spacer(Modifier.height(6.dp))
             Text(
@@ -100,7 +99,7 @@ internal fun AiArtifactDetailSheet(
                     stringResource(R.string.artifacts_output_chars, formatCount(item.outputChars.toLong())),
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.labelSmall,
-                color = colors.textTertiary,
+                color = colors.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
 
@@ -116,7 +115,7 @@ internal fun AiArtifactDetailSheet(
                     Text(
                         text = stringResource(R.string.artifact_unparseable),
                         style = MaterialTheme.typography.bodySmall,
-                        color = colors.textSecondary,
+                        color = colors.onSurfaceVariant,
                     )
                 } else {
                     detail.lines.forEach { line ->
@@ -130,7 +129,7 @@ internal fun AiArtifactDetailSheet(
             TextButton(onClick = { showRaw = !showRaw }) {
                 Text(
                     text = if (showRaw) stringResource(R.string.collapse_raw) else stringResource(R.string.view_raw),
-                    color = colors.accent,
+                    color = colors.primary,
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -138,14 +137,14 @@ internal fun AiArtifactDetailSheet(
             if (showRaw) {
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = colors.surface2,
+                    color = colors.surfaceContainer,
                     modifier = Modifier.heightIn(max = 220.dp),
                 ) {
                     Box(Modifier.verticalScroll(rememberScrollState()).padding(12.dp)) {
                         Text(
                             text = detail.raw,
                             style = MaterialTheme.typography.bodySmall,
-                            color = colors.textSecondary,
+                            color = colors.onSurfaceVariant,
                         )
                     }
                 }
@@ -153,11 +152,11 @@ internal fun AiArtifactDetailSheet(
                     Icon(
                         imageVector = Lucide.Copy,
                         contentDescription = null,
-                        tint = colors.textSecondary,
+                        tint = colors.onSurfaceVariant,
                         modifier = Modifier.size(14.dp),
                     )
                     Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.copy_raw), color = colors.textSecondary, style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.copy_raw), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
             }
 
@@ -166,12 +165,12 @@ internal fun AiArtifactDetailSheet(
                 // 跳转按钮只在有落点时出现：点一个没接线的按钮，用户只会以为又坏了。
                 if (item.scope == AiScope.ARTICLE) {
                     TextButton(onClick = { onOpenArticle(item.subjectId) }) {
-                        Text(stringResource(R.string.open_article), color = colors.accent, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.open_article), color = colors.primary, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 if (item.scope == AiScope.FEED) {
                     TextButton(onClick = { onOpenFeed(item.subjectId) }) {
-                        Text(stringResource(R.string.open_feed), color = colors.accent, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.open_feed), color = colors.primary, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 Spacer(Modifier.weight(1f))
@@ -179,11 +178,11 @@ internal fun AiArtifactDetailSheet(
                     Icon(
                         imageVector = Lucide.Trash2,
                         contentDescription = null,
-                        tint = colors.textTertiary,
+                        tint = colors.onSurfaceVariant,
                         modifier = Modifier.size(14.dp),
                     )
                     Spacer(Modifier.width(6.dp))
-                    Text(stringResource(UiR.string.delete), color = colors.textTertiary)
+                    Text(stringResource(UiR.string.delete), color = colors.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -194,7 +193,7 @@ internal fun AiArtifactDetailSheet(
 @Composable
 
 private fun PayloadLineRow(line: AiPayloadLine) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -206,7 +205,7 @@ private fun PayloadLineRow(line: AiPayloadLine) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodySmall,
-                color = colors.textTertiary,
+                color = colors.onSurfaceVariant,
                 modifier = Modifier.width(84.dp),
             )
             Spacer(Modifier.width(8.dp))
@@ -214,7 +213,7 @@ private fun PayloadLineRow(line: AiPayloadLine) {
         Text(
             text = line.value,
             style = MaterialTheme.typography.bodySmall,
-            color = colors.textPrimary,
+            color = colors.onSurface,
             modifier = Modifier.weight(1f),
         )
     }

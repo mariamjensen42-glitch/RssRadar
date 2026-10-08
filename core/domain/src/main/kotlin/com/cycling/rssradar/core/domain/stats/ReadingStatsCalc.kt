@@ -1,0 +1,84 @@
+package com.cycling.rssradar.core.domain.stats
+
+/**
+ * 阅读习惯的统计算法，纯函数、无依赖。
+ *
+ * 放在 domain 层且刻意不碰数据库：这些数字必须能脱离 Android 环境算出来并断言——
+ * 记录阅读习惯的页面要的是可复核的数字，不是看起来差不多的估算。
+ */
+object ReadingStatsCalc {
+
+    private const val HOUR_MS = 60 * 60 * 1000L
+    private const val DAY_MS = 24 * HOUR_MS
+
+    /**
+     * 活跃时段：出现频次明显高于全天平均的小时，按频次降序后取前 [topN]，最后按小时升序返回。
+     *
+     * "明显高于平均"是个保守判据——平均线以下的小时说明不了习惯，
+     * 把它们列进报告只会让"你的活跃时段是 0~23 点"这种废话出现。
+     * 样本太少（比如只有 1 次打开）时结果就是 1 个小时，如实反映，不美化。
+     */
+    fun activeHours(
+        timestamps: List<Long>,
+        zoneOffsetMillis: Int,
+        topN: Int = 5,
+    ): List<Int> {
+        if (timestamps.isEmpty()) return emptyList()
+
+        val buckets = IntArray(24)
+        timestamps.forEach { t ->
+            val localMillis = (t + zoneOffsetMillis) % DAY_MS
+            val hour = ((if (localMillis < 0) localMillis + DAY_MS else localMillis) / HOUR_MS).toInt()
+            buckets[hour]++
+        }
+
+        val average = timestamps.size / 24.0
+        return buckets
+            .mapIndexed { hour, count -> hour to count }
+            .filter { (_, count) -> count > 0 && count > average }
+            .sortedWith(compareByDescending<Pair<Int, Int>> { it.second }.thenBy { it.first })
+            .take(topN)
+            .map { it.first }
+            .sorted()
+    }
+
+    /**
+     * 订阅源集中度：归一化赫芬达尔指数，0 = 完全分散，1 = 全部集中在一个源。
+     *
+     * 用归一化版本而不是裸 HHI，是因为裸 HHI 的下界随订阅源数量变化
+     * （10 个源的最分散状态是 0.1，100 个源是 0.01），
+     * 直接拿给用户看会得出"订得越多越专注"的荒谬结论。
+     */
+    fun concentration(counts: List<Int>): Double {
+        val positive = counts.filter { it > 0 }
+        val total = positive.sum()
+        if (total <= 0) return 0.0
+
+        val n = positive.size
+        if (n == 1) return 1.0
+
+        val hhi = positive.sumOf { count ->
+            val share = count.toDouble() / total
+            share * share
+        }
+        return ((hhi - 1.0 / n) / (1.0 - 1.0 / n)).coerceIn(0.0, 1.0)
+    }
+
+    /**
+     * 连续阅读天数（统计仪表盘，#81/#83）：[dayKeys] 是打开过文章的本地历日
+     * （epoch day）集合，[todayDay] 是今天的 epoch day。
+     *
+     * 今天还没打开不算断——从今天或昨天起往回数，日子连续才累加。
+     * 「今天没读」时从昨天起数，否则早上打开 App 看统计永远是 0，夜里 0 点
+     * 跨天瞬间连击清零，两个都是反直觉的。
+     */
+    fun streakDays(dayKeys: Set<Long>, todayDay: Long): Int {
+        var cursor = if (todayDay in dayKeys) todayDay else todayDay - 1
+        var streak = 0
+        while (cursor in dayKeys) {
+            streak++
+            cursor--
+        }
+        return streak
+    }
+}

@@ -53,7 +53,7 @@ interface ArticleBrowseDao {
     suspend fun loadFeedWithFeedPaged(feedId: Long, limit: Int, offset: Int): List<ArticleWithFeed>
 
     /**
-     * 推荐候选池（ADR-0013）：未读 且 发布时间在窗口内。
+     * 推荐候选池：未读 且 发布时间在窗口内。
      * 已读文章永不进推荐。窗口基准与归档一致（COALESCE(publishedAt, fetchedAt)）。
      * [limit] 是候选池上限（不是分页），打分在内存里做。
      */
@@ -90,7 +90,7 @@ interface ArticleBrowseDao {
     suspend fun loadRelatedCandidates(excludeId: Long, since: Long, limit: Int): List<ArticleWithFeed>
 
     /**
-     * 画像样本（ADR-0013）：真实表达过兴趣的文章——打开过、收藏或稍后读。
+     * 画像样本：真实表达过兴趣的文章——打开过、收藏或稍后读。
      * 按最近一次打开时间倒序取前 [limit] 条，越近的行为在画像里权重越高。
      */
     @Query(
@@ -106,7 +106,7 @@ interface ArticleBrowseDao {
     )
     suspend fun loadEngagementSamples(limit: Int): List<EngagementRow>
 
-    /** 窗口内每个订阅源的文章总数：源亲和度的分母（打开率，ADR-0013）。 */
+    /** 窗口内每个订阅源的文章总数：源亲和度的分母（打开率）。 */
     @Query(
         """
         SELECT feedId AS feedId, COUNT(*) AS cnt
@@ -130,7 +130,7 @@ interface ArticleBrowseDao {
     suspend fun loadByIds(ids: List<Long>): List<ArticleWithFeed>
 
     /**
-     * 记录一次打开（ADR-0013）：每次打开详情页都更新，画像靠它做时间衰减。
+     * 记录一次打开：每次打开详情页都更新，画像靠它做时间衰减。
      * 只写这一列，不碰用户状态（已读/收藏/稍后读）。
      */
     @Query("UPDATE articles SET lastOpenedAt = :now WHERE id = :id")

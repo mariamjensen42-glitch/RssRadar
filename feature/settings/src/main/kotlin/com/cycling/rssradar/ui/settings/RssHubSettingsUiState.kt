@@ -30,6 +30,17 @@ data class RssHubSettingsUiState(
     val aiKeyConfigured: Boolean = false,
     /** AI Key 保存的提示文案。 */
     val aiMessage: UiText? = null,
+    /**
+     * AI 概览（「AI 与诊断」入口页的顶部状态卡）。
+     *
+     * 入口页原先只有 Key 状态和三行裸链接，看不出「我现在开了几项、今天花了多少额度、
+     * 后台有没有积压」——而这三件事恰好决定用户要不要进去。数字全部来自 Store 真值。
+     */
+    val aiEnabledCount: Int = 0,
+    val aiUsedToday: Int = 0,
+    /** 日上限；0 = 不限。 */
+    val aiDailyLimit: Int = 0,
+    val aiPendingTasks: Int = 0,
     /** 信息流列表显示项（issue #56）。 */
     val listDisplay: ListDisplayState = ListDisplayState(),
     /** 归档保留档位（issue #57）。 */
@@ -38,7 +49,7 @@ data class RssHubSettingsUiState(
     val sync: SyncState = SyncState(),
     /** 外链打开方式与分享格式（#26）。 */
     val linkShare: LinkShareState = LinkShareState(),
-    /** 推荐流开关（ADR-0013）。 */
+    /** 推荐流开关。 */
     val recommendationEnabled: Boolean = true,
     /** 新文章通知总开关（#31）。 */
     val notifyEnabled: Boolean = false,

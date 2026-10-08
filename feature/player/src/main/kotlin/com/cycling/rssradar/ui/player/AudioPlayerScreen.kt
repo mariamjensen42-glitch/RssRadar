@@ -28,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cycling.rssradar.core.playback.PlaybackState
 import com.cycling.rssradar.core.playback.PlaybackTrack
+import com.cycling.rssradar.core.ui.text.formatMediaTime
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,7 +49,6 @@ import coil3.request.ImageRequest
 import com.cycling.rssradar.core.ui.R as UiR
 import com.cycling.rssradar.core.ui.components.SegmentedChips
 import com.cycling.rssradar.core.ui.components.SyncedSlider
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.ui.player.R
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Headphones
@@ -107,7 +107,7 @@ fun AudioPlayerScreen(
     onNext: () -> Unit = {},
     onSetSpeed: (Float) -> Unit = {},
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
 
     // 拖动进度条期间用本地值，松手才 seek——否则轮询会把手指按着的位置一直拽回去
@@ -116,7 +116,7 @@ fun AudioPlayerScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.bgRoot)
+            .background(colors.surface)
             .statusBarsPadding(),
     ) {
         Row(
@@ -126,11 +126,11 @@ fun AudioPlayerScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = colors.textPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = colors.onSurface)
             }
             Text(
                 text = stringResource(R.string.player_title),
-                color = colors.textPrimary,
+                color = colors.onSurface,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -140,7 +140,7 @@ fun AudioPlayerScreen(
                 if (index >= 0) {
                     Text(
                         text = stringResource(R.string.player_queue_position, index + 1, queue.size),
-                        color = colors.textTertiary,
+                        color = colors.onSurfaceVariant,
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
@@ -151,7 +151,7 @@ fun AudioPlayerScreen(
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     text = stringResource(R.string.player_no_audio),
-                    color = colors.textSecondary,
+                    color = colors.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(32.dp),
@@ -169,7 +169,7 @@ fun AudioPlayerScreen(
         ) {
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                color = colors.surface1,
+                color = colors.surfaceContainerLowest,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f),
@@ -180,7 +180,7 @@ fun AudioPlayerScreen(
                         Icon(
                             Lucide.Headphones,
                             contentDescription = null,
-                            tint = colors.textTertiary,
+                            tint = colors.onSurfaceVariant,
                             modifier = Modifier.size(64.dp),
                         )
                     }
@@ -203,7 +203,7 @@ fun AudioPlayerScreen(
         Column(modifier = Modifier.padding(horizontal = 28.dp)) {
             Text(
                 text = state.title ?: stringResource(R.string.player_unknown_title),
-                color = colors.textPrimary,
+                color = colors.onSurface,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
@@ -213,7 +213,7 @@ fun AudioPlayerScreen(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = feed,
-                    color = colors.textTertiary,
+                    color = colors.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -240,14 +240,14 @@ fun AudioPlayerScreen(
             )
             Row(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = formatTime((progress * duration).toLong()),
-                    color = colors.textTertiary,
+                    text = formatMediaTime((progress * duration).toLong()),
+                    color = colors.onSurfaceVariant,
                     style = MaterialTheme.typography.labelSmall,
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = if (duration > 0) formatTime(duration) else stringResource(R.string.player_live_stream),
-                    color = colors.textTertiary,
+                    text = if (duration > 0) formatMediaTime(duration) else stringResource(R.string.player_live_stream),
+                    color = colors.onSurfaceVariant,
                     style = MaterialTheme.typography.labelSmall,
                 )
             }
@@ -260,15 +260,15 @@ fun AudioPlayerScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onPrevious, enabled = queue.size > 1) {
-                Icon(Lucide.SkipBack, contentDescription = stringResource(R.string.player_previous), tint = colors.textPrimary)
+                Icon(Lucide.SkipBack, contentDescription = stringResource(R.string.player_previous), tint = colors.onSurface)
             }
             IconButton(onClick = { onSkipBy(-SKIP_MILLIS) }) {
-                Icon(Lucide.RotateCcw, contentDescription = stringResource(R.string.player_back_15), tint = colors.textPrimary)
+                Icon(Lucide.RotateCcw, contentDescription = stringResource(R.string.player_back_15), tint = colors.onSurface)
             }
             Spacer(Modifier.size(8.dp))
             Surface(
                 shape = CircleShape,
-                color = colors.accent,
+                color = colors.primary,
                 modifier = Modifier.size(64.dp),
             ) {
                 IconButton(onClick = onTogglePlayPause) {
@@ -277,17 +277,17 @@ fun AudioPlayerScreen(
                         contentDescription = stringResource(
                             if (state.playing) R.string.player_pause else R.string.player_play,
                         ),
-                        tint = colors.onAccent,
+                        tint = colors.onPrimary,
                         modifier = Modifier.size(30.dp),
                     )
                 }
             }
             Spacer(Modifier.size(8.dp))
             IconButton(onClick = { onSkipBy(SKIP_MILLIS) }) {
-                Icon(Lucide.RotateCw, contentDescription = stringResource(R.string.player_forward_15), tint = colors.textPrimary)
+                Icon(Lucide.RotateCw, contentDescription = stringResource(R.string.player_forward_15), tint = colors.onSurface)
             }
             IconButton(onClick = onNext, enabled = queue.size > 1) {
-                Icon(Lucide.SkipForward, contentDescription = stringResource(R.string.player_next), tint = colors.textPrimary)
+                Icon(Lucide.SkipForward, contentDescription = stringResource(R.string.player_next), tint = colors.onSurface)
             }
         }
 
@@ -311,19 +311,12 @@ fun AudioPlayerScreen(
             Spacer(Modifier.height(16.dp))
             Text(
                 text = stringResource(R.string.player_error, message),
-                color = colors.accent,
+                color = colors.primary,
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.padding(horizontal = 28.dp),
             )
         }
     }
-}
-
-private fun formatTime(millis: Long): String {
-    val totalSeconds = (millis / 1000).coerceAtLeast(0)
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return "%d:%02d".format(minutes, seconds)
 }
 
 private fun formatSpeed(speed: Float): String =

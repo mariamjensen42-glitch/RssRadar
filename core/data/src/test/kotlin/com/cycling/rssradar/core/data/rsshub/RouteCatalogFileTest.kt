@@ -8,7 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * slim schema 的解析（ADR-0010）。
+ * slim schema 的解析。
  *
  * 内置快照（assets）与在线更新后的缓存共用这份格式，也是 python 脚本
  * `scripts/build-route-catalog.py` 的输出契约——这里锁住解析行为。

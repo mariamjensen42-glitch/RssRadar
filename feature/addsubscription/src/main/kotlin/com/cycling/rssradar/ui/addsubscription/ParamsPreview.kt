@@ -36,7 +36,6 @@ import com.cycling.rssradar.core.model.rsshub.RssHubRoute
 import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.core.ui.text.resolve
 import com.cycling.rssradar.core.ui.theme.Success
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 @Composable
 
@@ -48,14 +47,14 @@ internal fun ParamsHeader(route: RssHubRoute, onBack: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onBack) {
-            Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.add_back_to_catalog), tint = radarColors().textPrimary)
+            Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.add_back_to_catalog), tint = MaterialTheme.colorScheme.onSurface)
         }
         FeedIcon(title = route.sourceName, size = 32.dp, cornerRadius = 9.dp)
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = route.name,
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -63,7 +62,7 @@ internal fun ParamsHeader(route: RssHubRoute, onBack: () -> Unit) {
             )
             Text(
                 text = route.sourceName,
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -88,7 +87,7 @@ internal fun PreviewResult(
         if (state.isValidating) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(
-                    color = radarColors().accent,
+                    color = MaterialTheme.colorScheme.primary,
                     strokeWidth = 2.dp,
                     modifier = Modifier.size(14.dp),
                 )
@@ -101,7 +100,7 @@ internal fun PreviewResult(
                     } else {
                         stringResource(R.string.add_validating)
                     },
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -150,7 +149,7 @@ internal fun ExamplePicker(
     Column {
         Text(
             text = stringResource(R.string.add_example),
-            color = radarColors().textSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
         )
@@ -160,7 +159,7 @@ internal fun ExamplePicker(
                 val example = examples[index]
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = radarColors().surface2,
+                    color = MaterialTheme.colorScheme.surfaceContainer,
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
                         .clickable { onSelect(example) },
@@ -168,7 +167,7 @@ internal fun ExamplePicker(
                     Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                         Text(
                             text = example.title.ifBlank { example.path.substringAfterLast('/') },
-                            color = radarColors().textPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodySmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -176,7 +175,7 @@ internal fun ExamplePicker(
                         if (example.title.isNotBlank()) {
                             Text(
                                 text = example.path,
-                                color = radarColors().textTertiary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.labelSmall,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -194,12 +193,12 @@ internal fun ExamplePicker(
 internal fun CodeBlock(text: String, accent: Boolean = false) {
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = if (accent) radarColors().surface2 else Color(0xFF111114),
+        color = if (accent) MaterialTheme.colorScheme.surfaceContainer else Color(0xFF111114),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Text(
             text = text,
-            color = if (accent) radarColors().link else radarColors().textSecondary,
+            color = if (accent) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
         )
@@ -215,7 +214,7 @@ internal fun ValidationBanner(info: ValidationInfo) {
     val color = when (info) {
         is ValidationInfo.Valid -> Success
         // 发现到候选不是错误，是进展：用强调色而非报错红
-        is ValidationInfo.Discovered -> radarColors().accent
+        is ValidationInfo.Discovered -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.error
     }
     Row(

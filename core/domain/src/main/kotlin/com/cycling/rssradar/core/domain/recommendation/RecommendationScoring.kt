@@ -4,7 +4,7 @@ import kotlin.math.ln
 import kotlin.math.pow
 
 /**
- * 推荐打分（ADR-0013）：纯 JVM 实现，不依赖 Room / Android，可直接单测。
+ * 推荐打分：纯 JVM 实现，不依赖 Room / Android，可直接单测。
  *
  * 三个分量，全部可解释：
  * - **新鲜度**：发布时间的指数衰减（半衰期 [FRESHNESS_HALF_LIFE_DAYS] 天）。
@@ -13,8 +13,10 @@ import kotlin.math.pow
  * - **内容亲和度**：从用户真实读过的文章（打开/收藏/稍后读）抽取 bigram 词袋，
  *   用 IDF 加权后的覆盖率给候选打分，落在 [0,1]。
  *
- * 不做真分词（不引分词库）：中文取相邻二字片段，拉丁文按词。标题/摘要粒度上
+ * `ponytail:` 不做真分词（不引分词库）：中文取相邻二字片段，拉丁文按词。标题/摘要粒度上
  * bigram 的区分度足够，且零依赖。
+ * 天花板：没有词性/短语概念，专有名词和固定搭配会被切碎，长摘要上区分度会掉。
+ * 升级路径：真出现“推得不准”时换 jieba（中文分词库）或按领域词表加权。
  */
 
 /** 推荐候选（打分侧的纯数据，由 DB 行映射而来）。 */
@@ -70,7 +72,7 @@ data class InterestProfile(
 
 object RecommendationScoring {
 
-    /** 兴趣词袋容量（ADR-0013：top 200，控制内存与噪声）。 */
+    /** 兴趣词袋容量（top 200，控制内存与噪声）。 */
     const val TERM_LIMIT = 200
 
     /** 打开行为的时间衰减半衰期（天）。 */
@@ -78,6 +80,16 @@ object RecommendationScoring {
 
     /** 新鲜度衰减半衰期（天）。 */
     const val FRESHNESS_HALF_LIFE_DAYS = 3.0
+
+    /**
+     * 用户手选领域（[RecommendationSeeds]）的权重。
+     *
+     * 取 0.6 的理由是量纲上的：一个被打开过的样本贡献
+     * `recency(0.5~1.0) × engagement(1.0~2.3)`，量级在 1 上下。
+     * 所以 0.6 ≈ **半篇被打开的文章**——读一两篇就把它压过去了。
+     * 这正是想要的：勾选是起步的临时先验，不是长期偏好。
+     */
+    const val SEED_TERM_WEIGHT = 0.6
 
     /** 多样性：滑动窗口大小。 */
     const val DIVERSITY_WINDOW = 20
@@ -102,10 +114,20 @@ object RecommendationScoring {
         candidates: List<RecommendationCandidate>,
         feedTotals: Map<Long, Int>,
         now: Long,
+        /** 用户手选的领域（[RecommendationSeeds.TOPICS]），没有勾选时传空。 */
+        seeds: List<String> = emptyList(),
     ): InterestProfile {
         val idf = idf(candidates, samples)
         val terms = HashMap<String, Double>()
         val opens = HashMap<Long, Double>()
+
+        // 先注入种子：它必须与文章正文走**同一个分词器**。种子若原样整串塞进去，
+        // 永远匹配不到任何文章（文章侧只有二字片段），那份画像就是一份摆着好看的死数据。
+        seeds.forEach { seed ->
+            Bigrams.of(seed).toSet().forEach { term ->
+                terms[term] = (terms[term] ?: 0.0) + SEED_TERM_WEIGHT
+            }
+        }
 
         for (sample in samples) {
             val weight = sampleWeight(sample, now)
@@ -200,7 +222,7 @@ object RecommendationScoring {
     }
 
     /**
-     * 冷启动退化（ADR-0013）：画像为空时，按订阅源分组轮转取最近未读。
+     * 冷启动退化：画像为空时，按订阅源分组轮转取最近未读。
      * 退化结果本身有用（等于按源均衡的未读流），所以推荐 tab 永远有内容。
      */
     fun coldStartRank(candidates: List<RecommendationCandidate>): List<Long> {

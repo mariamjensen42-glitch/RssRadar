@@ -29,7 +29,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronUp
 import com.composables.icons.lucide.Lucide
@@ -63,7 +62,7 @@ internal fun ReaderFindBar(
     modifier: Modifier = Modifier,
     limit: FindLimit = FindLimit.NONE,
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     val focusRequester = remember { FocusRequester() }
     // 打开就聚焦：查找栏的唯一用途就是输入，还要用户再点一下输入框是多余的
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -72,14 +71,14 @@ internal fun ReaderFindBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(colors.surface1)
+                .background(colors.surfaceContainerLowest)
                 .padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 Lucide.Search,
                 contentDescription = null,
-                tint = colors.textSecondary,
+                tint = colors.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
             Box(
@@ -90,7 +89,7 @@ internal fun ReaderFindBar(
                 if (query.isEmpty()) {
                     Text(
                         text = stringResource(R.string.find_hint),
-                        color = colors.textSecondary,
+                        color = colors.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -98,8 +97,8 @@ internal fun ReaderFindBar(
                     value = query,
                     onValueChange = onQueryChange,
                     singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(color = colors.textPrimary),
-                    cursorBrush = SolidColor(colors.accent),
+                    textStyle = LocalTextStyle.current.copy(color = colors.onSurface),
+                    cursorBrush = SolidColor(colors.primary),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -108,25 +107,25 @@ internal fun ReaderFindBar(
             }
             Text(
                 text = "$cursor/$count",
-                color = if (count == 0) colors.textSecondary else colors.textPrimary,
+                color = if (count == 0) colors.onSurfaceVariant else colors.onSurface,
                 style = MaterialTheme.typography.labelMedium,
             )
             IconButton(onClick = onPrevious, enabled = count > 0) {
                 Icon(
                     Lucide.ChevronUp,
                     contentDescription = stringResource(R.string.find_previous),
-                    tint = if (count > 0) colors.textPrimary else colors.textSecondary,
+                    tint = if (count > 0) colors.onSurface else colors.onSurfaceVariant,
                 )
             }
             IconButton(onClick = onNext, enabled = count > 0) {
                 Icon(
                     Lucide.ChevronDown,
                     contentDescription = stringResource(R.string.find_next),
-                    tint = if (count > 0) colors.textPrimary else colors.textSecondary,
+                    tint = if (count > 0) colors.onSurface else colors.onSurfaceVariant,
                 )
             }
             IconButton(onClick = onClose) {
-                Icon(Lucide.X, contentDescription = stringResource(R.string.find_close), tint = colors.textPrimary)
+                Icon(Lucide.X, contentDescription = stringResource(R.string.find_close), tint = colors.onSurface)
             }
         }
         // 无命中：说清是"没找到"而不是"还在找"；能力受限：说清为什么
@@ -140,11 +139,11 @@ internal fun ReaderFindBar(
         if (note != null) {
             Text(
                 text = note,
-                color = colors.textSecondary,
+                color = colors.onSurfaceVariant,
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(colors.surface1)
+                    .background(colors.surfaceContainerLowest)
                     .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
             )
         }

@@ -38,7 +38,6 @@ import com.cycling.rssradar.core.domain.filter.RuleMatchType
 import com.cycling.rssradar.core.domain.filter.RuleScopeType
 import com.cycling.rssradar.core.ui.R as UiR
 import com.cycling.rssradar.core.ui.components.ConfirmDialog
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.components.SettingSwitchRow
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,7 +67,7 @@ internal fun RuleEditorSheet(
                 text = stringResource(
                     if (rule.id == 0L) R.string.rule_new else R.string.rule_edit,
                 ),
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium,
             )
             Spacer(Modifier.height(16.dp))
@@ -82,7 +81,7 @@ internal fun RuleEditorSheet(
             )
             Spacer(Modifier.height(12.dp))
 
-            Text(stringResource(R.string.rule_match_type), color = radarColors().textSecondary, style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.rule_match_type), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(6.dp))
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 RuleMatchType.entries.forEachIndexed { index, type ->
@@ -96,7 +95,7 @@ internal fun RuleEditorSheet(
             }
             Spacer(Modifier.height(12.dp))
 
-            Text(stringResource(R.string.rule_fields), color = radarColors().textSecondary, style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.rule_fields), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(6.dp))
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -144,7 +143,7 @@ internal fun RuleEditorSheet(
             )
             Spacer(Modifier.height(12.dp))
 
-            Text(stringResource(R.string.rule_scope), color = radarColors().textSecondary, style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.rule_scope), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(6.dp))
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 RuleScopeType.entries.forEachIndexed { index, scope ->
@@ -188,7 +187,7 @@ internal fun RuleEditorSheet(
             }
             Spacer(Modifier.height(12.dp))
 
-            Text(stringResource(R.string.rule_action), color = radarColors().textSecondary, style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.rule_action), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(6.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 RuleAction.entries.forEach { action ->
@@ -203,7 +202,7 @@ internal fun RuleEditorSheet(
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = stringResource(R.string.rule_hide_warning),
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -220,7 +219,7 @@ internal fun RuleEditorSheet(
                         draft.matchType == RuleMatchType.REGEX -> stringResource(R.string.rule_preview_unknown)
                         else -> stringResource(R.string.rule_preview_none)
                     },
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }

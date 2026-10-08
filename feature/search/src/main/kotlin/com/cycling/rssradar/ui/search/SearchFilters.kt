@@ -26,7 +26,6 @@ import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.model.library.LibraryRange
 import com.cycling.rssradar.core.ui.components.SegmentedChips
 import com.cycling.rssradar.core.ui.labels.labelRes
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.ui.search.R
 
 /**
@@ -95,7 +94,7 @@ internal fun SearchFilterRow(
                 TextButton(onClick = { onIntent(SearchIntent.ClearFilters) }) {
                     Text(
                         text = stringResource(R.string.search_filter_clear),
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
@@ -124,14 +123,14 @@ internal fun SearchFilterRow(
 private fun FilterToggle(label: String, active: Boolean, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(50),
-        color = if (active) radarColors().accent else radarColors().surface2,
+        color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier
             .clip(RoundedCornerShape(50))
             .clickable(onClick = onClick),
     ) {
         Text(
             text = label,
-            color = if (active) radarColors().onAccent else radarColors().textPrimary,
+            color = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
         )

@@ -15,7 +15,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 统一空态：居中的「图标 + 主文案（+ 次文案）」。
@@ -38,12 +37,12 @@ fun EmptyState(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = radarColors().textTertiary,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(iconSize),
         )
         Text(
             text = message,
-            color = radarColors().textSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 12.dp),
@@ -51,7 +50,7 @@ fun EmptyState(
         if (hint != null) {
             Text(
                 text = hint,
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 4.dp),

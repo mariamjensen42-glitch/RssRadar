@@ -5,7 +5,6 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.runtime.Composable
@@ -43,22 +42,18 @@ import coil3.request.crossfade
  * `MotionSchemeKt` 里带 `getMotionScheme` 的 Composable 函数——所以入口是
  * `MaterialTheme.motionScheme.xxxSpec()`，不能当顶层函数 import。
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun effectsSpec(): FiniteAnimationSpec<Float> = MaterialTheme.motionScheme.defaultEffectsSpec()
 
 /** 官方动效方案里的「效果变化」快档（退场淡出用：比进场快才跟手）。 */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun fastEffectsSpec(): FiniteAnimationSpec<Float> = MaterialTheme.motionScheme.fastEffectsSpec()
 
 /** 官方动效方案里的「空间位移」规格（页面转场 / 跟手拖拽）。 */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun <T> spatialSpec(): FiniteAnimationSpec<T> = MaterialTheme.motionScheme.defaultSpatialSpec()
 
 /** 官方动效方案里的「空间位移」快档（退场用）。 */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun <T> fastSpatialSpec(): FiniteAnimationSpec<T> = MaterialTheme.motionScheme.fastSpatialSpec()
 

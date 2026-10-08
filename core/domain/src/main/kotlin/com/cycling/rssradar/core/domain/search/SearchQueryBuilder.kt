@@ -39,6 +39,6 @@ object SearchQueryBuilder {
 
     private fun quote(token: String): String = "\"" + token.replace("\"", "\"\"") + "\""
 
-    private fun escapeLike(raw: String): String =
+    fun escapeLike(raw: String): String =
         raw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 }

@@ -57,7 +57,6 @@ import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.core.ui.components.FeedLetterTile
 import com.cycling.rssradar.core.ui.components.RadarImage
 import com.cycling.rssradar.core.ui.components.pressScale
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.components.ArticleContextMenu
 import com.cycling.rssradar.core.ui.components.ArticleMenuActions
 import com.cycling.rssradar.core.ui.components.articleMenuOffset
@@ -74,7 +73,7 @@ fun ArticleCard(
     onToggleStarred: () -> Unit,
     onToggleBookmarked: () -> Unit,
     onDelete: () -> Unit,
-    /** 「减少此类」（ADR-0013）：非空时上下文菜单出现该动作。 */
+    /** 「减少此类」：非空时上下文菜单出现该动作。 */
     onReduceSuch: (() -> Unit)? = null,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -88,8 +87,8 @@ fun ArticleCard(
     val windowHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
     // 已读弱化（issue #56）：开关开启时已读卡片降弱色；未读卡片永不因此改变
     val dimmed = display.dimRead && item.article.isRead
-    val titleColor = if (dimmed) radarColors().textTertiary else radarColors().textPrimary
-    val descColor = if (dimmed) radarColors().textTertiary else radarColors().textSecondary
+    val titleColor = if (dimmed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+    val descColor = if (dimmed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant
     // 按压缩放（docs/motion.md #2）：source 与 combinedClickable 共用同一实例
     val interactionSource = remember { MutableInteractionSource() }
     val menuActions = ArticleMenuActions(
@@ -106,7 +105,7 @@ fun ArticleCard(
     Box {
         Surface(
             shape = RoundedCornerShape(14.dp),
-            color = radarColors().articleCard,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
             modifier = Modifier
                 .fillMaxWidth()
                 .pressScale(interactionSource)
@@ -148,7 +147,7 @@ fun ArticleCard(
                     Spacer(Modifier.width(6.dp))
                     Text(
                         text = item.feedTitle,
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
@@ -160,7 +159,7 @@ fun ArticleCard(
                     item.article.publishedAt?.let { ts ->
                         Text(
                             text = DateUtils.getRelativeTimeSpanString(ts).toString(),
-                            color = radarColors().textTertiary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.labelSmall,
                         )
                     }
@@ -222,9 +221,9 @@ fun ArticleCard(
 
 /**
  * 列表封面缩略图：统一 96×72（4:3），ContentScale.Crop 居中裁剪不拉伸；
- * 无封面画 radarColors().surface2 + Image 图标占位。固定尺寸让 Coil 免读原图尺寸、按目标大小解码，
+ * 无封面画 MaterialTheme.colorScheme.surfaceContainer + Image 图标占位。固定尺寸让 Coil 免读原图尺寸、按目标大小解码，
  * LazyColumn 滚动开销最小；AsyncImage 无子组合，比 SubcomposeAsyncImage 更轻。
- * 音视频条目（ADR-0014）在角上加播放/音频角标。
+ * 音视频条目在角上加播放/音频角标。
  */
 @Composable
 
@@ -234,7 +233,7 @@ private fun CoverThumb(url: String?, mediaKind: Int = ArticleEntity.MEDIA_KIND_N
             modifier = Modifier
                 .size(width = 96.dp, height = 72.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(radarColors().surface2),
+                .background(MaterialTheme.colorScheme.surfaceContainer),
         ) {
             if (url != null) {
                 RadarImage(
@@ -287,14 +286,14 @@ private fun MediaKindChip(kind: Int) {
         ArticleEntity.MEDIA_KIND_VIDEO -> Lucide.Play to stringResource(R.string.ctype_video)
         else -> Lucide.Music to stringResource(R.string.ctype_audio)
     }
-    Surface(shape = RoundedCornerShape(50), color = radarColors().surface2) {
+    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceContainer) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, contentDescription = null, tint = radarColors().accent, modifier = Modifier.size(12.dp))
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
             Spacer(Modifier.width(4.dp))
-            Text(label, color = radarColors().accent, style = MaterialTheme.typography.labelSmall)
+            Text(label, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
         }
     }
 }

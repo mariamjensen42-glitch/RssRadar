@@ -34,7 +34,6 @@ import com.cycling.rssradar.core.ui.components.SectionHeader
 import com.cycling.rssradar.core.ui.components.SettingSwitchRow
 import com.cycling.rssradar.core.ui.components.SettingsSubPage
 import com.cycling.rssradar.core.ui.theme.RssRadarTheme
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 @Composable
 fun NotificationSettingsDestination(
@@ -74,7 +73,7 @@ fun NotificationSettingsScreen(
             stringResource(R.string.notify_dnd),
             description = stringResource(R.string.notify_dnd_desc),
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 SettingSwitchRow(
                     label = stringResource(R.string.notify_dnd_enabled),
@@ -107,7 +106,7 @@ fun NotificationSettingsScreen(
             stringResource(R.string.notify_keyword),
             description = stringResource(R.string.notify_keyword_desc),
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
                 OutlinedTextField(
                     value = includeDraft,
@@ -138,7 +137,7 @@ fun NotificationSettingsScreen(
 
         Text(
             text = stringResource(R.string.notify_keyword_note),
-            color = radarColors().textTertiary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
         )
     }

@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * 路由 path 的参数语法（ADR-0010）。
+ * 路由 path 的参数语法。
  *
  * 这是目录能用的关键：3800 条路由里有 1546 条含可选参数、168 条带正则约束，
  * 拼错一个斜杠就是 404。语法解析全部走纯函数，必须锁死。
@@ -104,5 +104,23 @@ class RoutePathTest {
         assertNull(RoutePath.match("/bilibili/user/video/:uid", "/bilibili/user/dynamic/2267573"))
         assertNull(RoutePath.match("/github/activity/:user", "/github/activity"))
         assertNull(RoutePath.match("/zhihu/daily", "/zhihu/daily/extra"))
+    }
+
+    @Test
+    fun `字面骨架剥掉参数段与首斜杠`() {
+        assertEquals("bilibili/user/video", RoutePath.base("/bilibili/user/video/:uid/:embed?"))
+        assertEquals("zhihu/hot", RoutePath.base("/zhihu/hot/:category?"))
+        assertEquals("zhihu/hot", RoutePath.base("/zhihu/hot"))
+    }
+
+    @Test
+    fun `参数夹在字面段之间时骨架仍然连续`() {
+        assertEquals("x/item", RoutePath.base("/x/:category{.+}/item/:id"))
+    }
+
+    @Test
+    fun `全是参数时骨架为空`() {
+        // 空骨架必须能被识别出来：否则"骨架匹配"会去匹配所有骨架同样为空的路径
+        assertEquals("", RoutePath.base("/:uid/:embed"))
     }
 }

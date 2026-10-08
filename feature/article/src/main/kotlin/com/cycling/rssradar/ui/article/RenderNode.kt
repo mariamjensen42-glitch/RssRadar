@@ -49,7 +49,6 @@ import com.cycling.rssradar.core.ui.components.ShimmerOverlay
 import com.cycling.rssradar.core.ui.components.rememberImageLoadState
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.crossfadeMotion
-import com.cycling.rssradar.core.ui.theme.radarColors
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
@@ -111,7 +110,7 @@ internal fun RenderNode(
             if (annotated.text.isNotBlank()) {
                 Text(
                     text = annotated,
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontSize = style.fontSize.sp,
                         lineHeight = (style.fontSize * style.lineHeight).sp,
@@ -135,7 +134,7 @@ internal fun RenderNode(
                 }
                 Text(
                     text = annotated,
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     fontSize = (style.fontSize * scale).sp,
                     lineHeight = (style.fontSize * scale * 1.4f).sp,
@@ -153,7 +152,7 @@ internal fun RenderNode(
         is NodeQuote -> {
             if (node.blocks.isNotEmpty()) {
                 Surface(
-                    color = radarColors().surface2,
+                    color = MaterialTheme.colorScheme.surfaceContainer,
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -178,7 +177,7 @@ internal fun RenderNode(
         }
         is NodeCode -> {
             Surface(
-                color = radarColors().surface2,
+                color = MaterialTheme.colorScheme.surfaceContainer,
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -192,7 +191,7 @@ internal fun RenderNode(
                 ) {
                     Text(
                         text = node.code,
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontFamily = FontFamily.Monospace,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -204,7 +203,7 @@ internal fun RenderNode(
             if (annotated.text.isNotBlank()) {
                 Text(
                     text = annotated,
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontSize = style.fontSize.sp,
                         lineHeight = (style.fontSize * style.lineHeight).sp,
@@ -226,7 +225,7 @@ internal fun RenderNode(
                 else -> Modifier
             }
             // 公式图（LaTeX CDN）是黑字透明底：不垫浅色底，深色主题下直接隐形
-            val formulaBg = if (node.isFormula) Modifier.background(radarColors().surface2) else Modifier
+            val formulaBg = if (node.isFormula) Modifier.background(MaterialTheme.colorScheme.surfaceContainer) else Modifier
             // 显式解码尺寸：宽度按屏、高度同 heightIn 上限，再过像素预算兜底。
             // 长图/大图按原图解码会直接撞 Canvas 上限崩溃（119MB bitmap 实案）。
             val context = LocalContext.current
@@ -278,7 +277,7 @@ internal fun RenderNode(
             node.caption?.let { caption ->
                 Text(
                     text = caption,
-                    color = radarColors().textSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
@@ -292,7 +291,7 @@ internal fun RenderNode(
             if (annotated.text.isNotBlank()) {
                 Text(
                     text = annotated,
-                    color = radarColors().textSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -306,7 +305,7 @@ internal fun RenderNode(
                     if (item.termRuns.isNotEmpty()) {
                         Text(
                             text = runsToAnnotated(item.termRuns, style),
-                            color = radarColors().textPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyLarge.copy(
                                 fontSize = style.fontSize.sp,
@@ -317,7 +316,7 @@ internal fun RenderNode(
                     if (item.descRuns.isNotEmpty()) {
                         Text(
                             text = runsToAnnotated(item.descRuns, style),
-                            color = radarColors().textPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodyLarge.copy(
                                 fontSize = style.fontSize.sp,
                                 lineHeight = (style.fontSize * style.lineHeight).sp,
@@ -333,7 +332,7 @@ internal fun RenderNode(
         is NodeDetails -> {
             var expanded by remember { mutableStateOf(false) }
             Surface(
-                color = radarColors().surface2,
+                color = MaterialTheme.colorScheme.surfaceContainer,
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -349,7 +348,7 @@ internal fun RenderNode(
                                 ?.let { runsToAnnotated(it, style) }
                                 ?.takeIf { it.text.isNotBlank() }
                                 ?: AnnotatedString(stringResource(R.string.details)),
-                            color = radarColors().textPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyLarge.copy(
                                 fontSize = style.fontSize.sp,
@@ -357,7 +356,7 @@ internal fun RenderNode(
                             ),
                             modifier = Modifier.weight(1f),
                         )
-                        Text(if (expanded) "−" else "+", color = radarColors().textSecondary)
+                        Text(if (expanded) "−" else "+", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (expanded) {
                         Column(modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 10.dp)) {
@@ -378,7 +377,7 @@ internal fun RenderNode(
                 }
             }
         }
-        // 正文媒体（ADR-0018）：直链 video/audio 内嵌播放，iframe 保持外跳卡。
+        // 正文媒体：直链 video/audio 内嵌播放，iframe 保持外跳卡。
         // 分派全在 InlineMediaNode 里，这里只透传块间距与外链出口。
         is NodeMediaCard -> InlineMediaNode(node, onLinkClick, bottomPadding)
         is NodeTable -> {
@@ -393,20 +392,20 @@ internal fun RenderNode(
                         node.caption?.let { caption ->
                             Text(
                                 text = caption,
-                                color = radarColors().textSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(bottom = 6.dp),
                             )
                         }
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, radarColors().divider),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         ) {
                         Column {
                             node.rows.forEachIndexed { idx, row ->
                                 Row(
                                     modifier = Modifier.background(
-                                        if (row.isHeader) radarColors().surface2 else Color.Unspecified,
+                                        if (row.isHeader) MaterialTheme.colorScheme.surfaceContainer else Color.Unspecified,
                                     ),
                                 ) {
                                     row.cells.forEach { cellRuns ->
@@ -417,7 +416,7 @@ internal fun RenderNode(
                                         ) {
                                             Text(
                                                 text = runsToAnnotated(cellRuns, style),
-                                                color = radarColors().textPrimary,
+                                                color = MaterialTheme.colorScheme.onSurface,
                                                 style = MaterialTheme.typography.bodySmall,
                                             )
                                         }
@@ -428,7 +427,7 @@ internal fun RenderNode(
                                         modifier = Modifier
                                             .height(1.dp)
                                             .fillMaxWidth()
-                                            .background(radarColors().divider),
+                                            .background(MaterialTheme.colorScheme.outlineVariant),
                                     )
                                 }
                             }
@@ -445,7 +444,7 @@ internal fun RenderNode(
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
                     .height(1.dp)
-                    .background(radarColors().divider),
+                    .background(MaterialTheme.colorScheme.outlineVariant),
             )
         }
         is NodeGroup -> {
@@ -480,7 +479,7 @@ private fun RenderList(
             Row(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = prefix,
-                    color = radarColors().textSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = style.fontSize.sp,
                     fontFamily = style.fontFamily.toComposeFontFamily(),
                     modifier = Modifier.padding(end = 6.dp),
@@ -489,7 +488,7 @@ private fun RenderList(
                     if (item.runs.isNotEmpty()) {
                         Text(
                             text = runsToAnnotated(item.runs, style),
-                            color = radarColors().textPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodyLarge.copy(
                                 fontSize = style.fontSize.sp,
                                 lineHeight = (style.fontSize * style.lineHeight).sp,

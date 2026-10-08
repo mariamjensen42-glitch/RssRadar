@@ -79,7 +79,7 @@ fun dayGroups(
 }
 
 /**
- * 日历日文案包（ADR-0017 §3）：纯 JVM 数据结构，生产端由 Composable 用
+ * 日历日文案包：纯 JVM 数据结构，生产端由 Composable 用
  * `stringResource` 装配后传入，测试端直接给常量——[calendarDayLabel] 因此
  * 保持零 Android 依赖，也就不必在纯 JVM 代码里硬编码任何语言的文案。
  */

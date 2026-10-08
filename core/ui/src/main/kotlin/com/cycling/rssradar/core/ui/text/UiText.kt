@@ -6,7 +6,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.res.stringResource
 
 /**
- * VM 层的消息载体（ADR-0017 §3）：VM 只给身份（res id + 结构化参数），
+ * VM 层的消息载体：VM 只给身份（res id + 结构化参数），
  * 翻译在 UI 层按当前语言进行——纯 JVM 测试不碰 android 资源。
  *
  * [Raw] 只装「不可翻译的动态数据」（外部 error message、用户输入的地址等），
