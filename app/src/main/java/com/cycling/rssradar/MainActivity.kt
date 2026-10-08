@@ -95,7 +95,6 @@ import dagger.hilt.android.AndroidEntryPoint
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.fastEffectsSpec
 import com.cycling.rssradar.core.ui.theme.fastSpatialSpec
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.spatialSpec
 
 /**
@@ -112,7 +111,7 @@ class MainActivity : ComponentActivity() {
      */
     private var sharedUrl by mutableStateOf<String?>(null)
 
-    /** 界面语言覆盖（ADR-0017）：API 31/32 无系统 per-app locale，attach 时手动包一层。 */
+    /** 界面语言覆盖：API 31/32 无系统 per-app locale，attach 时手动包一层。 */
     override fun attachBaseContext(newBase: android.content.Context) {
         super.attachBaseContext(
             com.cycling.rssradar.core.data.platform.AppLocales.wrapContext(
@@ -171,6 +170,9 @@ private fun RssRadarAppContent(
     // 外部分享链接的一次性预填地址：加订阅页拿不到外部 intent，由这里暂存、进页面消费掉即清空。
     // 不走路由参数是因为导航对 String 参数需要编码处理（全仓无先例），为一条预填不值当。
     var prefillUrl by remember { mutableStateOf<String?>(null) }
+    // 同一条思路：AI 结果卡里的词要带去搜索页。同样一次性、进页面即消费
+    // （留在状态里会让旋转屏幕或任何一次重组把同一个词再搜一遍）。
+    var searchPrefill by remember { mutableStateOf<String?>(null) }
     // 外部链接 → 直接进加订阅页并预填。清空 sharedUrl 是必须的：否则旋转屏幕
     // 或任何一次重组都会把同一个地址再填一遍（还会打断用户已经改过的输入）。
     LaunchedEffect(sharedUrl) {
@@ -189,7 +191,7 @@ private fun RssRadarAppContent(
         else -> null
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(radarColors().bgRoot)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         // 页面转场（docs/motion.md #1，issue #72）分两层：
         // - 层级导航（列表→详情这类）：前进「新页右滑入 1/12 + fade」，返回镜像；
         //   退场用官方 fast 档——退场比进场快，转场才跟手，双向同速必然显拖。
@@ -255,7 +257,6 @@ private fun RssRadarAppContent(
             composable<SubscriptionsRoute> {
                 SubscriptionsDestination(
                     onAddSubscription = { navController.navigate(AddSubscriptionRoute) },
-                    onCreateGroup = { /* TODO */ },
                     onOpenFeed = { navController.navigate(FeedArticlesRoute(it)) },
                 )
             }
@@ -264,6 +265,8 @@ private fun RssRadarAppContent(
                     onBack = { navController.popBackStack() },
                     onOpenArticle = { navController.navigate(ArticleDetailRoute(it.article.id)) },
                     onOpenSubscriptions = { navController.navigate(SubscriptionsRoute) },
+                    initialQuery = searchPrefill,
+                    onInitialQueryConsumed = { searchPrefill = null },
                 )
             }
             composable<AddSubscriptionRoute> {
@@ -310,13 +313,21 @@ private fun RssRadarAppContent(
                     onOpenAiFeatures = { navController.navigate(AiFeaturesRoute) },
                     onOpenAiArtifacts = { navController.navigate(AiArtifactsRoute()) },
                     onOpenPromptTemplates = { navController.navigate(PromptTemplatesRoute) },
+                    // 兴趣画像在「通用 → 推荐流」下也有入口（那里是"配置推荐"的上下文）；
+                    // 这里再给一个是因为它是 AI 产物的展示面，从 AI 的角度看不能缺席。
+                    onOpenInterestProfile = { navController.navigate(InterestProfileRoute) },
                     onOpenFetchDiagnostics = { navController.navigate(FetchDiagnosticsRoute) },
                     onOpenCrashLog = { navController.navigate(CrashLogRoute) },
                 )
             }
             // 八项功能新增的二级页：过滤规则 / 备份与恢复 / 通知细粒度
             composable<FilterRulesRoute> {
-                FilterRulesDestination(onBack = { navController.popBackStack() })
+                FilterRulesDestination(
+                    onBack = { navController.popBackStack() },
+                    // 同一个 feature 模块内的兄弟页：AI 生成的开关在 AI 与诊断页，
+                    // 未开启时从规则页直达，省掉"自己找回去"的一段路。
+                    onOpenAiSettings = { navController.navigate(SettingsAiDiagRoute) },
+                )
             }
             composable<BackupRoute> {
                 BackupDestination(onBack = { navController.popBackStack() })
@@ -338,7 +349,7 @@ private fun RssRadarAppContent(
                     onOpenArticle = { navController.navigate(ArticleDetailRoute(it)) },
                 )
             }
-            // 兴趣画像（ADR-0013）：推荐流的可解释性出口
+            // 兴趣画像：推荐流的可解释性出口
             composable<InterestProfileRoute> {
                 InterestProfileDestination(onBack = { navController.popBackStack() })
             }
@@ -347,7 +358,7 @@ private fun RssRadarAppContent(
                     onBack = { navController.popBackStack() },
                 )
             }
-            // AI 智能功能总览：35 项独立开关、用量看板、任务队列
+            // AI 智能功能总览：12 项独立开关、用量看板、任务队列
             composable<AiFeaturesRoute> {
                 AiFeaturesDestination(
                     onBack = { navController.popBackStack() },
@@ -391,6 +402,11 @@ private fun RssRadarAppContent(
                     onOpenArticle = { navController.navigate(ArticleDetailRoute(it)) },
                     onOpenAnnotations = { navController.navigate(AnnotationsRoute) },
                     onOpenAudio = { navController.navigate(AudioPlayerRoute(articleId = it)) },
+                    // 先写预填状态再导航：SearchRoute 首次组合时就要读到它
+                    onSearch = { query ->
+                        searchPrefill = query
+                        navController.navigate(SearchRoute)
+                    },
                 )
             }
             // 音频/播客播放页：播放器活在 PlaybackService 里，本页只是它的视图

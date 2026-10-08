@@ -1,7 +1,7 @@
 // Feature 模块：订阅管理（订阅源列表/分组/批量整理 + 单源操作页）。
 // 依赖方向：feature → core。禁止依赖 app，也禁止依赖其他 feature。
 // 不含 res：本模块还没有任何 R.string —— 文案目前是硬编码中文（141 条），
-// 属 ADR-0017 双语路线的欠账，待资源化批次统一处理，与模块边界无关。
+// 属双语路线的欠账，待资源化批次统一处理，与模块边界无关。
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.compose)

@@ -3,10 +3,10 @@
     <!-- #34：分享单 / 选中文字菜单里本应用动作的名字 -->
     <string name="intent_subscribe">用 RssRadar 订阅</string>
 
-    <!-- ADR-0017 界面语言（i18n 批1 起，新文案一律进这里，英文进 values-en） -->
+    <!-- 界面语言（i18n 批1 起，新文案一律进这里，英文进 values-en） -->
     <string name="language_applied">语言已切换，界面即将刷新</string>
 
-    <!-- i18n batch 2: reading domain (ADR-0017) -->
+    <!-- i18n batch 2: reading domain -->
     <string name="more_actions">更多操作</string>
     <string name="close">关闭</string>
     <!-- i18n batch 3 -->

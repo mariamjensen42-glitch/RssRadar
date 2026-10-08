@@ -42,7 +42,7 @@ data class SearchUiState(
 
 private val defaultHistory = listOf("RSSHub 自部署", "Flutter 3.32", "周刊 305")
 
-/** 搜索事件（候选 A，ADR-0003）。长按菜单动作与信息流一致（issue #46）。 */
+/** 搜索事件（候选 A）。长按菜单动作与信息流一致（issue #46）。 */
 sealed interface SearchIntent {
     data class QueryChange(val value: String) : SearchIntent
     data object Submit : SearchIntent

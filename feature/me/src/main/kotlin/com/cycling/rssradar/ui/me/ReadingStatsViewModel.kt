@@ -26,6 +26,7 @@ class ReadingStatsViewModel @Inject constructor(
 
     override fun onIntent(intent: ReadingStatsIntent) = Unit
 
+
     init {
         viewModelScope.launch {
             // 口径装配收敛到 ReadingStatsDashboard（core/domain 纯函数，JVM 可测）——

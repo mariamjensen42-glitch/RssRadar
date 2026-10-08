@@ -4,7 +4,7 @@ import com.cycling.rssradar.core.data.backup.ConflictPolicy
 import com.cycling.rssradar.core.data.backup.ImportStrategy
 
 /**
- * 备份域枚举文案的资源映射（ADR-0017）：core 层的中文 label 是数据口径，
+ * 备份域枚举文案的资源映射：core 层的中文 label 是数据口径，
  * 界面展示一律走这里按当前语言取 res。
  *
  * 本文件原叫 FeatureTexts.kt，装着过滤 + 备份两个不相干领域；模块化时过滤的一半

@@ -27,7 +27,6 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Rss
 import com.composables.icons.lucide.Search
 import com.cycling.rssradar.core.data.service.DiscoveredFeed
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
 
 @Composable
@@ -43,18 +42,18 @@ internal fun UrlField(
         placeholder = {
             Text(
                 "https://rsshub.app/zhihu/daily",
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
             )
         },
         singleLine = true,
         leadingIcon = {
-            Icon(Lucide.Link2, contentDescription = null, tint = radarColors().textTertiary)
+            Icon(Lucide.Link2, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         },
         trailingIcon = {
             if (isLoading) {
                 CircularProgressIndicator(
-                    color = radarColors().accent,
+                    color = MaterialTheme.colorScheme.primary,
                     strokeWidth = 2.dp,
                     modifier = Modifier.size(18.dp),
                 )
@@ -76,11 +75,11 @@ internal fun SearchField(
         onValueChange = onChange,
         modifier = modifier.fillMaxWidth(),
         placeholder = {
-            Text(stringResource(R.string.add_search_hint), color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.add_search_hint), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         },
         singleLine = true,
         leadingIcon = {
-            Icon(Lucide.Search, contentDescription = null, tint = radarColors().textTertiary)
+            Icon(Lucide.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         },
         shape = RoundedCornerShape(12.dp),
         colors = radarOutlinedTextFieldColors(),
@@ -95,7 +94,7 @@ internal fun DiscoveredFeedRow(
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = radarColors().surface1,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
@@ -108,21 +107,21 @@ internal fun DiscoveredFeedRow(
             Icon(
                 imageVector = Lucide.Rss,
                 contentDescription = null,
-                tint = radarColors().accent,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(16.dp),
             )
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = feed.title.ifBlank { feed.url },
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = feed.url,
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -130,7 +129,7 @@ internal fun DiscoveredFeedRow(
             }
             Text(
                 text = stringResource(R.string.add_article_count, feed.articleCount),
-                color = radarColors().textSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelSmall,
             )
         }

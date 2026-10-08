@@ -23,7 +23,6 @@ hiltNavigationCompose = "1.4.0"
 runtimeSaveable = "1.13.0-alpha01"
 foundation = "1.13.0-alpha01"
 material3 = "1.5.0-alpha28"
-graphicsShapes = "1.0.1"
 work = "2.10.1"
 kotlinxCoroutines = "1.10.2"
 media3 = "1.11.1"
@@ -45,7 +44,6 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
-androidx-graphics-shapes = { group = "androidx.graphics", name = "graphics-shapes", version.ref = "graphicsShapes" }
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }

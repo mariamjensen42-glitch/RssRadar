@@ -168,7 +168,7 @@ class BodyModeTest {
         assertEquals(BodyMode.TRANSLATION, result.mode)
     }
 
-    // ---- 视口渲染（ADR-0007 的 OOM 防线） ----
+    // ---- 视口渲染（OOM 防线） ----
 
     @Test
     fun `viewport only applies to illustrated webview content`() {
@@ -191,7 +191,7 @@ class BodyModeTest {
         val brief = "字".repeat(100)
         assertTrue(canSwitchToSummary(full, brief))
 
-        // 正文就是摘要本身（ADR-0001「取较长者」的直接后果）：切了等于没切
+        // 正文就是摘要本身（「取较长者」的直接后果）：切了等于没切
         assertFalse(canSwitchToSummary(brief, brief))
         assertFalse(canSwitchToSummary(null, brief))
         assertFalse(canSwitchToSummary(full, null))

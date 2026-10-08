@@ -5,6 +5,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cycling.rssradar.core.data.ai.AiArtifactRepository
+import com.cycling.rssradar.core.data.ai.AiFeedRecommendPayload
+import com.cycling.rssradar.core.data.ai.AiParsers
 import com.cycling.rssradar.core.data.service.AddFeedResult
 import com.cycling.rssradar.core.data.service.DiscoveredFeed
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
@@ -12,6 +15,7 @@ import com.cycling.rssradar.core.data.qualify.FeedContentTypeGuesser
 import com.cycling.rssradar.core.domain.concurrency.quietCatching
 import com.cycling.rssradar.core.domain.rss.FeedProbeResult
 import com.cycling.rssradar.core.data.service.SubscriptionFlow
+import com.cycling.rssradar.core.model.AiFeature
 import com.cycling.rssradar.core.model.GROUP_DESIGN
 import com.cycling.rssradar.core.model.GROUP_DEV
 import com.cycling.rssradar.core.model.GROUP_TECH
@@ -22,6 +26,7 @@ import com.cycling.rssradar.core.model.rsshub.RouteCategory
 import com.cycling.rssradar.core.model.rsshub.RouteExample
 import com.cycling.rssradar.core.model.rsshub.RouteParam
 import com.cycling.rssradar.core.domain.rsshub.RoutePath
+import com.cycling.rssradar.core.domain.rsshub.RouteSuggestion
 import com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore
 import com.cycling.rssradar.core.model.rsshub.RssHubRoute
 import com.cycling.rssradar.core.domain.rsshub.RssHubRoutes
@@ -30,6 +35,8 @@ import com.cycling.rssradar.core.ui.mvi.MviStateViewModel
 import com.cycling.rssradar.core.ui.text.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +44,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** 链接校验结果。 */
@@ -68,7 +76,7 @@ data class AddSubscriptionUiState(
     val validation: ValidationInfo = ValidationInfo.Idle,
     val selectedGroup: String = GROUP_TECH,
     /**
-     * 用户显式挑的内容类型（ADR-0014）。null = 没挑过，交给 [FeedContentTypeGuesser] 预判。
+     * 用户显式挑的内容类型。null = 没挑过，交给 [FeedContentTypeGuesser] 预判。
      *
      * 刻意不用「默认选中文章」来表达未选：订阅 bilibili / 播客这类源时预判本来能猜对，
      * 硬塞一个默认值反而把预判覆盖掉，是退步。
@@ -98,6 +106,8 @@ data class AddSubscriptionUiState(
     val uiMessage: UiText? = null,
     /** 分组选项。原先硬编码三个常量，与订阅页读注册表各说各话，新建分组这里看不见。 */
     val groupOptions: List<String> = emptyList(),
+    /** 「猜你想订」：AI 推荐的订阅源，每条都已落到具体动作（见 [SuggestionTarget]）。 */
+    val aiSuggestions: List<FeedSuggestionUi> = emptyList(),
 ) {
     /** 当前生效的内容类型：用户挑过就用它，否则按当前地址预判。UI 选中态读这个。 */
     val effectiveContentType: Int
@@ -115,7 +125,32 @@ data class AddSubscriptionUiState(
     val canSubmit: Boolean get() = url.isNotBlank() && validation is ValidationInfo.Valid && !isAdding
 }
 
-/** 加订阅抽屉事件（候选 A，ADR-0003）。 */
+/**
+ * 「猜你想订」的一条。
+ *
+ * 带 [target] 而不是只带一个地址：建议的质量参差不齐——有的能对上内置目录（可一键进填参），
+ * 有的给了完整地址（可校验后直接用），有的只有一个名字。三者的"点一下会发生什么"完全不同，
+ * 界面必须能如实预告，不能都写成"添加"。
+ */
+data class FeedSuggestionUi(
+    val name: String,
+    val reason: String,
+    val target: SuggestionTarget,
+)
+
+/** 一条建议点下去会做什么。 */
+sealed interface SuggestionTarget {
+    /** 命中内置 RSSHub 路由目录：直接进填参步（与在目录里点同一条路由同一条路径）。 */
+    data class Route(val route: RssHubRoute) : SuggestionTarget
+
+    /** 给了完整地址：填进地址栏并探测（与「自动发现」采用候选同一条路径）。 */
+    data class Url(val url: String) : SuggestionTarget
+
+    /** 只给了名字：填进目录搜索，让用户在真实路由里挑。 */
+    data object Search : SuggestionTarget
+}
+
+/** 加订阅抽屉事件（候选 A）。 */
 sealed interface AddSubscriptionIntent {
     data class UrlChange(val raw: String) : AddSubscriptionIntent
     data class GroupSelected(val group: String) : AddSubscriptionIntent
@@ -130,12 +165,14 @@ sealed interface AddSubscriptionIntent {
     /** 选中一条官方示例：反填参数并直接预览。 */
     data class ExampleSelected(val example: RouteExample) : AddSubscriptionIntent
     data object PreviewRoute : AddSubscriptionIntent
-    /** 联网更新路由目录（ADR-0010）。 */
+    /** 联网更新路由目录。 */
     data object RefreshCatalog : AddSubscriptionIntent
     data object Submit : AddSubscriptionIntent
     data object ConsumeMessage : AddSubscriptionIntent
     /** 采用自动发现（#5）找到的某条候选：填进地址栏并校验。 */
     data class PickDiscovered(val feed: DiscoveredFeed) : AddSubscriptionIntent
+    /** 采用「猜你想订」的一条建议；具体动作由该条的 [FeedSuggestionUi.target] 决定。 */
+    data class PickSuggestion(val suggestion: FeedSuggestionUi) : AddSubscriptionIntent
 }
 
 @HiltViewModel
@@ -144,6 +181,8 @@ class AddSubscriptionViewModel @Inject constructor(
     private val instanceStore: RssHubInstanceStore,
     private val catalogStore: RouteCatalogStore,
     private val groupStore: GroupStore,
+    /** 「猜你想订」的建议出口（产物表里 kind = FEED_RECOMMEND 的行）。 */
+    private val artifacts: AiArtifactRepository,
 ) : ViewModel(), MviStateViewModel<AddSubscriptionIntent, AddSubscriptionUiState> {
 
     private val _state = MutableStateFlow(AddSubscriptionUiState(host = instanceStore.currentOrDefault()))
@@ -154,14 +193,26 @@ class AddSubscriptionViewModel @Inject constructor(
     /** 全量路由常驻内存：检索是纯内存打分，不必每次回 Store。 */
     private var allRoutes: List<RssHubRoute> = emptyList()
 
+    /** 原样读回的 AI 建议；落点要等目录就绪才能判定，所以先存着（见 [resolveSuggestions]）。 */
+    private var rawSuggestions: List<AiFeedRecommendPayload.Suggestion> = emptyList()
+
     init {
         viewModelScope.launch {
             groupStore.state.collect { groups -> _state.update { it.copy(groupOptions = groups) } }
         }
         loadCatalog()
+        loadSuggestions()
     }
 
     companion object {
+        /**
+         * 「猜你想订」最多露几条。
+         *
+         * 这块在路由目录**上方**，多一条就把用户真正要用的目录往下推一行；而它的定位是
+         * "不知道订什么时的起步提示"，三条足够。想多看全量，去「AI 结果」页按功能筛选。
+         */
+        private const val SUGGESTION_PREVIEW = 3
+
         /** 手填链接的防抖；点「生成并预览」是明确意图，直接发请求。 */
         private const val VALIDATE_DEBOUNCE_MS = 400L
         /**
@@ -190,6 +241,7 @@ class AddSubscriptionViewModel @Inject constructor(
             AddSubscriptionIntent.Submit -> submit()
             AddSubscriptionIntent.ConsumeMessage -> _state.update { it.copy(uiMessage = null) }
             is AddSubscriptionIntent.PickDiscovered -> pickDiscovered(intent.feed)
+            is AddSubscriptionIntent.PickSuggestion -> pickSuggestion(intent.suggestion)
         }
     }
 
@@ -207,6 +259,8 @@ class AddSubscriptionViewModel @Inject constructor(
                 catalogSource = catalog.source,
                 visibleRoutes = search(),
             )
+            // 目录就绪后重判一次建议落点：建议可能比目录先到（见 resolveSuggestions）。
+            resolveSuggestions()
         }
     }
 
@@ -252,6 +306,75 @@ class AddSubscriptionViewModel @Inject constructor(
     }
 
     /* ------------------------------- 填参数 ------------------------------- */
+
+    /**
+     * 读「猜你想订」的最近一次建议。
+     *
+     * 一次性读、不订阅：建议只在批处理跑完后变化，而这个 VM 绑在路由的 backStackEntry 上
+     * （退出即销毁），下次进页面天然会重读一遍——比挂一条 Flow 更简单，时机也更准。
+     */
+    private fun loadSuggestions() {
+        viewModelScope.launch {
+            val raw = try {
+                withContext(Dispatchers.IO) {
+                    artifacts.browse(kind = AiFeature.FEED_RECOMMEND.dbValue, limit = 1)
+                        .firstOrNull()
+                        ?.let { AiParsers.feedRecommend(it.payload).suggestions }
+                        .orEmpty()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // 读不到就当作没有建议：这是页面上一块附加信息，不该让加订阅页跟着报错。
+                emptyList()
+            }
+            rawSuggestions = raw
+            resolveSuggestions()
+        }
+    }
+
+    /**
+     * 把建议落到具体动作上。
+     *
+     * 必须在**每次**目录变化后重算：目录是异步读的（内置快照 / 缓存 / 联网更新），
+     * 建议比目录先到的时候，三条都会退化成"只给名字"——用户会以为一键填参根本不存在，
+     * 而其实目录里就有现成的一条。
+     */
+    private fun resolveSuggestions() {
+        val items = rawSuggestions.take(SUGGESTION_PREVIEW).map { suggestion ->
+            val resolved = RouteSuggestion.resolve(suggestion.route, allRoutes)
+            FeedSuggestionUi(
+                name = suggestion.name,
+                reason = suggestion.reason,
+                target = when {
+                    resolved != null -> SuggestionTarget.Route(resolved)
+                    suggestion.url.isNotBlank() -> SuggestionTarget.Url(suggestion.url)
+                    else -> SuggestionTarget.Search
+                },
+            )
+        }
+        _state.update { it.copy(aiSuggestions = items) }
+    }
+
+    /**
+     * 采用一条建议。
+     *
+     * 三条路都**复用已有流程**，不另起一套：命中目录走 [routeSelected]（与在目录里点同一条路由
+     * 完全一样），给了地址走 [pickDiscovered]（探测 + 同一套失败分类），只有名字就把名字填进
+     * 目录搜索。第三条刻意不替它猜一条路由——名字与路由之间没有可靠对应，猜错等于把用户
+     * 送到一个不相干的栏目里。
+     */
+    private fun pickSuggestion(suggestion: FeedSuggestionUi) {
+        when (val target = suggestion.target) {
+            is SuggestionTarget.Route -> routeSelected(target.route)
+            is SuggestionTarget.Url -> pickDiscovered(DiscoveredFeed(target.url, suggestion.name, 0))
+            SuggestionTarget.Search -> {
+                queryChange(suggestion.name)
+                // 搜索框在建议区块**下方**，填进去的变化在屏幕外，必须给一句反馈。
+                _state.update { it.copy(uiMessage = UiText.res(R.string.add_suggest_searched, suggestion.name)) }
+            }
+        }
+    }
 
     /**
      * 选中路由 → 记录所选路由并清空手填痕迹；UI 依 selectedRoute 切到填参步。

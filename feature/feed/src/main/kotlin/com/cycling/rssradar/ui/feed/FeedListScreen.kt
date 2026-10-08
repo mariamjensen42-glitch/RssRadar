@@ -38,11 +38,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import com.cycling.rssradar.core.model.FeedValueMode
 import com.cycling.rssradar.core.model.ListViewMode
 import com.cycling.rssradar.core.model.MarkAsReadCondition
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.components.OptionPickerSheet
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.labels.labelRes
 import com.cycling.rssradar.core.ui.text.resolve
 import com.cycling.rssradar.core.ui.theme.LocalListDisplay
@@ -58,7 +58,7 @@ fun FeedListDestination(
     onOpenSubscriptions: () -> Unit = {},
     viewModel: FeedListViewModel = hiltViewModel(),
 ) {
-    // MVI 候选 C（ADR-0003）：单一 UiState 快照驱动渲染
+    // MVI 候选 C：单一 UiState 快照驱动渲染
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     FeedListScreen(
         uiState = uiState,
@@ -92,6 +92,8 @@ fun FeedListScreen(
     var showViewModeSheet by remember { mutableStateOf(false) }
     /** 视图模式是全局显示偏好（ListDisplayStore → CompositionLocal），这里读，VM 写。 */
     val viewMode = LocalListDisplay.current.viewMode
+    /** AI 价值档位：同样是全局显示偏好（ListDisplayStore → CompositionLocal）。 */
+    val valueMode = LocalListDisplay.current.valueMode
     val context = LocalContext.current
     val message = uiState.uiMessage
 
@@ -102,7 +104,7 @@ fun FeedListScreen(
         }
     }
 
-    // 「减少此类」撤销（ADR-0013）：Snackbar 期内可撤销，超时自动丢弃（降权保留）
+    // 「减少此类」撤销：Snackbar 期内可撤销，超时自动丢弃（降权保留）
     // 文案在组合作用域预取：LaunchedEffect 不是组合作用域，在里面用 context.getString
     // 会被 lint 判为 configuration-unaware（切语言/配置变化时可能拿到旧文案）。
     val undoLabel = stringResource(R.string.undo)
@@ -144,7 +146,7 @@ fun FeedListScreen(
     val currentList = uiState.articles
 
     Scaffold(
-        containerColor = radarColors().bgRoot,
+        containerColor = MaterialTheme.colorScheme.surface,
         snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
             FeedListTopBar(
@@ -153,11 +155,13 @@ fun FeedListScreen(
                 onMarkAllRead = { showMarkReadSheet = true },
                 onOpenViewMode = { showViewModeSheet = true },
                 viewMode = viewMode,
+                valueMode = valueMode,
+                onSelectValueMode = { onIntent(FeedListIntent.SetValueMode(it)) },
                 // 只判分组：内容类型已常驻首页一行且选中态自明，不必再借 ⋮ 菜单里的一行文案提示
                 filterActive = uiState.selectedGroup != null,
                 selectedTab = uiState.selectedTab,
                 unreadCount = unreadCount,
-                // 推荐流开关（ADR-0013）：关掉就不渲染「推荐」
+                // 推荐流开关：关掉就不渲染「推荐」
                 tabs = if (recommendationEnabled) FeedTab.entries else FeedTab.entries.filter { it != FeedTab.Recommended },
                 onSelectTab = { onIntent(FeedListIntent.SelectTab(it)) },
             )
@@ -181,14 +185,14 @@ fun FeedListScreen(
                 ) {
                     LinearProgressIndicator(
                         progress = { uiState.refreshDone.toFloat() / uiState.refreshTotal },
-                        trackColor = radarColors().surface2,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainer,
                         modifier = Modifier.weight(1f).height(3.dp).clip(RoundedCornerShape(2.dp)),
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
                         text = "${uiState.refreshDone}/${uiState.refreshTotal}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = radarColors().accent,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
@@ -262,7 +266,7 @@ fun FeedListScreen(
                     ) {
                         if (uiState.isLoadingMore) {
                             CircularProgressIndicator(
-                                color = radarColors().accent,
+                                color = MaterialTheme.colorScheme.primary,
                                 strokeWidth = 2.dp,
                                 modifier = Modifier.size(18.dp),
                             )

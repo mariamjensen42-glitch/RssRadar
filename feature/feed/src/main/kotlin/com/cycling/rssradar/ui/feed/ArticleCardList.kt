@@ -28,9 +28,9 @@ import com.cycling.rssradar.core.model.ListViewMode
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.effectsSpec
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.LocalListDisplay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import androidx.compose.material3.MaterialTheme
 
 @OptIn(ExperimentalFoundationApi::class)
 
@@ -45,7 +45,7 @@ fun ArticleCardList(
     onDelete: (Long) -> Unit,
     onScrolledToEnd: () -> Unit,
     /**
-     * 「减少此类」（ADR-0013）：非空时卡片的上下文菜单出现该动作。
+     * 「减少此类」：非空时卡片的上下文菜单出现该动作。
      * 只有推荐流传——其余列表的排序与画像无关，负反馈无处落地。
      */
     onReduceSuch: ((Long) -> Unit)? = null,
@@ -230,7 +230,7 @@ fun ArticleCardList(
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
                 .width(6.dp)
-                .articleScrollbar(listState, radarColors().textTertiary, totalCount),
+                .articleScrollbar(listState, MaterialTheme.colorScheme.onSurfaceVariant, totalCount),
         )
     }
 }

@@ -50,7 +50,6 @@
     <string name="diag_empty_hint">Records appear after you open a summary-only article and trigger a full-text fetch.</string>
     <string name="diag_failures">Failed: %1$s</string>
     <string name="diag_incomplete">Incomplete: %1$s</string>
-    <string name="diag_pages">%1$s page(s)</string>
     <string name="diag_retries">Retried %1$s time(s)</string>
     <string name="diag_title">Full-text fetch diagnostics</string>
     <string name="duration_hours">%1$dh</string>
@@ -60,7 +59,7 @@
     <string name="failure_label">Failed</string>
     <string name="issue_incomplete">Body incomplete</string>
     <string name="issue_js_render">Likely JS-rendered content</string>
-    <string name="issue_missing_meta">Missing title or date</string>
+    <string name="issue_link_list">Likely a navigation or index page</string>
     <string name="list_separator">, </string>
     <string name="stats_articles">%1$s articles</string>
     <string name="stats_concentrated">Reading concentrated in a few feeds</string>
@@ -80,30 +79,5 @@
     <string name="stats_title">Reading stats</string>
     <string name="stats_top_feeds">Most-opened feeds</string>
     <string name="tap_expand">Tap to view full text</string>
-    <string name="tip1_body">RSSHub is this app\'s core data source. Settings → RSSHub → Route catalog lists ready-made routes by site; or share a link from another app to RssRadar to open the add-subscription sheet directly.</string>
-    <string name="tip1_title">Feeds come from RSSHub routes</string>
-    <string name="tip2_body">The subscriptions top-bar menu has \"Import OPML\". That\'s step one when coming from another reader.</string>
-    <string name="tip2_title">Migrating? Import OPML first</string>
-    <string name="tip3_body">Settings → Sync &amp; cleanup offers Wi-Fi only, charging only, sync-on-launch and the sync interval. Turn the conditions on to save battery and data.</string>
-    <string name="tip3_title">Auto sync can be narrowed by conditions</string>
-    <string name="tip4_body">The list stores what the feed provides; the full body is fetched when you open the article (saves data). The typography panel adjusts font size, line height, letter spacing and reading theme.</string>
-    <string name="tip4_title">Full text is fetched on demand</string>
-    <string name="tip5_body">Settings → Sync &amp; cleanup → retention defaults to \"Forever\". Existing libraries are large, so deleting on upgrade is unacceptable — auto cleanup is strictly opt-in. Starred and read-later articles are never touched.</string>
-    <string name="tip5_title">Archives are kept forever unless you opt in</string>
-    <string name="tips_screen_title">Tips &amp; troubleshooting</string>
-    <string name="tips_section_basics">Good to know first</string>
-    <string name="tips_section_trouble">If something breaks</string>
-    <string name="ts1_body">Common causes: the link isn\'t a valid feed, the site returns 4xx, certificate errors, DNS failures, or an oversized feed. Adding a feed reports the probe result; feeds that keep failing get flagged as dead — the dead-feed filter in feed management shows the reason and consecutive failure count, and any successful refresh restores them automatically.</string>
-    <string name="ts1_title">Can\'t add a feed</string>
-    <string name="ts2_body">On ingest the longer of the feed\'s description and content is kept — many feeds only provide a summary. Opening the article triggers a full-text fetch; paywalls, JS rendering or anti-crawling can block it, and the reader will explain why with a Retry button. For per-site fetch health, see Settings → AI &amp; diagnostics → Full-text fetch diagnostics.</string>
-    <string name="ts2_title">Body is just a summary, or very short</string>
-    <string name="ts3_body">Three switches must all be on: the system notification permission, the in-app master switch (off by default), and the feed\'s own notification switch. Miss any one and nothing rings.</string>
-    <string name="ts3_title">No new-article notifications</string>
-    <string name="ts4_body">AI summary and translation use your own DeepSeek API key — configure it in Settings → AI &amp; diagnostics first. Still nothing? You\'re probably hitting the daily budget, concurrency or min-interval limits.</string>
-    <string name="ts4_title">AI features do nothing</string>
-    <string name="ts5_body">Same as above: retention defaults to Forever. Set a tier (1 day / 1 week / 1 month) to enable auto cleanup.</string>
-    <string name="ts5_title">Articles keep piling up</string>
-    <string name="ts6_body">Settings → AI &amp; diagnostics → Crash logs shows recent crashes with exportable full text — attach it when reporting.</string>
-    <string name="ts6_title">The app crashed</string>
     <string name="unknown_site">(unknown site)</string>
 </resources>

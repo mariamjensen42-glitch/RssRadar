@@ -16,8 +16,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
 import com.cycling.rssradar.core.data.platform.openUrl
 import com.cycling.rssradar.core.ui.theme.LocalReadingPrefs
-import com.cycling.rssradar.core.ui.theme.radarColors
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.MaterialTheme
 
 /**
  * 页内查找在 WebView 路的状态。刻意**不用 Compose State**——[AndroidView] 的 update
@@ -68,7 +68,7 @@ private fun WebView.restoreToRatio(ratio: Float) {
 /**
  * 净化后的正文 HTML 用 WebView 渲染：排版参数与主题色注入 CSS（issue #42）。
  * 模板构建在 [ReadingContentHtml]（纯函数，JVM 单测覆盖）；本组合函数只负责
- * 从 radarColors() / LocalReadingPrefs 读实时值。
+ * 从 MaterialTheme.colorScheme / LocalReadingPrefs 读实时值。
  *
  * [passThroughTouch]：整页模式（高度包内容）为 true——触摸穿透给外层 Compose 滚动，
  * 否则 WebView 会吞掉滑动手势；视口模式（有图文章，内部滚动）为 false——
@@ -79,7 +79,7 @@ private fun WebView.restoreToRatio(ratio: Float) {
  * [imageUrls]：本文图片地址（[ReadingImages.extract] 的结果）。"点击放大"开启时，
  * build 阶段会把 <img> 包成指向自身的 <a class="img-link">，于是点击图片和点击链接
  * 走同一条 shouldOverrideUrlLoading 通道——地址命中本集合就交给 [onImageClick]
- * （全屏查看），否则照旧开浏览器。**全程不开 JS**（ADR-0007 不动，详见 ADR-0011）。
+ * （全屏查看），否则照旧开浏览器。**全程不开 JS**（点图改走链接上报，不注入 JS）。
  *
  * [findQuery]/[findCursor]/[onFindCount]：页内查找。用的是平台的 find-in-page
  * （`findAllAsync`/`findNext`/`clearMatches`），**同样不需要 JS**。
@@ -103,13 +103,13 @@ internal fun ArticleWebView(
     /** 到顶 / 到底的跳转请求。同样只对视口模式有意义：整页模式的滚动归外层 Compose。 */
     jumpRequest: JumpRequest? = null,
 ) {
-    // 颜色读自 radarColors()（CompositionLocal），主题切换自动重组
-    val bg = toCssColor(radarColors().bgRoot)
-    val fg = toCssColor(radarColors().textPrimary)
-    val muted = toCssColor(radarColors().textSecondary)
-    val codeBg = toCssColor(radarColors().surface2)
-    val border = toCssColor(radarColors().surface1)
-    val link = toCssColor(radarColors().link)
+    // 颜色读自 MaterialTheme.colorScheme（CompositionLocal），主题切换自动重组
+    val bg = toCssColor(MaterialTheme.colorScheme.surface)
+    val fg = toCssColor(MaterialTheme.colorScheme.onSurface)
+    val muted = toCssColor(MaterialTheme.colorScheme.onSurfaceVariant)
+    val codeBg = toCssColor(MaterialTheme.colorScheme.surfaceContainer)
+    val border = toCssColor(MaterialTheme.colorScheme.surfaceContainerLowest)
+    val link = toCssColor(MaterialTheme.colorScheme.secondary)
     val style = LocalReadingPrefs.current.style
     val image = LocalReadingPrefs.current.image
     val immersive = LocalReadingPrefs.current.immersive
@@ -189,7 +189,7 @@ internal fun ArticleWebView(
             }.apply {
                 settings.javaScriptEnabled = false
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                // 链接接管（视口模式生效；整页模式触摸穿透点不到，见 ADR-0007）：
+                // 链接接管（视口模式生效；整页模式触摸穿透点不到）：
                 // 一律不进 WebView 导航，http(s) 外链交系统浏览器（与stringResource(R.string.view_original)一致），
                 // 其余 scheme 静默丢弃——顺带消灭"原地导航把正文顶掉"的默认行为。
                 webViewClient = object : WebViewClient() {

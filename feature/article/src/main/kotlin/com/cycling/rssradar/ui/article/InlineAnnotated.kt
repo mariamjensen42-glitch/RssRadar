@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.sp
 import com.cycling.rssradar.core.model.ReadingFontFamily
 import com.cycling.rssradar.core.model.ReadingStyleState
 import com.cycling.rssradar.core.model.ReadingTextAlign
-import com.cycling.rssradar.core.ui.theme.radarColors
+import androidx.compose.material3.MaterialTheme
 
 /**
  * 行内片段 → AnnotatedString。
@@ -48,7 +48,7 @@ internal fun runsToAnnotated(runs: List<InlineRun>, style: ReadingStyleState): A
                             fontStyle = if (run.italic) FontStyle.Italic else null,
                             fontFamily = if (run.code) FontFamily.Monospace else baseFamily,
                             background = when {
-                                run.code -> radarColors().surface2
+                                run.code -> MaterialTheme.colorScheme.surfaceContainer
                                 run.mark -> MarkHighlight
                                 else -> Color.Unspecified
                             },
@@ -84,7 +84,7 @@ internal fun runsToAnnotated(runs: List<InlineRun>, style: ReadingStyleState): A
                     val start = length
                     pushStyle(
                         SpanStyle(
-                            color = radarColors().link,
+                            color = MaterialTheme.colorScheme.secondary,
                             textDecoration = TextDecoration.Underline,
                             fontFamily = baseFamily,
                         ),

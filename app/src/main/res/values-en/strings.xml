@@ -3,10 +3,10 @@
     <!-- #34: action name for share sheet / text selection menu -->
     <string name="intent_subscribe">Subscribe with RssRadar</string>
 
-    <!-- ADR-0017 UI language (i18n batch 1) -->
+    <!-- UI language (i18n batch 1) -->
     <string name="language_applied">Language changed, refreshing interface</string>
 
-    <!-- i18n batch 2: reading domain (ADR-0017) -->
+    <!-- i18n batch 2: reading domain -->
     <string name="more_actions">More actions</string>
     <string name="close">Close</string>
     <!-- i18n batch 3 -->

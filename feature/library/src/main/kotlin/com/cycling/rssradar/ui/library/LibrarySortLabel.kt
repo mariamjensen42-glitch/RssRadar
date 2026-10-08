@@ -3,7 +3,7 @@ package com.cycling.rssradar.ui.library
 import com.cycling.rssradar.core.model.library.LibrarySort
 
 /**
- * [LibrarySort] 的文案（ADR-0017：文案映射随领域走）。
+ * [LibrarySort] 的文案（文案映射随领域走）。
  *
  * 原先挂在 app/i18n/FeatureTexts.kt —— 那个文件按技术层归拢，收藏的枚举文案
  * 和过滤规则、备份策略的混在一处；模块化时拆散归位。

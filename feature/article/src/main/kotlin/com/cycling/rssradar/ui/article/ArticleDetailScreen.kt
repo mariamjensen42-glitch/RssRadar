@@ -23,6 +23,8 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
@@ -54,14 +56,13 @@ import com.cycling.rssradar.core.model.LinkShareState
 import com.cycling.rssradar.core.model.ReadingPrefs
 import com.cycling.rssradar.core.model.ReadingRenderer
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
-import com.cycling.rssradar.core.ui.theme.LocalRadarColors
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.isLightBackground
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.data.platform.shareArticle
 import com.cycling.rssradar.core.ui.theme.ApplySystemBarIcons
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 
@@ -74,9 +75,9 @@ private data class ImageViewer(val images: List<String>, val index: Int)
 /**
  * 阅读页外壳：只负责把**阅读主题**（#16）装到 CompositionLocal 上。
  *
- * 为什么包在外面而不是逐处取色：阅读页有上百处 `radarColors()`（顶栏、底栏、
- * 卡片、正文、WebView 注入的 CSS 全读它），逐处改必然漏。这里整页覆盖
- * [LocalRadarColors]，下游零改动自动跟随；系统栏图标也跟着阅读页底色翻。
+ * 为什么包在外面而不是逐处取色：阅读页有上百处主题色取用（顶栏、底栏、
+ * 卡片、正文、WebView 注入的 CSS 全读它），逐处改必然漏。这里整页换掉
+ * `MaterialTheme.colorScheme`，下游零改动自动跟随；系统栏图标也跟着阅读页底色翻。
  */
 /** 阅读页的全部命令出口：Screen 不持有 VM，只从 [ArticleDetailActions] 发起动作。 */
 class ArticleDetailActions(
@@ -99,6 +100,8 @@ fun ArticleDetailDestination(
     onOpenAnnotations: () -> Unit = {},
     /** 打开音频播放页（有音频地址的文章才有入口）。 */
     onOpenAudio: (Long) -> Unit = {},
+    /** AI 结果卡里的词送去搜索页（话题 / 标签 / 关键词）。 */
+    onSearch: (String) -> Unit = {},
     viewModel: ArticleDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -123,6 +126,7 @@ fun ArticleDetailDestination(
         onOpenArticle = onOpenArticle,
         onOpenAnnotations = onOpenAnnotations,
         onOpenAudio = onOpenAudio,
+        onSearch = onSearch,
     )
 }
 
@@ -139,36 +143,40 @@ fun ArticleDetailScreen(
     onOpenAnnotations: () -> Unit = {},
     /** 打开音频播放页（有音频地址的文章才有入口）。 */
     onOpenAudio: (Long) -> Unit = {},
+    /** AI 结果卡里的词送去搜索页（话题 / 标签 / 关键词）。 */
+    onSearch: (String) -> Unit = {},
 ) {
     val readingPrefs = state.readingPrefs
-    val appColors = radarColors()
-    val pageColors = remember(readingPrefs.readingTheme, appColors) {
-        readingPrefs.readingTheme.pageColors(appColors)
+    val appScheme = MaterialTheme.colorScheme
+    val pageScheme = remember(readingPrefs.readingTheme, appScheme) {
+        readingPrefs.readingTheme.pageScheme(appScheme)
     }
     // 深色模式下开「纸张」时状态栏图标必须变深色，否则一片糊。
     // 退出阅读页由 ApplySystemBarIcons 的 onDispose 还原成应用主题。
-    ApplySystemBarIcons(darkTheme = !pageColors.isLightBackground())
+    ApplySystemBarIcons(darkTheme = !pageScheme.isLightBackground())
     val annotations = state.annotations
-    // 正文媒体播放器（ADR-0018）：页面级唯一实例，延迟创建。挂在这一层是为了让
+    // 正文媒体播放器：页面级唯一实例，延迟创建。挂在这一层是为了让
     // 正文渲染（RenderNode 递归深处）、底栏视频入口、全屏播放页三者共用同一个播放器。
     val media = rememberArticleMediaPlayer()
     // 换篇即停：播放器是页面级的，不留上一篇的媒体在新文章里继续出声
     LaunchedEffect(articleId) { media.stop() }
-    CompositionLocalProvider(
-        LocalRadarColors provides pageColors,
-        LocalReadingAnnotations provides annotations,
-        LocalArticleMediaPlayer provides media,
-    ) {
-        ArticleDetailBody(
-            state = state,
-            actions = actions,
-            articleId = articleId,
-            onBack = onBack,
-            onOpenOriginal = onOpenOriginal,
-            onOpenArticle = onOpenArticle,
-            onOpenAnnotations = onOpenAnnotations,
-            onOpenAudio = onOpenAudio,
-        )
+    MaterialExpressiveTheme(colorScheme = pageScheme) {
+        CompositionLocalProvider(
+            LocalReadingAnnotations provides annotations,
+            LocalArticleMediaPlayer provides media,
+        ) {
+            ArticleDetailBody(
+                state = state,
+                actions = actions,
+                articleId = articleId,
+                onBack = onBack,
+                onOpenOriginal = onOpenOriginal,
+                onOpenArticle = onOpenArticle,
+                onOpenAnnotations = onOpenAnnotations,
+                onOpenAudio = onOpenAudio,
+                onSearch = onSearch,
+            )
+        }
     }
 }
 
@@ -185,6 +193,8 @@ private fun ArticleDetailBody(
     onOpenAnnotations: () -> Unit = {},
     /** 打开音频播放页（有音频地址的文章才有入口）。 */
     onOpenAudio: (Long) -> Unit = {},
+    /** AI 结果卡里的词送去搜索页（话题 / 标签 / 关键词）。 */
+    onSearch: (String) -> Unit = {},
 ) {
     val article = state.article
     val media = LocalArticleMediaPlayer.current
@@ -231,6 +241,15 @@ private fun ArticleDetailBody(
     // 到顶 / 到底（右下角悬浮按钮）：用递增序号而不是裸目标 —— 连点两次同一个目标时
     // 目标值不变，下游按值判重会把它当成重复请求吞掉。
     var jumpRequest by remember { mutableStateOf<JumpRequest?>(null) }
+    // 大纲跳段（AI 结果卡）：按「节序号 / 节数」折算比例，取节中点避免落到上一节尾部。
+    // 刻意不用产物里的 anchor 文字去精确定位——anchor → 全文偏移的映射只存在于原生
+    // 渲染器的文本映射里，视口模式（WebView 自己滚）拿不到，而两路都必须能用。
+    val jumpToSection: (Int, Int) -> Unit = { index, count ->
+        if (count > 0) {
+            val ratio = ((index + 0.5f) / count).coerceIn(0f, 1f)
+            jumpRequest = JumpRequest((jumpRequest?.seq ?: 0L) + 1L, JumpTarget.RATIO, ratio)
+        }
+    }
     // 视口模式（有图文章）的头部折叠量 = WebView 内部滚动量，同样驱动顶栏补位标题
     var headerScrollY by remember { mutableStateOf(0) }
     // 视口模式的可滚动上限（WebView 内部滚动范围）：与 headerScrollY 一起算阅读位置比例
@@ -309,7 +328,7 @@ private fun ArticleDetailBody(
     // 并在下一次操作（点按钮/提问）或关闭面板时消费。
 
     Scaffold(
-        containerColor = radarColors().bgRoot,
+        containerColor = MaterialTheme.colorScheme.surface,
         snackbarHost = { AppSnackbarHost(snackbarHostState) },
         // 到顶 / 到底：走 Scaffold 的 FAB 槽位 —— 它会自动避让 bottomBar 与系统栏，
         // 且位于 content 之上。自己往内容区里摆会落到操作栏底下，点不到。
@@ -412,7 +431,7 @@ private fun ArticleDetailBody(
                     onPlayAudio = item.article.mediaUrl
                         ?.takeIf { it.isNotBlank() && item.article.mediaKind == ArticleEntity.MEDIA_KIND_AUDIO }
                         ?.let { { onOpenAudio(item.article.id) } },
-                    // 视频同理（ADR-0018）：拿到直链才给入口，点开是全屏播放页。
+                    // 视频同理：拿到直链才给入口，点开是全屏播放页。
                     // 正文里的视频另有内嵌播放，这条只覆盖订阅源级 enclosure 视频——
                     // 它不在正文 HTML 里，正文区没有它的位置。
                     onPlayVideo = item.article.mediaUrl
@@ -433,11 +452,11 @@ private fun ArticleDetailBody(
             ) {
                 if (initialLoadDone) {
                     // 查过了、确实没有，才可以说「文章不存在」
-                    Text(stringResource(R.string.article_not_found), color = radarColors().textSecondary)
+                    Text(stringResource(R.string.article_not_found), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     // 首查进行中（issue #73）：此前的 null 会闪一帧「文章不存在」
                     CircularProgressIndicator(
-                        color = radarColors().accent,
+                        color = MaterialTheme.colorScheme.primary,
                         strokeWidth = 2.dp,
                         modifier = Modifier.size(20.dp),
                     )
@@ -455,9 +474,9 @@ private fun ArticleDetailBody(
         LaunchedEffect(jumpRequest?.seq) {
             val request = jumpRequest ?: return@LaunchedEffect
             if (!viewportBody) {
-                scrollState.animateScrollTo(
-                    if (request.target == JumpTarget.TOP) 0 else scrollState.maxValue,
-                )
+                // 只用 ratio：到顶 0、到底 1、大纲跳段是节比例，三种目标共用一个量，
+                // 不必在这里再分支（视口模式由 WebView 消费同一个 request）。
+                scrollState.animateScrollTo((scrollState.maxValue * request.ratio).roundToInt())
             }
         }
         val findLimit = when {
@@ -596,7 +615,7 @@ private fun ArticleDetailBody(
         )
     }
 
-    // 全屏播放（ADR-0018）：与全屏看图一样是阅读页之上的瞬时 UI，不进路由。
+    // 全屏播放：与全屏看图一样是阅读页之上的瞬时 UI，不进路由。
     // 退出语义由播放器定：正文里有这条媒体的画面 ⇒ 只退出全屏、退回正文继续播；
     // 没有（订阅源级视频）⇒ 停掉，免得留下"看不见的声音"。
     media?.fullscreenUrl?.let { url ->
@@ -619,6 +638,8 @@ private fun ArticleDetailBody(
             onRun = { feature -> actions.onIntent(ArticleDetailIntent.RunAi(feature)) },
             onAsk = { question -> actions.onIntent(ArticleDetailIntent.AskArticle(question)) },
             onExplain = { term -> actions.onIntent(ArticleDetailIntent.ExplainTerm(term)) },
+            onSearch = onSearch,
+            onJumpToSection = jumpToSection,
             onConsumeMessage = { actions.onIntent(ArticleDetailIntent.ConsumeAiMessage) },
             onDismiss = {
                 showAiSheet = false
@@ -745,8 +766,8 @@ private fun ReadingJumpButton(
     val toTop = target == JumpTarget.TOP
     SmallFloatingActionButton(
         onClick = onClick,
-        containerColor = radarColors().surface1,
-        contentColor = radarColors().textSecondary,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier,
     ) {
         Icon(

@@ -37,7 +37,6 @@ import com.cycling.rssradar.core.data.db.entity.ArticleEntity
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.ui.components.RadarImage
 import com.cycling.rssradar.core.ui.components.pressScale
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /** 杂志模式首篇：16:9 大图 + 标题压图（黑渐变 scrim 保证可读）；无封面退化为大字排版。 */
 @Composable
@@ -50,7 +49,7 @@ internal fun MagazineHeroCard(
     val interactionSource = remember { MutableInteractionSource() }
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = radarColors().articleCard,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
             .fillMaxWidth()
             .pressScale(interactionSource)
@@ -66,7 +65,7 @@ internal fun MagazineHeroCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
-                    .background(radarColors().surface2),
+                    .background(MaterialTheme.colorScheme.surfaceContainer),
             ) {
                 // RadarImage 对 null/加载失败自带图标占位兜底
                 RadarImage(
@@ -80,7 +79,7 @@ internal fun MagazineHeroCard(
                             .align(Alignment.TopStart)
                             .padding(10.dp)
                             .size(8.dp)
-                            .background(radarColors().accent, RoundedCornerShape(50)),
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50)),
                     )
                 }
                 // 标题压底：白字 + scrim，来源行让读者知道重点来自哪个源
@@ -116,7 +115,7 @@ internal fun MagazineHeroCard(
             item.article.summary?.takeIf { it.isNotBlank() }?.let { summary ->
                 Text(
                     text = summary,
-                    color = radarColors().textSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -138,7 +137,7 @@ internal fun MagazineCard(
     val interactionSource = remember { MutableInteractionSource() }
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = radarColors().articleCard,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
             .fillMaxWidth()
             .pressScale(interactionSource)
@@ -156,7 +155,7 @@ internal fun MagazineCard(
                         .fillMaxWidth()
                         .aspectRatio(16f / 9f)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(radarColors().surface2),
+                        .background(MaterialTheme.colorScheme.surfaceContainer),
                 ) {
                     RadarImage(
                         url = cover,
@@ -177,7 +176,7 @@ internal fun MagazineCard(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = item.feedTitle,
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -186,7 +185,7 @@ internal fun MagazineCard(
                 item.article.publishedAt?.let { ts ->
                     Text(
                         text = DateUtils.getRelativeTimeSpanString(ts).toString(),
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -194,7 +193,7 @@ internal fun MagazineCard(
             Spacer(Modifier.height(6.dp))
             Text(
                 text = item.article.title,
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
@@ -204,7 +203,7 @@ internal fun MagazineCard(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = summary,
-                    color = radarColors().textSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,

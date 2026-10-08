@@ -15,7 +15,6 @@ import com.cycling.rssradar.core.model.FetchFailure
 import com.cycling.rssradar.core.data.ai.AiArtifactRepository
 import com.cycling.rssradar.core.model.AiFeature
 import com.cycling.rssradar.core.data.ai.AiFeatureRunner
-import com.cycling.rssradar.core.data.ai.AiFulltextPayload
 import com.cycling.rssradar.core.data.ai.AiFeatureSpecs
 import com.cycling.rssradar.core.data.ai.AiRepository
 import com.cycling.rssradar.core.model.AiFeatureSettings
@@ -66,7 +65,7 @@ sealed interface ContentFetchState {
     data class Failed(val reason: FetchFailReason) : ContentFetchState
 }
 
-/** 文章详情事件（候选 A，ADR-0003）。load 为生命周期，留 init，不进 Intent。 */
+/** 文章详情事件（候选 A）。load 为生命周期，留 init，不进 Intent。 */
 sealed interface ArticleDetailIntent {
     data object ToggleStarred : ArticleDetailIntent
     data object ToggleBookmarked : ArticleDetailIntent
@@ -103,22 +102,16 @@ sealed interface ArticleDetailIntent {
  *
  * 只列**在单篇文章上有意义**的那些——全局功能（每日简报、阅读习惯）和订阅源级功能
  * （健康监控）在文章页触发没有落点，列出来只会让用户点出一个莫名其妙的结果。
- * 展示顺序即按钮顺序：便宜且常用的在前，贵而重的在后。
+ *
+ * **顺序 = 面板上的分组顺序**（读懂 / 分享，见 `AI_BUTTON_GROUPS`）：
+ * 多个按钮平铺时用户得逐个读完才发现自己要哪个，按用途分组后才谈得上"扫一眼就找到"。
+ * 同一个顺序也决定产物卡片的排列，按钮与结果一一对应。
  */
 val ARTICLE_AI_BUTTONS: List<AiFeature> = listOf(
     AiFeature.OUTLINE,
-    AiFeature.OPINION,
-    AiFeature.CREDIBILITY,
-    AiFeature.SHARE_COPY,
-    // FULLTEXT（AI 正文还原）刻意不进按钮：正文的第一来源永远是规则提取器，
-    // 让模型"还原"正文与「AI 不捏造」相冲，ReadYou 同类产品也没有这一步。
-    // 枚举、prompt 与产物解析都保留，需要时把它加回这里即可恢复接线。
-    AiFeature.TAGS,
-    AiFeature.KEYWORDS,
-    AiFeature.CLASSIFY,
-    AiFeature.SENTIMENT,
-    AiFeature.QUALITY,
     AiFeature.NOISE,
+    AiFeature.KEYWORDS,
+    AiFeature.SHARE_COPY,
 )
 
 /**
@@ -201,13 +194,13 @@ private const val KEY_ARTICLE_ID = "articleId"
 class ArticleDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: FeedRepository,
-    /** 按需抓取原网页正文（ADR-0001）。直连模块，不经过 FeedRepository 转发。 */
+    /** 按需抓取原网页正文。直连模块，不经过 FeedRepository 转发。 */
     private val onDemandFetch: OnDemandFetch,
     private val readingPrefsStore: ReadingPrefsStore,
     private val linkStore: LinkStore,
     private val aiRepository: AiRepository,
     private val aiStore: AiStore,
-    /** AI 智能功能模块：35 项功能的执行器与产物仓储。 */
+    /** AI 智能功能模块：16 项功能的执行器与产物仓储。 */
     private val featureRunner: AiFeatureRunner,
     private val artifacts: AiArtifactRepository,
     private val featureStore: AiFeatureStore,
@@ -291,7 +284,7 @@ class ArticleDetailViewModel @Inject constructor(
 
     /**
      * 已开启的 AI 功能集合。面板要靠它把「未开启」的功能渲染成灰色并给出开启引导——
-     * 35 项里绝大多数默认关闭，若按钮一律长成能点的样子，
+     * 16 项里绝大多数默认关闭，若按钮一律长成能点的样子，
      * 用户点下去只会得到一个静默失败，这是最糟糕的一类反馈。
      */
     val aiEnabledFeatures: StateFlow<AiFeatureSettings> = featureStore.state
@@ -312,7 +305,7 @@ class ArticleDetailViewModel @Inject constructor(
 
     /**
      * 阅读偏好（排版 / 图片 / 渲染器 / 译文显示）。偏好属 UI 环境而非业务事件，
-     * 按 ADR-0003「纯函数与状态 producer 保持 fun」的先例走普通方法，不进 Intent 面；
+     * 按「纯函数与状态 producer 保持 fun」的先例走普通方法，不进 Intent 面；
      * 数据源与主题宿主注入的 [com.cycling.rssradar.core.ui.theme.LocalReadingPrefs] 是同一份 Store。
      *
      * 四项偏好合成一份 state，因此这里只暴露两个成员，而不是原先的八个
@@ -449,7 +442,7 @@ class ArticleDetailViewModel @Inject constructor(
             if (_article.value?.article?.isRead == false) {
                 repository.markRead(articleId)
             }
-            // 推荐画像的采集点（ADR-0013）：每次打开都记，源亲和度的时间衰减靠它。
+            // 推荐画像的采集点：每次打开都记，源亲和度的时间衰减靠它。
             // 这一列不参与内容状态刷新，也不影响已读语义。
             repository.markOpened(articleId)
             fetchFullContentIfNeeded(articleId)
@@ -483,31 +476,6 @@ class ArticleDetailViewModel @Inject constructor(
         _aiArtifacts.value = loaded
     }
 
-    /**
-     * 把 AI 提取的正文写回文章并重载。
-     *
-     * 纯文本用标签剔除的方式得到：阅读时长、检索、以及后续所有 AI 分析的输入都吃
-     * `contentText`，只写 HTML 会让它们全部落空。
-     */
-    private suspend fun applyExtractedContent(articleId: Long, html: String) {
-        val plainText = stripHtmlTags(html)
-        repository.applyExtractedContent(articleId, html, plainText)
-        // 只在用户仍停在这篇时才回写界面状态：否则一次后台完成的全文提取会把
-        // 已经切走的正文顶回屏幕上。
-        if (currentArticleId == articleId) _article.value = repository.getArticle(articleId)
-    }
-
-    /** 去标签取纯文本。够用即可——这里只为了生成 contentText，不是要做 HTML 解析器。 */
-    private fun stripHtmlTags(html: String): String =
-        html.replace(Regex("<[^>]+>"), " ")
-            .replace("&nbsp;", " ")
-            .replace("&amp;", "&")
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&quot;", "\"")
-            .replace(Regex("\\s+"), " ")
-            .trim()
-
     private fun runAi(feature: AiFeature, question: String? = null) {
         val articleId = currentArticleId
         if (articleId < 0) return
@@ -523,11 +491,6 @@ class ArticleDetailViewModel @Inject constructor(
                 when (val outcome = featureRunner.run(feature, articleId, question)) {
                     is AiFeatureRunner.Outcome.Success -> {
                         val parsed = runCatching { AiFeatureSpecs.parse(feature, outcome.payload) }.getOrNull()
-                        // 全文提取的产物落回**它自己那篇**文章的库，与用户此刻在看哪篇无关——
-                        // 这次调用已经付过费，DB 写入必须完成。
-                        if (feature == AiFeature.FULLTEXT && parsed is AiFulltextPayload && parsed.ok) {
-                            applyExtractedContent(articleId, parsed.html)
-                        }
                         // 界面状态只在用户还停在这篇时才写。这个协程不挂在 loadJob 下，
                         // 切篇不会取消它：慢半拍回来的旧结果会直接盖在新文章上
                         // （「AI 摘要是上一篇的」），是最典型的一类过期覆盖。
@@ -578,7 +541,7 @@ class ArticleDetailViewModel @Inject constructor(
     }
 
     /**
-     * 文章没有 feed 自带正文时按需抓原网页（ADR-0001）。
+     * 文章没有 feed 自带正文时按需抓原网页。
      *
      * 结果写进 [contentFetch]：不再 `runCatching` 一吞了之——失败要给出中文原因，
      * 读者才知道该重试还是该去看原文。
@@ -795,7 +758,7 @@ class ArticleDetailViewModel @Inject constructor(
     }
 }
 
-/** 抓取失败的结构化原因：VM 不产文案，翻译在 UI 层（ADR-0017 §3）。 */
+/** 抓取失败的结构化原因：VM 不产文案，翻译在 UI 层。 */
 sealed interface FetchFailReason {
     data class FromFailure(val failure: FetchFailure) : FetchFailReason
     data object FeedDisabled : FetchFailReason
@@ -803,5 +766,5 @@ sealed interface FetchFailReason {
     data class ShorterThanExisting(val got: Int, val existing: Int) : FetchFailReason
 }
 
-/** 抓取失败的结构化原因：VM 不产文案，翻译在 UI 层（ADR-0017 §3）。 */
+/** 抓取失败的结构化原因：VM 不产文案，翻译在 UI 层。 */
 

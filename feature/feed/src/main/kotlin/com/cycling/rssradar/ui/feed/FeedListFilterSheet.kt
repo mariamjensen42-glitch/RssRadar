@@ -23,7 +23,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lucide
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 分组筛选弹层（issue #74）。
@@ -42,11 +41,11 @@ internal fun GroupFilterSheet(
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = radarColors().surface1) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
             Text(
                 text = stringResource(R.string.group_title),
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
@@ -83,7 +82,7 @@ private fun GroupOption(label: String, selected: Boolean, onClick: () -> Unit) {
     ) {
         Text(
             text = label,
-            color = if (selected) radarColors().accent else radarColors().textPrimary,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.bodyLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -93,7 +92,7 @@ private fun GroupOption(label: String, selected: Boolean, onClick: () -> Unit) {
             Icon(
                 imageVector = Lucide.Check,
                 contentDescription = stringResource(R.string.cd_selected),
-                tint = radarColors().accent,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(18.dp),
             )
         }

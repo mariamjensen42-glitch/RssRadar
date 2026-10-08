@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,7 +30,6 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.Video
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 @Composable
 internal fun ArticleActionsBar(
@@ -42,7 +42,7 @@ internal fun ArticleActionsBar(
     onStar: () -> Unit,
     onBookmark: () -> Unit,
     onOpenOriginal: () -> Unit,
-    /** AI 智能功能面板（35 项里的文章级功能）。 */
+    /** AI 智能功能面板（16 项里的文章级功能）。 */
     onOpenAi: () -> Unit = {},
     /** 打开播放页；null = 这篇没有可播的音频（入口整个不出现，不留一个点不动的按钮）。 */
     onPlayAudio: (() -> Unit)? = null,
@@ -50,7 +50,7 @@ internal fun ArticleActionsBar(
     onPlayVideo: (() -> Unit)? = null,
 ) {
     val insets = WindowInsets.navigationBars.asPaddingValues()
-    Surface(color = radarColors().bgRoot) {
+    Surface(color = MaterialTheme.colorScheme.surface) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -131,11 +131,11 @@ private fun ActionIcon(
     enabled: Boolean = true,
     size: androidx.compose.ui.unit.Dp = 48.dp,
 ) {
-    val bg = if (checked) radarColors().accent else radarColors().surface2
+    val bg = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer
     val fg = when {
-        checked -> radarColors().onAccent
-        !enabled -> radarColors().textTertiary
-        else -> radarColors().textPrimary
+        checked -> MaterialTheme.colorScheme.onPrimary
+        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.onSurface
     }
     Surface(
         shape = RoundedCornerShape(14.dp),
