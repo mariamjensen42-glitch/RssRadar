@@ -1,17 +1,21 @@
 package com.cycling.rssradar.core.data.parser
 
 import com.cycling.rssradar.core.model.ExtractionIssue
-import com.cycling.rssradar.core.model.FetchFailure
-import net.dankito.readability4j.Readability4J
+import net.dankito.readability4j.extended.Readability4JExtended
+import net.dankito.readability4j.extended.processor.ArticleGrabberExtended
+import net.dankito.readability4j.extended.processor.PostprocessorExtended
+import net.dankito.readability4j.extended.util.RegExUtilExtended
+import net.dankito.readability4j.model.ReadabilityOptions
+import net.dankito.readability4j.processor.MetadataParser
+import net.dankito.readability4j.processor.Preprocessor
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import java.time.Instant
 import java.time.format.DateTimeFormatter
-import kotlin.math.max
 
 /** 提取器来源（可观测：哪条路径救回了这篇）。 */
-enum class Extractor { READABILITY, JSOUP_FALLBACK, BODY_FALLBACK }
+enum class Extractor { READABILITY, BODY_FALLBACK }
 
 data class ExtractionQuality(
     val chars: Int,
@@ -20,9 +24,9 @@ data class ExtractionQuality(
     val extractor: Extractor,
     val issue: ExtractionIssue,
 ) {
-    /** 是否可作为完整正文写入。TOO_SHORT/NO_PARAGRAPH/DYNAMIC_RENDER/PAYWALL 都算不完整。 */
+    /** 是否可作为完整正文写入。只有 NONE（正常正文）算完整。 */
     val isComplete: Boolean
-        get() = issue == ExtractionIssue.NONE || issue == ExtractionIssue.METADATA_MISSING
+        get() = issue == ExtractionIssue.NONE
 }
 
 data class ExtractedArticle(
@@ -32,7 +36,7 @@ data class ExtractedArticle(
     val title: String?,
     val author: String?,
     val publishedAt: Long?,
-    /** og:image / JSON-LD image，取不到则正文首图（由调用方兜底）。 */
+    /** og:image / twitter:image，取不到则正文首图（由调用方兜底）。 */
     val coverUrl: String?,
     val quality: ExtractionQuality,
 )
@@ -40,24 +44,35 @@ data class ExtractedArticle(
 data class ExtractConfig(
     /** 正文纯文本低于该字数即判「不完整」。中文 200 字约等于一段话，再短基本是噪声或截断。 */
     val minContentChars: Int = 200,
-    /** 候选容器打分时的链接密度上限：超过说明这是导航/推荐列表而不是正文。 */
+    /** 最终正文的链接文本占比上限：超过说明抓到的是导航/索引页而不是正文。 */
     val maxLinkDensity: Float = 0.5f,
 )
 
 /**
- * 网页正文提取（纯 JVM：jsoup + readability4j，不碰 Android）。
+ * 网页正文提取的**唯一入口**（纯 JVM：jsoup + readability4j，不碰 Android）。
  *
- * 三段式，逐级兜底——readability 对欧美站点准，对中文站点（div 套 div、正文被拆成多个块）
- * 命中率明显下降，所以不能只用一条路径：
- * 1. **readability4j**：Mozilla Readability 的 JVM 移植，ReadYou 生产验证。
- * 2. **jsoup 候选容器打分**：去噪后按「文本长度 + 段落数 + 图片数 − 链接密度惩罚」挑正文容器。
- * 3. **去噪后的 body**：前两路都不够时，把整个 body 当正文（比什么都不显示强，但会标不完整）。
+ * 算法侧走 readability4j extended 处理器——保留含图兄弟节点、把懒加载 `data-*` 提到 src、
+ * 处理 `<base href>` 与 `<amp-img>`。抓取节点用库自带的 [ArticleGrabberExtended]。
+ * `ponytail:` 不抄 ReadYou 的 `RYArticleGrabberExtended.prepareNodes`：与上游逐行比对过，只差
+ * “不写 `display:inline`”与“不打 `readability-styled`”两行；而已核实（jar 常量池）
+ * `ArticleGrabber` 打的正是这两样，[RssParser.sanitizeHtml] 又会剥掉全部 class（只留媒体占位卡）
+ * 且 `display` 不在 `STYLE_PROPERTIES` 白名单里——净化后的产物一模一样，
+ * 拿 60 行 GPL-3.0 代码换这个零差异不划算（MIT 仓库不该沾 copyleft）。
+ * 天花板：从此跟库走，库改了 `prepareNodes` 就会跟着变；升级路径：真有差异时再抄，但得先换协议。
+ *
+ * 两条路径，逐级兜底，**两份候选都过同一套去噪**——readability 拿的是原始 html，
+ * 不补这一步它就会靠「正文块 + 广告块」的总字数反杀干净候选（实测：推广块进正文且被判为完整）：
+ * 1. **readability 抽取**：extended 处理器 + RY grabber。
+ * 2. **去噪后的 body**：readability 空手时，把整个 body 当正文（比什么都不显示强，但多半会标不完整）。
+ *
+ * 两份都非空时取纯文本更长的一条。不引入「候选容器打分」：body 的纯文本恒 ≥ 其子容器，
+ * 打分结果永远赢不了 body，只见成本不见收益（旧实现里它是死路径）。
  *
  * 去噪针对的是用户最常抱怨的四类噪声：导航/侧栏、广告、推荐位、评论区。
  * 元数据（标题/作者/发布时间）从**未去噪的原始 DOM** 上取，避免被误删。
  * 图片统一转成绝对 URL（readability 与 jsoup 都可能留下相对路径），并剔除 1×1 占位图。
  */
-object ArticleExtractor {
+object Readability {
 
     fun extract(url: String, html: String, config: ExtractConfig = ExtractConfig()): ExtractedArticle? {
         if (html.isBlank()) return null
@@ -68,32 +83,30 @@ object ArticleExtractor {
         val publishedAt = extractPublishedAt(doc)
         val coverUrl = extractOgImage(doc)
 
-        val readability = runCatching { Readability4J(url, html).parse() }.getOrNull()
-        val readabilityHtml = readability?.content?.takeIf { it.isNotBlank() }
-        val cleaned = cleanedClone(doc)
-        val fallbackHtml = bestContainer(cleaned, config)
-        val bodyHtml = cleaned.body().html().takeIf { it.isNotBlank() }
+        // 输出仍要走去噪：readability 读的是原始 html，不过这一步就会带着广告/评论
+        // 一起参与「取最长」，把去噪过的 body 顶掉。
+        val readabilityHtml = parseToContent(html, url)
+            ?.let { stripNoiseInFragment(it) }
+            ?.takeIf { it.isNotBlank() }
+        val bodyHtml = cleanedClone(doc).body().html().takeIf { it.isNotBlank() }
 
         val candidates = listOfNotNull(
             readabilityHtml?.let { Extractor.READABILITY to it },
-            fallbackHtml?.let { Extractor.JSOUP_FALLBACK to it },
             bodyHtml?.let { Extractor.BODY_FALLBACK to it },
         )
-        if (candidates.isEmpty()) return null
 
         // 取纯文本最长的一条；同长度时优先 readability（ordinal 更小）。
-        // readability 在中文站点常常只捞到正文前半段，而容器打分能拿到整块——
+        // readability 在中文站点常常只捞到正文前半段，而 body 能拿到整块——
         // 比长度而不是「无条件优先 readability」，实测差异很大。
-        val picked = candidates.maxWith(
+        val picked = candidates.maxWithOrNull(
             compareBy<Pair<Extractor, String>> { RssParser.textLength(it.second) }
                 .thenBy { -it.first.ordinal },
-        )
+        ) ?: return null
         val extractor = picked.first
         val contentHtml = RssParser.sanitizeHtml(prepareImages(picked.second, url))
-        val contentText = readability?.textContent
-            ?.takeIf { extractor == Extractor.READABILITY && it.isNotBlank() }
-            ?: RssParser.toPlainText(contentHtml)
-            ?: return null
+        // 纯文本一律取自净化后的 HTML：readability 的 textContent 没走过噪声清洗，
+        // 混用它会让 AI/搜索/过滤规则看到与阅读页不一样的正文（页面干净、喂给模型的带广告）。
+        val contentText = RssParser.toPlainText(contentHtml) ?: return null
         if (contentHtml.isBlank()) return null
 
         val stats = measure(contentHtml)
@@ -112,6 +125,13 @@ object ArticleExtractor {
                 issue = diagnose(stats, doc, config),
             ),
         )
+    }
+
+    /** 只取正文 HTML，不做元数据与完整性判定。 */
+    fun parseToContent(html: String?, uri: String?): String? {
+        html ?: return null
+        if (html.isBlank()) return null
+        return runCatching { create(uri, html).parse().content?.takeIf { it.isNotBlank() } }.getOrNull()
     }
 
     /**
@@ -134,50 +154,43 @@ object ArticleExtractor {
         return if (removed) doc.body().html() else html
     }
 
+    private fun create(uri: String?, html: String): Readability4JExtended {
+        val options = ReadabilityOptions()
+        val regExUtil = RegExUtilExtended()
+        return Readability4JExtended(
+            uri = uri ?: "",
+            html = html,
+            options = options,
+            regExUtil = regExUtil,
+            preprocessor = Preprocessor(regExUtil),
+            metadataParser = MetadataParser(regExUtil),
+            articleGrabber = ArticleGrabberExtended(options, regExUtil),
+            postprocessor = PostprocessorExtended(),
+        )
+    }
+
     // ———————————————————————————————————————————————
-    // 去噪与候选容器
+    // 去噪与图片
     // ———————————————————————————————————————————————
 
     /** 在副本上去噪，原始 DOM 留给元数据提取。 */
-    private fun cleanedClone(doc: Document): Document {
-        val clone = doc.clone()
-        clone.select(NOISE_SELECTOR).remove()
+    private fun cleanedClone(doc: Document): Document = doc.clone().also { stripNoise(it) }
+
+    /** 对 HTML 片段去噪（readability 的输出走这条）。 */
+    private fun stripNoiseInFragment(fragmentHtml: String): String {
+        val doc = Jsoup.parseBodyFragment(fragmentHtml)
+        stripNoise(doc)
+        return doc.body().html()
+    }
+
+    private fun stripNoise(root: Element) {
+        root.select(NOISE_SELECTOR).remove()
         // 隐藏节点（display:none 的广告/评论）：jsoup 不解析外部 CSS，只能看 inline style
-        clone.select("[style]").forEach { el ->
+        root.select("[style]").forEach { el ->
             val style = el.attr("style").replace(Regex("\\s+"), "")
             if (style.contains("display:none") || style.contains("visibility:hidden")) el.remove()
         }
-        clone.select("[hidden]").remove()
-        return clone
-    }
-
-    /**
-     * 候选容器打分：文本长度为主，段落/图片加权，链接密度过高则判为导航或推荐列表。
-     */
-    private fun bestContainer(doc: Document, config: ExtractConfig): String? {
-        val candidates = doc.select(CONTAINER_SELECTOR)
-        val all = if (candidates.isEmpty()) {
-            // 没有语义容器：退化到「div 里文本最长且段落最多的那个」
-            doc.select("div")
-        } else {
-            candidates
-        }
-        var best: Pair<Double, Element>? = null
-        for (el in all) {
-            if (el.select("p").isEmpty() && el.ownText().length < config.minContentChars) continue
-            val text = el.text()
-            val chars = text.length
-            if (chars < config.minContentChars) continue
-            val links = el.select("a").sumOf { it.text().length }
-            val density = if (chars == 0) 1f else links.toFloat() / chars
-            if (density > config.maxLinkDensity) continue
-            val score = chars +
-                el.select("p").size * 80 +
-                el.select("img").size * 40 -
-                (density * 200).toInt()
-            if (best == null || score > best!!.first) best = score.toDouble() to el
-        }
-        return best?.second?.html()?.takeIf { it.isNotBlank() }
+        root.select("[hidden]").remove()
     }
 
     private fun prepareImages(fragmentHtml: String, url: String): String {
@@ -196,7 +209,6 @@ object ArticleExtractor {
                 continue
             }
             img.attr("src", src)
-            img.attr("alt", img.attr("alt"))
         }
         // <picture>/<source> 的懒加载兜底：把 srcset 首地址提上来
         for (source in doc.select("source[data-srcset], source[srcset]")) {
@@ -211,7 +223,7 @@ object ArticleExtractor {
         return doc.body().html()
     }
 
-    private data class Stats(val chars: Int, val paragraphs: Int, val images: Int)
+    private data class Stats(val chars: Int, val paragraphs: Int, val images: Int, val linkChars: Int)
 
     private fun measure(sanitizedHtml: String): Stats {
         val doc = Jsoup.parseBodyFragment(sanitizedHtml)
@@ -221,6 +233,8 @@ object ArticleExtractor {
             // 否则纯 `<pre>` 或纯表格的文章会被误判成「一个段落都没有」
             paragraphs = doc.select("p, li, pre, blockquote, td").size,
             images = doc.select("img").size,
+            // 链接文本是「列表页伪装成正文」唯一的量化特征（导航页的 li 也算段落块）
+            linkChars = doc.select("a").sumOf { it.text().length },
         )
     }
 
@@ -238,6 +252,10 @@ object ArticleExtractor {
         }
         // 够长却一个正文块都没有 = 容器误判（纯导航/纯表格骨架）
         if (stats.paragraphs == 0) return ExtractionIssue.NO_PARAGRAPH
+        // 够长、有段落块，但一半以上是链接文字 = 抓到的是索引/推荐页，不是正文
+        if (stats.linkChars.toFloat() / stats.chars > config.maxLinkDensity) {
+            return ExtractionIssue.LINK_LIST
+        }
         return ExtractionIssue.NONE
     }
 
@@ -264,7 +282,6 @@ object ArticleExtractor {
     private fun extractTitle(doc: Document): String? =
         doc.selectFirst("meta[property=og:title]")?.attr("content")?.trim()?.takeIf { it.isNotEmpty() }
             ?: doc.selectFirst("meta[name=twitter:title]")?.attr("content")?.trim()?.takeIf { it.isNotEmpty() }
-            ?: jsonLdFirst(doc, "headline")
             ?: doc.selectFirst("h1")?.text()?.trim()?.takeIf { it.isNotEmpty() }
             ?: doc.title()?.trim()?.takeIf { it.isNotEmpty() }
 
@@ -272,7 +289,6 @@ object ArticleExtractor {
         doc.selectFirst("meta[name=author]")?.attr("content")?.trim()?.takeIf { it.isNotEmpty() }
             ?: doc.selectFirst("meta[property=article:author]")?.attr("content")?.trim()?.takeIf { it.isNotEmpty() }
             ?: doc.selectFirst("[rel=author]")?.text()?.trim()?.takeIf { it.isNotEmpty() }
-            ?: jsonLdAuthor(doc)
             ?: doc.selectFirst(".byline, .author, .author-name, [class*=author]")?.text()
                 ?.trim()?.takeIf { it.length in 1..40 }
 
@@ -281,7 +297,6 @@ object ArticleExtractor {
             ?: doc.selectFirst("meta[name=pubdate]")?.attr("content")
             ?: doc.selectFirst("meta[itemprop=datePublished]")?.attr("content")
             ?: doc.selectFirst("time[datetime]")?.attr("datetime")
-            ?: jsonLdFirst(doc, "datePublished")
             ?: return null
         return parseDateTime(raw)
     }
@@ -301,33 +316,9 @@ object ArticleExtractor {
         return null
     }
 
-    /** 从 `<script type="application/ld+json">` 里抓字段（避免引 org.json，正则够用）。 */
-    private fun jsonLdFirst(doc: Document, key: String): String? {
-        for (script in doc.select("script[type=application/ld+json]")) {
-            val json = script.data().ifBlank { script.html() }
-            val m = Regex("\"$key\"\\s*:\\s*\"([^\"]+)\"").find(json)
-            if (m != null) return m.groupValues[1].trim().takeIf { it.isNotEmpty() }
-        }
-        return null
-    }
-
-    private fun jsonLdAuthor(doc: Document): String? {
-        for (script in doc.select("script[type=application/ld+json]")) {
-            val json = script.data().ifBlank { script.html() }
-            val block = Regex("\"author\"\\s*:\\s*\\{[^}]*\\}").find(json)?.value
-                ?: Regex("\"author\"\\s*:\\s*\"([^\"]+)\"").find(json)?.let { return it.groupValues[1].trim() }
-                ?: continue
-            Regex("\"name\"\\s*:\\s*\"([^\"]+)\"").find(block)?.let {
-                return it.groupValues[1].trim().takeIf { v -> v.isNotEmpty() }
-            }
-        }
-        return null
-    }
-
     private fun extractOgImage(doc: Document): String? {
         val raw = doc.selectFirst("meta[property=og:image]")?.attr("content")
             ?: doc.selectFirst("meta[name=twitter:image]")?.attr("content")
-            ?: jsonLdFirst(doc, "image")
             ?: return null
         val v = raw.trim()
         return when {
@@ -360,16 +351,6 @@ object ArticleExtractor {
         ".sidebar", ".widget", ".promo", ".sponsor", ".sponsored", ".author-bio", ".copyright",
         ".footer", ".header-ad", ".topbar", ".toolbar",
         "[class*=advert]", "[class*=sponsor]", "[class*=promo]", "[id*=advert]",
-    ).joinToString(", ")
-
-    /** 正文容器候选：语义标签优先，其次是各 CMS 的惯用类名。 */
-    private val CONTAINER_SELECTOR = listOf(
-        "article", "main", "[role=article]", "[role=main]",
-        ".post-content", ".entry-content", ".article-content", ".article-body", ".articleBody",
-        ".article", ".article-detail", ".post-body", ".post", ".story", ".story-body",
-        "#content", "#article", "#article-content", "#main-content", "#js_content",
-        ".content-article", ".news-content", ".detail-content", ".detail", ".text",
-        ".rich-text", ".rich_media_content", ".markdown-body", ".blog-post", ".post-text",
     ).joinToString(", ")
 
     private val PLACEHOLDER_IMG =

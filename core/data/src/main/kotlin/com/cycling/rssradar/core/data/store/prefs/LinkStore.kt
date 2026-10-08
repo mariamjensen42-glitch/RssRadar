@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import com.cycling.rssradar.core.model.LinkOpenMode
 import com.cycling.rssradar.core.model.LinkShareState
 import com.cycling.rssradar.core.model.ShareContentFormat
+import com.cycling.rssradar.core.model.enumValueOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,11 +25,9 @@ class LinkStore(private val prefs: SharedPreferences) {
     }
 
     private fun readPersisted(): LinkShareState = LinkShareState(
-        linkOpenMode = prefs.getString(KEY_LINK_MODE, null)
-            ?.let { runCatching { LinkOpenMode.valueOf(it) }.getOrNull() }
+        linkOpenMode = enumValueOrNull<LinkOpenMode>(prefs.getString(KEY_LINK_MODE, null))
             ?: LinkOpenMode.BROWSER,
-        shareFormat = prefs.getString(KEY_SHARE_FORMAT, null)
-            ?.let { runCatching { ShareContentFormat.valueOf(it) }.getOrNull() }
+        shareFormat = enumValueOrNull<ShareContentFormat>(prefs.getString(KEY_SHARE_FORMAT, null))
             ?: ShareContentFormat.TITLE_LINK,
     )
 

@@ -2,6 +2,7 @@ package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
 import com.cycling.rssradar.core.model.KeepArchived
+import com.cycling.rssradar.core.model.enumValueOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,7 +22,7 @@ class ArchiveStore(private val prefs: SharedPreferences) {
     }
 
     private fun readPersisted(): KeepArchived =
-        KeepArchived.fromNameOrNull(prefs.getString(KEY_KEEP_ARCHIVED, null)) ?: KeepArchived.ALWAYS
+        enumValueOrNull<KeepArchived>(prefs.getString(KEY_KEEP_ARCHIVED, null)) ?: KeepArchived.ALWAYS
 
     companion object {
         private const val KEY_KEEP_ARCHIVED = "archive_keep_archived"

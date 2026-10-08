@@ -35,60 +35,37 @@ class AiParsersTest {
     }
 
     @Test
-    fun `标签去重去空并限长`() {
-        val raw = """{"tags":["大模型","大模型","  ","推理成本","算力","A","B","C","D","E"]}"""
-        val parsed = AiParsers.tags(raw)
-        assertEquals(listOf("大模型", "推理成本", "算力", "A", "B", "C"), parsed.tags)
-        assertTrue(parsed.tags.size <= AiParsers.MAX_TAGS)
+    fun `关键词去重去空并限长`() {
+        val raw = """{"keywords":["大模型","大模型","  ","推理成本","算力","A","B","C","D","E"]}"""
+        val parsed = AiParsers.keywords(raw)
+        assertEquals(listOf("大模型", "推理成本", "算力", "A", "B", "C", "D", "E"), parsed.keywords)
+        assertTrue(parsed.keywords.size <= AiParsers.MAX_KEYWORDS)
     }
 
     @Test
     fun `垃圾输入返回空载荷而不是抛异常`() {
-        val parsed = AiParsers.tags("这不是 JSON")
-        assertTrue(parsed.tags.isEmpty())
+        assertTrue(AiParsers.keywords("这不是 JSON").keywords.isEmpty())
     }
 
     @Test
-    fun `中文情绪枚举兜底为规范值`() {
-        assertEquals("POSITIVE", AiParsers.sentiment("""{"polarity":"偏正面","score":0.6}""").polarity)
-        assertEquals("NEUTRAL", AiParsers.sentiment("""{"polarity":"瞎写的值"}""").polarity)
-        assertEquals("NEGATIVE", AiParsers.sentiment("""{"polarity":"negative","score":0.9}""").polarity)
+    fun `中文健康档位兜底为规范值`() {
+        assertEquals("BROKEN", AiParsers.feedHealth("""{"status":"失效"}""").status)
+        assertEquals("UNKNOWN", AiParsers.feedHealth("""{"status":"瞎写的值"}""").status)
+        assertEquals("DEGRADED", AiParsers.feedHealth("""{"status":"degraded"}""").status)
     }
 
     @Test
-    fun `强度超出 0 到 1 时夹取`() {
-        assertEquals(1.0, AiParsers.sentiment("""{"polarity":"POSITIVE","score":5}""").score, 0.001)
-        assertEquals(0.0, AiParsers.sentiment("""{"polarity":"POSITIVE","score":-3}""").score, 0.001)
-    }
-
-    @Test
-    fun `质量分超出 0 到 100 时夹取`() {
-        val parsed = AiParsers.quality("""{"overall":150,"density":-20,"clickbait":999}""")
-        assertEquals(100, parsed.overall)
-        assertEquals(0, parsed.density)
-        assertEquals(100, parsed.clickbait)
-    }
-
-    @Test
-    fun `全文提取声称成功却没有内容按失败处理`() {
-        val parsed = AiParsers.fulltext("""{"ok":true,"html":"  "}""")
-        assertFalse(parsed.ok)
-        assertTrue(parsed.html.isBlank())
-    }
-
-    @Test
-    fun `模型返回列表外的 id 被过滤掉`() {
-        val allowed = setOf(1L, 2L, 3L)
-        assertEquals(listOf(1L, 3L), AiParsers.restrictIds(listOf(1L, 99L, 3L), allowed))
-        assertTrue(AiParsers.restrictIds(listOf(7L), allowed).isEmpty())
+    fun `信息价值分超出 0 到 100 时夹取`() {
+        assertEquals(100, AiParsers.noise("""{"value":150}""").value)
+        assertEquals(0, AiParsers.noise("""{"value":-20}""").value)
     }
 
     @Test
     fun `空壳产物被判为无意义`() {
-        assertFalse(AiFeatureSpecs.isMeaningful(AiFeature.TAGS, AiParsers.tags("""{"tags":[]}""")))
-        assertFalse(AiFeatureSpecs.isMeaningful(AiFeature.CLASSIFY, AiParsers.classify("""{"topic":""}""")))
+        assertFalse(AiFeatureSpecs.isMeaningful(AiFeature.KEYWORDS, AiParsers.keywords("""{"keywords":[]}""")))
+        assertFalse(AiFeatureSpecs.isMeaningful(AiFeature.FILTER_RULE, AiParsers.filterRule("""{"rules":[]}""")))
         assertFalse(AiFeatureSpecs.isMeaningful(AiFeature.SUMMARY, "   "))
-        assertTrue(AiFeatureSpecs.isMeaningful(AiFeature.TAGS, AiParsers.tags("""{"tags":["a"]}""")))
+        assertTrue(AiFeatureSpecs.isMeaningful(AiFeature.KEYWORDS, AiParsers.keywords("""{"keywords":["a"]}""")))
     }
 
     @Test
@@ -99,16 +76,9 @@ class AiParsersTest {
     }
 
     @Test
-    fun `事件合并的时间线去掉非法 id`() {
-        val raw = """{"event":"某发布会","timeline":[{"articleId":0,"headline":"无效"},{"articleId":5,"headline":"有效"}]}"""
-        val parsed = AiParsers.event(raw)
-        assertEquals(listOf(5L), parsed.timeline.map { it.articleId })
-    }
-
-    @Test
     fun `未知字段不导致解析失败`() {
-        val raw = """{"tags":["a"],"未来新增的字段":{"嵌套":1}}"""
-        assertEquals(listOf("a"), AiParsers.tags(raw).tags)
+        val raw = """{"keywords":["a"],"未来新增的字段":{"嵌套":1}}"""
+        assertEquals(listOf("a"), AiParsers.keywords(raw).keywords)
     }
 
     @Test

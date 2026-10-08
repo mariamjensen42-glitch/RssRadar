@@ -12,12 +12,11 @@ object DndWindow {
         return if (start < end) now >= start && now < end else now >= start || now < end
     }
 
-    fun normalize(minute: Int): Int = ((minute % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY
+    fun normalize(minute: Int): Int = Math.floorMod(minute, MINUTES_PER_DAY)
 
     fun minuteOfDay(epochMillis: Long, zoneOffsetMillis: Int): Int {
         val dayMillis = 24L * 60L * 60L * 1000L
         val local = epochMillis + zoneOffsetMillis
-        val withinDay = ((local % dayMillis) + dayMillis) % dayMillis
-        return (withinDay / 60000L).toInt()
+        return (Math.floorMod(local, dayMillis) / 60000L).toInt()
     }
 }

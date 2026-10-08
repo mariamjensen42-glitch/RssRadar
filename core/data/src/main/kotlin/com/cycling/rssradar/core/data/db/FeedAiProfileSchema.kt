@@ -13,9 +13,13 @@ import kotlinx.coroutines.flow.Flow
  * 订阅源级 AI 配置。
  *
  * 「为每个订阅源配置不同的摘要提示词」这条需求落在 `summaryPrompt`：
- * 为空 = 跟随全局模板，非空 = 覆盖。同理 `autoSummary / autoTags / autoClassify / autoScore`
+ * 为空 = 跟随全局模板，非空 = 覆盖。同理 `autoSummary / autoScore / watchHealth`
  * 是**三态**：列里存的是「是否覆盖全局」，真正的三态语义由仓库层合并得出
  * （见 [com.cycling.rssradar.core.data.ai.FeedAiProfile]）。
+ *
+ * `autoTags` / `autoClassify` 两列已无对应功能（「自动标签」「智能分类」都已删），
+ * 但列必须保留以匹配表结构——Room 会校验实体与表的列集合，
+ * 删字段就得为一个死列写一次重建表迁移。
  *
  * 只有配置过的订阅源才有行——没配过的源走全局默认值，不写空行，避免几千个订阅源
  * 撑出几千行无用配置。
@@ -28,9 +32,9 @@ data class FeedAiProfileEntity(
     val summaryPrompt: String? = null,
     /** 刷新后是否自动为该源的新文章生成摘要。null = 跟随全局。 */
     val autoSummary: Boolean? = null,
-    /** 是否自动打标签。null = 跟随全局。 */
+    /** 已无消费者（「自动标签」已删）；保留字段只为匹配表结构。 */
     val autoTags: Boolean? = null,
-    /** 是否自动分类。null = 跟随全局。 */
+    /** 已无消费者（「智能分类」已删）；保留字段只为匹配表结构。 */
     val autoClassify: Boolean? = null,
     /** 是否自动跑质量与降噪评分。null = 跟随全局。 */
     val autoScore: Boolean? = null,

@@ -200,7 +200,7 @@ class RssParserTest {
         assertEquals("only a summary", article.summary)
         // 摘要留在 content 列（列表检索与详情页兜底要用），但**不够格当正文**——
         // contentSource 因此记 NONE，详情页才会去抓原文。这是"正文只有摘要"的根因修复
-        // （ADR-0012 / ContentQualification.FULL_TEXT_MIN_CHARS）。
+        // （见 ContentQualification.FULL_TEXT_MIN_CHARS）。
         assertFalse(ContentQualification.qualifies(article.contentHtml, article.contentText))
     }
 
@@ -529,7 +529,7 @@ class RssParserTest {
     }
 
     // ———————————————————————————————————————————————
-    // 全文门槛（ADR-0012）：摘要级 feed 内容不能挡住按需抓原文
+    // 全文门槛：摘要级 feed 内容不能挡住按需抓原文
     // ———————————————————————————————————————————————
 
     @Test
@@ -648,6 +648,14 @@ class RssParserTest {
     fun `清洗 裸和与查不到的实体`() {
         assertEquals("a &amp; b", parser.sanitizeXml("a & b"))
         assertEquals("&amp;unknown;", parser.sanitizeXml("&unknown;"))
+    }
+
+    @Test
+    fun `清洗 覆盖HTML5实体全集而不只是手写子集`() {
+        // 命名实体表来自 jsoup（HTML4/XHTML 全集）；手写子集（旧实现 57 条）漏掉的会退化成字面文本
+        assertEquals("&#945;", parser.sanitizeXml("&alpha;"))
+        assertEquals("&#233;", parser.sanitizeXml("&eacute;"))
+        assertEquals("&#241;", parser.sanitizeXml("&ntilde;"))
     }
 
     @Test

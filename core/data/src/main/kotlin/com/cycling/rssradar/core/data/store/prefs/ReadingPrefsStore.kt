@@ -16,6 +16,7 @@ import com.cycling.rssradar.core.model.coerceImageCornerRadius
 import com.cycling.rssradar.core.model.coerceLetterSpacing
 import com.cycling.rssradar.core.model.coerceLineHeight
 import com.cycling.rssradar.core.model.coercePadding
+import com.cycling.rssradar.core.model.enumValueOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -70,14 +71,12 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
                 prefs.getInt(KEY_PADDING, ReadingStyleState.DEFAULT_PADDING),
             ),
             // 枚举名读不到（历史脏数据/改名）时回退默认值，不让老用户崩在启动路径上
-            fontFamily = prefs.getString(KEY_FONT_FAMILY, null)
-                ?.let { runCatching { ReadingFontFamily.valueOf(it) }.getOrNull() }
+            fontFamily = enumValueOrNull<ReadingFontFamily>(prefs.getString(KEY_FONT_FAMILY, null))
                 ?: ReadingFontFamily.SYSTEM,
             letterSpacing = coerceLetterSpacing(
                 prefs.getFloat(KEY_LETTER_SPACING, ReadingStyleState.DEFAULT_LETTER_SPACING),
             ),
-            textAlign = prefs.getString(KEY_TEXT_ALIGN, null)
-                ?.let { runCatching { ReadingTextAlign.valueOf(it) }.getOrNull() }
+            textAlign = enumValueOrNull<ReadingTextAlign>(prefs.getString(KEY_TEXT_ALIGN, null))
                 ?: ReadingTextAlign.START,
         ),
         image = ReadingImageState(
@@ -86,21 +85,17 @@ class ReadingPrefsStore(private val prefs: SharedPreferences) {
             ),
             maximizeOnTap = prefs.getBoolean(KEY_MAXIMIZE, true),
         ),
-        renderer = prefs.getString(KEY_RENDERER, null)
-            ?.let { runCatching { ReadingRenderer.valueOf(it) }.getOrNull() }
+        renderer = enumValueOrNull<ReadingRenderer>(prefs.getString(KEY_RENDERER, null))
             ?: ReadingRenderer.NATIVE,
         translation = TranslationDisplayState(
-            viewMode = prefs.getString(KEY_VIEW_MODE, null)
-                ?.let { runCatching { TranslationViewMode.valueOf(it) }.getOrNull() }
+            viewMode = enumValueOrNull<TranslationViewMode>(prefs.getString(KEY_VIEW_MODE, null))
                 ?: TranslationViewMode.TRANSLATION_ONLY,
-            bilingualLayout = prefs.getString(KEY_BILINGUAL_LAYOUT, null)
-                ?.let { runCatching { BilingualLayout.valueOf(it) }.getOrNull() }
+            bilingualLayout = enumValueOrNull<BilingualLayout>(prefs.getString(KEY_BILINGUAL_LAYOUT, null))
                 ?: BilingualLayout.STACKED,
         ),
         immersive = prefs.getBoolean(KEY_IMMERSIVE, true),
         autoHideBars = prefs.getBoolean(KEY_AUTO_HIDE_BARS, false),
-        readingTheme = prefs.getString(KEY_READING_THEME, null)
-            ?.let { runCatching { ReadingTheme.valueOf(it) }.getOrNull() }
+        readingTheme = enumValueOrNull<ReadingTheme>(prefs.getString(KEY_READING_THEME, null))
             ?: ReadingTheme.FOLLOW,
         pullToSwitchArticle = prefs.getBoolean(KEY_PULL_TO_SWITCH, false),
     )

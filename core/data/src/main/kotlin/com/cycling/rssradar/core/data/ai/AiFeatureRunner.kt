@@ -11,7 +11,7 @@ import kotlinx.coroutines.CancellationException
 
 
 /**
- * 35 项功能的执行入口。
+ * 16 项功能的执行入口。
  *
  * 职责边界很清楚：**只负责"给一篇文章（或一批上下文）跑某一项 AI 分析"**，
  * 不管排队、不管调度、不管 UI。队列由 [AiTaskQueue] 管，调度由 Worker 管，
@@ -64,8 +64,6 @@ class AiFeatureRunner(
         if (!featureStore.isEnabled(feature)) return Outcome.Skipped("${feature.label}未开启")
 
         val context = when (feature) {
-            AiFeature.FULLTEXT -> fulltextContext(targetId)
-            in CROSS_ARTICLE_FEATURES -> return Outcome.Skipped("${feature.label}需要调用方提供多篇文章上下文")
             in STATS_FEATURES -> return Outcome.Skipped("${feature.label}需要调用方提供统计上下文")
             else -> articleContext(targetId, question)
         } ?: return Outcome.Failed("没有可用于分析的内容")
@@ -91,8 +89,10 @@ class AiFeatureRunner(
         subjectId: Long,
         context: AiPromptContext,
     ): Outcome {
-        val overrides = AiPromptOverrides(summaryPrompt = summaryPromptFor(feature, subjectId))
-        val prompt = AiFeatureSpecs.buildPrompt(feature, context, overrides)
+        val prompt = AiFeatureSpecs.buildPrompt(
+            feature,
+            context.copy(summaryPrompt = summaryPromptFor(feature, subjectId)),
+        )
             ?: return Outcome.Skipped("${feature.label}不调用模型")
 
         val raw = try {
@@ -124,19 +124,20 @@ class AiFeatureRunner(
                 return Outcome.Failed("AI 没有返回有效结果，请重试")
             }
 
-            // 涉及文章 id 的产物要按本次真实候选集收口，防止模型给出列表里不存在的 id。
-            val payload = AiFeatureSpecs.restrictIds(feature, raw, context.companions.map { it.id }.toSet())
-            limiter.record(prompt.user.length, payload.length, success = true)
+            limiter.record(prompt.user.length, raw.length, success = true)
             artifacts.save(
                 feature = feature,
                 subjectId = subjectId,
-                payload = payload,
+                payload = raw,
                 model = DeepSeekClient.MODEL,
                 inputChars = prompt.user.length,
-                outputChars = payload.length,
+                outputChars = raw.length,
+                // 分数取自**已解析的载荷**而不是重新解析 payload 字符串：手上就有对象，
+                // 重解析既白花 CPU，又可能因为收口后的 JSON 与原文不同而取错。
+                score = AiFeatureSpecs.score(feature, parsed),
                 now = clock(),
             )
-            Outcome.Success(feature, payload)
+            Outcome.Success(feature, raw)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -164,20 +165,6 @@ class AiFeatureRunner(
         )
     }
 
-    /** 全文提取喂的是原始 HTML——要的就是标签结构，用纯文本反而把结构信息丢了。 */
-    private suspend fun fulltextContext(articleId: Long): AiPromptContext? {
-        val row = articleDao.getWithFeed(articleId) ?: return null
-        val html = row.article.content?.takeIf { it.isNotBlank() }
-            ?: row.article.summary?.takeIf { it.isNotBlank() }
-            ?: return null
-        val (body, truncated) = AiText.truncateForPrompt(html)
-        return AiPromptContext(
-            title = row.article.title,
-            feedTitle = row.feedTitle,
-            body = body,
-            truncated = truncated,
-        )
-    }
 
     /**
      * 「为每个订阅源配置不同的摘要提示词」的落点：
@@ -234,24 +221,10 @@ class AiFeatureRunner(
     suspend fun feedTitleOf(feedId: Long): String = feedDao.getById(feedId)?.title.orEmpty()
 
     companion object {
-        /** 需要多篇文章作为输入的功能——上下文必须由调用方组装。 */
-        private val CROSS_ARTICLE_FEATURES = setOf(
-            AiFeature.DEDUPE,
-            AiFeature.AGGREGATE,
-            AiFeature.EVENT_MERGE,
-            AiFeature.DAILY_BRIEF,
-            AiFeature.DISCOVER,
-        )
-
         /** 需要真实统计数字作为输入的功能——数字必须来自数据库，模型不参与统计。 */
         private val STATS_FEATURES = setOf(
-            AiFeature.HABIT,
-            AiFeature.DAILY_REPORT,
             AiFeature.FEED_HEALTH,
-            AiFeature.INTEREST_RANK,
-            AiFeature.BUBBLE_BREAK,
             AiFeature.FEED_RECOMMEND,
-            AiFeature.COLD_START,
         )
     }
 }

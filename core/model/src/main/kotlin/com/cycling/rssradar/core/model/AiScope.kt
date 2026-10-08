@@ -8,7 +8,7 @@ enum class AiScope(val dbValue: Int, val label: String) {
     /** 订阅源级：随订阅源删除而清理。 */
     FEED(dbValue = 1, label = "订阅源"),
 
-    /** 全局级：按时间滚动清理（简报、报告、画像解读）。 */
+    /** 全局级：不属于任何单篇文章或订阅源（源推荐、过滤规则、用量看板等）。 */
     GLOBAL(dbValue = 2, label = "全局"),
     ;
 

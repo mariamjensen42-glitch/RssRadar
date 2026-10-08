@@ -5,16 +5,17 @@ import com.cycling.rssradar.core.model.ExtractionIssue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * [ArticleExtractor] 的提取契约（纯 JVM）。
+ * [Readability] 的提取契约（纯 JVM）。
  *
  * 这里锁的是「正文不完整」的几类真实成因：噪声没剔干净、容器误判、过短、
  * JS 动态渲染、付费墙，以及元数据与图片的处理。
  */
-class ArticleExtractorTest {
+class ReadabilityExtractTest {
 
     private val config = ExtractConfig(minContentChars = 200)
 
@@ -44,7 +45,7 @@ class ArticleExtractorTest {
             </body></html>
         """.trimIndent()
 
-        val article = ArticleExtractor.extract("https://example.com/a", html, config)
+        val article = Readability.extract("https://example.com/a", html, config)
 
         assertNotNull(article)
         val body = article!!.contentText
@@ -68,7 +69,7 @@ class ArticleExtractorTest {
             </head><body><article><p>${longText()}</p></article></body></html>
         """.trimIndent()
 
-        val article = ArticleExtractor.extract("https://example.com/a", html, config)!!
+        val article = Readability.extract("https://example.com/a", html, config)!!
 
         assertEquals("Open Graph 标题", article.title)
         assertEquals("张三", article.author)
@@ -76,7 +77,7 @@ class ArticleExtractorTest {
     }
 
     @Test
-    fun `falls back to json ld author and h1 title`() {
+    fun `falls back to h1 title and ignores json ld`() {
         val html = """
             <html><head>
               <script type="application/ld+json">
@@ -87,11 +88,11 @@ class ArticleExtractorTest {
             </head><body><article><h1>页面 H1</h1><p>${longText()}</p></article></body></html>
         """.trimIndent()
 
-        val article = ArticleExtractor.extract("https://example.com/a", html, config)!!
+        val article = Readability.extract("https://example.com/a", html, config)!!
 
-        assertEquals("JSON-LD 标题", article.title)
-        assertEquals("李四", article.author)
-        assertNotNull(article.publishedAt)
+        assertEquals("页面 H1", article.title)
+        assertNull(article.author)
+        assertNull(article.publishedAt)
     }
 
     @Test
@@ -106,7 +107,7 @@ class ArticleExtractorTest {
             </article></body></html>
         """.trimIndent()
 
-        val article = ArticleExtractor.extract("https://example.com/news/a", html, config)!!
+        val article = Readability.extract("https://example.com/news/a", html, config)!!
         val contentHtml = article.contentHtml
 
         assertTrue("相对路径要转绝对", contentHtml.contains("https://example.com/img/real.png"))
@@ -123,7 +124,7 @@ class ArticleExtractorTest {
     fun `short body is marked too short`() {
         val html = "<html><body><article><h1>标题</h1><p>只有一句话。</p></article></body></html>"
 
-        val article = ArticleExtractor.extract("https://example.com/a", html, config)!!
+        val article = Readability.extract("https://example.com/a", html, config)!!
 
         assertFalse(article.quality.isComplete)
         assertEquals(ExtractionIssue.TOO_SHORT, article.quality.issue)
@@ -142,7 +143,7 @@ class ArticleExtractorTest {
             </body></html>
         """.trimIndent()
 
-        val article = ArticleExtractor.extract("https://example.com/a", html, config)!!
+        val article = Readability.extract("https://example.com/a", html, config)!!
 
         assertFalse(article.quality.isComplete)
         assertEquals(ExtractionIssue.DYNAMIC_RENDER, article.quality.issue)
@@ -154,7 +155,7 @@ class ArticleExtractorTest {
         // 写一条空正文进库只会让用户看到空白页，不如如实降级到摘要。
         val html = "<html><head></head><body></body></html>"
 
-        assertEquals(null, ArticleExtractor.extract("https://example.com/a", html, config))
+        assertEquals(null, Readability.extract("https://example.com/a", html, config))
     }
 
     @Test
@@ -167,7 +168,7 @@ class ArticleExtractorTest {
             </article></body></html>
         """.trimIndent()
 
-        val article = ArticleExtractor.extract("https://example.com/a", html, config)!!
+        val article = Readability.extract("https://example.com/a", html, config)!!
 
         assertFalse(article.quality.isComplete)
         assertEquals(ExtractionIssue.PAYWALL, article.quality.issue)
@@ -183,7 +184,7 @@ class ArticleExtractorTest {
             </body></html>
         """.trimIndent()
 
-        val article = ArticleExtractor.extract("https://example.com/a", html, config)
+        val article = Readability.extract("https://example.com/a", html, config)
 
         // 要么提不出来，要么提出来也必须判定为不完整——绝不能算「完整正文」
         if (article != null) {
@@ -196,7 +197,7 @@ class ArticleExtractorTest {
     // ———————————————————————————————————————————————
 
     @Test
-    fun `jsoup fallback wins when readability only gets a fragment`() {
+    fun `no paragraph is lost when the body is split across nested divs`() {
         // 中文站点常见形态：正文放在多层 div 里，readability 常常只捞到一小段
         val body = (1..10).joinToString("\n") { "<div><p>第 $it 段：${longText(3)}</p></div>" }
         val html = """
@@ -205,10 +206,51 @@ class ArticleExtractorTest {
             </body></html>
         """.trimIndent()
 
-        val article = ArticleExtractor.extract("https://mp.example.com/a", html, config)!!
+        val article = Readability.extract("https://mp.example.com/a", html, config)!!
 
         assertTrue("应拿到完整正文而不是片段", article.contentText.contains("第 10 段"))
         assertTrue(article.quality.isComplete)
+    }
+
+    /**
+     * 回归：readability 读的是原始 html，它的输出必须同样过一遍去噪。
+     *
+     * 否则「正文块 + 广告块」的总字数会反杀干净候选（实测过：整段推广文案被当成正文）。
+     * 这条用例的噪声 class 命中 [NOISE_SELECTOR]，正文 HTML 与纯文本都不许带出来。
+     */
+    @Test
+    fun `readability output is cleaned with the same noise rules`() {
+        val ads = (1..20).joinToString("") {
+            "<div class=\"promo-block\"><p>推广文案 $it ${longText(2)}</p></div>"
+        }
+        val html = """
+            <html><body>
+              <article><h1>真实标题</h1><p>${longText()}</p></article>
+              <div class="sidebar">$ads</div>
+            </body></html>
+        """.trimIndent()
+
+        val article = Readability.extract("https://example.com/a", html, config)!!
+
+        assertFalse("广告不该进正文 HTML", article.contentHtml.contains("推广文案"))
+        assertFalse("广告不该进纯文本", article.contentText.contains("推广文案"))
+        assertTrue(article.quality.isComplete)
+    }
+
+    /**
+     * 回归：锚文本够长的链接列表会被当成「够长的正文」（旧实现里判为完整）。
+     *
+     * 段落块计数把 `li` 也算进去，所以必须有链接密度这一关。
+     */
+    @Test
+    fun `link list with long anchors is flagged instead of complete`() {
+        val links = (1..30).joinToString("") { "<li><a href=\"/t/$it\">标题 $it ${longText(1)}</a></li>" }
+        val html = "<html><body><div class=\"index-list\"><ul>$links</ul></div></body></html>"
+
+        val article = Readability.extract("https://example.com/a", html, config)!!
+
+        assertFalse("链接列表不该被当成完整正文", article.quality.isComplete)
+        assertEquals(ExtractionIssue.LINK_LIST, article.quality.issue)
     }
 
     @Test
@@ -220,7 +262,7 @@ class ArticleExtractorTest {
             </article></body></html>
         """.trimIndent()
 
-        val article = ArticleExtractor.extract("https://example.com/a", html, config)!!
+        val article = Readability.extract("https://example.com/a", html, config)!!
 
         assertFalse(article.contentHtml.contains("该出现的脚本内容"))
         assertFalse(article.contentHtml.contains("color:red"))
@@ -232,22 +274,22 @@ class ArticleExtractorTest {
 
     @Test
     fun `parses common date formats`() {
-        assertTrue(ArticleExtractor.parseDateTime("2026-08-30T10:15:00Z") != null)
-        assertTrue(ArticleExtractor.parseDateTime("2026-08-30T10:15:00+08:00") != null)
-        assertTrue(ArticleExtractor.parseDateTime("2026-08-30") != null)
-        assertEquals(null, ArticleExtractor.parseDateTime(""))
-        assertEquals(null, ArticleExtractor.parseDateTime("不是日期"))
+        assertTrue(Readability.parseDateTime("2026-08-30T10:15:00Z") != null)
+        assertTrue(Readability.parseDateTime("2026-08-30T10:15:00+08:00") != null)
+        assertTrue(Readability.parseDateTime("2026-08-30") != null)
+        assertEquals(null, Readability.parseDateTime(""))
+        assertEquals(null, Readability.parseDateTime("不是日期"))
     }
 
     // ———————————————————————————————————————————————
-    // 重复标题行（ADR-0015，ReadYou 同款）
+    // 重复标题行（ReadYou 同款）
     // ———————————————————————————————————————————————
 
     @Test
     fun `drops heading that duplicates the article title only`() {
         val html = "<h1>真实标题</h1><p>正文第一段</p><h2>小标题</h2><p>正文第二段</p>"
 
-        val out = ArticleExtractor.dropDuplicateTitle(html, "真实标题")
+        val out = Readability.dropDuplicateTitle(html, "真实标题")
 
         assertFalse(out.contains(">真实标题<"))
         assertTrue(out.contains("小标题")) // 同名之外的小标题一律保留
@@ -258,8 +300,8 @@ class ArticleExtractorTest {
     fun `keeps content untouched when no heading matches`() {
         val html = "<h1>另一个标题</h1><p>正文</p>"
 
-        assertEquals(html, ArticleExtractor.dropDuplicateTitle(html, "真实标题"))
-        assertEquals(html, ArticleExtractor.dropDuplicateTitle(html, null))
-        assertEquals("", ArticleExtractor.dropDuplicateTitle("", "真实标题"))
+        assertEquals(html, Readability.dropDuplicateTitle(html, "真实标题"))
+        assertEquals(html, Readability.dropDuplicateTitle(html, null))
+        assertEquals("", Readability.dropDuplicateTitle("", "真实标题"))
     }
 }

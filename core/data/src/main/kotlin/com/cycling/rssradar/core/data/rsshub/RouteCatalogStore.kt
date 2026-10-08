@@ -26,7 +26,7 @@ import javax.inject.Singleton
  *
  * 数据全量常驻内存（3800 条，几百 KB 对象），检索是纯内存线性打分，
  * 不建索引、不进 Room——一次全量扫描比维护一张表简单得多。
- * 见 ADR-0010。
+ *
  */
 @Singleton
 class RouteCatalogStore @Inject constructor(

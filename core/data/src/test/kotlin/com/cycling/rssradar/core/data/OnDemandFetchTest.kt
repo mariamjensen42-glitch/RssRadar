@@ -151,10 +151,9 @@ class OnDemandFetchTest {
             title = "标题",
             author = null,
             publishedAt = null,
-            pages = 1,
-            isComplete = issue == ExtractionIssue.NONE || issue == ExtractionIssue.METADATA_MISSING,
+            isComplete = issue == ExtractionIssue.NONE,
             issue = issue,
-            extractor = Extractor.JSOUP_FALLBACK,
+            extractor = Extractor.BODY_FALLBACK,
         ),
         report = FetchReport(
             url = link,
@@ -162,11 +161,10 @@ class OnDemandFetchTest {
             host = "example.com",
             statusCode = 200,
             attempts = 1,
-            pages = 1,
             durationMs = 10L,
             bytes = text.length,
             contentChars = text.length,
-            extractor = Extractor.JSOUP_FALLBACK,
+            extractor = Extractor.BODY_FALLBACK,
             issue = issue,
         ),
     )
@@ -179,7 +177,6 @@ class OnDemandFetchTest {
             host = "example.com",
             statusCode = 403,
             attempts = 1,
-            pages = 0,
             durationMs = 10L,
             bytes = 0,
             contentChars = 0,
@@ -314,7 +311,7 @@ class OnDemandFetchTest {
         assertEquals(0, mem.logs.size)
     }
 
-    // ---- 结果可见（ADR-0015）：阅读页要能说清「为什么没有正文」 ----
+    // ---- 结果可见：阅读页要能说清「为什么没有正文」 ----
 
     @Test
     fun `result names the reason when there is no content`() = runBlocking {
@@ -323,7 +320,7 @@ class OnDemandFetchTest {
         val m1 = module(disabled) { success("随便什么") }
         assertEquals(OnDemandResult.FeedDisabled, m1.fetchWithResult(articleId))
 
-        // 反爬：原因直达 UI（FetchFailure.label 由 UI 层取）
+        // 反爬：原因直达 UI（FetchFailure.uiRes() 由 UI 层取）
         val blocked = Mem()
         val m2 = module(blocked) { failure(FetchFailure.HTTP_403) }
         assertEquals(OnDemandResult.Failed(FetchFailure.HTTP_403), m2.fetchWithResult(articleId))

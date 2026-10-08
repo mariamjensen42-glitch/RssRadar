@@ -3,7 +3,7 @@ package com.cycling.rssradar.core.data.qualify
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
 
 /**
- * 订阅时的内容类型预判（ADR-0014）：从订阅地址与标题的关键词猜 feed 的内容类型。
+ * 订阅时的内容类型预判：从订阅地址与标题的关键词猜 feed 的内容类型。
  *
  * 为什么 feed 级：RSS 的 item 没有可靠的「这是什么」字段；而订阅源几乎总是
  * 单一性质的（一个推特路由全是推文、一个播客路由全是音频）。feed 级猜一次、

@@ -13,6 +13,7 @@ import com.cycling.rssradar.core.domain.rss.ConditionalHttpFetcher
 import com.cycling.rssradar.core.domain.rss.FeedFailureCategory
 import com.cycling.rssradar.core.domain.rss.FeedProbeResult
 import com.cycling.rssradar.core.domain.rss.HttpFetcher
+import com.cycling.rssradar.core.domain.rss.hostOf
 import com.cycling.rssradar.core.domain.rss.retryOnSlowResponse
 import com.cycling.rssradar.core.domain.filter.FilterRuleEngine
 import com.cycling.rssradar.core.domain.filter.RuleOutcome
@@ -304,10 +305,6 @@ class RefreshEngine(
         }
         return null
     }
-
-    /** 主机比较用；解析不出（非法 URL）按「不同主机」处理，保守排后面。 */
-    private fun hostOf(url: String): String? =
-        runCatching { java.net.URL(url).host }.getOrNull()
 
     /**
      * 单次「抓取 → 写库」本体：异常一律上抛给 [refreshFeed] 统一归类，

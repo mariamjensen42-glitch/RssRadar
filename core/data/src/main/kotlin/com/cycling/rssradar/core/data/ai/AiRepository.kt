@@ -34,7 +34,7 @@ data class TranslationProgress(
 }
 
 /**
- * AI 能力的领域门面（issue #44，ADR-0005）：
+ * AI 能力的领域门面（issue #44）：
  * - AI 摘要：基于正文生成，持久化（articles.aiSummary），刷新永不覆盖；
  * - AI 翻译：按 [TranslationSegments] 分段逐段译为简体中文，不落盘，
  *   会话内整篇缓存；经 [onProgress] 回调实现渐进显示（翻译功能 v2）。
@@ -48,7 +48,7 @@ class AiRepository(
 ) {
 
     /**
-     * 译文会话级缓存：key = articleId，进程内有效，不落盘（ADR-0005）。
+     * 译文会话级缓存：key = articleId，进程内有效，不落盘。
      * LRU 上限 20 篇（OOM 防线）：每条译文是整篇正文的分段集合，无上限的 Map 会
      * 随翻译篇数线性吃堆。按访问序淘汰最旧的。originalsHash 防正文变化后错位恢复。
      */

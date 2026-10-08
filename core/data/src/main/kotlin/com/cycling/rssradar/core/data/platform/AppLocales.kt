@@ -6,11 +6,12 @@ import android.content.SharedPreferences
 import android.os.Build
 import android.os.LocaleList
 import com.cycling.rssradar.core.model.AppLanguage
+import com.cycling.rssradar.core.data.store.prefs.LanguageStore
 import com.cycling.rssradar.core.data.store.prefs.SettingsPrefs
 import java.util.Locale
 
 /**
- * 界面语言的应用层（ADR-0017）。
+ * 界面语言的应用层。
  *
  * 单一真相源是 [SettingsPrefs] 里的 `app_language`（LanguageStore 持久化）。
  * - API 33+：把 locale 推给系统 [LocaleManager]（per-app locale），系统自动重建
@@ -24,10 +25,7 @@ import java.util.Locale
 object AppLocales {
 
     /** 从持久化读当前偏好（attachBaseContext 阶段 Hilt 还没起来，直接读 prefs）。 */
-    fun persisted(prefs: SharedPreferences): AppLanguage {
-        val name = prefs.getString("app_language", null) ?: return AppLanguage.SYSTEM
-        return runCatching { AppLanguage.valueOf(name) }.getOrDefault(AppLanguage.SYSTEM)
-    }
+    fun persisted(prefs: SharedPreferences): AppLanguage = LanguageStore(prefs).language.value
 
     /** 覆盖 locale 用：SYSTEM 走系统默认，其余强制对应 locale。 */
     fun localeOf(language: AppLanguage): Locale = when (language) {

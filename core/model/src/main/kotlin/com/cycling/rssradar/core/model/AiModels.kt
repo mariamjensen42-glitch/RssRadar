@@ -21,7 +21,7 @@ object AiDayIndex {
 /**
  * AI 调用预算与用量统计。
  *
- * 存在的理由：35 项功能里 32 项要调大模型，**不限流的 AI 功能等于让用户开着水龙头睡觉**。
+ * 存在的理由：16 项功能里 10 项要调大模型，**不限流的 AI 功能等于让用户开着水龙头睡觉**。
  * 三道闸都在这里：日调用上限（配额）、并发上限（不把连接池打满）、最小间隔（不触发服务端限流）。
  *
  * **只统计次数与字数，不换算金额**——DeepSeek 的单价随时调整，
@@ -74,17 +74,11 @@ data class AiBudgetState(
     }
 }
 
-/** 当前开启的 AI 功能集合。用 Set 而不是 35 个布尔字段的数据类——增删功能不用改这里。 */
+/** 当前开启的 AI 功能集合。用 Set 而不是 33 个布尔字段的数据类——增删功能不用改这里。 */
 data class AiFeatureSettings(
     val enabled: Set<AiFeature> = AiFeature.DEFAULT_ENABLED,
 ) {
     fun isEnabled(feature: AiFeature): Boolean = feature in enabled
-
-    /** 某个分组里开了几项，设置页分组标题上显示「3 / 15」。 */
-    fun countIn(category: AiCategory): Int = AiFeature.ofCategory(category).count { it in enabled }
-
-    /** 该分组是否全开（用于分组一键开关的三态显示）。 */
-    fun allIn(category: AiCategory): Boolean = AiFeature.ofCategory(category).all { it in enabled }
 
     companion object
 }

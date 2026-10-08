@@ -91,9 +91,9 @@ enum class ReadingTheme(val label: String) {
 }
 
 /**
- * 阅读页正文渲染器选择（原生双渲染器，ADR-0009）。
+ * 阅读页正文渲染器选择（原生双渲染器）。
  *
- * 默认 WEBVIEW：原生路对表格/视频/内联样式明显退化（ADR-0009 已记录），
+ * 默认 WEBVIEW：原生路对表格/视频/内联样式明显退化（已知取舍），
  * 默认开会让多数文章变丑；被 WebView 滚动闪烁困扰的用户手动切原生即可。
  */
 enum class ReadingRenderer(val label: String) {

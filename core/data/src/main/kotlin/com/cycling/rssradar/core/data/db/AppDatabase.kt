@@ -19,7 +19,7 @@ import com.cycling.rssradar.core.data.db.entity.RecommendationFeedbackEntity
         ContentFetchLogEntity::class,
         ArchivedArticleTombstoneEntity::class,
         RecommendationFeedbackEntity::class,
-        // AI 智能功能模块（35 项）：产物 / 订阅源级配置 / 任务队列。见 AiSchema.kt。
+        // AI 智能功能模块（16 项）：产物 / 订阅源级配置 / 任务队列。见 AiSchema.kt。
         AiArtifactEntity::class,
         FeedAiProfileEntity::class,
         AiTaskEntity::class,
@@ -28,7 +28,7 @@ import com.cycling.rssradar.core.data.db.entity.RecommendationFeedbackEntity
         ArticleAnnotationEntity::class,
         ArticleFtsEntity::class,
     ],
-    version = 17,
+    version = 18,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -3,6 +3,7 @@ package com.cycling.rssradar.core.data.store.prefs
 import android.content.SharedPreferences
 import com.cycling.rssradar.core.model.SyncInterval
 import com.cycling.rssradar.core.model.SyncState
+import com.cycling.rssradar.core.model.enumValueOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,7 +30,7 @@ class SyncStore(private val prefs: SharedPreferences) {
     }
 
     private fun readPersisted(): SyncState = SyncState(
-        interval = SyncInterval.fromNameOrNull(prefs.getString(KEY_INTERVAL, null))
+        interval = enumValueOrNull<SyncInterval>(prefs.getString(KEY_INTERVAL, null))
             ?: SyncInterval.MANUALLY,
         onlyOnWifi = prefs.getBoolean(KEY_ONLY_WIFI, true),
         onlyWhenCharging = prefs.getBoolean(KEY_ONLY_CHARGING, false),

@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 /**
- * 自动同步调度（issue #58，ADR-0008）：WorkManager 唯一周期任务
+ * 自动同步调度（issue #58）：WorkManager 唯一周期任务
  * 「rssradar-auto-sync」，间隔/约束由 SyncStore 驱动，设置变更即重建。
  */
 object SyncScheduler {

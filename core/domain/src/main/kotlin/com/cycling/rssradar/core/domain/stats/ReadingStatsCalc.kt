@@ -1,14 +1,12 @@
-package com.cycling.rssradar.core.domain.ai
+package com.cycling.rssradar.core.domain.stats
 
 /**
  * 阅读习惯的统计算法，纯函数、无依赖。
  *
- * 放在 domain 层且刻意不碰数据库：这些数字要**喂给模型去组织语言**，
- * 所以它们必须能脱离 Android 环境算出来并断言——
- * 「AI 只做意图识别与语言组织，数字必须真实」这条原则在这里的具体形态就是：
- * 数字由纯函数算，模型一个字都不许改。
+ * 放在 domain 层且刻意不碰数据库：这些数字必须能脱离 Android 环境算出来并断言——
+ * 记录阅读习惯的页面要的是可复核的数字，不是看起来差不多的估算。
  */
-object AiReadingStats {
+object ReadingStatsCalc {
 
     private const val HOUR_MS = 60 * 60 * 1000L
     private const val DAY_MS = 24 * HOUR_MS
