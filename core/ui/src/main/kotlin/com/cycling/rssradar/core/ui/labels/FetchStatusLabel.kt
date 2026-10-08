@@ -5,7 +5,7 @@ import com.cycling.rssradar.core.model.FetchFailure
 import com.cycling.rssradar.core.ui.R
 
 /**
- * 抓取失败 / 提取问题 → 文案资源（ADR-0017：枚举只给身份，人话由 UI 层按当前语言翻译）。
+ * 抓取失败 / 提取问题 → 文案资源（枚举只给身份，人话由 UI 层按当前语言翻译）。
  *
  * 原先住在 `ui/article/BodyContent.kt` 且是 `internal`，而 `ui/me` 的抓取诊断页也要同一套说法。
  * 两个 feature 一旦分家，「internal 跨模块不可见」+「feature 间禁互依」会同时踩。
@@ -35,5 +35,5 @@ fun ExtractionIssue.uiRes(): Int = when (this) {
     ExtractionIssue.NO_PARAGRAPH -> R.string.issue_no_paragraph
     ExtractionIssue.DYNAMIC_RENDER -> R.string.issue_dynamic_render
     ExtractionIssue.PAYWALL -> R.string.issue_paywall
-    ExtractionIssue.METADATA_MISSING -> R.string.issue_metadata_missing
+    ExtractionIssue.LINK_LIST -> R.string.issue_link_list
 }

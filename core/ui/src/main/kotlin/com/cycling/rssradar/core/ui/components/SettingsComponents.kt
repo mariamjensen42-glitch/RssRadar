@@ -34,7 +34,6 @@ import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide
 import com.cycling.rssradar.core.ui.R
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.radarSwitchColors
 
 /**
@@ -59,7 +58,7 @@ fun SettingsSubPage(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(radarColors().bgRoot)
+            .background(MaterialTheme.colorScheme.surface)
             .statusBarsPadding(),
     ) {
         Row(
@@ -69,11 +68,11 @@ fun SettingsSubPage(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.back), tint = radarColors().textPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.back), tint = MaterialTheme.colorScheme.onSurface)
             }
             Text(
                 text = title,
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
@@ -98,7 +97,7 @@ fun SectionHeader(
 ) {
     Text(
         text = title,
-        color = radarColors().textSecondary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
         modifier = modifier,
@@ -106,7 +105,7 @@ fun SectionHeader(
     if (description != null) {
         Text(
             text = description,
-            color = radarColors().textTertiary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
         )
@@ -137,13 +136,13 @@ fun SettingSwitchRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
-                color = if (enabled) radarColors().textPrimary else radarColors().textTertiary,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (subtitle != null) {
                 Text(
                     text = subtitle,
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 2.dp),
                 )
@@ -175,13 +174,13 @@ fun OptionRow(
     ) {
         Text(
             text = label,
-            color = radarColors().textPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f),
         )
         Text(
             text = value,
-            color = radarColors().accent,
+            color = MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
         )
@@ -189,7 +188,7 @@ fun OptionRow(
         Icon(
             imageVector = Lucide.ChevronRight,
             contentDescription = stringResource(R.string.select),
-            tint = radarColors().textTertiary,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(16.dp),
         )
     }
@@ -204,7 +203,7 @@ fun NavigateRow(
 ) {
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = radarColors().surface1,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
@@ -216,14 +215,14 @@ fun NavigateRow(
         ) {
             Text(
                 text = label,
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
             )
             Icon(
                 imageVector = Lucide.ChevronRight,
                 contentDescription = stringResource(R.string.enter),
-                tint = radarColors().textTertiary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
         }
@@ -249,14 +248,14 @@ fun <T> SegmentedChips(
             val isSelected = option == selected
             Surface(
                 shape = RoundedCornerShape(50),
-                color = if (isSelected) radarColors().accent else radarColors().surface2,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer,
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
                     .clickable { onSelect(option) },
             ) {
                 Text(
                     text = label(option),
-                    color = if (isSelected) radarColors().onAccent else radarColors().textPrimary,
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 )

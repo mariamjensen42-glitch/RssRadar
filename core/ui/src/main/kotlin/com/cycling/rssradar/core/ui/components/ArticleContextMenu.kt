@@ -35,7 +35,6 @@ import com.composables.icons.lucide.Share2
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.ThumbsDown
 import com.composables.icons.lucide.Trash2
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /** 菜单项标准高度 48dp；容器上下 padding + 描边约 16dp。 */
 private const val MENU_ITEM_HEIGHT_DP = 48
@@ -89,13 +88,13 @@ data class ArticleMenuActions(
     val onToggleBookmarked: () -> Unit,
     val onDelete: () -> Unit,
     /**
-     * 「减少此类」（ADR-0013）：非空时菜单里出现该项，点击后该文章所属订阅源
+     * 「减少此类」：非空时菜单里出现该项，点击后该文章所属订阅源
      * 在推荐流里降权。只有推荐流传这个回调——常规列表不做推荐负反馈。
      */
     val onReduceSuch: (() -> Unit)? = null,
 ) {
     /**
-     * 菜单实际渲染的项数：只有「减少此类」（ADR-0013）一个可选动作，所以是 7 或 8。
+     * 菜单实际渲染的项数：只有「减少此类」一个可选动作，所以是 7 或 8。
      * 长按偏移 [articleMenuOffset] 要用它估算高度，而调用方不在本文件——写死两遍必然漂移。
      */
     val itemCount: Int get() = BASE_ITEM_COUNT + if (onReduceSuch != null) 1 else 0
@@ -125,17 +124,17 @@ fun ArticleContextMenu(
 ) {
     val context = LocalContext.current
     val hasLink = actions.link.isNotBlank()
-    // iOS Dark 风：radarColors().surface1 卡片面 + 14dp 圆角 + radarColors().divider 细描边，与设计稿卡片语言一致
+    // iOS Dark 风：MaterialTheme.colorScheme.surfaceContainerLowest 卡片面 + 14dp 圆角 + MaterialTheme.colorScheme.outlineVariant 细描边，与设计稿卡片语言一致
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismiss,
         offset = offset,
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
-        containerColor = radarColors().surface1,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         tonalElevation = 0.dp,
         shadowElevation = 8.dp,
-        border = BorderStroke(1.dp, radarColors().divider),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         DropdownMenuItem(
             text = { Text(stringResource(if (actions.isRead) R.string.menu_mark_unread else R.string.menu_mark_read)) },
@@ -193,15 +192,15 @@ fun ArticleContextMenu(
     }
 }
 
-/** 普通项：文字 radarColors().textPrimary、图标 radarColors().textSecondary（禁用时文字/图标都用 radarColors().textTertiary）。 */
+/** 普通项：文字 MaterialTheme.colorScheme.onSurface、图标 MaterialTheme.colorScheme.onSurfaceVariant（禁用时文字/图标都用 MaterialTheme.colorScheme.onSurfaceVariant）。 */
 @Composable
 private fun normalItemColors() = MenuItemColors(
-    textColor = radarColors().textPrimary,
-    leadingIconColor = radarColors().textSecondary,
-    trailingIconColor = radarColors().textSecondary,
-    disabledTextColor = radarColors().textTertiary,
-    disabledLeadingIconColor = radarColors().textTertiary,
-    disabledTrailingIconColor = radarColors().textTertiary,
+    textColor = MaterialTheme.colorScheme.onSurface,
+    leadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    trailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
 )
 
 /** 破坏性项（删除）：Danger 红，与 App 内危险操作色一致。 */
@@ -210,9 +209,9 @@ private fun dangerItemColors() = MenuItemColors(
     textColor = Danger,
     leadingIconColor = Danger,
     trailingIconColor = Danger,
-    disabledTextColor = radarColors().textTertiary,
-    disabledLeadingIconColor = radarColors().textTertiary,
-    disabledTrailingIconColor = radarColors().textTertiary,
+    disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
 )
 
 @Composable

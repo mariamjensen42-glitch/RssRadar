@@ -15,6 +15,9 @@
     <string name="set_view_card">Card</string>
     <string name="set_view_magazine">Magazine</string>
     <string name="set_view_grid">Grid</string>
+    <string name="set_value_by_value">By AI value</string>
+    <string name="set_value_only_good">Only worth reading</string>
+    <string name="set_value_time">By time</string>
     <string name="fetch_invalid_url">Invalid URL</string>
     <string name="fetch_timeout">Request timed out</string>
     <string name="fetch_network">Network connection failed</string>
@@ -33,7 +36,7 @@
     <string name="issue_no_paragraph">No body paragraphs found</string>
     <string name="issue_dynamic_render">Page rendered dynamically by scripts</string>
     <string name="issue_paywall">Likely paywalled or login-walled</string>
-    <string name="issue_metadata_missing">Missing title or date</string>
+    <string name="issue_link_list">Body looks like a navigation or index page</string>
     <string name="close">Close</string>
     <string name="menu_mark_read">Mark as read</string>
     <string name="menu_mark_unread">Mark as unread</string>

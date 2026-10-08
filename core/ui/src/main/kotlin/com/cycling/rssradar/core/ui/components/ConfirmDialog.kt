@@ -7,7 +7,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.cycling.rssradar.core.ui.theme.Danger
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 全应用统一确认对话框：卡片形态，确认按钮默认 accent 强调；
@@ -36,7 +35,7 @@ fun ConfirmDialog(
             ) {
                 Text(
                     text = confirmText,
-                    color = if (destructive) Danger else radarColors().accent,
+                    color = if (destructive) Danger else MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.labelLarge,
                 )
             }
@@ -44,7 +43,7 @@ fun ConfirmDialog(
         dismissButton = dismissText?.let { label ->
             {
                 TextButton(onClick = onDismiss) {
-                    Text(label, color = radarColors().textSecondary)
+                    Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         },
