@@ -53,4 +53,14 @@ class AiFeatureSpecsTest {
         assertTrue(AiFeatureSpecs.isMeaningful(AiFeature.SUMMARY, "结论"))
         assertEquals("原文", AiFeatureSpecs.parse(AiFeature.SUMMARY, "原文"))
     }
+
+    @Test
+    fun `只有可排序的功能给出分数`() {
+        // 列表按这个分数排序，所以它必须来自已解析的载荷、并且被夹在 0~100
+        assertEquals(80, AiFeatureSpecs.score(AiFeature.NOISE, AiNoisePayload(value = 80)))
+        assertEquals(100, AiFeatureSpecs.score(AiFeature.NOISE, AiNoisePayload(value = 120)))
+        // 没有可排序量的功能必须给 null（列表据此判断"这篇还没被评估过"）
+        assertNull(AiFeatureSpecs.score(AiFeature.SUMMARY, "一段摘要"))
+        assertNull(AiFeatureSpecs.score(AiFeature.KEYWORDS, AiKeywordsPayload(keywords = listOf("a"))))
+    }
 }

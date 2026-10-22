@@ -10,9 +10,9 @@ import com.cycling.rssradar.core.data.db.dao.ContentFetchLogDao
 import com.cycling.rssradar.core.data.db.entity.ContentFetchLogEntity
 import com.cycling.rssradar.core.data.db.dao.FeedDao
 import com.cycling.rssradar.core.data.db.projection.FetchHostStat
-import com.cycling.rssradar.core.data.parser.ArticleExtractor
 import com.cycling.rssradar.core.data.parser.ContentFetcher
 import com.cycling.rssradar.core.data.parser.FeedUrlResolver
+import com.cycling.rssradar.core.data.parser.Readability
 import com.cycling.rssradar.core.model.ExtractionIssue
 import com.cycling.rssradar.core.model.FetchFailure
 import com.cycling.rssradar.core.data.parser.FetchLogger
@@ -27,7 +27,7 @@ import com.cycling.rssradar.core.data.refresh.estimateReadingMinutes
  * 旧契约返回 Boolean，调用方用 `runCatching {}` 一包就把原因丢了——读者只看到
  * 「正在获取全文…」然后什么都没有，失败与「这篇本来就没有正文」混为一谈，也无从重试。
  * ReadYou 的做法是让阅读页有一个 `Error(message)` 态；这里把原因结构化，
- * 由 UI 层取 [FetchFailure.label] / [ExtractionIssue.label] 说人话。
+ * 由 UI 层取 `FetchFailure.uiRes()` / `ExtractionIssue.uiRes()` 说人话。
  */
 sealed interface OnDemandResult {
 
@@ -66,7 +66,7 @@ sealed interface OnDemandResult {
  * 3. **每次抓取都留痕**——成功、不完整、失败三种 outcome 都写日志，只是 ok/issue 字段不同。
  *    一个字都抓不到时不写正文，记为提取失败。
  *
- * interface 只有五个方法加一条抓取缝；[ContentFetcher] / ArticleExtractor / [FetchLogger]
+ * interface 只有五个方法加一条抓取缝；[ContentFetcher] / [Readability] / [FetchLogger]
  * 是它的实现，不是调用方的助手。诊断页（「我的 → 正文抓取 → 全文抓取诊断」）是抓取日志的
  * 唯一读取方，直连本模块，不再经过 FeedRepository。
  */
@@ -134,7 +134,7 @@ class OnDemandFetch(
                     )
                 }
                 // 正文里与文章标题重复的标题行：头部已经显示过标题，正文里那段是多余的
-                val html = ArticleExtractor.dropDuplicateTitle(content.contentHtml, item.article.title)
+                val html = Readability.dropDuplicateTitle(content.contentHtml, item.article.title)
                 articleDao.updateFetchedContent(
                     id = articleId,
                     content = html,
@@ -153,7 +153,7 @@ class OnDemandFetch(
         }
     }
 
-    /** 诊断清单（ADR-0012）：有问题的抓取记录（失败或不完整），诊断页直接展示。 */
+    /** 诊断清单：有问题的抓取记录（失败或不完整），诊断页直接展示。 */
     fun observeProblems(limit: Int = 200): Flow<List<ContentFetchLogEntity>> =
         contentFetchLogDao.observeProblems(limit)
 
@@ -176,7 +176,7 @@ class OnDemandFetch(
             host = report.host,
             statusCode = report.statusCode,
             attempts = report.attempts,
-            pages = report.pages,
+            pages = 1,
             ok = true,
             failure = null,
             issue = content.issue.name,

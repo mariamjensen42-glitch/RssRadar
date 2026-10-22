@@ -19,11 +19,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
- * 全应用统一 Snackbar：跟随 RadarColors（radarColors().surface3 底 / radarColors().textPrimary 文字 / radarColors().accent 动作），
- * 圆角卡片形态，取代 M3 默认的反色胶囊。带动作标签的（如撤销删除）动作用 radarColors().accent 强调。
+ * 全应用统一 Snackbar：跟随主题色（surfaceContainerHighest 底 / onSurface 文字 / primary 动作），
+ * 圆角卡片形态，取代 M3 默认的反色胶囊。带动作标签的（如撤销删除）动作用主题 primary 强调。
  * 所有屏幕的 SnackbarHost 统一走这里，保证观感一致。
  */
 @Composable
@@ -44,20 +43,20 @@ private fun AppSnackbar(data: SnackbarData) {
                 .fillMaxWidth()
                 .shadow(8.dp, RoundedCornerShape(14.dp))
                 .clip(RoundedCornerShape(14.dp))
-                .background(radarColors().surface3)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                 .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = data.visuals.message,
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
             )
             data.visuals.actionLabel?.let { label ->
                 Text(
                     text = label,
-                    color = radarColors().accent,
+                    color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier

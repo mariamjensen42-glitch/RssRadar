@@ -30,7 +30,6 @@ import com.cycling.rssradar.core.model.FetchFailure
 import com.cycling.rssradar.core.model.BilingualLayout
 import com.cycling.rssradar.core.model.TranslationDisplayState
 import com.cycling.rssradar.core.model.TranslationViewMode
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.labels.uiRes
 import com.cycling.rssradar.core.ui.theme.LocalReadingPrefs
 
@@ -39,7 +38,7 @@ import com.cycling.rssradar.core.ui.theme.LocalReadingPrefs
  *
  * 以前失败原因只写进抓取日志，只有诊断页看得到，阅读页静默降级——
  * 于是「我为什么只有摘要」成了无解的问题。这里把两种需要解释的结果摊到正文上方：
- * - 失败：中文原因 + 重试按钮（原因来自 [FetchFailure.label]）；
+ * - 失败：中文原因 + 重试按钮（原因来自 `FetchFailure.uiRes()`）；
  * - 不完整：哪一类不完整（过短 / 脚本渲染 / 付费墙…），不假装这就是全文。
  */
 @Composable
@@ -75,7 +74,7 @@ private fun FetchFailedBanner(
     }
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = radarColors().surface2,
+        color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(
@@ -85,13 +84,13 @@ private fun FetchFailedBanner(
             Icon(
                 Lucide.CircleAlert,
                 contentDescription = null,
-                tint = radarColors().textTertiary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(14.dp),
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = message,
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.weight(1f),
             )
@@ -99,7 +98,7 @@ private fun FetchFailedBanner(
                 Text(
                     text = stringResource(R.string.retry),
                     style = MaterialTheme.typography.labelMedium,
-                    color = radarColors().accent,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
@@ -117,7 +116,7 @@ internal fun SummaryModeBanner(
 ) {
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = radarColors().surface2,
+        color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(
@@ -127,13 +126,13 @@ internal fun SummaryModeBanner(
             Icon(
                 Lucide.Type,
                 contentDescription = null,
-                tint = radarColors().textTertiary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(14.dp),
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = stringResource(R.string.summary_banner),
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.weight(1f),
             )
@@ -141,14 +140,14 @@ internal fun SummaryModeBanner(
                 Text(
                     text = stringResource(R.string.see_full),
                     style = MaterialTheme.typography.labelMedium,
-                    color = radarColors().accent,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
     }
 }
 
-/** 无正文分支的兜底提示：正文被判「不完整」时挂在头部下方（ADR-0012）。 */
+/** 无正文分支的兜底提示：正文被判「不完整」时挂在头部下方。 */
 @Composable
 private fun IncompleteContentBanner(
     issue: ExtractionIssue?,
@@ -156,7 +155,7 @@ private fun IncompleteContentBanner(
 ) {
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = radarColors().surface2,
+        color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = modifier.fillMaxWidth(),
     ) {
         // issue 的枚举先在组合作用域翻成当前语言，再喂给带占位符的资源
@@ -171,13 +170,13 @@ private fun IncompleteContentBanner(
             Icon(
                 Lucide.CircleAlert,
                 contentDescription = null,
-                tint = radarColors().textTertiary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(14.dp),
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = stringResource(R.string.article_incomplete, issueText),
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelMedium,
             )
         }
@@ -197,14 +196,14 @@ internal fun NoContentBody(
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(
-                    color = radarColors().accent,
+                    color = MaterialTheme.colorScheme.primary,
                     strokeWidth = 2.dp,
                     modifier = Modifier.size(14.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = stringResource(R.string.fetching_full),
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                 )
             }
@@ -235,7 +234,7 @@ internal fun TranslationBanner(
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Lucide.Languages, contentDescription = null, tint = radarColors().accent, modifier = Modifier.size(14.dp))
+        Icon(Lucide.Languages, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(6.dp))
         Text(
             text = if (progressing) {
@@ -243,12 +242,12 @@ internal fun TranslationBanner(
             } else {
                 stringResource(R.string.ai_translation_deepseek)
             },
-            color = radarColors().textTertiary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.weight(1f),
         )
         if (progressing) {
-            CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
         } else {
             TextButton(
                 onClick = {
@@ -266,7 +265,7 @@ internal fun TranslationBanner(
             ) {
                 Text(
                     text = if (display.viewMode == TranslationViewMode.TRANSLATION_ONLY) stringResource(R.string.bilingual) else stringResource(R.string.translation_only),
-                    color = radarColors().accent,
+                    color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.labelMedium,
                 )
             }
@@ -287,17 +286,17 @@ internal fun TranslationBanner(
                 ) {
                     Text(
                         text = if (display.bilingualLayout == BilingualLayout.STACKED) stringResource(R.string.side_by_side) else stringResource(R.string.stacked),
-                        color = radarColors().accent,
+                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
             }
             TextButton(onClick = onRetranslate, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                Text(stringResource(R.string.retranslate), color = radarColors().accent, style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.retranslate), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
             }
         }
         TextButton(onClick = onShowOriginal, contentPadding = PaddingValues(horizontal = 8.dp)) {
-            Text(stringResource(R.string.ai_back_to_original), color = radarColors().textSecondary, style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.ai_back_to_original), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
         }
     }
 }

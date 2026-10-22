@@ -1,12 +1,13 @@
 package com.cycling.rssradar.ui.article
 
+import com.cycling.rssradar.core.domain.rss.hostOf
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
 
 /**
- * 正文 HTML → Compose 中间树的**纯 JVM 解析**（ADR-0009 原生渲染器的解析半边）。
+ * 正文 HTML → Compose 中间树的**纯 JVM 解析**（原生渲染器的解析半边）。
  *
  * 与渲染分离的理由和 [ReadingContentHtml] / [ReadingImages] 一样：解析是可测的纯函数，
  * 不碰 Android、不碰 Compose，单测直接覆盖；渲染那边只剩「树 → Composable」的直译。
@@ -411,7 +412,7 @@ object ReadingNodes {
     }
 
     /**
-     * 判媒体种类。**净化在入库前发生**（`RssParser` / `ArticleExtractor` 都把产物写进
+     * 判媒体种类。**净化在入库前发生**（`RssParser` / `Readability` 都把产物写进
      * `article.content`），所以库里大量是**加后缀之前**的行——只认类名后缀的话，
      * 存量文章的视频永远停在"点了跳浏览器"。故三级判定，先到先得：
      *
@@ -459,7 +460,7 @@ object ReadingNodes {
             MediaNodeKind.AUDIO -> "音频"
             MediaNodeKind.EMBED -> "嵌入内容"
         }
-        return NodeMediaCard(url, "$label · ${hostOf(url)}", kind)
+        return NodeMediaCard(url, "$label · ${hostOf(url).ifEmpty { "外部内容" }}", kind)
     }
 
     // ———————————————————————————————————————————————
@@ -670,9 +671,6 @@ object ReadingNodes {
         return false
     }
 
-    private fun hostOf(url: String): String =
-        runCatching { java.net.URI(url).host }.getOrNull().orEmpty().ifEmpty { "外部内容" }
-
     private fun List<InlineRun>.hasText(): Boolean = any { it.text.isNotBlank() }
 
     private val Element.isList: Boolean
@@ -737,7 +735,7 @@ data class NodeImage(
 data class NodeMath(val spans: List<MathSpan>) : ReadingNode
 
 /**
- * 正文里的嵌入媒体（ADR-0018）。
+ * 正文里的嵌入媒体。
  *
  * [kind] 决定渲染去向：`VIDEO`/`AUDIO` 指向的是**直链媒体文件**，App 侧用 ExoPlayer
  * 就地播放（不经第三方页面、不执行脚本）；`EMBED` 是 iframe 这类第三方页面，

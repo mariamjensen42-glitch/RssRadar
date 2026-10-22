@@ -4,8 +4,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -40,8 +43,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ArrowDownUp
@@ -50,19 +55,22 @@ import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.FileDown
 import com.composables.icons.lucide.FileUp
 import com.composables.icons.lucide.FolderInput
+import com.composables.icons.lucide.HeartPulse
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.X
+import com.cycling.rssradar.core.domain.ai.FeedHealthDigest
 import com.cycling.rssradar.core.model.FeedSortMode
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.components.OptionPickerSheet
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
+import com.cycling.rssradar.core.ui.text.todayStamp
 import com.cycling.rssradar.core.ui.theme.Danger
+import com.cycling.rssradar.core.ui.theme.Warning
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.effectsSpec
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
 import com.cycling.rssradar.core.ui.theme.spatialSpec
 import androidx.compose.runtime.getValue
@@ -71,7 +79,6 @@ import androidx.compose.runtime.setValue
 @Composable
 fun SubscriptionsDestination(
     onAddSubscription: () -> Unit = {},
-    onCreateGroup: () -> Unit = {},
     onOpenFeed: (Long) -> Unit = {},
     viewModel: SubscriptionsViewModel = hiltViewModel(),
 ) {
@@ -81,7 +88,6 @@ fun SubscriptionsDestination(
         state = state,
         onIntent = viewModel::onIntent,
         onAddSubscription = onAddSubscription,
-        onCreateGroup = onCreateGroup,
         onOpenFeed = onOpenFeed,
         groupActionSheet = { group, feedCount, onDismiss ->
             GroupActionSheet(
@@ -102,7 +108,6 @@ fun SubscriptionsScreen(
     state: SubscriptionsUiState,
     onIntent: (SubscriptionsIntent) -> Unit,
     onAddSubscription: () -> Unit = {},
-    onCreateGroup: () -> Unit = {},
     /** 点击订阅源 → 进「订阅源文章列表」（issue #51）。 */
     onOpenFeed: (Long) -> Unit = {},
     /**
@@ -122,6 +127,7 @@ fun SubscriptionsScreen(
     val unhealthyOnly = state.unhealthyOnly
     val unhealthyCount = state.unhealthyCount
     val unhealthyFeeds = state.unhealthyFeeds
+    val aiHealthIssues = state.aiHealthIssues
     val selectionMode = state.selectionMode
     val selectedIds = state.selectedIds
     val snackbarHostState = remember { SnackbarHostState() }
@@ -153,7 +159,7 @@ fun SubscriptionsScreen(
     val itemPlacementSpec: FiniteAnimationSpec<IntOffset>? =
         if (reducedMotion) null else spatialSpec()
 
-    // OPML 导入：SAF 文件选择器（mime 放宽，规避文件管理器标注不一致，见 ADR-0004）
+    // OPML 导入：SAF 文件选择器（mime 放宽，规避文件管理器标注不一致）
     val opmlLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -175,7 +181,7 @@ fun SubscriptionsScreen(
     }
 
     Scaffold(
-        containerColor = radarColors().bgRoot,
+        containerColor = MaterialTheme.colorScheme.surface,
         snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
             if (selectionMode) {
@@ -225,17 +231,17 @@ fun SubscriptionsScreen(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     singleLine = true,
-                    placeholder = { Text("搜索订阅源", color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium) },
-                    leadingIcon = { Icon(Lucide.Search, contentDescription = null, tint = radarColors().textTertiary, modifier = Modifier.size(18.dp)) },
+                    placeholder = { Text("搜索订阅源", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium) },
+                    leadingIcon = { Icon(Lucide.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp)) },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(32.dp)) {
-                                Icon(Lucide.X, contentDescription = "清空", tint = radarColors().textTertiary, modifier = Modifier.size(16.dp))
+                                Icon(Lucide.X, contentDescription = "清空", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                             }
                         }
                     },
                     shape = RoundedCornerShape(12.dp),
-                    colors = radarOutlinedTextFieldColors(containerColor = radarColors().surface1),
+                    colors = radarOutlinedTextFieldColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -266,7 +272,7 @@ fun SubscriptionsScreen(
                     item(key = "no-hit", contentType = "no-hit") {
                         Text(
                             text = "没有匹配「${searchQuery.trim()}」的订阅源",
-                            color = radarColors().textTertiary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(vertical = 24.dp),
                         )
@@ -294,7 +300,7 @@ fun SubscriptionsScreen(
                     item(key = "no-unhealthy", contentType = "no-hit") {
                         Text(
                             text = "没有失效的订阅源",
-                            color = radarColors().textTertiary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(vertical = 24.dp),
                         )
@@ -338,6 +344,17 @@ fun SubscriptionsScreen(
                     }
                 }
             } else {
+            // AI 源健康（AiFeature.FEED_HEALTH 的展示落点）：只在此默认视图出现。
+            // 搜索态用户已有明确目标、"只看失效源"态用户已选定本地失败这一视角，
+            // 两种情况下插一张 AI 判定卡都是干扰。
+            if (aiHealthIssues.isNotEmpty()) {
+                item(key = "ai-health", contentType = "ai-health") {
+                    AiHealthSection(
+                        issues = aiHealthIssues,
+                        onOpenActions = { feedActionTarget = it },
+                    )
+                }
+            }
             // 分组列表拍平（#48）：分组头与 FeedRow 都是 LazyColumn 的 item，
             // 展开大分组只组合可见行——原 AnimatedVisibility { forEach } 会把
             // 几百行一次性同步组合在主线程上，点击分组卡顿的根因。
@@ -348,7 +365,7 @@ fun SubscriptionsScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(radarColors().bgRoot)
+                            .background(MaterialTheme.colorScheme.surface)
                             .animateItem(itemFadeSpec, itemPlacementSpec, itemFadeSpec),
                     ) {
                         GroupHeader(
@@ -410,9 +427,9 @@ fun SubscriptionsScreen(
     if (showMarkAllReadConfirm) {
         AlertDialog(
             onDismissRequest = { showMarkAllReadConfirm = false },
-            containerColor = radarColors().surface1,
-            titleContentColor = radarColors().textPrimary,
-            textContentColor = radarColors().textSecondary,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             title = { Text("全部标记为已读", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
             text = { Text("将把全部 $totalUnread 篇未读文章标为已读，此操作不可撤销。") },
             confirmButton = {
@@ -420,12 +437,12 @@ fun SubscriptionsScreen(
                     showMarkAllReadConfirm = false
                     onIntent(SubscriptionsIntent.MarkAllRead)
                 }) {
-                    Text("标记已读", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                    Text("标记已读", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showMarkAllReadConfirm = false }) {
-                    Text("取消", color = radarColors().textTertiary)
+                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
         )
@@ -461,9 +478,9 @@ fun SubscriptionsScreen(
     if (showBatchDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showBatchDeleteConfirm = false },
-            containerColor = radarColors().surface1,
-            titleContentColor = radarColors().textPrimary,
-            textContentColor = radarColors().textSecondary,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             title = { Text("删除订阅源", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
             text = { Text("将删除 ${selectedIds.size} 个订阅源及其全部文章，此操作不可撤销。") },
             confirmButton = {
@@ -476,7 +493,7 @@ fun SubscriptionsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showBatchDeleteConfirm = false }) {
-                    Text("取消", color = radarColors().textTertiary)
+                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
         )
@@ -486,9 +503,9 @@ fun SubscriptionsScreen(
     if (showDeleteUnhealthyConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteUnhealthyConfirm = false },
-            containerColor = radarColors().surface1,
-            titleContentColor = radarColors().textPrimary,
-            textContentColor = radarColors().textSecondary,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             title = { Text("删除失效订阅源", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
             text = { Text("将删除 ${unhealthyFeeds.size} 个失效订阅源及其全部文章，此操作不可撤销。") },
             confirmButton = {
@@ -501,7 +518,7 @@ fun SubscriptionsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteUnhealthyConfirm = false }) {
-                    Text("取消", color = radarColors().textTertiary)
+                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
         )
@@ -526,7 +543,13 @@ fun SubscriptionsScreen(
             title = "订阅列表排序",
             options = FeedSortMode.entries.toList(),
             selected = sortMode,
-            label = { it.label },
+            label = {
+                when (it) {
+                    FeedSortMode.BY_NAME -> "按名称"
+                    FeedSortMode.BY_RECENT -> "按最近更新"
+                    FeedSortMode.BY_UNREAD -> "按未读数"
+                }
+            },
             subtitle = { mode ->
                 when (mode) {
                     FeedSortMode.BY_NAME -> "订阅源按标题排列"
@@ -537,6 +560,126 @@ fun SubscriptionsScreen(
             onSelect = { mode -> onIntent(SubscriptionsIntent.SelectSort(mode)) },
             onDismiss = { showSortSheet = false },
         )
+    }
+}
+
+/**
+ * 「AI 源健康」区：模型判定为**降频 / 失效**、且仍在监控中的源。
+ *
+ * **与上面的「失效源」筛选刻意并列而不是合并**：那边判的是"抓不抓得到"
+ * （本地判定、错误本身确定、有精确阈值与分类），这边判的是"抓得到，但内容还对不对"
+ * （模型读更新统计得出的语义判断）。两者会同时成立，但那不是重复——合并成一个入口
+ * 会永久丢掉「抓取一切正常、内容已经不值得读」这一整类问题，而它恰好是订阅源腐坏
+ * 最常见的形态（悄悄变成营销号、只发转载）。
+ *
+ * 没有需要处理的源时**整区不渲染**：订阅页是高频页，一张永远写着"一切正常"的卡片
+ * 只会变成每次都要划过去的噪音。
+ */
+@Composable
+private fun AiHealthSection(
+    issues: List<FeedAiHealthUi>,
+    onOpenActions: (Long) -> Unit,
+) {
+    if (issues.isEmpty()) return
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = colors.surfaceContainerLowest,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Lucide.HeartPulse,
+                    contentDescription = null,
+                    tint = colors.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "AI 源健康",
+                    color = colors.onSurface,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "${issues.size} 个需要处理",
+                    color = colors.primary,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+            Text(
+                text = "模型读更新统计后的判断，包含「抓得到、但内容已经不对」的源——"
+                    + "这类问题看本地失败次数是看不出来的。点一行打开该源的管理面板。",
+                color = colors.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            issues.forEach { issue ->
+                AiHealthRow(issue = issue, onClick = { onOpenActions(issue.feedId) })
+            }
+        }
+    }
+}
+
+/**
+ * 一行源健康判定。
+ *
+ * reason 与 advice 都原样列出：模型给的处置建议常常要在 App 之外动手
+ * （"检查 RSSHub 实例是否可用"、"该源已停止更新，建议替换"），
+ * 界面能做的最后一件事是把它说清楚，并把这一行的管理入口（含删除订阅）摆到手边。
+ */
+@Composable
+private fun AiHealthRow(issue: FeedAiHealthUi, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val broken = issue.status == FeedHealthDigest.Status.BROKEN
+    // 失效用红、降频用告警黄：同一页上摆两个同等严重的红色角标，
+    // 用户就不再区分"坏了"和"值得看一眼"，而那正是这一区要传递的信息。
+    val statusColor = if (broken) Danger else Warning
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = RoundedCornerShape(50), color = statusColor.copy(alpha = 0.14f)) {
+                Text(
+                    text = if (broken) "失效" else "降频",
+                    color = statusColor,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = issue.feedTitle,
+                color = colors.onSurface,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (issue.reason.isNotBlank()) {
+            Text(
+                text = issue.reason,
+                color = colors.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        if (issue.advice.isNotBlank()) {
+            Text(
+                text = "建议：${issue.advice}",
+                color = colors.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
 }
 
@@ -562,17 +705,17 @@ private fun SubscriptionsTopBar(
     ) {
         Text(
             text = "订阅管理",
-            color = radarColors().textPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f),
         )
         IconButton(onClick = onAdd) {
-            Icon(Lucide.Plus, contentDescription = "添加订阅", tint = radarColors().textPrimary)
+            Icon(Lucide.Plus, contentDescription = "添加订阅", tint = MaterialTheme.colorScheme.onSurface)
         }
         Box {
             IconButton(onClick = { menuExpanded = true }) {
-                Icon(Lucide.EllipsisVertical, contentDescription = "更多操作", tint = radarColors().textPrimary)
+                Icon(Lucide.EllipsisVertical, contentDescription = "更多操作", tint = MaterialTheme.colorScheme.onSurface)
             }
             DropdownMenu(
                 expanded = menuExpanded,
@@ -629,11 +772,6 @@ private fun SubscriptionsTopBar(
 }
 
 internal fun String.withoutScheme(): String = removePrefix("https://").removePrefix("http://")
-
-/** 导出文件名日期后缀：多次导出不互相覆盖。 */
-private fun todayStamp(): String =
-    java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())
-
 
 @Preview(showBackground = true, name = "订阅 · 空态")
 @Composable

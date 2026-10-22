@@ -46,7 +46,6 @@ import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.ui.components.FeedLetterTile
 import com.cycling.rssradar.core.ui.components.RadarImage
 import com.cycling.rssradar.core.ui.components.pressScale
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.components.ArticleMenuActions
 
 /** 封面比例测出之前的占位值（沿用旧网格的 4:3），让未加载时的高度先落在常见横图上。 */
@@ -172,7 +171,7 @@ private fun GridArticleCard(
             .aspectRatio(coverAspectRatio)
             .pressScale(interactionSource)
             .clip(RoundedCornerShape(14.dp))
-            .background(radarColors().surface2)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .combinedClickable(
                 interactionSource = interactionSource,
                 onClick = onClick,
@@ -199,7 +198,7 @@ private fun GridArticleCard(
                     .align(Alignment.TopStart)
                     .padding(8.dp)
                     .size(8.dp)
-                    .background(radarColors().accent, RoundedCornerShape(50)),
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50)),
             )
         }
         // 媒体角标放右上：底部整条让给标题与来源，放右下会被 scrim 里的文字压住

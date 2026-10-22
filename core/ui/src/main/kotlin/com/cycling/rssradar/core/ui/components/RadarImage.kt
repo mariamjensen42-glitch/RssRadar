@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -18,7 +19,6 @@ import coil3.request.crossfade
 import androidx.compose.ui.platform.LocalContext
 import com.cycling.rssradar.core.ui.theme.LocalReducedMotion
 import com.cycling.rssradar.core.ui.theme.crossfadeMotion
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 统一图片组件：包 coil AsyncImage，提供全应用一致的加载行为——
@@ -46,7 +46,7 @@ fun RadarImage(
     val context = LocalContext.current
     val reducedMotion = LocalReducedMotion.current
     Box(
-        modifier = modifier.background(radarColors().surface1),
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerLowest),
         contentAlignment = Alignment.Center,
     ) {
         if (url.isNullOrBlank() || failed) {
@@ -54,7 +54,7 @@ fun RadarImage(
                 Icon(
                     imageVector = fallback,
                     contentDescription = null,
-                    tint = radarColors().textTertiary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(fallbackSize),
                 )
             }

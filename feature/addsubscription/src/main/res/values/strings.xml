@@ -4,6 +4,12 @@
     <string name="add_subtitle">粘贴链接，或从 RSSHub 路由构建</string>
     <string name="add_field_url">订阅源链接</string>
     <string name="add_discovering">正在探测订阅源…</string>
+    <string name="add_suggest_title">猜你想订</string>
+    <string name="add_suggest_desc">根据你已订阅的源与阅读习惯推荐；点一条继续。</string>
+    <string name="add_suggest_via_route">填参数</string>
+    <string name="add_suggest_via_url">直接添加</string>
+    <string name="add_suggest_via_search">去目录搜</string>
+    <string name="add_suggest_searched">已在路由目录中搜索「%1$s」</string>
     <string name="add_or_from_route">或从 RSSHub 路由构建</string>
     <string name="add_catalog_loading">正在装载路由目录…</string>
     <string name="add_catalog_empty">没有匹配的路由</string>

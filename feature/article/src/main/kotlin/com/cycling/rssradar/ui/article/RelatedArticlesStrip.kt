@@ -29,7 +29,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 相关阅读横滑条：与本文内容最相近的近期文章（本地 bigram 相似度，needsLlm=false）。
@@ -45,12 +44,12 @@ internal fun RelatedArticlesStrip(
     items: List<ArticleWithFeed>,
     onOpen: (Long) -> Unit,
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     Column(Modifier.fillMaxWidth()) {
         Text(
             text = stringResource(R.string.related_reads),
             style = MaterialTheme.typography.labelMedium,
-            color = colors.textTertiary,
+            color = colors.onSurfaceVariant,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
         )
@@ -67,7 +66,7 @@ internal fun RelatedArticlesStrip(
                 items.forEach { item ->
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = colors.surface1,
+                        color = colors.surfaceContainerLowest,
                         modifier = Modifier
                             .width(200.dp)
                             .clip(RoundedCornerShape(12.dp))
@@ -77,7 +76,7 @@ internal fun RelatedArticlesStrip(
                             Text(
                                 text = item.article.title,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = colors.textPrimary,
+                                color = colors.onSurface,
                                 fontWeight = FontWeight.Medium,
                                 maxLines = 3,
                                 overflow = TextOverflow.Ellipsis,
@@ -86,7 +85,7 @@ internal fun RelatedArticlesStrip(
                             Text(
                                 text = item.feedTitle,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = colors.textTertiary,
+                                color = colors.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -102,7 +101,7 @@ internal fun RelatedArticlesStrip(
                         .width(32.dp)
                         .background(
                             Brush.horizontalGradient(
-                                listOf(Color.Transparent, colors.bgRoot),
+                                listOf(Color.Transparent, colors.surface),
                             ),
                         ),
                 )

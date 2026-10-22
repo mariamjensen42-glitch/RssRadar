@@ -40,7 +40,6 @@ import com.cycling.rssradar.core.ui.components.SectionHeader
 import com.cycling.rssradar.core.ui.components.SettingSwitchRow
 import com.cycling.rssradar.core.ui.components.SettingsSubPage
 import com.cycling.rssradar.core.ui.theme.RssRadarTheme
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.text.resolve
 
 @Composable
@@ -81,7 +80,7 @@ fun SettingsSyncScreen(
             stringResource(R.string.auto_sync),
             description = stringResource(R.string.auto_sync_desc),
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 Row(
                     modifier = Modifier
@@ -92,13 +91,13 @@ fun SettingsSyncScreen(
                 ) {
                     Text(
                         text = stringResource(R.string.sync_interval),
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
-                        text = state.sync.interval.label,
-                        color = radarColors().accent,
+                        text = stringResource(state.sync.interval.labelRes()),
+                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -128,7 +127,7 @@ fun SettingsSyncScreen(
             stringResource(R.string.article_cleanup),
             description = stringResource(R.string.cleanup_desc),
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -138,13 +137,13 @@ fun SettingsSyncScreen(
             ) {
                 Text(
                     text = stringResource(R.string.keep_over),
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    text = state.keepArchived.label,
-                    color = radarColors().accent,
+                    text = stringResource(state.keepArchived.labelRes()),
+                    color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -152,7 +151,7 @@ fun SettingsSyncScreen(
                 Icon(
                     imageVector = Lucide.ChevronRight,
                     contentDescription = stringResource(UiR.string.select),
-                    tint = radarColors().textTertiary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp),
                 )
             }
@@ -165,7 +164,7 @@ fun SettingsSyncScreen(
             stringResource(R.string.new_article_notify),
             description = stringResource(R.string.notify_desc),
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 SettingSwitchRow(
                     label = stringResource(R.string.enable_notify),
@@ -181,7 +180,7 @@ fun SettingsSyncScreen(
                 state.notifyMessage?.let { message ->
                     Text(
                         text = message.resolve(),
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(vertical = 4.dp),
                     )

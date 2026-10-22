@@ -17,7 +17,7 @@ data class OpmlEntry(
 )
 
 /**
- * OPML 解析器（ADR-0004）：jsoup XML 模式解析，纯 JVM 组件，是导入链路的测试缝。
+ * OPML 解析器：jsoup XML 模式解析，纯 JVM 组件，是导入链路的测试缝。
  *
  * - 根元素非 `<opml>` 抛 [IllegalArgumentException]，与 RssParser 的失败约定一致。
  * - 无 xmlUrl 的 outline 视为文件夹：其嵌套路径拼接为分组名（`技术/后端`）。

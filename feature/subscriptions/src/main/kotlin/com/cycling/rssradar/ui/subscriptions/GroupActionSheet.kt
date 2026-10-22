@@ -32,13 +32,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
+import com.cycling.rssradar.core.ui.components.ConfirmDialog
 import com.cycling.rssradar.core.ui.theme.Danger
 import com.composables.icons.lucide.Eraser
 import com.composables.icons.lucide.FolderX
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Trash2
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
 
 /**
@@ -49,7 +49,7 @@ import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
  * - 删除分组内全部订阅：删源（文章级联），**分组保留**；
  * - 删除分组：**只把订阅移进默认分组**，一个都不删。
  *
- * 与 [FeedActionScreen] 同一套形态（composable + ModalBottomSheet，ADR-0002 #31）：
+ * 与 [FeedActionScreen] 同一套形态（composable + ModalBottomSheet）：
  * 纯弹层不进导航栈，关闭统一走 onDismiss。
  * 除重命名外都要二次确认——它们动的分别是文章、订阅源、订阅归属，均无撤销。
  *
@@ -71,12 +71,12 @@ fun GroupActionSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = radarColors().surface1,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text(
                 text = group,
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -84,7 +84,7 @@ fun GroupActionSheet(
             )
             Spacer(Modifier.height(16.dp))
             ActionRow(
-                icon = { Icon(Lucide.Pencil, contentDescription = null, tint = radarColors().textSecondary, modifier = Modifier.size(18.dp)) },
+                icon = { Icon(Lucide.Pencil, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp)) },
                 title = "重命名分组",
                 onClick = { renameTarget = group },
             )
@@ -93,7 +93,7 @@ fun GroupActionSheet(
             if (feedCount > 0) {
                 Spacer(Modifier.height(8.dp))
                 ActionRow(
-                    icon = { Icon(Lucide.Eraser, contentDescription = null, tint = radarColors().textSecondary, modifier = Modifier.size(18.dp)) },
+                    icon = { Icon(Lucide.Eraser, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp)) },
                     title = "清空分组文章",
                     subtitle = "删除本组所有订阅的文章，收藏与稍后读保留",
                     onClick = { confirmClear = true },
@@ -125,9 +125,9 @@ fun GroupActionSheet(
         var value by remember { mutableStateOf(initial) }
         AlertDialog(
             onDismissRequest = { renameTarget = null },
-            containerColor = radarColors().surface1,
-            titleContentColor = radarColors().textPrimary,
-            textContentColor = radarColors().textSecondary,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             title = {
                 Text(
                     "重命名分组",
@@ -151,11 +151,11 @@ fun GroupActionSheet(
                         onDismiss()
                     },
                 ) {
-                    Text("保存", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                    Text("保存", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { renameTarget = null }) { Text("取消", color = radarColors().textTertiary) }
+                TextButton(onClick = { renameTarget = null }) { Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             },
         )
     }
@@ -165,6 +165,8 @@ fun GroupActionSheet(
             title = "清空分组文章",
             text = "将删除「$group」下所有订阅的文章，收藏与稍后读保留，操作不可撤销。",
             confirmText = "清空",
+            dismissText = "取消",
+            destructive = true,
             onDismiss = { confirmClear = false },
             onConfirm = {
                 viewModel.onIntent(SubscriptionsIntent.ClearGroupArticles(group))
@@ -179,6 +181,8 @@ fun GroupActionSheet(
             title = "删除分组内全部订阅",
             text = "将删除「$group」下的 $feedCount 个订阅源及其全部文章，此操作不可撤销。",
             confirmText = "全部删除",
+            dismissText = "取消",
+            destructive = true,
             onDismiss = { confirmDeleteFeeds = false },
             onConfirm = {
                 viewModel.onIntent(SubscriptionsIntent.DeleteGroupFeeds(group))
@@ -193,6 +197,8 @@ fun GroupActionSheet(
             title = "删除分组",
             text = "「$group」下的订阅将移入$DEFAULT_GROUP 分组，订阅与其文章都不会被删除。",
             confirmText = "删除分组",
+            dismissText = "取消",
+            destructive = true,
             onDismiss = { confirmDelete = false },
             onConfirm = {
                 viewModel.onIntent(SubscriptionsIntent.DeleteGroup(group))
@@ -209,11 +215,11 @@ private fun ActionRow(
     title: String,
     onClick: () -> Unit,
     subtitle: String? = null,
-    titleColor: Color = radarColors().textPrimary,
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = radarColors().surface2,
+        color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
@@ -230,37 +236,11 @@ private fun ActionRow(
                 if (subtitle != null) {
                     Text(
                         subtitle,
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }
         }
     }
-}
-
-@Composable
-private fun ConfirmDialog(
-    title: String,
-    text: String,
-    confirmText: String,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = radarColors().surface1,
-        titleContentColor = radarColors().textPrimary,
-        textContentColor = radarColors().textSecondary,
-        title = { Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
-        text = { Text(text, style = MaterialTheme.typography.bodyMedium) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(confirmText, color = Danger, fontWeight = FontWeight.SemiBold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消", color = radarColors().textTertiary) }
-        },
-    )
 }

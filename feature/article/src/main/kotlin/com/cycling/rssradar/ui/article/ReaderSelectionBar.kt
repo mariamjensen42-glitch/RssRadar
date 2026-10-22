@@ -20,6 +20,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,7 +36,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.domain.annotation.AnnotationPalette
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.composables.icons.lucide.Copy
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.StickyNote
@@ -133,7 +133,7 @@ fun ReaderSelectionBar(
                     )
                 },
             shape = RoundedCornerShape(8.dp),
-            color = radarColors().surface3,
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
             shadowElevation = 6.dp,
         ) {
             Row(
@@ -148,7 +148,7 @@ fun ReaderSelectionBar(
                     Surface(
                         color = Color(argb),
                         shape = CircleShape,
-                        border = BorderStroke(1.dp, radarColors().textPrimary.copy(alpha = 0.45f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)),
                         modifier = Modifier
                             .size(28.dp)
                             .clip(CircleShape)

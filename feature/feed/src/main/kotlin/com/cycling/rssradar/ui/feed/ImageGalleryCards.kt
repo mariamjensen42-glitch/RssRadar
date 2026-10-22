@@ -34,10 +34,9 @@ import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.ui.components.RadarImage
 import com.cycling.rssradar.core.ui.components.pressScale
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
- * 图片类订阅源的画廊视图（ADR-0014）：两列方图网格，标题压在图上。
+ * 图片类订阅源的画廊视图：两列方图网格，标题压在图上。
  * 只改列表形态，交互仍走文章详情（媒体/大图查看不内嵌，遵守媒体占位卡词条）。
  * 分页沿用 ArticleCardList 的滚近底部触发；无粘性日期头（网格里没有它的一席之地）。
  */
@@ -85,7 +84,7 @@ private fun ImageGalleryCard(item: ArticleWithFeed, onClick: () -> Unit) {
             .aspectRatio(1f)
             .pressScale(interactionSource)
             .clip(RoundedCornerShape(14.dp))
-            .background(radarColors().surface2)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .clickable(interactionSource = interactionSource, onClick = onClick),
     ) {
         RadarImage(
@@ -99,7 +98,7 @@ private fun ImageGalleryCard(item: ArticleWithFeed, onClick: () -> Unit) {
                     .align(Alignment.TopStart)
                     .padding(8.dp)
                     .size(8.dp)
-                    .background(radarColors().accent, RoundedCornerShape(50)),
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50)),
             )
         }
         // 标题压底：黑渐变 scrim 保证白字可读，最多两行

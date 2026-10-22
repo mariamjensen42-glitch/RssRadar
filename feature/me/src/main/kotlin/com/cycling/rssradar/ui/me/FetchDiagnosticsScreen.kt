@@ -42,6 +42,7 @@ import com.cycling.rssradar.core.data.db.entity.ContentFetchLogEntity
 import com.cycling.rssradar.core.data.db.projection.FetchHostStat
 import com.cycling.rssradar.core.model.ExtractionIssue
 import com.cycling.rssradar.core.model.FetchFailure
+import com.cycling.rssradar.core.model.enumValueOrNull
 import com.cycling.rssradar.core.ui.theme.Danger
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.CircleAlert
@@ -57,7 +58,6 @@ import javax.inject.Inject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.cycling.rssradar.core.ui.theme.radarColors
 import androidx.compose.runtime.setValue
 import com.cycling.rssradar.core.ui.text.formatLogTimestamp
 
@@ -98,7 +98,7 @@ data class FetchDiagnosticsUiState(
 )
 
 /**
- * 全文抓取诊断（ADR-0012 可观测性）。
+ * 全文抓取诊断（可观测性）。
  *
  * 只展示**有问题的**记录：抓取失败（限流/403/超时…）与「抓到但不完整」（正文过短 /
  * 无段落 / JS 渲染 / 付费墙）。每条都带站点、状态码、重试次数、页数与原因分类——
@@ -132,7 +132,7 @@ fun FetchDiagnosticsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(radarColors().bgRoot)
+            .background(MaterialTheme.colorScheme.surface)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(bottom = 24.dp),
@@ -144,18 +144,18 @@ fun FetchDiagnosticsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = radarColors().textPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = MaterialTheme.colorScheme.onSurface)
             }
             Text(
                 text = stringResource(R.string.diag_title),
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
             if (problems.isNotEmpty()) {
                 IconButton(onClick = onClear) {
-                    Icon(Lucide.Trash, contentDescription = stringResource(R.string.diag_clear), tint = radarColors().textSecondary)
+                    Icon(Lucide.Trash, contentDescription = stringResource(R.string.diag_clear), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -167,11 +167,11 @@ fun FetchDiagnosticsScreen(
                     .padding(horizontal = 20.dp, vertical = 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(stringResource(R.string.diag_empty), color = radarColors().textSecondary, style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.diag_empty), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(6.dp))
                 Text(
                     stringResource(R.string.diag_empty_hint),
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -181,7 +181,7 @@ fun FetchDiagnosticsScreen(
         SectionTitle(stringResource(R.string.by_site))
         Surface(
             shape = RoundedCornerShape(14.dp),
-            color = radarColors().surface1,
+            color = MaterialTheme.colorScheme.surfaceContainerLowest,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp),
@@ -196,7 +196,7 @@ fun FetchDiagnosticsScreen(
                     ) {
                         Text(
                             text = stat.host.ifBlank { stringResource(R.string.unknown_site) },
-                            color = radarColors().textPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -225,7 +225,7 @@ fun FetchDiagnosticsScreen(
 private fun SectionTitle(text: String) {
     Text(
         text = text,
-        color = radarColors().textSecondary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
@@ -234,10 +234,10 @@ private fun SectionTitle(text: String) {
 
 @Composable
 private fun StatChip(label: String, danger: Boolean) {
-    Surface(shape = RoundedCornerShape(50), color = radarColors().surface2) {
+    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceContainer) {
         Text(
             text = label,
-            color = if (danger) Danger else radarColors().textSecondary,
+            color = if (danger) Danger else MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
         )
@@ -250,7 +250,7 @@ private fun ProblemRow(log: ContentFetchLogEntity) {
     val (title, detail) = describe(log, context)
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = radarColors().surface1,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
@@ -267,7 +267,7 @@ private fun ProblemRow(log: ContentFetchLogEntity) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = title,
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f, fill = false),
@@ -275,7 +275,7 @@ private fun ProblemRow(log: ContentFetchLogEntity) {
                     Spacer(Modifier.size(6.dp))
                     Text(
                         text = log.host,
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -284,15 +284,15 @@ private fun ProblemRow(log: ContentFetchLogEntity) {
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = log.link,
-                    color = radarColors().textSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(detail, color = radarColors().textTertiary, style = MaterialTheme.typography.labelSmall)
-                    Text(formatTime(log.createdAt), color = radarColors().textTertiary, style = MaterialTheme.typography.labelSmall)
+                    Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+                    Text(formatLogTimestamp(log.createdAt), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
@@ -302,18 +302,18 @@ private fun ProblemRow(log: ContentFetchLogEntity) {
 /** 原因 → 中文文案；未知枚举值（老版本写入的）如实显示原始值，不编造。 */
 private fun describe(log: ContentFetchLogEntity, context: Context): Pair<String, String> {
     if (!log.ok) {
-        val failure = runCatching { FetchFailure.valueOf(log.failure.orEmpty()) }.getOrNull()
+        val failure = enumValueOrNull<FetchFailure>(log.failure)
         val label = failure?.uiRes()?.let { UiText.res(it) }
             ?: (log.failure?.let { UiText.Raw(it) } ?: UiText.res(R.string.failure_label))
         return label.resolve(context) to facts(log, context)
     }
-    val issue = runCatching { ExtractionIssue.valueOf(log.issue.orEmpty()) }.getOrNull()
+    val issue = enumValueOrNull<ExtractionIssue>(log.issue)
     val label = when (issue) {
         ExtractionIssue.TOO_SHORT -> UiText.res(UiR.string.issue_too_short)
         ExtractionIssue.NO_PARAGRAPH -> UiText.res(UiR.string.issue_no_paragraph)
         ExtractionIssue.DYNAMIC_RENDER -> UiText.res(R.string.issue_js_render)
         ExtractionIssue.PAYWALL -> UiText.res(UiR.string.issue_paywall)
-        ExtractionIssue.METADATA_MISSING -> UiText.res(R.string.issue_missing_meta)
+        ExtractionIssue.LINK_LIST -> UiText.res(R.string.issue_link_list)
         else -> UiText.res(R.string.issue_incomplete)
     }
     return label.resolve(context) to facts(log, context)
@@ -322,10 +322,8 @@ private fun describe(log: ContentFetchLogEntity, context: Context): Pair<String,
 private fun facts(log: ContentFetchLogEntity, context: Context): String {
     val parts = mutableListOf<UiText>(UiText.res(R.string.diag_retries, "${log.attempts}"))
     log.statusCode?.let { parts += UiText.Raw("HTTP $it") }
-    if (log.pages > 1) parts += UiText.res(R.string.diag_pages, "${log.pages}")
     parts += UiText.res(R.string.diag_chars, "${log.contentChars}")
     parts += UiText.Raw("${log.durationMs} ms")
     return parts.joinToString(" · ") { it.resolve(context) }
 }
 
-private fun formatTime(millis: Long): String = formatLogTimestamp(millis)

@@ -42,11 +42,8 @@ import com.cycling.rssradar.core.ui.components.SectionHeader
 import com.cycling.rssradar.core.ui.components.SettingSwitchRow
 import com.cycling.rssradar.core.ui.components.SettingsSubPage
 import com.cycling.rssradar.core.ui.text.resolve
+import com.cycling.rssradar.core.ui.text.todayStamp
 import com.cycling.rssradar.core.ui.theme.RssRadarTheme
-import com.cycling.rssradar.core.ui.theme.radarColors
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun BackupDestination(
@@ -92,7 +89,7 @@ fun BackupScreen(
 
     SettingsSubPage(title = stringResource(R.string.backup_title), onBack = onBack) {
         SectionHeader(stringResource(R.string.backup_export), description = stringResource(R.string.backup_export_desc))
-        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 SettingSwitchRow(
                     label = stringResource(R.string.backup_include_content),
@@ -113,7 +110,7 @@ fun BackupScreen(
         Spacer(Modifier.height(24.dp))
 
         SectionHeader(stringResource(R.string.backup_import), description = stringResource(R.string.backup_import_desc))
-        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 OptionRow(
                     label = stringResource(R.string.backup_conflict),
@@ -139,7 +136,7 @@ fun BackupScreen(
         Spacer(Modifier.height(24.dp))
 
         SectionHeader(stringResource(R.string.backup_maintain), description = stringResource(R.string.backup_rebuild_index_desc))
-        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 NavigateRow(
                     label = stringResource(R.string.backup_rebuild_index),
@@ -158,7 +155,7 @@ fun BackupScreen(
                 } else {
                     stringResource(R.string.backup_working)
                 },
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -167,7 +164,7 @@ fun BackupScreen(
             Spacer(Modifier.height(12.dp))
             Text(
                 text = message.resolve(),
-                color = radarColors().textSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -188,13 +185,13 @@ fun BackupScreen(
             Icon(
                 imageVector = Lucide.ShieldCheck,
                 contentDescription = null,
-                tint = radarColors().textTertiary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(16.dp),
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = stringResource(R.string.backup_excludes_secrets),
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -238,7 +235,7 @@ fun BackupScreen(
 private fun ReportLine(text: String) {
     Text(
         text = text,
-        color = radarColors().textSecondary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodySmall,
         modifier = Modifier.padding(vertical = 1.dp),
     )
@@ -271,6 +268,3 @@ private fun BackupScreenRunningPreview() {
 }
 
 private val FILE_MIME = arrayOf("application/json", "text/plain", "*/*")
-
-private fun todayStamp(): String =
-    SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())

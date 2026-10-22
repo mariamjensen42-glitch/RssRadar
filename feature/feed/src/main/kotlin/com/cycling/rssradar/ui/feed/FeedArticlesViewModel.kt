@@ -22,7 +22,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-/** 订阅源文章列表事件（候选 A，ADR-0003）。 */
+/** 订阅源文章列表事件（候选 A）。 */
 sealed interface FeedArticlesIntent {
     data object Refresh : FeedArticlesIntent
     data object LoadMore : FeedArticlesIntent
@@ -36,7 +36,7 @@ sealed interface FeedArticlesIntent {
 
 /**
  * 订阅源文章列表（CONTEXT.md「Feed article list」，issue #51）。
- * 单源全部文章的分页快照，管线与信息流完全一致（ADR-0006）：
+ * 单源全部文章的分页快照，管线与信息流完全一致：
  * LIMIT/OFFSET 每页 30 条、滚动到底预加载、卡片状态 mutateLocal 原地更新。
  */
 /**
@@ -197,7 +197,7 @@ class FeedArticlesViewModel @Inject constructor(
         }
     }
 
-    /** 分页快照原地更新单篇卡片状态，免去整表重查（ADR-0006）。 */
+    /** 分页快照原地更新单篇卡片状态，免去整表重查。 */
     private fun mutateLocal(articleId: Long, transform: (ArticleEntity) -> ArticleEntity) {
         articles = articles.map {
             if (it.article.id == articleId) it.copy(article = transform(it.article)) else it

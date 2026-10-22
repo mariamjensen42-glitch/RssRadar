@@ -20,8 +20,6 @@ data class FeedAiProfile(
     /** 覆盖全局的摘要提示词，null = 用内置模板。 */
     val summaryPrompt: String? = null,
     val autoSummary: Boolean = false,
-    val autoTags: Boolean = false,
-    val autoClassify: Boolean = false,
     val autoScore: Boolean = false,
     val watchHealth: Boolean = false,
     val priority: Int = 0,
@@ -30,8 +28,7 @@ data class FeedAiProfile(
         /**
          * 合并：未配置的项跟随全局开关。
          *
-         * 注意 `autoScore` 同时受「文章质量分析」和「智能降噪」两个全局开关影响——
-         * 用户在设置页开任一项，该源若未单独配置就跟着跑。
+         * `autoScore` 跟随「智能降噪」全局开关：用户在设置页开它，该源若未单独配置就跟着跑。
          */
         fun resolve(
             entity: com.cycling.rssradar.core.data.db.FeedAiProfileEntity?,
@@ -40,19 +37,14 @@ data class FeedAiProfile(
             if (entity == null) {
                 return FeedAiProfile(
                     autoSummary = global.isEnabled(AiFeature.SUMMARY),
-                    autoTags = global.isEnabled(AiFeature.TAGS),
-                    autoClassify = global.isEnabled(AiFeature.CLASSIFY),
-                    autoScore = global.isEnabled(AiFeature.QUALITY) || global.isEnabled(AiFeature.NOISE),
+                    autoScore = global.isEnabled(AiFeature.NOISE),
                     watchHealth = global.isEnabled(AiFeature.FEED_HEALTH),
                 )
             }
             return FeedAiProfile(
                 summaryPrompt = entity.summaryPrompt?.takeIf { it.isNotBlank() },
                 autoSummary = entity.autoSummary ?: global.isEnabled(AiFeature.SUMMARY),
-                autoTags = entity.autoTags ?: global.isEnabled(AiFeature.TAGS),
-                autoClassify = entity.autoClassify ?: global.isEnabled(AiFeature.CLASSIFY),
-                autoScore = entity.autoScore
-                    ?: (global.isEnabled(AiFeature.QUALITY) || global.isEnabled(AiFeature.NOISE)),
+                autoScore = entity.autoScore ?: global.isEnabled(AiFeature.NOISE),
                 watchHealth = entity.watchHealth ?: global.isEnabled(AiFeature.FEED_HEALTH),
                 priority = entity.priority.coerceIn(0, 100),
             )
@@ -130,6 +122,8 @@ class AiArtifactRepository(
         model: String,
         inputChars: Int,
         outputChars: Int,
+        /** 可排序分数（0~100），见 [AiFeatureSpecs.score]；null = 该功能没有可排序的量。 */
+        score: Int? = null,
         now: Long = System.currentTimeMillis(),
     ) {
         dao.upsert(
@@ -142,6 +136,7 @@ class AiArtifactRepository(
                 inputChars = inputChars,
                 outputChars = outputChars,
                 createdAt = now,
+                score = score,
             ),
         )
     }
@@ -189,14 +184,14 @@ class AiArtifactRepository(
     fun globalSubjectId(): Long = AiArtifactEntity.GLOBAL_SUBJECT_ID
 
     // ── 产物中心 ─────────────────────────────────────────────────────────
-    // 这一组方法的存在理由：35 项功能里只有一部分有专属 UI，其余功能跑完就落进
+    // 这一组方法的存在理由：16 项功能里只有一部分有专属 UI，其余功能跑完就落进
     // ai_artifacts，用户无从判断"到底跑了没跑、结果是什么"。产物中心按功能把全部
     // 产物摊开，让每一项功能至少有一个能看见结果的地方。
 
     /**
      * 按功能聚合的概览，按最近生成时间倒序。
      *
-     * 只列**真的产出过**的功能——把 35 项全列出来、其中 20 项是空的，
+     * 只列**真的产出过**的功能——把 16 项全列出来、其中近一半是空的，
      * 用户扫一眼只会得到"一半功能是坏的"这个错误印象。没产出的功能，
      * 用户该去看功能开关与任务队列，而不是来产物中心数空行。
      */

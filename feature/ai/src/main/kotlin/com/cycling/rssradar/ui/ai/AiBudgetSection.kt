@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
 import com.cycling.rssradar.core.model.AiBudgetState
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.text.formatCount
 
 /**
@@ -36,21 +35,21 @@ import com.cycling.rssradar.core.ui.text.formatCount
  */
 @Composable
 internal fun UsageCard(budget: AiBudgetState) {
-    val colors = radarColors()
-    Surface(shape = RoundedCornerShape(14.dp), color = colors.surface1) {
+    val colors = MaterialTheme.colorScheme
+    Surface(shape = RoundedCornerShape(14.dp), color = colors.surfaceContainerLowest) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Lucide.Sparkles,
                     contentDescription = null,
-                    tint = colors.accent,
+                    tint = colors.primary,
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     stringResource(R.string.usage_title),
                     style = MaterialTheme.typography.titleSmall,
-                    color = colors.textPrimary,
+                    color = colors.onSurface,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
@@ -64,20 +63,20 @@ internal fun UsageCard(budget: AiBudgetState) {
                     Modifier
                         .fillMaxWidth()
                         .height(6.dp)
-                        .background(colors.surface3, RoundedCornerShape(3.dp)),
+                        .background(colors.surfaceContainerHighest, RoundedCornerShape(3.dp)),
                 ) {
                     val ratio = (budget.usedToday.toFloat() / budget.dailyLimit).coerceIn(0f, 1f)
                     Box(
                         Modifier
                             .fillMaxWidth(ratio)
                             .height(6.dp)
-                            .background(colors.accent, RoundedCornerShape(3.dp)),
+                            .background(colors.primary, RoundedCornerShape(3.dp)),
                     )
                 }
                 // 空进度条状态不明（UI 审计 M4）：0 时直接说明
                 if (budget.usedToday == 0) {
                     Spacer(Modifier.height(6.dp))
-                    Text(stringResource(R.string.not_used_today), style = MaterialTheme.typography.bodySmall, color = colors.textTertiary)
+                    Text(stringResource(R.string.not_used_today), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.height(10.dp))
@@ -90,11 +89,11 @@ internal fun UsageCard(budget: AiBudgetState) {
 
 @Composable
 private fun UsageRow(label: String, value: String) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
         Spacer(Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface)
     }
 }
 
@@ -105,20 +104,20 @@ internal fun BudgetSection(
     budget: AiBudgetState,
     onIntent: (AiFeaturesIntent) -> Unit,
 ) {
-    val colors = radarColors()
-    Surface(shape = RoundedCornerShape(14.dp), color = colors.surface1) {
+    val colors = MaterialTheme.colorScheme
+    Surface(shape = RoundedCornerShape(14.dp), color = colors.surfaceContainerLowest) {
         Column(Modifier.padding(16.dp)) {
             Text(
                 stringResource(R.string.budget_section),
                 style = MaterialTheme.typography.titleSmall,
-                color = colors.textPrimary,
+                color = colors.onSurface,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.budget_hint),
                 style = MaterialTheme.typography.bodySmall,
-                color = colors.textTertiary,
+                color = colors.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
 
@@ -158,16 +157,16 @@ private fun <T> ChipChoiceRow(
     labelOf: (T) -> String,
     onSelect: (T) -> Unit,
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     Column {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { option ->
                 val isSelected = option == selected
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = if (isSelected) colors.accent else colors.surface2,
+                    color = if (isSelected) colors.primary else colors.surfaceContainer,
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
                         .clickable { onSelect(option) },
@@ -176,7 +175,7 @@ private fun <T> ChipChoiceRow(
                         text = labelOf(option),
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (isSelected) colors.onAccent else colors.textSecondary,
+                        color = if (isSelected) colors.onPrimary else colors.onSurfaceVariant,
                     )
                 }
             }

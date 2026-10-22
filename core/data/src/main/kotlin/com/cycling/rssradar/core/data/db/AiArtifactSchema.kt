@@ -11,10 +11,10 @@ import com.cycling.rssradar.core.model.AiFeature
 import com.cycling.rssradar.core.model.AiScope
 
 /**
- * AI 产物（AI 智能功能模块，35 项）。
+ * AI 产物（AI 智能功能模块，16 项）。
  *
  * **为什么所有功能共用一张表、且用 (subjectKind, subjectId, kind) 三元组作主键**：
- * 35 项功能会持续增减。若每项往 `articles` 加一列，每次加功能都要
+ * 16 项功能会持续增减。若每项往 `articles` 加一列，每次加功能都要
  * 升 schema 版本 + 写迁移 + 同步 `ARTICLE_LIST_COLUMNS`（漏一处就是列表页静默拿到默认值）；
  * 若每项建一张表，app 会背上几十张表。共用一张表后，**加功能零迁移**——
  * 新功能只是新的 kind 值，产物是 payload 里的 JSON，由 [AiParsers] 解释。
@@ -24,7 +24,7 @@ import com.cycling.rssradar.core.model.AiScope
  * 由每日批处理末段的 `deleteOrphanArtifacts()` 清理——文章被归档删除、订阅源被删除后，
  * 残留产物最多活到下一次每日任务。
  *
- * payload 是模型原始输出的**结构化 JSON**（不存渲染后的文本），理由与 ADR-0005 一致：
+ * payload 是模型原始输出的**结构化 JSON**（不存渲染后的文本）：
  * 展示形态可以改，产物只有一次，重跑要花钱。
  */
 @Entity(
@@ -39,7 +39,7 @@ import com.cycling.rssradar.core.model.AiScope
 )
 
 data class AiArtifactEntity(
-    /** [AiScope.dbValue]：0=文章 1=订阅源 2=全局。 */
+    /** [AiScope.dbValue]：0=文章 1=订阅源 2=全局 3=话题。 */
     val subjectKind: Int,
     /** 文章 id / 订阅源 id / 全局产物为 0（用 createdAt 区分不同天的简报）。 */
     val subjectId: Long,
@@ -54,6 +54,15 @@ data class AiArtifactEntity(
     /** 模型返回的字符数。 */
     @ColumnInfo(defaultValue = "0") val outputChars: Int = 0,
     val createdAt: Long,
+    /**
+     * 可排序的 0~100 数值（信息价值 / 质量总分），供列表按「信息价值」排序与卡片角标使用。
+     * null = 这项产物没有可排序的量（摘要、翻译、问答、标签…）。
+     *
+     * 刻意存成列而不是从 [payload] 的 JSON 里现取：文章列表是全 App 最热的查询，
+     * `json_extract` 既用不上索引、又把 JSON 解析压进每一行；存列可以让列表
+     * 按主键位置 LEFT JOIN 一次就拿到（见 `ArticleSql.AI_VALUE_JOIN`）。
+     */
+    val score: Int? = null,
 ) {
     companion object {
         /** 全局产物的 subjectId 固定为 0；同一天同功能只有一行（覆盖式写入）。 */
@@ -133,17 +142,11 @@ interface AiArtifactDao {
      * 清孤儿：文章已被归档删除 / 订阅源已被删除后残留的产物。
      * 不加外键的代价，由每日任务末段偿还。
      */
-    @Query(
-        """
-        DELETE FROM ai_artifacts
-        WHERE (subjectKind = 0 AND subjectId NOT IN (SELECT id FROM articles))
-           OR (subjectKind = 1 AND subjectId NOT IN (SELECT id FROM feeds))
-        """,
-    )
+    @Query("DELETE FROM ai_artifacts WHERE $AI_ORPHAN_PREDICATE")
     suspend fun deleteOrphans()
 
     // ── 产物中心 ─────────────────────────────────────────────────────────
-    // 三条查询都是为了同一个页面：让 35 项功能的产物**第一次可见**。
+    // 三条查询都是为了同一个页面：让 16 项功能的产物**第一次可见**。
     // 在此之前，只有那些有专属 UI 的功能看得到结果，其余功能跑完就石沉大海，
     // 用户无从判断"到底跑了没跑"。
 
@@ -180,6 +183,17 @@ interface AiArtifactDao {
     @Query("SELECT * FROM ai_artifacts WHERE kind = :kind ORDER BY createdAt DESC LIMIT :limit")
     suspend fun recentOfKindAll(kind: Int, limit: Int): List<AiArtifactEntity>
 }
+
+/**
+ * 清孤儿的判定条件。
+ *
+ * `@Query` 只吃编译期常量，用不了 [AiScope] 的构造属性，所以这里的 0 / 1 是字面量，
+ * 由 `AiOrphanSqlContractTest` 把"它们等于 ARTICLE / FEED 的 dbValue"变成会变红的断言。
+ * 一旦脱钩，症状是**产物永远不清**（订阅源删了、文章归档了，孤儿行还在），编译与运行都不报错。
+ */
+internal const val AI_ORPHAN_PREDICATE =
+    "(subjectKind = 0 AND subjectId NOT IN (SELECT id FROM articles))" +
+        " OR (subjectKind = 1 AND subjectId NOT IN (SELECT id FROM feeds))"
 
 /** 产物中心按功能聚合的一行。Room 要求构造函数参数名与列名一致。 */
 data class AiArtifactKindOverview(

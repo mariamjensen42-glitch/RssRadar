@@ -27,7 +27,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.ai.AiArtifactItem
-import com.cycling.rssradar.core.ui.theme.radarColors
 import java.text.SimpleDateFormat
 import java.util.Date
 
@@ -39,7 +38,7 @@ internal fun ArtifactList(
     onOpen: (AiArtifactItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     // 按功能分组，组内按时间倒序（数据库已按时间倒序返回，分组不破坏该顺序）。
     val groups = remember(items) {
         items.groupBy { it.feature }.toList().sortedByDescending { (_, list) -> list.first().createdAt }
@@ -51,11 +50,11 @@ internal fun ArtifactList(
     ) {
         groups.forEach { (feature, list) ->
             stickyHeader(key = "h-${feature.dbValue}") {
-                Surface(color = colors.bgRoot) {
+                Surface(color = colors.surface) {
                     Text(
                         text = stringResource(R.string.artifacts_feature_count, stringResource(feature.labelRes()), list.size),
                         style = MaterialTheme.typography.labelMedium,
-                        color = colors.accent,
+                        color = colors.primary,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -79,11 +78,11 @@ private fun ArtifactRow(
     timeFormat: SimpleDateFormat,
     onOpen: () -> Unit,
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     val preview = remember(item.payload) { previewOf(item) }
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = colors.surface1,
+        color = colors.surfaceContainerLowest,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
@@ -94,7 +93,7 @@ private fun ArtifactRow(
                 Text(
                     text = stringResource(item.feature.labelRes()),
                     style = MaterialTheme.typography.labelSmall,
-                    color = colors.accent,
+                    color = colors.primary,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -104,7 +103,7 @@ private fun ArtifactRow(
                 Text(
                     text = timeFormat.format(Date(item.createdAt)),
                     style = MaterialTheme.typography.labelSmall,
-                    color = colors.textTertiary,
+                    color = colors.onSurfaceVariant,
                     maxLines = 1,
                 )
             }
@@ -112,7 +111,7 @@ private fun ArtifactRow(
             Text(
                 text = subjectLabel(item),
                 style = MaterialTheme.typography.bodyMedium,
-                color = colors.textPrimary,
+                color = colors.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -121,7 +120,7 @@ private fun ArtifactRow(
                 Text(
                     text = preview,
                     style = MaterialTheme.typography.bodySmall,
-                    color = colors.textSecondary,
+                    color = colors.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )

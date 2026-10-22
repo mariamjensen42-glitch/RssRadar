@@ -3,7 +3,7 @@ package com.cycling.rssradar.core.data.store.prefs
 import android.content.SharedPreferences
 
 /**
- * DeepSeek API Key 存储（issue #44，ADR-0005）。
+ * DeepSeek API Key 存储（issue #44）。
  * SharedPreferences，对标 [com.cycling.rssradar.core.data.rsshub.RssHubInstanceStore]：
  * 用户自备 Key，成本与额度由用户掌控，无内置 Key 分支。
  */

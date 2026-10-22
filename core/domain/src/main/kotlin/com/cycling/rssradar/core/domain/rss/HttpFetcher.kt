@@ -42,6 +42,10 @@ fun normalizeHttpUrl(raw: String): String? {
     }
 }
 
+/** 取主机名；非法/相对地址返回空串（调用方据此保守处理，不当作同一主机）。 */
+fun hostOf(url: String): String =
+    runCatching { parseUri(url).host }.getOrNull().orEmpty()
+
 /**
  * 字符串 → [URI]。JDK 20 起 [URL] 的字符串构造器废弃，替代品是 [URI.toURL]；
  * 但 URI 比旧构造器严格（空格、方括号等字符直接抛），而用户粘贴的地址与 Location

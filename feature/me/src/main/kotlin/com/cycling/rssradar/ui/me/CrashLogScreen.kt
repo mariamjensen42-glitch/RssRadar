@@ -62,7 +62,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.text.formatLogTimestamp
 
 /** 单条崩溃的全文（dialog 内容）。 */
@@ -101,7 +100,7 @@ fun CrashLogScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(radarColors().bgRoot)
+            .background(MaterialTheme.colorScheme.surface)
             .statusBarsPadding(),
     ) {
         Row(
@@ -111,18 +110,18 @@ fun CrashLogScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = radarColors().textPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = MaterialTheme.colorScheme.onSurface)
             }
             Text(
                 text = stringResource(R.string.crash_title),
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
             if (records.isNotEmpty()) {
                 IconButton(onClick = { confirmClear = true }) {
-                    Icon(Lucide.Trash, contentDescription = stringResource(R.string.crash_clear), tint = radarColors().textSecondary)
+                    Icon(Lucide.Trash, contentDescription = stringResource(R.string.crash_clear), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -134,11 +133,11 @@ fun CrashLogScreen(
                     .padding(horizontal = 20.dp, vertical = 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(stringResource(R.string.crash_empty), color = radarColors().textSecondary, style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.crash_empty), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(6.dp))
                 Text(
                     stringResource(R.string.crash_desc),
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -159,7 +158,7 @@ fun CrashLogScreen(
             title = {
                 Text(
                     text = crash.head,
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
@@ -170,7 +169,7 @@ fun CrashLogScreen(
                     SelectionContainer {
                         Text(
                             text = crash.text.ifBlank { stringResource(R.string.crash_lost) },
-                            color = radarColors().textSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -178,21 +177,21 @@ fun CrashLogScreen(
             },
             confirmButton = {
                 TextButton(onClick = { context.shareCrashLog(crash.text, crash.head) }) {
-                    Text(stringResource(R.string.export), color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.export), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { onIntent(CrashLogIntent.CloseDetail, context) }) { Text(stringResource(UiR.string.close), color = radarColors().textSecondary) }
+                TextButton(onClick = { onIntent(CrashLogIntent.CloseDetail, context) }) { Text(stringResource(UiR.string.close), color = MaterialTheme.colorScheme.onSurfaceVariant) }
             },
-            containerColor = radarColors().surface1,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         )
     }
 
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text(stringResource(R.string.crash_confirm_title), color = radarColors().textPrimary) },
-            text = { Text(stringResource(R.string.crash_confirm_msg, records.size), color = radarColors().textSecondary) },
+            title = { Text(stringResource(R.string.crash_confirm_title), color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text(stringResource(R.string.crash_confirm_msg, records.size), color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -202,9 +201,9 @@ fun CrashLogScreen(
                 ) { Text(stringResource(R.string.clear), color = Danger, fontWeight = FontWeight.SemiBold) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text(stringResource(UiR.string.cancel), color = radarColors().textSecondary) }
+                TextButton(onClick = { confirmClear = false }) { Text(stringResource(UiR.string.cancel), color = MaterialTheme.colorScheme.onSurfaceVariant) }
             },
-            containerColor = radarColors().surface1,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         )
     }
 }
@@ -213,7 +212,7 @@ fun CrashLogScreen(
 private fun CrashRow(record: CrashRecord, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = radarColors().surface1,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
@@ -231,7 +230,7 @@ private fun CrashRow(record: CrashRecord, onClick: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = record.head,
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
@@ -240,13 +239,13 @@ private fun CrashRow(record: CrashRecord, onClick: () -> Unit) {
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = formatTime(record.time),
-                        color = radarColors().textTertiary,
+                        text = formatLogTimestamp(record.time, withSeconds = true),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall,
                     )
                     Text(
                         text = stringResource(R.string.tap_expand),
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -254,7 +253,7 @@ private fun CrashRow(record: CrashRecord, onClick: () -> Unit) {
             Icon(
                 Lucide.Share,
                 contentDescription = null,
-                tint = radarColors().textTertiary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -277,4 +276,3 @@ private fun Context.shareCrashLog(text: String, head: String) {
         .onFailure { Toast.makeText(this, getString(R.string.crash_export_failed), Toast.LENGTH_SHORT).show() }
 }
 
-private fun formatTime(millis: Long): String = formatLogTimestamp(millis, withSeconds = true)

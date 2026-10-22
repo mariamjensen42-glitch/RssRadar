@@ -15,7 +15,7 @@ import org.junit.Test
 
 
 /**
- * 35 项开关与预算的持久化测试。
+ * 16 项开关与预算的持久化测试。
  *
  * 最关键的一条是 `reset 后默认值等于出厂设置`：
  * 它钉死的是「逐项读 key、缺 key 回落 defaultEnabled」这个设计——
@@ -44,16 +44,16 @@ class AiStoreTest {
     @Test
     fun `单项开关落到独立 key 且能读回`() {
         val (store, prefs) = featureStore()
-        store.set(AiFeature.TAGS, true)
-        assertTrue(store.isEnabled(AiFeature.TAGS))
-        assertEquals(true, prefs.getBoolean(AiFeatureStore.keyFor(AiFeature.TAGS), false))
+        store.set(AiFeature.KEYWORDS, true)
+        assertTrue(store.isEnabled(AiFeature.KEYWORDS))
+        assertEquals(true, prefs.getBoolean(AiFeatureStore.keyFor(AiFeature.KEYWORDS), false))
     }
 
     @Test
     fun `重启后开关保留`() {
         val (_, prefs) = featureStore()
-        AiFeatureStore(prefs).set(AiFeature.QUALITY, true)
-        assertTrue(AiFeatureStore(prefs).isEnabled(AiFeature.QUALITY))
+        AiFeatureStore(prefs).set(AiFeature.NOISE, true)
+        assertTrue(AiFeatureStore(prefs).isEnabled(AiFeature.NOISE))
     }
 
     @Test
@@ -88,12 +88,16 @@ class AiStoreTest {
     }
 
     @Test
-    fun `设置项计数与全开判定`() {
-        val settings = AiFeatureSettings(setOf(AiFeature.TAGS))
-        assertEquals(1, settings.countIn(AiCategory.CONTENT))
-        assertFalse(settings.allIn(AiCategory.CONTENT))
-        assertEquals(0, settings.countIn(AiCategory.ASSIST))
-        assertTrue(AiFeatureSettings(AiFeature.entries.toSet()).allIn(AiCategory.CONTENT))
+    fun `设置入口不进功能开关列表`() {
+        // 这三项的 isEnabled 全仓没有读取点（拨动不改变行为），
+        // 出现在开关列表里只会让"要不要开用量看板"变成一个无意义的问题。
+        val assist = AiFeature.configurableOfCategory(AiCategory.ASSIST)
+        assertFalse(AiFeature.USAGE in assist)
+        assertFalse(AiFeature.TASK_QUEUE in assist)
+        assertFalse(AiFeature.PROMPT_TEMPLATE in assist)
+        assertTrue(AiFeature.FEED_HEALTH in assist)
+        // 清理类逻辑走 ofCategory（含设置入口），两个集合必须真的不同
+        assertTrue(AiFeature.ofCategory(AiCategory.ASSIST).size > assist.size)
     }
 
     // ── 预算 ────────────────────────────────────────────────────────────────

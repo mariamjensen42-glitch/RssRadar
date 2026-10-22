@@ -23,7 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lucide
-import com.cycling.rssradar.core.ui.theme.radarColors
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
@@ -42,9 +41,9 @@ internal fun BatchMoveToGroupDialog(
     var target by remember { mutableStateOf(groups.firstOrNull().orEmpty()) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = radarColors().surface1,
-        titleContentColor = radarColors().textPrimary,
-        textContentColor = radarColors().textSecondary,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         title = {
             Text(
                 "移动 $selectedCount 个订阅到",
@@ -64,7 +63,7 @@ internal fun BatchMoveToGroupDialog(
                     ) {
                         Text(
                             text = group,
-                            color = radarColors().textPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
                         )
@@ -72,7 +71,7 @@ internal fun BatchMoveToGroupDialog(
                             Icon(
                                 Lucide.Check,
                                 contentDescription = null,
-                                tint = radarColors().accent,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(18.dp),
                             )
                         }
@@ -82,11 +81,11 @@ internal fun BatchMoveToGroupDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(target) }, enabled = target.isNotBlank()) {
-                Text("移动", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                Text("移动", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消", color = radarColors().textTertiary) }
+            TextButton(onClick = onDismiss) { Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         },
     )
 }
@@ -104,27 +103,27 @@ internal fun TextInputDialog(
     var value by remember { mutableStateOf(initialValue) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = radarColors().surface1,
-        titleContentColor = radarColors().textPrimary,
-        textContentColor = radarColors().textSecondary,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         title = { Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
         text = {
             OutlinedTextField(
                 value = value,
                 onValueChange = { value = it },
                 singleLine = true,
-                placeholder = { Text(placeholder, color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium) },
+                placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium) },
                 colors = radarOutlinedTextFieldColors(),
             )
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(value) }) {
-                Text(confirmText, color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                Text(confirmText, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消", color = radarColors().textTertiary)
+                Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
     )

@@ -9,6 +9,12 @@ data class ArticleWithFeed(
     val feedTitle: String,
     val feedGroup: String,
     val feedIconUrl: String?,
+    /**
+     * AI 判定的「值不值得读」（0~100）：降噪的信息价值优先，没有就退回质量总分；
+     * null = 这篇还没被评估过。只有走 `AI_VALUE_JOIN` 的查询会填它（默认时间排序的
+     * 查询不带这个 JOIN，所以恒为 null）——卡片上的角标据此决定显示与否。
+     */
+    val aiValue: Int? = null,
 )
 
 /** 重建检索索引的输入行：标题与摘要优先，正文用于补齐语料。 */
@@ -36,7 +42,7 @@ data class RuleScanRow(
 )
 
 /**
- * 推荐画像的输入行（ADR-0013）：所有"用户真实表达过兴趣"的文章。
+ * 推荐画像的输入行：所有"用户真实表达过兴趣"的文章。
  * 打开过（lastOpenedAt 非空）、收藏、稍后读都算——三选一即可入样本，
  * 没有这些信号的文章不参与画像（画像只由真实行为驱动，不预置兴趣类别）。
  */

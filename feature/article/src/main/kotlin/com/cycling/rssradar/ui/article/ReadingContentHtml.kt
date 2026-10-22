@@ -2,16 +2,17 @@ package com.cycling.rssradar.ui.article
 
 import com.cycling.rssradar.core.model.ReadingImageState
 import com.cycling.rssradar.core.model.ReadingStyleState
+import androidx.compose.material3.MaterialTheme
 
 /**
  * 阅读页 styled-HTML 构建（issue #42 单一测试缝）。
  *
  * 纯 JVM 函数：排版参数 + 实时主题色 + 净化后的正文 HTML → 完整可渲染文档。
- * 颜色由调用方从 radarColors() 实时读出（#RRGGBB），本函数不做任何颜色决策；
+ * 颜色由调用方从 MaterialTheme.colorScheme 实时读出（#RRGGBB），本函数不做任何颜色决策；
  * 排版参数只在 CSS 中体现：font-size / line-height / padding / font-family。
  *
  * [imageUrls] 是本文的图片地址集合（[ReadingImages.extract] 的产物）：非空时每张图会被
- * 包成指向自身的链接，让 JS 禁用的 WebView 也能把点图当点链接上报（ADR-0011）；
+ * 包成指向自身的链接，让 JS 禁用的 WebView 也能把点图当点链接上报；
  * 传空集合 = 点击放关闭，正文原样输出。调用方拿同一份集合做点击分流与全屏翻页。
  * [imageCorners] 是图片圆角 dp，默认与引入该设置前的 8px 一致。
  */
@@ -80,7 +81,7 @@ object ReadingContentHtml {
 
     /**
      * 降噪 CSS（沉浸阅读，issue #93）：WebView 路拿不到中间树，只能按选择器隐藏。
-     * 与 [com.cycling.rssradar.core.data.parser.ArticleExtractor] 的噪声选择器同一批
+     * 与 [com.cycling.rssradar.core.data.parser.Readability] 的噪声选择器同一批
      * 目标（导航/分享/推荐/评论/广告位）；只 display:none 不删节点，正文零风险。
      */
     private const val DENOISE_CSS = """

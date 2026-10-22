@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 正文图片提取与"点图放大"链接包装（issue #60，ADR-0011）。纯 JVM，含 jsoup。 */
+/** 正文图片提取与"点图放大"链接包装（issue #60）。纯 JVM，含 jsoup。 */
 class ReadingImagesTest {
 
     private val html = """

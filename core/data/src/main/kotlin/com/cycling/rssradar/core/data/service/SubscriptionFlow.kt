@@ -40,7 +40,7 @@ data class DiscoveredFeed(
     val articleCount: Int,
 )
 
-/** OPML 盲导结果（ADR-0004）。 */
+/** OPML 盲导结果。 */
 data class OpmlImportResult(
     val imported: Int,
     val skipped: Int,
@@ -173,7 +173,7 @@ class SubscriptionFlow(
     }
 
     /**
-     * OPML 盲导（ADR-0004）：解析 [stream] 后直接入库，不联网校验。
+     * OPML 盲导：解析 [stream] 后直接入库，不联网校验。
      * 标题取 OPML text/title，分组取 outline 嵌套路径；重复（规范化 URL 精确匹配）跳过计数。
      * 根元素非 OPML 时抛 [IllegalArgumentException]，由调用方转为提示。
      */

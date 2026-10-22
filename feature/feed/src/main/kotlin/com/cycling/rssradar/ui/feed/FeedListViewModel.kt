@@ -13,6 +13,8 @@ import com.cycling.rssradar.core.data.recommend.Recommendation
 import com.cycling.rssradar.core.data.ai.AiRepository
 import com.cycling.rssradar.core.data.store.prefs.GroupStore
 import com.cycling.rssradar.core.data.store.prefs.ListDisplayStore
+import com.cycling.rssradar.core.data.store.prefs.RecommendationSeedStore
+import com.cycling.rssradar.core.model.FeedValueMode
 import com.cycling.rssradar.core.model.ListViewMode
 import com.cycling.rssradar.core.model.MarkAsReadCondition
 import com.cycling.rssradar.core.data.store.prefs.RecommendationStore
@@ -29,11 +31,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** 信息流页内的过滤 tab（推荐流为第五个，ADR-0013）。 */
+/** 信息流页内的过滤 tab（推荐流为第五个）。 */
 enum class FeedTab { All, Unread, Starred, Bookmarked, Recommended }
 
 /**
- * 信息流页界面状态（MVI 候选 C 首个落地，ADR-0003）：不可变快照驱动渲染，
+ * 信息流页界面状态（MVI 候选 C 首个落地）：不可变快照驱动渲染，
  * 变更走 [FeedListViewModel] 的单一 onIntent。
  * 分页快照规则见 [PagedSnapshot]（纯函数，可测）。
  */
@@ -82,7 +84,7 @@ data class FeedListUiState(
     /** 推荐流首次加载中（打分在内存里做，不是一瞬间）。 */
     val isRanking: Boolean = false,
     /**
-     * 「减少此类」撤销期内暂存的订阅源 id（ADR-0013）。
+     * 「减少此类」撤销期内暂存的订阅源 id。
      * Snackbar 期内可撤销；超时即丢弃（降权保留）。
      */
     val pendingUndoReduceFeedId: Long? = null,
@@ -90,11 +92,11 @@ data class FeedListUiState(
     val unreadCount: Int = 0,
     /** 分组清单（注册表），供筛选栏使用。 */
     val groupOptions: List<String> = emptyList(),
-    /** 推荐流开关状态（ADR-0013）。 */
+    /** 推荐流开关状态。 */
     val recommendationEnabled: Boolean = false,
 )
 
-/** 信息流事件（候选 A，ADR-0003）。 */
+/** 信息流事件（候选 A）。 */
 sealed interface FeedListIntent {
     data object ConsumeMessage : FeedListIntent
     data class SelectTab(val tab: FeedTab) : FeedListIntent
@@ -111,7 +113,7 @@ sealed interface FeedListIntent {
     data object UndoDeleteArticle : FeedListIntent
     /** 放弃撤销机会（Snackbar 自动消失）。 */
     data object DiscardUndo : FeedListIntent
-    /** 推荐流「减少此类」（ADR-0013）：该文章所属订阅源后续降权。 */
+    /** 推荐流「减少此类」：该文章所属订阅源后续降权。 */
     data class ReduceSuch(val articleId: Long) : FeedListIntent
     /** 撤销「减少此类」。 */
     data object UndoReduceSuch : FeedListIntent
@@ -126,6 +128,9 @@ sealed interface FeedListIntent {
     data class MarkReadPassed(val ids: List<Long>) : FeedListIntent
     /** 文章列表视图模式（列表/卡片/杂志/网格），写入全局显示偏好，即改即见并持久化。 */
     data class SetViewMode(val mode: ListViewMode) : FeedListIntent
+
+    /** AI 价值档位（按时间 / 按信息价值 / 只看值得读）；持久化后必须重查第一页。 */
+    data class SetValueMode(val mode: FeedValueMode) : FeedListIntent
 }
 
 @HiltViewModel
@@ -134,10 +139,12 @@ class FeedListViewModel @Inject constructor(
     private val subscriptionFlow: SubscriptionFlow,
     groupStore: GroupStore,
     private val aiRepository: AiRepository,
-    /** 推荐流（ADR-0013）：候选池 + 打分 + 负反馈。 */
+    /** 推荐流：候选池 + 打分 + 负反馈。 */
     private val recommendation: Recommendation,
     recommendationStore: RecommendationStore,
     private val listDisplayStore: ListDisplayStore,
+    /** 冷启动种子：推荐流在没有任何互动时唯一可用的偏好依据。 */
+    private val recommendationSeedStore: RecommendationSeedStore,
 ) : ViewModel(), MviStateViewModel<FeedListIntent, FeedListUiState> {
 
     private val _uiState = MutableStateFlow(FeedListUiState())
@@ -149,7 +156,7 @@ class FeedListViewModel @Inject constructor(
     private var filterJob: Job? = null
 
     /**
-     * 推荐流的排序结果（进 tab 时实时算一次，ADR-0013）。
+     * 推荐流的排序结果（进 tab 时实时算一次）。
      * 只存 id 序，文章实体按页切片时才去 DB 还原——不把候选池全文常驻内存。
      */
     private var rankedIds: List<Long> = emptyList()
@@ -210,6 +217,13 @@ class FeedListViewModel @Inject constructor(
             is FeedListIntent.MarkAllRead -> markAllRead(intent.condition)
             is FeedListIntent.MarkReadPassed -> markReadPassed(intent.ids)
             is FeedListIntent.SetViewMode -> listDisplayStore.update { it.copy(viewMode = intent.mode) }
+            is FeedListIntent.SetValueMode -> {
+                if (listDisplayStore.state.value.valueMode == intent.mode) return
+                listDisplayStore.update { it.copy(valueMode = intent.mode) }
+                // 档位决定 DB 侧的 ORDER BY 与 WHERE，游标与结果集强相关 ⇒ 必须回到第一页重查。
+                // 只改渲染的话，第 2 页起会与第 1 页不一致（同一篇出现两次/漏掉，或分母对不上）。
+                viewModelScope.launch { loadFirstPage() }
+            }
         }
     }
 
@@ -510,17 +524,19 @@ class FeedListViewModel @Inject constructor(
         offset: Int,
     ): List<ArticleWithFeed> {
         val type = contentType.dbValue
+        // 档位直接读 Store：它是这件事的唯一真相源，且切换时上面已触发过重查。
+        val valueMode = listDisplayStore.state.value.valueMode
         return when (tab) {
-            FeedTab.All -> repository.loadArticlesPageFiltered(group, type, limit, offset)
-            FeedTab.Unread -> repository.loadUnreadPageFiltered(group, type, limit, offset)
-            FeedTab.Starred -> repository.loadStarredPageFiltered(group, type, limit, offset)
-            FeedTab.Bookmarked -> repository.loadBookmarkedPageFiltered(group, type, limit, offset)
+            FeedTab.All -> repository.loadArticlesPageFiltered(group, type, limit, offset, valueMode)
+            FeedTab.Unread -> repository.loadUnreadPageFiltered(group, type, limit, offset, valueMode)
+            FeedTab.Starred -> repository.loadStarredPageFiltered(group, type, limit, offset, valueMode)
+            FeedTab.Bookmarked -> repository.loadBookmarkedPageFiltered(group, type, limit, offset, valueMode)
             FeedTab.Recommended -> loadRecommendationsPage(group, contentType, limit, offset)
         }
     }
 
     /**
-     * 推荐流分页（ADR-0013）：首屏现算一次排序，之后按游标切片、批量还原文章。
+     * 推荐流分页：首屏现算一次排序，之后按游标切片、批量还原文章。
      * 排序不落库——候选池受「未读 + 时间窗」约束，规模可控，落库的失效维护是无底洞。
      * 打分在内存里做、耗时可见，loading 由 [applyFilter] 负责置位（本函数只算数据）。
      */
@@ -531,7 +547,9 @@ class FeedListViewModel @Inject constructor(
         offset: Int,
     ): List<ArticleWithFeed> {
         if (offset == 0) {
-            rankedIds = recommendation.rank()
+            // 种子（用户手选的领域）在冷启动时给画像一个弱先验；没勾过就是空列表，
+            // 于是排序与从前完全一致——这条改动对老用户是不可见的。
+            rankedIds = recommendation.rank(seeds = recommendationSeedStore.state.value)
             // 分组筛选（issue #74）：推荐序在内存里，直接过滤 id 序（默认组含空串语义）。
             // rankedIds 过滤后 hasMore 的游标判定（rankedIds.size）自然保持正确。
             if (group != null) {
@@ -548,7 +566,7 @@ class FeedListViewModel @Inject constructor(
     }
 
     /**
-     * 「减少此类」（ADR-0013）：文章所属订阅源在推荐流里降权，可撤销。
+     * 「减少此类」：文章所属订阅源在推荐流里降权，可撤销。
      * 降权落地后立刻重排，用户马上看到效果（不靠下次进 tab 才生效）。
      */
     private fun reduceSuch(articleId: Long) {
@@ -595,11 +613,14 @@ class FeedListViewModel @Inject constructor(
      */
     private suspend fun countTabPage(tab: FeedTab, group: String?, contentType: ContentTypeFilter): Int? {
         val type = contentType.dbValue
+        // 与 [loadTabPage] 同源同刻读同一个档位：分母与列表必须来自同一套谓词，
+        // 否则「只看值得读」下指示条的比例会与实际列表对不上。
+        val valueMode = listDisplayStore.state.value.valueMode
         return when (tab) {
-            FeedTab.All -> repository.countArticlesFiltered(group, type)
-            FeedTab.Unread -> repository.countUnreadFiltered(group, type)
-            FeedTab.Starred -> repository.countStarredFiltered(group, type)
-            FeedTab.Bookmarked -> repository.countBookmarkedFiltered(group, type)
+            FeedTab.All -> repository.countArticlesFiltered(group, type, valueMode)
+            FeedTab.Unread -> repository.countUnreadFiltered(group, type, valueMode)
+            FeedTab.Starred -> repository.countStarredFiltered(group, type, valueMode)
+            FeedTab.Bookmarked -> repository.countBookmarkedFiltered(group, type, valueMode)
             FeedTab.Recommended -> null
         }
     }

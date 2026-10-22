@@ -19,29 +19,28 @@ class AiPayloadTextTest {
 
     @Test
     fun `键值渲染成标签与值`() {
-        val lines = AiPayloadText.lines("""{"topic":"科技","confidence":0.9}""")
-        assertEquals("话题", lines[0].label)
-        assertEquals("科技", lines[0].value)
-        assertEquals("置信度", lines[1].label)
+        val lines = AiPayloadText.lines("""{"value":82,"keptPoints":["要点一"]}""")
+        assertEquals("信息价值", lines[0].label)
         // 不做数值换算：语义无法确知，换算错了就是把一个数字变成另一个数字。
-        assertEquals("0.9", lines[1].value)
+        assertEquals("82", lines[0].value)
+        assertEquals("实质要点", lines[1].label)
+        assertEquals("要点一", lines[1].value)
     }
 
     @Test
     fun `标量数组并成一行而不是拆成十行`() {
-        val lines = AiPayloadText.lines("""{"tags":["大模型","推理","成本"]}""")
+        val lines = AiPayloadText.lines("""{"keywords":["大模型","推理","成本"]}""")
         assertEquals(1, lines.size)
-        assertEquals("标签", lines[0].label)
+        assertEquals("关键词", lines[0].label)
         assertEquals("大模型 / 推理 / 成本", lines[0].value)
     }
 
     @Test
     fun `对象数组逐项渲染并带序号`() {
         val lines = AiPayloadText.lines(
-            """{"headline":"今天三条","items":[{"title":"A","why":"与你相关"},{"title":"B","why":"新进展"}]}""",
+            """{"rules":[{"keyword":"A","hits":["与你相关"]},{"keyword":"B","hits":["新进展"]}]}""",
         )
         val values = lines.map { it.value }
-        assertTrue(values.contains("今天三条"))
         assertTrue(values.contains("第 1 项"))
         assertTrue(values.contains("第 2 项"))
         assertTrue(values.contains("A"))
@@ -53,21 +52,21 @@ class AiPayloadTextTest {
 
     @Test
     fun `嵌套对象保持层级`() {
-        val lines = AiPayloadText.lines("""{"quality":{"overall":82,"note":"证据充分"}}""")
+        val lines = AiPayloadText.lines("""{"sections":[{"heading":"小标题","summary":"证据充分"}]}""")
         val note = lines.first { it.value == "证据充分" }
         assertTrue(note.depth >= 1)
     }
 
     @Test
     fun `枚举取值直译为中文`() {
-        val lines = AiPayloadText.lines("""{"polarity":"POSITIVE","level":"LOW"}""")
-        assertEquals("偏正面", lines[0].value)
-        assertEquals("低", lines[1].value)
+        val lines = AiPayloadText.lines("""{"status":"BROKEN","field":"TITLE"}""")
+        assertEquals("失效", lines[0].value)
+        assertEquals("标题", lines[1].value)
     }
 
     @Test
     fun `布尔值直译为是否`() {
-        val lines = AiPayloadText.lines("""{"notFound":false,"ok":true}""")
+        val lines = AiPayloadText.lines("""{"notFound":false,"isNoise":true}""")
         assertEquals("否", lines[0].value)
         assertEquals("是", lines[1].value)
     }
@@ -75,7 +74,7 @@ class AiPayloadTextTest {
     @Test
     fun `带代码围栏也能渲染`() {
         // 执行器对不需要收口 id 的功能**直接存模型原文**，围栏与客套话是常态。
-        val raw = "好的，这是结果：\n```json\n{\"tags\":[\"大模型\"]}\n```\n希望有帮助"
+        val raw = "好的，这是结果：\n```json\n{\"keywords\":[\"大模型\"]}\n```\n希望有帮助"
         val lines = AiPayloadText.lines(raw)
         assertEquals(1, lines.size)
         assertEquals("大模型", lines[0].value)
@@ -96,15 +95,15 @@ class AiPayloadTextTest {
 
     @Test
     fun `空对象与空数组不产生行`() {
-        assertTrue(AiPayloadText.lines("""{"items":[]}""").isEmpty())
+        assertTrue(AiPayloadText.lines("""{"rules":[]}""").isEmpty())
         assertTrue(AiPayloadText.lines("{}").isEmpty())
     }
 
     @Test
     fun `原文格式化后带缩进`() {
-        val pretty = AiPayloadText.prettyRaw("""{"topic":"科技"}""")
+        val pretty = AiPayloadText.prettyRaw("""{"term":"RAG"}""")
         assertTrue(pretty.contains("\n"))
-        assertTrue(pretty.contains("科技"))
+        assertTrue(pretty.contains("RAG"))
     }
 
     @Test

@@ -24,7 +24,7 @@ data class FeedEntity(
     /** 是否参与自动同步（issue #58）。屏蔽后不参与自动同步，手动刷新照常。 */
     @ColumnInfo(defaultValue = "1") val syncEnabled: Boolean = true,
     /**
-     * Feed 级预设（issue #9）：详情页是否自动抓取该源的原网页正文（ADR-0001 按需抓取）。
+     * Feed 级预设（issue #9）：详情页是否自动抓取该源的原网页正文（按需抓取）。
      * 关闭后详情页只显示 feed 自带内容，不再联网抓全文。
      */
     @ColumnInfo(defaultValue = "1") val fullContentEnabled: Boolean = true,
@@ -34,7 +34,7 @@ data class FeedEntity(
      */
     @ColumnInfo(defaultValue = "1") val notificationsEnabled: Boolean = true,
     /**
-     * 内容类型（ADR-0014）：feed 级主导的分类，决定列表用什么形态浏览。
+     * 内容类型：feed 级主导的分类，决定列表用什么形态浏览。
      * 0=文章（含社媒源，默认）、1=图片（画廊）、2=视频、3=音频。
      * 订阅时按信号预判，用户在订阅操作页可改。
      */

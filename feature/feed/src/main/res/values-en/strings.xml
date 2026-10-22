@@ -44,6 +44,7 @@
     <string name="feed_refreshed">Updated %1$s feed(s)</string>
     <string name="filter_all">All</string>
     <string name="group_filter">Group filter</string>
+    <string name="feed_value_only_good_hint">Hides scores below 40; unscored items are kept</string>
     <string name="group_filter_active">Group filter · on</string>
     <string name="group_title">Group</string>
     <string name="mark_cond_1d">1 day ago</string>

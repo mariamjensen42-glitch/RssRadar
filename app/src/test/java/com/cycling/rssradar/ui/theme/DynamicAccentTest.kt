@@ -7,7 +7,7 @@ import org.junit.Test
 
 /**
  * 动态取色强调色派生（#27）：系统只给 primary / onPrimary，
- * accentPressed 与 link 由本项目派生，比例即判据，所以单独立测试。
+ * link 由本项目派生，比例即判据，所以单独立测试。
  */
 class DynamicAccentTest {
 
@@ -19,12 +19,6 @@ class DynamicAccentTest {
         val dark = deriveAccentColors(accent, onAccent, darkTheme = true)
         assertEquals(accent, dark.accent)
         assertEquals(onAccent, dark.onAccent)
-    }
-
-    @Test
-    fun `pressed state is darker than accent in both themes`() {
-        assertTrue(deriveAccentColors(accent, onAccent, darkTheme = true).accentPressed.red < accent.red)
-        assertTrue(deriveAccentColors(accent, onAccent, darkTheme = false).accentPressed.red < accent.red)
     }
 
     @Test
@@ -43,7 +37,7 @@ class DynamicAccentTest {
     fun `derived colors stay inside channel range`() {
         listOf(true, false).forEach { dark ->
             val c = deriveAccentColors(Color(0xFFFFFFFF), Color(0xFF000000), dark)
-            listOf(c.accent, c.accentPressed, c.onAccent, c.link).forEach { color ->
+            listOf(c.accent, c.onAccent, c.link).forEach { color ->
                 assertTrue(color.red in 0f..1f)
                 assertTrue(color.green in 0f..1f)
                 assertTrue(color.blue in 0f..1f)

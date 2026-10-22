@@ -35,7 +35,6 @@ import com.cycling.rssradar.core.ui.components.SectionHeader
 import com.cycling.rssradar.core.ui.components.SettingsSubPage
 import com.cycling.rssradar.core.ui.text.resolve
 import com.cycling.rssradar.core.ui.theme.RssRadarTheme
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
 
 @Composable
@@ -68,18 +67,18 @@ fun SettingsRssHubScreen(
             stringResource(R.string.rsshub_instance),
             description = stringResource(R.string.instance_desc),
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = stringResource(R.string.current_instance),
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
                         text = state.activeHost,
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -91,12 +90,12 @@ fun SettingsRssHubScreen(
                     modifier = Modifier.fillMaxWidth().height(44.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = radarColors().accent,
-                        contentColor = radarColors().onAccent,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
                 ) {
                     if (state.probing) {
-                        CircularProgressIndicator(color = radarColors().onAccent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.probing), style = MaterialTheme.typography.labelLarge)
                     } else {
@@ -105,7 +104,7 @@ fun SettingsRssHubScreen(
                 }
                 state.probeMessage?.let { message ->
                     Spacer(Modifier.height(8.dp))
-                    Text(text = message.resolve(), color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
+                    Text(text = message.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -113,7 +112,7 @@ fun SettingsRssHubScreen(
         Spacer(Modifier.height(16.dp))
         Text(
             text = stringResource(R.string.custom_instance),
-            color = radarColors().textSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
         )
@@ -122,14 +121,14 @@ fun SettingsRssHubScreen(
             value = state.customInput,
             onValueChange = onCustomInputChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("https://your-rsshub.example.com", color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium) },
+            placeholder = { Text("https://your-rsshub.example.com", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             colors = radarOutlinedTextFieldColors(),
         )
         Text(
             text = stringResource(R.string.custom_instance_hint),
-            color = radarColors().textTertiary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 4.dp),
         )
@@ -140,8 +139,8 @@ fun SettingsRssHubScreen(
             modifier = Modifier.fillMaxWidth().height(44.dp),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = radarColors().accent,
-                contentColor = radarColors().onAccent,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
             ),
         ) {
             Text(stringResource(UiR.string.save), style = MaterialTheme.typography.labelLarge)
@@ -150,14 +149,14 @@ fun SettingsRssHubScreen(
         Spacer(Modifier.height(16.dp))
         Text(
             text = stringResource(R.string.builtin_mirrors),
-            color = radarColors().textTertiary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelMedium,
         )
         Spacer(Modifier.height(6.dp))
         RssHubInstanceStore.BUILTIN_INSTANCES.forEachIndexed { index, host ->
             Surface(
                 shape = RoundedCornerShape(10.dp),
-                color = radarColors().surface1,
+                color = MaterialTheme.colorScheme.surfaceContainerLowest,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 3.dp)
@@ -167,12 +166,12 @@ fun SettingsRssHubScreen(
                 Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "${index + 1}. $host",
-                        color = radarColors().textSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.weight(1f),
                     )
                     if (host == state.activeHost) {
-                        Text(stringResource(R.string.current_tag), color = radarColors().accent, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.current_tag), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -185,18 +184,18 @@ fun SettingsRssHubScreen(
             stringResource(R.string.route_catalog),
             description = stringResource(R.string.catalog_desc),
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = stringResource(R.string.catalog_count_label),
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
                         text = if (state.catalogRouteCount > 0) stringResource(R.string.catalog_routes_count, state.catalogRouteCount) else stringResource(R.string.loading_ellipsis),
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -205,14 +204,14 @@ fun SettingsRssHubScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = stringResource(R.string.data_time),
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
                         text = formatCatalogTimestamp(state.catalogGeneratedAt) +
                             if (state.catalogSource == CatalogSource.UPDATED) stringResource(R.string.updated_suffix) else stringResource(R.string.builtin_suffix),
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -224,12 +223,12 @@ fun SettingsRssHubScreen(
                     modifier = Modifier.fillMaxWidth().height(44.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = radarColors().accent,
-                        contentColor = radarColors().onAccent,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
                 ) {
                     if (state.catalogRefreshing) {
-                        CircularProgressIndicator(color = radarColors().onAccent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.updating), style = MaterialTheme.typography.labelLarge)
                     } else {
@@ -238,7 +237,7 @@ fun SettingsRssHubScreen(
                 }
                 state.catalogMessage?.let { message ->
                     Spacer(Modifier.height(8.dp))
-                    Text(text = message.resolve(), color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
+                    Text(text = message.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }

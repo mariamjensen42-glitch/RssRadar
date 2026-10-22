@@ -21,14 +21,14 @@ import com.cycling.rssradar.core.data.ai.TranslationSegments
 import com.cycling.rssradar.core.model.BilingualLayout
 import com.cycling.rssradar.core.model.TranslationViewMode
 import com.cycling.rssradar.core.ui.theme.LocalReadingPrefs
-import com.cycling.rssradar.core.ui.theme.radarColors
+import androidx.compose.material3.MaterialTheme
 
 /**
  * 译文渲染区（翻译功能 v2）：渐进显示 + 双语对照的唯一实现。
  *
  * 为什么不走 WebView：渐进显示要求"翻完一段亮一段"，WebView 每次 reload 整页
  * 会闪烁且滚动位置丢失；Compose 按块重组则天然增量。因此译文一律经
- * [ReadingNodes.parse] 解析后走原生渲染（ADR-0009 的渲染半边复用，
+ * [ReadingNodes.parse] 解析后走原生渲染（渲染半边复用，
  * 图片/媒体卡/链接点击行为与正文原生路一致）。
  *
  * 配对单位是**块**（[TranslationSegments] 两级切分里的顶层块，不是翻译分块）：
@@ -151,7 +151,7 @@ internal fun TranslationReader(
                                         modifier = Modifier
                                             .width(1.dp)
                                             .fillMaxHeight()
-                                            .background(radarColors().divider),
+                                            .background(MaterialTheme.colorScheme.outlineVariant),
                                     )
                                     Box(modifier = Modifier.weight(1f)) {
                                         NativeNodesColumn(
@@ -176,7 +176,7 @@ internal fun TranslationReader(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(1.dp)
-                            .background(radarColors().divider),
+                            .background(MaterialTheme.colorScheme.outlineVariant),
                     )
                     Spacer(Modifier.height(PAIR_GAP_DP.dp))
                 } else {

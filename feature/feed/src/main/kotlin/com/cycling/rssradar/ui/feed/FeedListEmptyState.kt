@@ -24,7 +24,6 @@ import com.composables.icons.lucide.FileUp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 @Composable
 
@@ -58,7 +57,7 @@ internal fun EmptyState(
             FeedTab.Bookmarked ->
                 stringResource(R.string.feed_empty_readlater) to
                     stringResource(R.string.feed_empty_readlater_desc)
-            // 推荐流空态（ADR-0013）：候选池 = 未读 + 14 天窗，读完就没了——如实说，不编内容
+            // 推荐流空态：候选池 = 未读 + 14 天窗，读完就没了——如实说，不编内容
             FeedTab.Recommended ->
                 stringResource(R.string.feed_empty_recommended) to
                     stringResource(R.string.feed_empty_recommended_desc)
@@ -78,11 +77,11 @@ internal fun EmptyState(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(title, color = radarColors().textPrimary, style = MaterialTheme.typography.titleMedium)
+        Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         Text(
             hint,
-            color = radarColors().textSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
         )
@@ -123,8 +122,8 @@ internal fun RecommendationLoading(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
         Spacer(Modifier.height(10.dp))
-        Text(stringResource(R.string.feed_ranking), color = radarColors().textSecondary, style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.feed_ranking), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
     }
 }

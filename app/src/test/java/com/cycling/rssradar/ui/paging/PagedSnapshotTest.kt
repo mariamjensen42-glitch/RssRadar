@@ -7,7 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 分页快照规则（ADR-0006）：追加必去重（OFFSET 位移兜底，防 LazyColumn key 冲突崩溃）。 */
+/** 分页快照规则：追加必去重（OFFSET 位移兜底，防 LazyColumn key 冲突崩溃）。 */
 class PagedSnapshotTest {
 
     private fun item(id: Long, read: Boolean = false) = ArticleWithFeed(

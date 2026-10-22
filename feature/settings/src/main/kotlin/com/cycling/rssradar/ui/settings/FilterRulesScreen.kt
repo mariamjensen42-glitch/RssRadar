@@ -10,11 +10,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -32,18 +34,20 @@ import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Trash2
 import com.cycling.rssradar.core.domain.filter.FilterRule
 import com.cycling.rssradar.core.ui.components.SettingsSubPage
 import com.cycling.rssradar.core.ui.text.resolve
 import com.cycling.rssradar.core.ui.theme.Danger
 import com.cycling.rssradar.core.ui.theme.RssRadarTheme
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.radarSwitchColors
 
 @Composable
 fun FilterRulesDestination(
     onBack: () -> Unit = {},
+    /** 「智能过滤规则生成」未开启时，面板里的「去开启」跳到 AI 与诊断页。 */
+    onOpenAiSettings: () -> Unit = {},
     viewModel: FilterRulesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -58,6 +62,13 @@ fun FilterRulesDestination(
         onDelete = viewModel::delete,
         onPreview = viewModel::preview,
         onSave = viewModel::save,
+        onOpenAiDraft = viewModel::openDraft,
+        onCloseAiDraft = viewModel::closeDraft,
+        onDraftDescriptionChange = viewModel::updateDraftDescription,
+        onGenerateProposals = viewModel::generateProposals,
+        onToggleProposal = viewModel::toggleProposal,
+        onApplyProposals = viewModel::applyProposals,
+        onOpenAiSettings = onOpenAiSettings,
     )
 }
 
@@ -74,13 +85,24 @@ fun FilterRulesScreen(
     onDelete: (Long) -> Unit = {},
     onPreview: (FilterRule) -> Unit = {},
     onSave: (FilterRule) -> Unit = {},
+    onOpenAiDraft: () -> Unit = {},
+    onCloseAiDraft: () -> Unit = {},
+    onDraftDescriptionChange: (String) -> Unit = {},
+    onGenerateProposals: () -> Unit = {},
+    onToggleProposal: (Int) -> Unit = {},
+    onApplyProposals: () -> Unit = {},
+    onOpenAiSettings: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         SettingsSubPage(title = stringResource(R.string.rule_title), onBack = onBack) {
+            // 入口常驻（AI 没开也显示）：它是这项功能唯一的路径，而"没开"这件事
+            // 只有点进去才会被告知与给出开关入口——藏起来等于用户永远发现不了。
+            AiDraftEntry(onClick = onOpenAiDraft)
+            Spacer(Modifier.height(14.dp))
             if (state.rules.isEmpty()) {
                 Text(
                     text = stringResource(R.string.rule_empty),
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(vertical = 12.dp),
                 )
@@ -102,7 +124,7 @@ fun FilterRulesScreen(
                 Spacer(Modifier.height(12.dp))
                 Text(
                     text = message.resolve(),
-                    color = radarColors().textSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -111,14 +133,27 @@ fun FilterRulesScreen(
 
         FloatingActionButton(
             onClick = onStartCreate,
-            containerColor = radarColors().accent,
-            contentColor = radarColors().onAccent,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 20.dp, bottom = 28.dp),
         ) {
             Icon(Lucide.Plus, contentDescription = stringResource(R.string.rule_new))
         }
+    }
+
+    state.drafting?.let { draft ->
+        AiRuleDraftSheet(
+            draft = draft,
+            aiEnabled = state.aiEnabled,
+            onDescriptionChange = onDraftDescriptionChange,
+            onGenerate = onGenerateProposals,
+            onToggleProposal = onToggleProposal,
+            onApply = onApplyProposals,
+            onOpenAiSettings = onOpenAiSettings,
+            onDismiss = onCloseAiDraft,
+        )
     }
 
     state.editing?.let { rule ->
@@ -135,6 +170,21 @@ fun FilterRulesScreen(
     }
 }
 
+/**
+ * AI 生成的入口。
+ *
+ * 摆在列表**上方**而不是做成第二颗 FAB：FAB 是"新建规则"这类高频动作的位置，
+ * 而这个入口低频、且需要先解释它做什么（说明在面板里）。摆在列表顶端更像"从这里开始"。
+ */
+@Composable
+private fun AiDraftEntry(onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Icon(Lucide.Sparkles, contentDescription = null, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(R.string.rule_ai_entry))
+    }
+}
+
 @Composable
 private fun RuleCard(
     rule: FilterRule,
@@ -148,7 +198,7 @@ private fun RuleCard(
 ) {
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = radarColors().surface1,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 8.dp),
@@ -162,17 +212,17 @@ private fun RuleCard(
                 ) {
                     Text(
                         text = rule.name,
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
                         text = "${stringResource(rule.matchType.labelRes())} · ${stringResource(rule.action.labelRes())}",
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
                         text = rule.pattern,
-                        color = radarColors().textSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -187,7 +237,7 @@ private fun RuleCard(
                     Icon(
                         Lucide.ArrowUp,
                         contentDescription = stringResource(R.string.rule_move_up),
-                        tint = if (canMoveUp) radarColors().textSecondary else radarColors().textTertiary,
+                        tint = if (canMoveUp) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -195,7 +245,7 @@ private fun RuleCard(
                     Icon(
                         Lucide.ArrowDown,
                         contentDescription = stringResource(R.string.rule_move_down),
-                        tint = if (canMoveDown) radarColors().textSecondary else radarColors().textTertiary,
+                        tint = if (canMoveDown) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -203,7 +253,7 @@ private fun RuleCard(
                     Icon(
                         Lucide.Pencil,
                         contentDescription = stringResource(R.string.rule_edit),
-                        tint = radarColors().textSecondary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
                     )
                 }

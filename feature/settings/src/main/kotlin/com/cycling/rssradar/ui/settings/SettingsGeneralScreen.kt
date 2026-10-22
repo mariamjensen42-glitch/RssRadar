@@ -47,7 +47,6 @@ import com.cycling.rssradar.core.ui.components.SettingSwitchRow
 import com.cycling.rssradar.core.ui.components.SettingsSubPage
 import com.cycling.rssradar.core.ui.labels.labelRes
 import com.cycling.rssradar.core.ui.theme.RssRadarTheme
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.supportsDynamicColor
 
 @Composable
@@ -89,12 +88,12 @@ fun SettingsGeneralScreen(
 
     SettingsSubPage(title = stringResource(R.string.settings_general), onBack = onBack) {
         SectionHeader(stringResource(R.string.settings_appearance))
-        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = stringResource(R.string.theme_label),
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f),
                     )
@@ -113,19 +112,19 @@ fun SettingsGeneralScreen(
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                // 界面语言（ADR-0017）：选完即推 locale 并重建界面。
+                // 界面语言：选完即推 locale 并重建界面。
                 // 选项名不用 stringResource —— 「中文」「English」在任何语言下都应原样显示。
                 val context = LocalContext.current
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(
                             text = stringResource(R.string.language),
-                            color = radarColors().textPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
                             text = stringResource(R.string.language_subtitle),
-                            color = radarColors().textTertiary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.labelSmall,
                         )
                     }
@@ -186,7 +185,7 @@ fun SettingsGeneralScreen(
             stringResource(R.string.list_display),
             description = stringResource(R.string.list_display_desc),
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 val display = state.listDisplay
                 // 视图模式（列表/卡片/杂志/网格）：与信息流顶栏同一份全局偏好
@@ -196,7 +195,7 @@ fun SettingsGeneralScreen(
                 ) {
                     Text(
                         text = stringResource(R.string.view_mode),
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f),
                     )
@@ -236,7 +235,7 @@ fun SettingsGeneralScreen(
                 ) {
                     Text(
                         text = stringResource(R.string.desc_label),
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f),
                     )
@@ -272,12 +271,12 @@ fun SettingsGeneralScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        // 推荐流（ADR-0013）
+        // 推荐流
         SectionHeader(
             stringResource(R.string.recommendation),
             description = stringResource(R.string.recommendation_desc),
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 SettingSwitchRow(
                     label = stringResource(R.string.show_recommend_tab),
@@ -294,14 +293,14 @@ fun SettingsGeneralScreen(
                     ) {
                         Text(
                             text = stringResource(R.string.profile_title),
-                            color = radarColors().textPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
                         )
                         Icon(
                             imageVector = Lucide.ChevronRight,
                             contentDescription = stringResource(UiR.string.enter),
-                            tint = radarColors().textTertiary,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(18.dp),
                         )
                     }
@@ -316,7 +315,7 @@ fun SettingsGeneralScreen(
             stringResource(R.string.link_share),
             description = stringResource(R.string.link_share_desc),
         )
-        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 OptionRow(
                     label = stringResource(R.string.open_links),
@@ -330,7 +329,7 @@ fun SettingsGeneralScreen(
                 )
                 Text(
                     text = stringResource(R.string.custom_tabs_hint),
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(vertical = 4.dp),
                 )
@@ -342,7 +341,7 @@ fun SettingsGeneralScreen(
         // 检查更新（#35）：只查 latest release，不自动下载安装——装包必须过用户这一关，
         // 这里只负责把「有新版本」和去 Release 页的链接摆出来。
         SectionHeader(stringResource(R.string.about), description = stringResource(R.string.about_desc))
-        Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 UpdateCheckRowDestination()
             }

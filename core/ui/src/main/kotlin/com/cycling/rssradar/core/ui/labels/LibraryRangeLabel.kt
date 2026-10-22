@@ -4,7 +4,7 @@ import com.cycling.rssradar.core.model.library.LibraryRange
 import com.cycling.rssradar.core.ui.R
 
 /**
- * [LibraryRange] 的文案（ADR-0017：文案映射随领域走）。
+ * [LibraryRange] 的文案（文案映射随领域走）。
  *
  * 为什么在 core:ui 而不在 feature:library：收藏页与搜索的二次筛选都要它，
  * 留在 library 里会逼搜索反向依赖 library（feature 之间禁止互依）——

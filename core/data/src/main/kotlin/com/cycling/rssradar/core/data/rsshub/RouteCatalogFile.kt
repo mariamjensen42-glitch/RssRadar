@@ -17,7 +17,7 @@ import com.cycling.rssradar.core.model.rsshub.RssHubRoute
  * - 在线更新后的缓存 `files/rsshub-routes.json`，由 [RouteCatalogSlimmer] 生成
  *
  * 字段名刻意压到 1–2 个字符：原始元数据 8.4MB，精简后 ~1.1MB，其中 key 名是大头。
- * schema 表见 ADR-0010；改字段必须三处同步（本文件 / python 脚本 / ADR）。
+ * schema 表见下方字段表；改字段必须三处同步（本文件 / scripts/build-route-catalog.py / RouteCatalogSlimmer）。
  */
 @Serializable
 data class RouteCatalogFile(

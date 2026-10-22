@@ -61,8 +61,7 @@ import com.composables.icons.lucide.Music
 import com.composables.icons.lucide.Pause
 import com.composables.icons.lucide.Play
 import com.cycling.rssradar.core.ui.components.SyncedSlider
-import com.cycling.rssradar.core.ui.theme.radarColors
-import java.util.Locale
+import com.cycling.rssradar.core.ui.text.formatMediaTime
 import kotlinx.coroutines.delay
 
 /** 进度采样间隔：ExoPlayer 不推送位置变化，进度只能轮询（与 PlaybackController 同策略，这里更密）。 */
@@ -85,7 +84,7 @@ internal fun fittedMediaModifier(width: Dp, height: Dp, aspectRatio: Float): Mod
 }
 
 /**
- * 正文媒体的播放器（ADR-0018）。
+ * 正文媒体的播放器。
  *
  * **一条正文只有一个实例**——整页扫描下来最坏会有几十个媒体节点，人手一个 ExoPlayer
  * 就是几十套解码器与音频通道。这里只维护"当前在播的那一条"：切换媒体复用同一个播放器，
@@ -355,9 +354,9 @@ internal fun InlineMediaNode(
 @Composable
 private fun ExternalMediaCard(node: NodeMediaCard, onLinkClick: (String) -> Unit, bottomPadding: Dp) {
     Surface(
-        color = radarColors().surface2,
+        color = MaterialTheme.colorScheme.surfaceContainer,
         shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, radarColors().divider),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
@@ -368,11 +367,11 @@ private fun ExternalMediaCard(node: NodeMediaCard, onLinkClick: (String) -> Unit
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(12.dp),
         ) {
-            Text("▶", color = radarColors().accent, fontWeight = FontWeight.Bold)
+            Text("▶", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             Spacer(Modifier.width(8.dp))
             Text(
                 text = node.label,
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.labelMedium,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -503,15 +502,15 @@ private fun InlineAudioPlayer(
     media: ArticleMediaPlayer,
     bottomPadding: Dp,
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     val active = media.isActive(node.url)
     val shape = RoundedCornerShape(MEDIA_CORNER_DP.dp)
     val startPlay = if (active) Modifier else Modifier.clickable { media.toggle(node.url, MediaNodeKind.AUDIO) }
 
     Surface(
-        color = colors.surface2,
+        color = colors.surfaceContainer,
         shape = shape,
-        border = BorderStroke(1.dp, colors.divider),
+        border = BorderStroke(1.dp, colors.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = bottomPadding)
@@ -523,13 +522,13 @@ private fun InlineAudioPlayer(
                 Icon(
                     imageVector = Lucide.Music,
                     contentDescription = stringResource(R.string.media_audio),
-                    tint = colors.accent,
+                    tint = colors.primary,
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = node.label,
-                    color = colors.textPrimary,
+                    color = colors.onSurface,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -564,9 +563,9 @@ internal fun MediaControlBar(
     dark: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val colors = radarColors()
-    val primary = if (dark) Color.White else colors.textPrimary
-    val secondary = if (dark) Color.White.copy(alpha = 0.7f) else colors.textTertiary
+    val colors = MaterialTheme.colorScheme
+    val primary = if (dark) Color.White else colors.onSurface
+    val secondary = if (dark) Color.White.copy(alpha = 0.7f) else colors.onSurfaceVariant
     var scrubbing by remember(url) { mutableStateOf<Float?>(null) }
     val duration = media.durationMs
     val hasDuration = duration > 0
@@ -661,7 +660,7 @@ private fun MediaPlayButton(
     Surface(
         shape = shape,
         // accent 之上的前景用 onAccent（跟强调色走），不是固定白
-        color = radarColors().accent,
+        color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
             .size(size)
             .clip(shape)
@@ -673,22 +672,9 @@ private fun MediaPlayButton(
                 contentDescription = stringResource(
                     if (playing) R.string.media_pause else R.string.media_play,
                 ),
-                tint = radarColors().onAccent,
+                tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(size * 0.45f),
             )
         }
-    }
-}
-
-/** 时长文本：`m:ss`，满一小时转 `h:mm:ss`。 */
-private fun formatMediaTime(millis: Long): String {
-    val totalSeconds = millis.coerceAtLeast(0L) / 1000L
-    val seconds = totalSeconds % 60
-    val minutes = (totalSeconds / 60) % 60
-    val hours = totalSeconds / 3600
-    return if (hours > 0) {
-        String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
-    } else {
-        String.format(Locale.US, "%d:%02d", minutes, seconds)
     }
 }

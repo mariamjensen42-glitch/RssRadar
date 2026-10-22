@@ -1,6 +1,5 @@
 package com.cycling.rssradar.ui.annotations
 
-import android.text.format.DateUtils
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,7 +40,7 @@ import com.cycling.rssradar.core.data.db.AnnotationWithArticle
 import com.cycling.rssradar.core.domain.annotation.AnnotationPalette
 import com.cycling.rssradar.core.ui.components.ConfirmDialog
 import com.cycling.rssradar.core.ui.components.EmptyState
-import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.text.relativeTime
 import com.cycling.rssradar.ui.annotations.R
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Highlighter
@@ -82,12 +81,12 @@ fun AnnotationsScreen(
     onConfirmDelete: () -> Unit = {},
     onCancelDelete: () -> Unit = {},
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.bgRoot)
+            .background(colors.surface)
             .statusBarsPadding(),
     ) {
         Row(
@@ -97,11 +96,11 @@ fun AnnotationsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = colors.textPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = colors.onSurface)
             }
             Text(
                 text = stringResource(R.string.annotations_title),
-                color = colors.textPrimary,
+                color = colors.onSurface,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
@@ -147,11 +146,11 @@ private fun AnnotationCard(
     onOpen: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     val annotation = item.annotation
     val shape = RoundedCornerShape(12.dp)
     Surface(
-        color = colors.surface1,
+        color = colors.surfaceContainerLowest,
         shape = shape,
         modifier = Modifier
             .fillMaxWidth()
@@ -170,7 +169,7 @@ private fun AnnotationCard(
                 .padding(start = 12.dp, top = 12.dp, bottom = 12.dp)) {
                 Text(
                     text = annotation.quote,
-                    color = colors.textPrimary,
+                    color = colors.onSurface,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
@@ -178,7 +177,7 @@ private fun AnnotationCard(
                 annotation.note?.let { note ->
                     Text(
                         text = note,
-                        color = colors.textSecondary,
+                        color = colors.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 6.dp),
                     )
@@ -191,7 +190,7 @@ private fun AnnotationCard(
                 ) {
                     Text(
                         text = item.articleTitle ?: stringResource(R.string.ann_unknown_article),
-                        color = colors.textTertiary,
+                        color = colors.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -199,7 +198,7 @@ private fun AnnotationCard(
                     )
                     Text(
                         text = relativeTime(annotation.createdAt),
-                        color = colors.textTertiary,
+                        color = colors.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -208,16 +207,10 @@ private fun AnnotationCard(
                 Icon(
                     Lucide.Trash2,
                     contentDescription = stringResource(UiR.string.delete),
-                    tint = colors.textSecondary,
+                    tint = colors.onSurfaceVariant,
                 )
             }
         }
     }
 }
 
-private fun relativeTime(millis: Long): String =
-    DateUtils.getRelativeTimeSpanString(
-        millis,
-        System.currentTimeMillis(),
-        DateUtils.MINUTE_IN_MILLIS,
-    ).toString()

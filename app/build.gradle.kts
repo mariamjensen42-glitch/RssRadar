@@ -18,8 +18,8 @@ android {
         applicationId = "com.cycling.rssradar"
         minSdk = 31
         targetSdk = 37
-        versionCode = 7
-        versionName = "1.0.4"
+        versionCode = 8
+        versionName = "1.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -127,11 +127,6 @@ dependencies {
     implementation(libs.androidx.media3.ui.compose)
     implementation(libs.androidx.media3.common)
     implementation(libs.androidx.media3.common.ktx)
-    implementation(libs.androidx.media3.datasource)
-    implementation(libs.androidx.media3.decoder)
-    implementation(libs.androidx.media3.container)
-    implementation(libs.androidx.media3.extractor)
-    implementation(libs.androidx.media3.database)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

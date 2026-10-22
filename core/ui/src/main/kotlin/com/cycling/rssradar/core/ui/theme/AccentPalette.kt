@@ -7,7 +7,7 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-/** 默认强调色：与 [RadarColors] 的固定紫一致（#7B7CFF）。 */
+/** 默认强调色：#7B7CFF，M3 基线色板之外的项目主色。 */
 const val DEFAULT_ACCENT_ARGB = 0xFF7B7CFFL
 
 /**

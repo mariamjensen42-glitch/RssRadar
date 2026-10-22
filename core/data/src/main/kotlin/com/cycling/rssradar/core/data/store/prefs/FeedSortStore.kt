@@ -2,6 +2,7 @@ package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
 import com.cycling.rssradar.core.model.FeedSortMode
+import com.cycling.rssradar.core.model.enumValueOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,8 +22,7 @@ class FeedSortStore(private val prefs: SharedPreferences) {
     }
 
     private fun readPersisted(): FeedSortMode =
-        prefs.getString(KEY_MODE, null)
-            ?.let { name -> runCatching { FeedSortMode.valueOf(name) }.getOrNull() }
+        enumValueOrNull<FeedSortMode>(prefs.getString(KEY_MODE, null))
             ?: FeedSortMode.BY_NAME
 
     companion object {

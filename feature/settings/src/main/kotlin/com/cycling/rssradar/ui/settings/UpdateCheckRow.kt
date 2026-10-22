@@ -23,7 +23,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cycling.rssradar.core.data.platform.openUrl
 import com.cycling.rssradar.core.ui.theme.RssRadarTheme
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /**
  * 检查更新（ReadYou 差距表第 35 项）。
@@ -54,12 +53,12 @@ internal fun UpdateCheckRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stringResource(R.string.update_current_version),
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Text(
                     text = version ?: stringResource(R.string.unknown),
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -69,7 +68,7 @@ internal fun UpdateCheckRow(
             ) {
                 Text(
                     text = if (state is UpdateState.Checking) stringResource(R.string.checking) else stringResource(R.string.check_updates),
-                    color = radarColors().accent,
+                    color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -81,14 +80,14 @@ internal fun UpdateCheckRow(
             is UpdateState.Available -> Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(R.string.new_version_found, current.version),
-                    color = radarColors().accent,
+                    color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f),
                 )
                 TextButton(onClick = { context.openUrl(current.url) }) {
                     Text(
                         text = stringResource(R.string.go_download),
-                        color = radarColors().accent,
+                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -101,7 +100,7 @@ internal fun UpdateCheckRow(
 private fun ResultLine(text: String) {
     Text(
         text = text,
-        color = radarColors().textTertiary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodySmall,
         modifier = Modifier.padding(vertical = 2.dp),
     )

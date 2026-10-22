@@ -38,7 +38,6 @@ import com.cycling.rssradar.core.data.db.dao.ArticleDao
 import com.cycling.rssradar.core.data.db.projection.FeedOpenStat
 import com.cycling.rssradar.core.domain.stats.ReadingStatsDashboard
 import com.cycling.rssradar.core.ui.components.rememberSlowLoad
-import com.cycling.rssradar.core.ui.theme.radarColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,7 +51,7 @@ data class ReadingStatsUiState(
     val weekOpens: Int = 0,
     /** 近 7 天估算阅读分钟合计（readingMinutes 求和，UI 必须标注「估算」）。 */
     val weekMinutes: Long = 0,
-    /** 活跃时段（AiReadingStats.activeHours，近 7 天样本）。 */
+    /** 活跃时段（ReadingStatsCalc.activeHours，近 7 天样本）。 */
     val activeHours: List<Int> = emptyList(),
     /** Top 5 打开源（近 7 天）。 */
     val topFeeds: List<FeedOpenStat> = emptyList(),
@@ -63,11 +62,16 @@ data class ReadingStatsUiState(
     val starredCount: Int = 0,
     val bookmarkedCount: Int = 0,
     val unreadCount: Int = 0,
+    /**
+     * AI 日报的产物（今天/最近一次）。null = 还没跑过——
+     * 批处理默认关，多数用户就是没跑过，所以 UI 必须给"去哪儿开"而不是"暂无数据"。
+     * 这一段的文字来自模型，**数字仍然全部来自本页上方那些 DB 统计**，别把两者混成一类。
+     */
     val loaded: Boolean = false,
 )
 
 /**
- * 统计仪表盘 VM（#83）：编排 SQL 原料与 [AiReadingStats] 纯函数。
+ * 统计仪表盘 VM（#83）：编排 SQL 原料与 [ReadingStatsCalc] 纯函数。
  * 纯函数管算法，DAO 管取数，这里只拼装——保证每个数字都能回溯到一条查询。
  */
 @Composable
@@ -85,7 +89,7 @@ fun ReadingStatsScreen(
     state: ReadingStatsUiState,
     onBack: () -> Unit,
 ) {
-    val colors = radarColors()
+    val colors = MaterialTheme.colorScheme
     val slowLoad = rememberSlowLoad(!state.loaded)
 
     Column(
@@ -97,12 +101,12 @@ fun ReadingStatsScreen(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
-                Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = colors.textPrimary)
+                Icon(Lucide.ArrowLeft, contentDescription = stringResource(UiR.string.back), tint = colors.onSurface)
             }
             Spacer(Modifier.width(4.dp))
             Text(
                 text = stringResource(R.string.stats_title),
-                color = colors.textPrimary,
+                color = colors.onSurface,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
@@ -110,7 +114,7 @@ fun ReadingStatsScreen(
         Spacer(Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.stats_scope),
-            color = colors.textTertiary,
+            color = colors.onSurfaceVariant,
             style = MaterialTheme.typography.labelMedium,
         )
         Spacer(Modifier.height(16.dp))
@@ -121,7 +125,7 @@ fun ReadingStatsScreen(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
                     horizontalArrangement = Arrangement.Center,
                 ) {
-                    CircularProgressIndicator(color = colors.accent)
+                    CircularProgressIndicator(color = colors.primary)
                 }
             }
             return@Column
@@ -159,12 +163,12 @@ fun ReadingStatsScreen(
                 Text(
                     text = state.activeHours.map { stringResource(R.string.stats_hour, it) }
                         .joinToString(stringResource(R.string.list_separator)),
-                    color = colors.textPrimary,
+                    color = colors.onSurface,
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
                     text = stringResource(R.string.stats_peak),
-                    color = colors.textTertiary,
+                    color = colors.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(top = 4.dp),
                 )
@@ -184,26 +188,26 @@ fun ReadingStatsScreen(
                     ) {
                         Text(
                             text = "${index + 1}",
-                            color = colors.textTertiary,
+                            color = colors.onSurfaceVariant,
                             style = MaterialTheme.typography.labelLarge,
                             modifier = Modifier.width(20.dp),
                         )
                         Text(
                             text = feed.feedTitle,
-                            color = colors.textPrimary,
+                            color = colors.onSurface,
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.weight(1f),
                             maxLines = 1,
                         )
                         Text(
                             text = stringResource(R.string.stats_articles, feed.cnt),
-                            color = colors.textSecondary,
+                            color = colors.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
                 }
                 val pct = (state.concentration * 100).toInt()
-                // 拼接翻译是 ADR-0017 明令禁止的：整句进资源，占比与档位文案都当参数传。
+                // 拼接翻译是明令禁止的：整句进资源，占比与档位文案都当参数传。
                 Text(
                     text = stringResource(
                         R.string.stats_concentration,
@@ -214,28 +218,31 @@ fun ReadingStatsScreen(
                             else -> stringResource(R.string.stats_scattered)
                         },
                     ),
-                    color = colors.textTertiary,
+                    color = colors.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
         }
+
+        Spacer(Modifier.height(16.dp))
+
     }
 }
 
 @Composable
 private fun StatsBigCard(value: String, label: String, modifier: Modifier = Modifier) {
-    Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1, modifier = modifier) {
+    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest, modifier = modifier) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
             Text(
                 text = value,
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 text = label,
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelMedium,
             )
         }
@@ -244,11 +251,11 @@ private fun StatsBigCard(value: String, label: String, modifier: Modifier = Modi
 
 @Composable
 private fun StatsSectionCard(title: String, content: @Composable () -> Unit) {
-    Surface(shape = RoundedCornerShape(14.dp), color = radarColors().surface1, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
             Text(
                 text = title,
-                color = radarColors().textSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -260,7 +267,7 @@ private fun StatsSectionCard(title: String, content: @Composable () -> Unit) {
 
 @Composable
 private fun StatsEmpty(text: String) {
-    Text(text = text, color = radarColors().textTertiary, style = MaterialTheme.typography.bodyMedium)
+    Text(text = text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
 }
 
 /** 分钟数转人话：不足一小时按分钟，整点按小时，其余按「X 小时 Y 分」（估值，别装精确）。 */

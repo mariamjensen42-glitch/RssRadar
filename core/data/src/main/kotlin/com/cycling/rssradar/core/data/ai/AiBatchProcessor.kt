@@ -6,7 +6,6 @@ import com.cycling.rssradar.core.data.db.AiSupportDao
 import com.cycling.rssradar.core.data.db.AiTaskEntity
 import com.cycling.rssradar.core.data.db.FeedAiProfileDao
 import com.cycling.rssradar.core.data.db.dao.FeedDao
-import com.cycling.rssradar.core.domain.ai.AiReadingStats
 import com.cycling.rssradar.core.data.store.prefs.AiBudgetStore
 import com.cycling.rssradar.core.data.store.prefs.AiFeatureStore
 import kotlinx.coroutines.async
@@ -151,13 +150,6 @@ class AiBatchProcessor(
         queue.markRunning(task, attempts, clock())
 
         val outcome = when {
-            // 跨文章与统计类功能的上下文要现组，runner 自己不知道该取哪批文章、哪些数字。
-            feature in CROSS_ARTICLE -> {
-                val context = crossArticleContext(feature, task.targetId)
-                    ?: return abort(task, attempts, "没有可用于${feature.label}的内容")
-                runner.runWithContext(feature, task.targetId, context)
-            }
-
             feature in STATS_SCOPED -> {
                 val context = statsContext(feature, task.targetId)
                     ?: return abort(task, attempts, "统计数据不足，跳过${feature.label}")
@@ -201,48 +193,6 @@ class AiBatchProcessor(
     // ── 上下文组装 ──────────────────────────────────────────────────────────
 
     /**
-     * 跨文章功能：把近期候选文章作为列表送进去，焦点文章附上正文。
-     * 候选统一走 [AiSupportDao.processableIdsSince]，保证批处理与手动触发看到的是同一批。
-     */
-    private suspend fun crossArticleContext(feature: AiFeature, targetId: Long): AiPromptContext? {
-        val now = clock()
-        val ids = when (feature) {
-            AiFeature.DAILY_BRIEF -> {
-                val todayStart = now - DEFAULT_WINDOW_MS
-                supportDao.processableIdsSince(todayStart, CROSS_LIMIT)
-            }
-
-            AiFeature.DISCOVER -> supportDao.unreadIdsSince(now - DEFAULT_WINDOW_MS, CROSS_LIMIT)
-            else -> supportDao.processableIdsSince(now - DEFAULT_WINDOW_MS, CROSS_LIMIT)
-        }
-        if (ids.isEmpty()) return null
-
-        val ordered = if (targetId in ids) {
-            listOf(targetId) + ids.filter { it != targetId }
-        } else {
-            ids
-        }
-        val companions = runner.briefsOf(ordered.take(CROSS_LIMIT))
-        if (companions.isEmpty()) return null
-
-        val focus = companions.firstOrNull { it.id == targetId }
-        // 简报与发现只按标题挑文章（几十篇正文塞不进上下文）；
-        // 去重、聚合、事件合并必须给正文，否则模型只能靠标题猜是不是同一件事。
-        val body = if (focus != null && feature !in TITLE_ONLY) {
-            runner.bodyOf(targetId).orEmpty()
-        } else {
-            ""
-        }
-
-        return AiPromptContext(
-            title = focus?.title.orEmpty(),
-            feedTitle = focus?.feedTitle.orEmpty(),
-            body = body,
-            companions = companions,
-        )
-    }
-
-    /**
      * 统计类功能：**数字全部来自数据库真实统计**，模型只负责把数字组织成人话。
      *
      * 这条边界不能让给模型——让它"估算"阅读时长分布，产出的就是一份看起来很专业、
@@ -251,49 +201,6 @@ class AiBatchProcessor(
     private suspend fun statsContext(feature: AiFeature, targetId: Long): AiPromptContext? {
         val now = clock()
         return when (feature) {
-            AiFeature.HABIT -> {
-                val since = now - HABIT_WINDOW_MS
-                val times = supportDao.openTimesSince(since)
-                if (times.isEmpty()) return null
-                val counts = supportDao.openCountsByFeedSince(since)
-                val feedTitles = feedDao.getAll().associate { it.id to it.title }
-                val hours = AiReadingStats.activeHours(times, zoneOffset(now))
-                val concentration = AiReadingStats.concentration(counts.map { it.total })
-                AiPromptContext(
-                    title = "阅读习惯分析",
-                    feedTitle = "本地统计",
-                    extra = buildString {
-                        appendLine("统计区间：最近 ${HABIT_WINDOW_MS / 86_400_000} 天")
-                        appendLine("打开文章次数：${times.size}")
-                        appendLine("活跃时段（小时）：${hours.joinToString("、")}")
-                        appendLine("订阅源集中度：${format2(concentration)}（0=完全分散，1=全部集中在一个源）")
-                        appendLine("按订阅源的打开次数：")
-                        counts.take(10).forEach {
-                            appendLine("- ${feedTitles[it.feedId] ?: "已删除的源"}：${it.total} 次")
-                        }
-                    },
-                )
-            }
-
-            AiFeature.DAILY_REPORT -> {
-                val since = now - DAY_MS
-                val read = supportDao.countReadSince(since)
-                val unread = supportDao.unreadIdsSince(since, CROSS_LIMIT)
-                if (read == 0 && unread.isEmpty()) return null
-                val companions = runner.briefsOf(unread)
-                AiPromptContext(
-                    title = "每日阅读报告",
-                    feedTitle = "本地统计",
-                    extra = buildString {
-                        appendLine("统计区间：最近 24 小时")
-                        appendLine("已读文章数：$read")
-                        appendLine("未处理文章数：${unread.size}")
-                        appendLine("未处理文章清单见下方文章列表。")
-                    },
-                    companions = companions,
-                )
-            }
-
             AiFeature.FEED_HEALTH -> {
                 val since = now - HEALTH_WINDOW_MS
                 val feed = feedDao.getById(targetId) ?: return null
@@ -317,7 +224,7 @@ class AiBatchProcessor(
                 )
             }
 
-            AiFeature.INTEREST_RANK, AiFeature.BUBBLE_BREAK, AiFeature.FEED_RECOMMEND -> {
+            AiFeature.FEED_RECOMMEND -> {
                 val feeds = feedDao.getAll()
                 if (feeds.isEmpty()) return null
                 val since = now - HABIT_WINDOW_MS
@@ -338,17 +245,10 @@ class AiBatchProcessor(
                 )
             }
 
-            AiFeature.COLD_START -> AiPromptContext(
-                title = "兴趣冷启动",
-                feedTitle = "本地统计",
-                extra = feedDao.getAll().joinToString("\n") { "- ${it.title}" },
-            )
-
             else -> null
         }
     }
 
-    private fun zoneOffset(millis: Long): Int = java.util.TimeZone.getDefault().getOffset(millis)
 
     // 固定 Locale：默认 Locale 随系统语言变化，某些语言下小数点会变成逗号，
     // 拼进 prompt 的数字格式一变，模型的解析行为也可能跟着变。
@@ -380,30 +280,13 @@ class AiBatchProcessor(
 
         const val HABIT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000L
         const val HEALTH_WINDOW_MS = 30 * 24 * 60 * 60 * 1000L
-        const val DAY_MS = 24 * 60 * 60 * 1000L
 
         /** 额度用尽后推迟多久再试（等到次日零点附近）。 */
         const val RETRY_AFTER_BUDGET_MS = 60 * 60 * 1000L
 
-        private val CROSS_ARTICLE = setOf(
-            AiFeature.DEDUPE,
-            AiFeature.AGGREGATE,
-            AiFeature.EVENT_MERGE,
-            AiFeature.DAILY_BRIEF,
-            AiFeature.DISCOVER,
-        )
-
-        /** 只按标题挑文章的跨文章功能——几十篇正文塞不进上下文，也没必要。 */
-        private val TITLE_ONLY = setOf(AiFeature.DAILY_BRIEF, AiFeature.DISCOVER)
-
         private val STATS_SCOPED = setOf(
-            AiFeature.HABIT,
-            AiFeature.DAILY_REPORT,
             AiFeature.FEED_HEALTH,
-            AiFeature.INTEREST_RANK,
-            AiFeature.BUBBLE_BREAK,
             AiFeature.FEED_RECOMMEND,
-            AiFeature.COLD_START,
         )
     }
 }

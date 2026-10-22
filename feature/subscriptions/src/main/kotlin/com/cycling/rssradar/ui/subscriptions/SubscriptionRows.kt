@@ -38,7 +38,6 @@ import com.cycling.rssradar.core.data.db.entity.FeedEntity
 import com.cycling.rssradar.core.ui.components.FeedIcon
 import com.cycling.rssradar.core.ui.components.pressScale
 import com.cycling.rssradar.core.ui.theme.Danger
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /** 多选态顶栏：已选计数 + 执行移动/删除 + 退出。 */
 @Composable
@@ -58,19 +57,19 @@ internal fun SelectionTopBar(
     ) {
         Text(
             text = "已选择 $selectedCount 个订阅",
-            color = radarColors().textPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f),
         )
         TextButton(onClick = onMove, enabled = canMove) {
-            Text("移动到", color = if (canMove) radarColors().accent else radarColors().textTertiary, fontWeight = FontWeight.SemiBold)
+            Text("移动到", color = if (canMove) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
         }
         TextButton(onClick = onDelete, enabled = canMove) {
-            Text("删除", color = if (canMove) Danger else radarColors().textTertiary, fontWeight = FontWeight.SemiBold)
+            Text("删除", color = if (canMove) Danger else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
         }
         IconButton(onClick = onCancel) {
-            Icon(Lucide.X, contentDescription = "退出多选", tint = radarColors().textPrimary)
+            Icon(Lucide.X, contentDescription = "退出多选", tint = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
@@ -94,20 +93,20 @@ internal fun GroupHeader(
         Icon(
             imageVector = if (expanded) Lucide.ChevronDown else Lucide.ChevronRight,
             contentDescription = if (expanded) "折叠" else "展开",
-            tint = radarColors().textSecondary,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp),
         )
         Spacer(Modifier.width(6.dp))
         Text(
             text = title,
-            color = radarColors().textPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.width(8.dp))
         Text(
             text = "$feedCount 个订阅",
-            color = radarColors().textTertiary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelMedium,
         )
         Spacer(Modifier.weight(1f))
@@ -126,7 +125,7 @@ internal fun FeedRow(
     val interactionSource = remember { MutableInteractionSource() }
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = radarColors().surface1,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = Modifier
             .fillMaxWidth()
             .pressScale(interactionSource)
@@ -145,7 +144,7 @@ internal fun FeedRow(
                 Icon(
                     imageVector = if (selected) Lucide.SquareCheckBig else Lucide.Square,
                     contentDescription = if (selected) "取消选择" else "选择",
-                    tint = if (selected) radarColors().accent else radarColors().textTertiary,
+                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(10.dp))
@@ -155,7 +154,7 @@ internal fun FeedRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = item.feed.title,
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -163,7 +162,7 @@ internal fun FeedRow(
                 )
                 Text(
                     text = item.feed.url.withoutScheme(),
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -172,10 +171,10 @@ internal fun FeedRow(
             // 类型标记：RSSHub 路由和常规 RSS 一眼区分
             if (item.feed.sourceType == FeedEntity.SOURCE_TYPE_RSSHUB) {
                 Spacer(Modifier.width(6.dp))
-                Surface(shape = RoundedCornerShape(50), color = radarColors().surface2) {
+                Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceContainer) {
                     Text(
                         text = "RSSHub",
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     )
@@ -201,7 +200,7 @@ internal fun FeedRow(
                     Icon(
                         Lucide.Ellipsis,
                         contentDescription = "更多",
-                        tint = radarColors().textSecondary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -214,10 +213,10 @@ internal fun FeedRow(
 private fun UnreadBadge(count: Int) {
     // 无未读不留任何徽标（UI 审计 F1）：灰色「已读」徽标无信息价值，还与状态标签混淆
     if (count <= 0) return
-    Surface(shape = RoundedCornerShape(50), color = radarColors().accent) {
+    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.primary) {
         Text(
             text = count.coerceAtMost(999).toString(),
-            color = radarColors().onAccent,
+            color = MaterialTheme.colorScheme.onPrimary,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
@@ -229,7 +228,7 @@ private fun UnreadBadge(count: Int) {
 internal fun CreateGroupRow(onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = radarColors().surface1,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
@@ -244,13 +243,13 @@ internal fun CreateGroupRow(onClick: () -> Unit) {
             Icon(
                 Lucide.Plus,
                 contentDescription = null,
-                tint = radarColors().link,
+                tint = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.size(18.dp),
             )
             Spacer(Modifier.width(8.dp))
             Text(
                 text = "新建分组",
-                color = radarColors().link,
+                color = MaterialTheme.colorScheme.secondary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )

@@ -16,7 +16,6 @@ import androidx.compose.ui.unit.dp
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.model.ListDisplayState
 import com.cycling.rssradar.core.model.ListViewMode
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.components.ArticleMenuActions
 
 /**
@@ -77,12 +76,12 @@ internal fun StickyDateHeader(label: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(radarColors().bgRoot)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(vertical = 4.dp),
     ) {
         Text(
             text = label,
-            color = radarColors().textTertiary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelMedium,
         )
     }
@@ -100,6 +99,6 @@ internal fun UnreadDot(visible: Boolean) {
         modifier = Modifier
             .size(6.dp)
             .clip(RoundedCornerShape(50))
-            .background(radarColors().accent),
+            .background(MaterialTheme.colorScheme.primary),
     )
 }

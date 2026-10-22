@@ -27,7 +27,6 @@ import com.cycling.rssradar.core.ui.theme.ACCENT_PRESETS
 import com.cycling.rssradar.core.ui.theme.DEFAULT_ACCENT_ARGB
 import com.cycling.rssradar.core.ui.theme.argbToHsl
 import com.cycling.rssradar.core.ui.theme.onAccentFor
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.theme.toArgb
 import com.cycling.rssradar.core.ui.components.SyncedSlider
 import androidx.compose.runtime.setValue
@@ -45,13 +44,13 @@ internal fun AccentPicker(
 ) {
     Text(
         text = stringResource(R.string.accent_color),
-        color = radarColors().textPrimary,
+        color = MaterialTheme.colorScheme.onSurface,
         style = MaterialTheme.typography.bodyMedium,
         modifier = Modifier.padding(top = 4.dp),
     )
     Text(
         text = stringResource(R.string.accent_desc),
-        color = radarColors().textTertiary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodySmall,
         modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
     )
@@ -84,7 +83,7 @@ private fun AccentSwatch(argb: Long, selected: Boolean, onClick: () -> Unit) {
             .background(Color(argb))
             .then(
                 if (selected) {
-                    Modifier.border(2.dp, radarColors().textPrimary, RoundedCornerShape(50))
+                    Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, RoundedCornerShape(50))
                 } else {
                     Modifier
                 },
@@ -124,7 +123,7 @@ private fun AccentSlider(
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = label,
-            color = radarColors().textTertiary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.width(48.dp),
         )

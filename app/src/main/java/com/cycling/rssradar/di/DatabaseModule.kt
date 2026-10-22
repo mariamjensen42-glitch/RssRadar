@@ -13,6 +13,7 @@ import com.cycling.rssradar.core.data.db.migration.MIGRATION_13_14
 import com.cycling.rssradar.core.data.db.migration.MIGRATION_14_15
 import com.cycling.rssradar.core.data.db.migration.MIGRATION_15_16
 import com.cycling.rssradar.core.data.db.migration.MIGRATION_16_17
+import com.cycling.rssradar.core.data.db.migration.MIGRATION_17_18
 import com.cycling.rssradar.core.data.db.migration.MIGRATION_1_2
 import com.cycling.rssradar.core.data.db.migration.MIGRATION_2_3
 import com.cycling.rssradar.core.data.db.migration.MIGRATION_3_4
@@ -40,7 +41,7 @@ object DatabaseModule {
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                 MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
                 MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
-                MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
+                MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
             )
             .build()
 
@@ -50,7 +51,7 @@ object DatabaseModule {
     fun provideTransactionRunner(db: AppDatabase): TransactionRunner =
         RoomTransactionRunner(db)
 
-    // ── AI 智能功能模块（35 项） ────────────────────────────────────────────
+    // ── AI 智能功能模块（16 项） ────────────────────────────────────────────
     // 装配顺序即依赖顺序：Store → 限流 → 产物 → 队列 → 执行器 → 编排器。
     // 全部单例：限流器与预算必须是全局唯一，否则手动点击会各自记账、绕过日预算。
 

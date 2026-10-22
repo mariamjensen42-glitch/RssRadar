@@ -105,7 +105,7 @@ class DayGroupsTest {
 }
 
 
-/** 中文文案包夹具：主源码不再自带任何语言的文案，测试自己带（ADR-0017 §3）。 */
+/** 中文文案包夹具：主源码不再自带任何语言的文案，测试自己带。 */
 private val TEST_DAY_LABELS = CalendarDayLabels(
     today = "今天",
     yesterday = "昨天",

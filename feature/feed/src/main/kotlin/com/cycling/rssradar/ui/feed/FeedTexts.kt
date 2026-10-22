@@ -3,7 +3,7 @@ package com.cycling.rssradar.ui.feed
 import com.cycling.rssradar.core.model.MarkAsReadCondition
 
 /**
- * 信息流与订阅域的枚举 → 文案资源映射（ADR-0017 §3）。
+ * 信息流与订阅域的枚举 → 文案资源映射。
  *
  * 枚举本身不带中文：core 与 ui 的枚举保持纯数据，翻译只在 UI 层按当前语言取，
  * 纯 JVM 测试因此不碰 android 资源。

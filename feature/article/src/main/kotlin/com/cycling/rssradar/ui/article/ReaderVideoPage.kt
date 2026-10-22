@@ -35,7 +35,7 @@ import com.cycling.rssradar.core.data.platform.openUrl
 import com.cycling.rssradar.core.ui.R as UiR
 
 /**
- * 全屏视频播放页（ADR-0018）。
+ * 全屏视频播放页。
  *
  * 独立 Dialog 承载：`usePlatformDefaultWidth = false` + `decorFitsSystemWindows = false`
  * 让它真正铺满屏幕，返回键由 Dialog 自动消费为关闭——与全屏看图

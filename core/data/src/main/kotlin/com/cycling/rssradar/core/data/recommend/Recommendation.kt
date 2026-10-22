@@ -14,7 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * 推荐流的家（ADR-0013）：加载候选池 → 建画像 → 打分 → 打散 → 按序还原文章。
+ * 推荐流的家：加载候选池 → 建画像 → 打分 → 打散 → 按序还原文章。
  *
  * 计算时机是**进 tab 实时算**（候选池受「未读 + 时间窗」约束，规模可控），
  * 不落库、不做快照——快照的失效维护（刷新/已读变化都要重算）是个无底洞。
@@ -30,7 +30,11 @@ class Recommendation(
      * 画像为空（冷启动）时退化成「按订阅源轮转的最近未读」，列表永不为空
      * ——除了真的没有候选（没订阅或全读完）。
      */
-    suspend fun rank(now: Long = System.currentTimeMillis()): List<Long> = withContext(ioDispatcher) {
+    suspend fun rank(
+        now: Long = System.currentTimeMillis(),
+        /** 冷启动种子（用户手选的领域）；空列表 = 与从前完全一致。 */
+        seeds: List<String> = emptyList(),
+    ): List<Long> = withContext(ioDispatcher) {
         val dao = database.articleDao()
         val since = now - WINDOW_DAYS * DAY_MILLIS
         val candidates = dao.loadRecommendationCandidates(since, CANDIDATE_LIMIT).map { it.toCandidate() }
@@ -45,6 +49,7 @@ class Recommendation(
             candidates = candidates,
             feedTotals = feedTotals,
             now = now,
+            seeds = seeds,
         )
         if (profile.isEmpty) return@withContext RecommendationScoring.coldStartRank(candidates)
 
@@ -116,14 +121,18 @@ class Recommendation(
         ids.mapNotNull { byId[it] }
     }
 
-    /** 兴趣画像（诊断页只读展示，ADR-0013 可解释性）。 */
-    suspend fun profile(now: Long = System.currentTimeMillis()): InterestProfile = withContext(ioDispatcher) {
+    /** 兴趣画像（诊断页只读展示，推荐流的可解释性出口）。 */
+    suspend fun profile(
+        now: Long = System.currentTimeMillis(),
+        /** 冷启动种子；传进来才能让诊断页看到"你勾的领域确实进了画像"。 */
+        seeds: List<String> = emptyList(),
+    ): InterestProfile = withContext(ioDispatcher) {
         val dao = database.articleDao()
         val since = now - WINDOW_DAYS * DAY_MILLIS
         val candidates = dao.loadRecommendationCandidates(since, CANDIDATE_LIMIT).map { it.toCandidate() }
         val samples = dao.loadEngagementSamples(SAMPLE_LIMIT).map { it.toSample() }
         val feedTotals = dao.countByFeedSince(since).associate { it.feedId to it.cnt }
-        RecommendationScoring.buildProfile(samples, candidates, feedTotals, now)
+        RecommendationScoring.buildProfile(samples, candidates, feedTotals, now, seeds)
     }
 
     /** 每个订阅源的降权系数（缺条目 = 1.0 不降权）。 */
@@ -132,7 +141,7 @@ class Recommendation(
     }
 
     /**
-     * 「减少此类」（ADR-0013）：文章所属订阅源在推荐流里降权。
+     * 「减少此类」：文章所属订阅源在推荐流里降权。
      * 只影响推荐流，不动常规信息流与订阅本身；同一源多点几次逐级降权（有下限）。
      * 返回被降权的 feedId，供调用方做撤销；文章不存在返回 null。
      */

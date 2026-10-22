@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -23,6 +24,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -30,13 +32,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.ChevronRight
+import com.composables.icons.lucide.Compass
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Rss
 import com.cycling.rssradar.core.model.rsshub.RouteCategory
 import com.cycling.rssradar.core.model.rsshub.RssHubRoute
 import com.cycling.rssradar.core.ui.R as UiR
 import com.cycling.rssradar.core.ui.components.FeedIcon
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 @Composable
 
@@ -52,7 +54,7 @@ internal fun CatalogHeader(title: String, subtitle: String?, onClose: () -> Unit
             Icon(
                 imageVector = Lucide.ArrowLeft,
                 contentDescription = stringResource(UiR.string.back),
-                tint = radarColors().textPrimary,
+                tint = MaterialTheme.colorScheme.onSurface,
             )
         }
         Column(modifier = Modifier.weight(1f)) {
@@ -73,14 +75,14 @@ internal fun CatalogHeader(title: String, subtitle: String?, onClose: () -> Unit
             }
             Text(
                 text = title,
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
             if (subtitle != null) {
                 Text(
                     text = subtitle,
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -115,14 +117,14 @@ internal fun ColumnScope.CatalogContent(
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(
-                            color = radarColors().accent,
+                            color = MaterialTheme.colorScheme.primary,
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(14.dp),
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = stringResource(R.string.add_discovering),
-                            color = radarColors().textTertiary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -168,6 +170,48 @@ internal fun ColumnScope.CatalogContent(
             }
         }
 
+        // 「猜你想订」（AiFeature.FEED_RECOMMEND 的展示落点）：排在路由目录**之前**，
+        // 因为它要解决的正是"还没想好搜什么"——摆在目录下面，用户已经找到要订的东西了。
+        // 没有建议时整块不渲染：加订阅页是"来干一件具体的事"的页面，空态提示只是挡路。
+        if (state.aiSuggestions.isNotEmpty()) {
+            item {
+                Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                    Spacer(Modifier.height(18.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Lucide.Compass,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.add_suggest_title),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        text = stringResource(R.string.add_suggest_desc),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    state.aiSuggestions.forEach { suggestion ->
+                        SuggestionRow(
+                            suggestion = suggestion,
+                            onClick = {
+                                viewModel.onIntent(AddSubscriptionIntent.PickSuggestion(suggestion))
+                            },
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
+            }
+        }
+
         item {
             Spacer(Modifier.height(18.dp))
             Row(
@@ -178,12 +222,12 @@ internal fun ColumnScope.CatalogContent(
             ) {
                 Text(
                     text = stringResource(R.string.add_or_from_route),
-                    color = radarColors().textSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.width(8.dp))
-                HorizontalDivider(color = radarColors().divider, modifier = Modifier.weight(1f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.weight(1f))
             }
         }
 
@@ -198,7 +242,7 @@ internal fun ColumnScope.CatalogContent(
         // 分类吸顶：路由目录动辄上百条，滑到中段还能就地切分类，不必先滚回顶部。
         // 背景必须不透明，否则滚过的行会从下面透出来。
         stickyHeader(key = "category-chips") {
-            Surface(color = radarColors().bgRoot) {
+            Surface(color = MaterialTheme.colorScheme.surface) {
                 CategoryChips(
                     categories = RouteCategory.ORDER,
                     selected = state.category,
@@ -227,11 +271,11 @@ internal fun ColumnScope.CatalogContent(
                     contentAlignment = Alignment.Center,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = stringResource(R.string.add_catalog_loading),
-                            color = radarColors().textTertiary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -247,7 +291,7 @@ internal fun ColumnScope.CatalogContent(
                 ) {
                     Text(
                         text = stringResource(R.string.add_catalog_empty),
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -263,6 +307,63 @@ internal fun ColumnScope.CatalogContent(
 
         item { Spacer(Modifier.height(24.dp)) }
     }
+}
+
+/**
+ * 一条「猜你想订」。
+ *
+ * 行尾如实标出"点下去会发生什么"：三种落点的结果完全不同（进填参 / 填地址 / 去目录搜），
+ * 一律写成「添加」就是在骗用户点——他按下之后可能只是被送进一个还得填参数的页面。
+ */
+@Composable
+private fun SuggestionRow(suggestion: FeedSuggestionUi, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Surface(
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = suggestion.name,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (suggestion.reason.isNotBlank()) {
+                    Text(
+                        text = suggestion.reason,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(suggestion.target.hintRes()),
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+/** 落点 → 行尾提示文案。三者必须区分开，否则用户不知道按下去会怎样。 */
+private fun SuggestionTarget.hintRes(): Int = when (this) {
+    is SuggestionTarget.Route -> R.string.add_suggest_via_route
+    is SuggestionTarget.Url -> R.string.add_suggest_via_url
+    SuggestionTarget.Search -> R.string.add_suggest_via_search
 }
 
 @Composable
@@ -281,7 +382,7 @@ private fun RouteRow(route: RssHubRoute, onClick: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = route.name,
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f, fill = false),
@@ -295,7 +396,7 @@ private fun RouteRow(route: RssHubRoute, onClick: () -> Unit) {
             }
             Text(
                 text = route.subtitle,
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -305,7 +406,7 @@ private fun RouteRow(route: RssHubRoute, onClick: () -> Unit) {
         Icon(
             imageVector = Lucide.ChevronRight,
             contentDescription = null,
-            tint = radarColors().textTertiary,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp),
         )
     }

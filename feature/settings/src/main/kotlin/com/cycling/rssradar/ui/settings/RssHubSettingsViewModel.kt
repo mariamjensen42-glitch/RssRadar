@@ -13,6 +13,9 @@ import com.cycling.rssradar.core.model.KeepArchived
 import com.cycling.rssradar.core.model.LinkShareState
 import com.cycling.rssradar.core.model.ListDisplayState
 import com.cycling.rssradar.core.model.SyncState
+import com.cycling.rssradar.core.data.ai.AiTaskQueue
+import com.cycling.rssradar.core.data.store.prefs.AiBudgetStore
+import com.cycling.rssradar.core.data.store.prefs.AiFeatureStore
 import com.cycling.rssradar.core.data.store.prefs.AiStore
 import com.cycling.rssradar.core.data.store.prefs.ArchiveStore
 import com.cycling.rssradar.core.data.store.prefs.LanguageStore
@@ -46,6 +49,10 @@ class RssHubSettingsViewModel @Inject constructor(
     private val themeStore: ThemeStore,
     private val languageStore: LanguageStore,
     private val aiStore: AiStore,
+    /** 「AI 与诊断」入口页的概览数字：开了几项、今天用了多少、后台积压多少。 */
+    private val aiFeatureStore: AiFeatureStore,
+    private val aiBudgetStore: AiBudgetStore,
+    private val aiTaskQueue: AiTaskQueue,
     private val listDisplayStore: ListDisplayStore,
     private val archiveStore: ArchiveStore,
     private val syncStore: SyncStore,
@@ -86,7 +93,7 @@ class RssHubSettingsViewModel @Inject constructor(
                 _state.value = _state.value.copy(themeMode = mode)
             }
         }
-        // 界面语言（ADR-0017）
+        // 界面语言
         viewModelScope.launch {
             languageStore.language.collect { language ->
                 _state.value = _state.value.copy(appLanguage = language)
@@ -134,11 +141,27 @@ class RssHubSettingsViewModel @Inject constructor(
                 _state.value = _state.value.copy(notifyEnabled = prefs.enabled)
             }
         }
-        // 推荐流开关（ADR-0013）
+        // 推荐流开关
         viewModelScope.launch {
             recommendationStore.state.collect { enabled ->
                 _state.value = _state.value.copy(recommendationEnabled = enabled)
             }
+        }
+        // AI 概览（「AI 与诊断」入口页顶部状态卡）：开启功能数跟随开关 Store
+        viewModelScope.launch {
+            aiFeatureStore.state.collect { settings ->
+                _state.value = _state.value.copy(aiEnabledCount = settings.enabled.size)
+            }
+        }
+        // 今日用量与日上限跟随预算 Store（改了上限立刻反映到概览）
+        viewModelScope.launch {
+            aiBudgetStore.state.collect { budget ->
+                _state.value = _state.value.copy(aiUsedToday = budget.usedToday, aiDailyLimit = budget.dailyLimit)
+            }
+        }
+        // 待执行任务数：队列只给一次性快照（没有 Flow），进页面读一次即可
+        viewModelScope.launch {
+            _state.value = _state.value.copy(aiPendingTasks = aiTaskQueue.snapshot().pending)
         }
         // 路由目录（issue #59）：装载一次，之后跟随 Store 的更新广播
         viewModelScope.launch {
@@ -199,7 +222,7 @@ class RssHubSettingsViewModel @Inject constructor(
         )
     }
 
-    /** 推荐流开关（ADR-0013）：关闭后信息流不再显示「推荐」tab。 */
+    /** 推荐流开关：关闭后信息流不再显示「推荐」tab。 */
     fun setRecommendationEnabled(enabled: Boolean) {
         recommendationStore.set(enabled)
     }
@@ -213,7 +236,7 @@ class RssHubSettingsViewModel @Inject constructor(
         themeStore.setMode(mode)
     }
 
-    /** 界面语言（ADR-0017）：只持久化，locale 推送与重建由 UI 层调 AppLocales。 */
+    /** 界面语言：只持久化，locale 推送与重建由 UI 层调 AppLocales。 */
     fun setAppLanguage(language: AppLanguage) {
         languageStore.setLanguage(language)
     }

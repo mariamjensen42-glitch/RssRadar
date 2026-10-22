@@ -67,3 +67,21 @@ fun Context.shareArticle(
     runCatching { startActivity(Intent.createChooser(intent, "分享文章").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         .onFailure { Toast.makeText(this, "无法分享", Toast.LENGTH_SHORT).show() }
 }
+
+/**
+ * 分享一段纯文本（AI 生成的分享文案）。
+ *
+ * 刻意不并进 [shareArticle]：那个会按用户的链接/分享偏好拼「标题 + 摘要 + 链接」，
+ * 而这里要分享的**就是这段文字本身**——AI 写好的文案再拼一遍标题链接等于毁了它。
+ * [chooserTitle] 由调用方传（core 层拿不到 app 的 R，文案不能在这里硬编码）。
+ */
+fun Context.shareText(text: String, chooserTitle: String) {
+    if (text.isBlank()) return
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    runCatching { startActivity(Intent.createChooser(intent, chooserTitle).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        .onFailure { Toast.makeText(this, "无法分享", Toast.LENGTH_SHORT).show() }
+}

@@ -19,7 +19,7 @@ enum class BodyMode {
      */
     TRANSLATION_FALLBACK,
 
-    /** 原生渲染器（ADR-0009）：中间树非空即走 Compose。 */
+    /** 原生渲染器：中间树非空即走 Compose。 */
     NATIVE,
 
     /** 订阅源自带正文（或按需抓来的正文）：WebView。 */
@@ -116,7 +116,7 @@ internal fun plainTextLength(html: String): Int =
 /**
  * 值不值得给用户「正文 / 摘要」切换。
  *
- * 判据刻意保守：ADR-0001 入库时就取 description 与 content 的**较长者**，
+ * 判据刻意保守：入库时就取 description 与 content 的**较长者**，
  * 于是大量源的 `content` 就是 `summary` 本身——这时给个切换开关，点下去屏幕
  * 纹丝不动。按 UI 铁律（没有意义的按钮不该存在），只有两者实质不同才给。
  */
@@ -128,7 +128,7 @@ fun canSwitchToSummary(content: String?, summary: String?): Boolean {
 }
 
 /**
- * 是否走「视口渲染」——正文 WebView 高度固定、内部滚动（ADR-0007 的 OOM 防线）。
+ * 是否走「视口渲染」——正文 WebView 高度固定、内部滚动（OOM 防线）。
  *
  * 只有 [BodyMode.WEBVIEW] 且正文含图时才成立：有图的整页包高 WebView 会被 Chromium
  * 视为全部内容可见，所有图片同时解码进 Java 堆，图多必 OOM。原生路与译文路是

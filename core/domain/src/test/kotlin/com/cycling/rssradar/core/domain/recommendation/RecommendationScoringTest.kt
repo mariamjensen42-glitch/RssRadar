@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 推荐打分（ADR-0013）的回归测试：纯 JVM，不依赖 Room / Android。
+ * 推荐打分的回归测试：纯 JVM，不依赖 Room / Android。
  *
  * 覆盖的是"算法说了算"的几条硬规则：
  * 1. 打分三分量可解释（新鲜度/源亲和度/内容亲和度都落在预期区间）；

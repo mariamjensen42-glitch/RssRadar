@@ -1,6 +1,5 @@
 package com.cycling.rssradar.core.data.repository
 
-import androidx.room.withTransaction
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +16,7 @@ import com.cycling.rssradar.core.domain.filter.FilterRuleEngine
 import com.cycling.rssradar.core.domain.search.SearchFilters
 import com.cycling.rssradar.core.domain.search.SearchQueryBuilder
 import com.cycling.rssradar.core.model.MarkAsReadCondition
+import com.cycling.rssradar.core.model.FeedValueMode
 import com.cycling.rssradar.core.model.library.LibrarySort
 import com.cycling.rssradar.core.data.maintenance.ArticleCleaner
 import com.cycling.rssradar.core.data.maintenance.ClearArticlesResult
@@ -35,19 +35,14 @@ import com.cycling.rssradar.core.data.refresh.estimateReadingMinutes
 class FeedRepository(
     private val database: AppDatabase,
     private val engine: RefreshEngine,
+    private val transactionRunner: TransactionRunner,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val feedDao = database.feedDao()
     private val articleDao = database.articleDao()
 
     /** 归档/清空的统一入口（墓碑 + 真删），生产用真 Room 事务。 */
-    private val cleaner = ArticleCleaner(
-        articleDao,
-        transactionRunner = object : TransactionRunner {
-            override suspend fun <T> inTransaction(block: suspend () -> T): T =
-                database.withTransaction { block() }
-        },
-    )
+    private val cleaner = ArticleCleaner(articleDao, transactionRunner)
 
     /** 过滤规则作用于存量文章：与 cleaner 共用同一套归档语义（含收藏/稍后读豁免）。 */
     private val ruleApplier = FilterRuleApplier(articleDao, cleaner)
@@ -146,22 +141,28 @@ class FeedRepository(
     ): Int = articleDao.countLibrary(starred, feedId, fromMillis, toMillis)
 
     // —— 信息流四个 tab 统一分页（规模：源 1000+、文章数万条，全量 observe 不可行） ——
+    // `ponytail:` 每个 tab × 过滤组合各留一条 DAO 查询，故意不合并成参数化的 CASE——
+    // 理由见 ArticleSql.AI_VALUE_JOIN 上方的注释（ORDER BY 里出现表达式就走不了索引）。
 
     /** All tab：一次取一页。 */
-    suspend fun loadArticlesPage(limit: Int, offset: Int): List<ArticleWithFeed> =
-        articleDao.loadAllWithFeedPaged(limit, offset)
+    suspend fun loadArticlesPage(limit: Int, offset: Int, valueMode: FeedValueMode = FeedValueMode.OFF): List<ArticleWithFeed> =
+        if (valueMode.usesAiValue) articleDao.loadAllWithFeedPagedFilteredByValue(null, false, null, valueMode.minValue, limit, offset)
+        else articleDao.loadAllWithFeedPaged(limit, offset)
 
     /** 未读 tab：一次取一页。 */
-    suspend fun loadUnreadPage(limit: Int, offset: Int): List<ArticleWithFeed> =
-        articleDao.loadUnreadWithFeedPaged(limit, offset)
+    suspend fun loadUnreadPage(limit: Int, offset: Int, valueMode: FeedValueMode = FeedValueMode.OFF): List<ArticleWithFeed> =
+        if (valueMode.usesAiValue) articleDao.loadUnreadWithFeedPagedFilteredByValue(null, false, null, valueMode.minValue, limit, offset)
+        else articleDao.loadUnreadWithFeedPaged(limit, offset)
 
     /** 收藏 tab：一次取一页。 */
-    suspend fun loadStarredPage(limit: Int, offset: Int): List<ArticleWithFeed> =
-        articleDao.loadStarredWithFeedPaged(limit, offset)
+    suspend fun loadStarredPage(limit: Int, offset: Int, valueMode: FeedValueMode = FeedValueMode.OFF): List<ArticleWithFeed> =
+        if (valueMode.usesAiValue) articleDao.loadStarredWithFeedPagedFilteredByValue(null, false, null, valueMode.minValue, limit, offset)
+        else articleDao.loadStarredWithFeedPaged(limit, offset)
 
     /** 稍后读 tab：一次取一页。 */
-    suspend fun loadBookmarkedPage(limit: Int, offset: Int): List<ArticleWithFeed> =
-        articleDao.loadBookmarkedWithFeedPaged(limit, offset)
+    suspend fun loadBookmarkedPage(limit: Int, offset: Int, valueMode: FeedValueMode = FeedValueMode.OFF): List<ArticleWithFeed> =
+        if (valueMode.usesAiValue) articleDao.loadBookmarkedWithFeedPagedFilteredByValue(null, false, null, valueMode.minValue, limit, offset)
+        else articleDao.loadBookmarkedWithFeedPaged(limit, offset)
 
     // —— 组合筛选入口（issue #74 分组 + issue #75 分区）：分组（null=全部，含默认组空串语义）
     // × 内容分区（null=全部）叠加。两个过滤都为空时走上面的无谓词原查询，不为空才进
@@ -169,43 +170,63 @@ class FeedRepository(
     // （group == DEFAULT_GROUP），DAO 不做字符串比较，谓词语义见 ArticleDao 注释。
 
     /** All tab + 组合筛选：一次取一页。 */
-    suspend fun loadArticlesPageFiltered(group: String?, contentType: Int?, limit: Int, offset: Int): List<ArticleWithFeed> =
-        if (group == null && contentType == null) articleDao.loadAllWithFeedPaged(limit, offset)
-        else articleDao.loadAllWithFeedPagedFiltered(group, group == DEFAULT_GROUP, contentType, limit, offset)
+    suspend fun loadArticlesPageFiltered(group: String?, contentType: Int?, limit: Int, offset: Int, valueMode: FeedValueMode = FeedValueMode.OFF): List<ArticleWithFeed> = when {
+        valueMode.usesAiValue -> articleDao.loadAllWithFeedPagedFilteredByValue(group, group == DEFAULT_GROUP, contentType, valueMode.minValue, limit, offset)
+        group == null && contentType == null -> articleDao.loadAllWithFeedPaged(limit, offset)
+        else -> articleDao.loadAllWithFeedPagedFiltered(group, group == DEFAULT_GROUP, contentType, limit, offset)
+    }
 
     /** 未读 tab + 组合筛选：一次取一页。 */
-    suspend fun loadUnreadPageFiltered(group: String?, contentType: Int?, limit: Int, offset: Int): List<ArticleWithFeed> =
-        if (group == null && contentType == null) articleDao.loadUnreadWithFeedPaged(limit, offset)
-        else articleDao.loadUnreadWithFeedPagedFiltered(group, group == DEFAULT_GROUP, contentType, limit, offset)
+    suspend fun loadUnreadPageFiltered(group: String?, contentType: Int?, limit: Int, offset: Int, valueMode: FeedValueMode = FeedValueMode.OFF): List<ArticleWithFeed> = when {
+        valueMode.usesAiValue -> articleDao.loadUnreadWithFeedPagedFilteredByValue(group, group == DEFAULT_GROUP, contentType, valueMode.minValue, limit, offset)
+        group == null && contentType == null -> articleDao.loadUnreadWithFeedPaged(limit, offset)
+        else -> articleDao.loadUnreadWithFeedPagedFiltered(group, group == DEFAULT_GROUP, contentType, limit, offset)
+    }
 
     /** 收藏 tab + 组合筛选：一次取一页。 */
-    suspend fun loadStarredPageFiltered(group: String?, contentType: Int?, limit: Int, offset: Int): List<ArticleWithFeed> =
-        if (group == null && contentType == null) articleDao.loadStarredWithFeedPaged(limit, offset)
-        else articleDao.loadStarredWithFeedPagedFiltered(group, group == DEFAULT_GROUP, contentType, limit, offset)
+    suspend fun loadStarredPageFiltered(group: String?, contentType: Int?, limit: Int, offset: Int, valueMode: FeedValueMode = FeedValueMode.OFF): List<ArticleWithFeed> = when {
+        valueMode.usesAiValue -> articleDao.loadStarredWithFeedPagedFilteredByValue(group, group == DEFAULT_GROUP, contentType, valueMode.minValue, limit, offset)
+        group == null && contentType == null -> articleDao.loadStarredWithFeedPaged(limit, offset)
+        else -> articleDao.loadStarredWithFeedPagedFiltered(group, group == DEFAULT_GROUP, contentType, limit, offset)
+    }
 
     /** 稍后读 tab + 组合筛选：一次取一页。 */
-    suspend fun loadBookmarkedPageFiltered(group: String?, contentType: Int?, limit: Int, offset: Int): List<ArticleWithFeed> =
-        if (group == null && contentType == null) articleDao.loadBookmarkedWithFeedPaged(limit, offset)
-        else articleDao.loadBookmarkedWithFeedPagedFiltered(group, group == DEFAULT_GROUP, contentType, limit, offset)
+    suspend fun loadBookmarkedPageFiltered(group: String?, contentType: Int?, limit: Int, offset: Int, valueMode: FeedValueMode = FeedValueMode.OFF): List<ArticleWithFeed> = when {
+        valueMode.usesAiValue -> articleDao.loadBookmarkedWithFeedPagedFilteredByValue(group, group == DEFAULT_GROUP, contentType, valueMode.minValue, limit, offset)
+        group == null && contentType == null -> articleDao.loadBookmarkedWithFeedPaged(limit, offset)
+        else -> articleDao.loadBookmarkedWithFeedPagedFiltered(group, group == DEFAULT_GROUP, contentType, limit, offset)
+    }
 
     // —— 总数 COUNT（滚动位置指示条）：与上面 loadXxxPageFiltered 同谓词同分支，分母保证一致 ——
 
     /** All tab + 组合筛选：文章总数。 */
-    suspend fun countArticlesFiltered(group: String?, contentType: Int?): Int =
-        if (group == null && contentType == null) articleDao.countAllWithFeed()
-        else articleDao.countAllWithFeedFiltered(group, group == DEFAULT_GROUP, contentType)
+    suspend fun countArticlesFiltered(group: String?, contentType: Int?, valueMode: FeedValueMode = FeedValueMode.OFF): Int {
+        // 只有「只看值得读」需要换分母：「按信息价值」只改顺序，总数与默认查询一致。
+        val min = valueMode.minValue
+        return when {
+            min != null -> articleDao.countAllWithFeedFilteredByValue(group, group == DEFAULT_GROUP, contentType, min)
+            group == null && contentType == null -> articleDao.countAllWithFeed()
+            else -> articleDao.countAllWithFeedFiltered(group, group == DEFAULT_GROUP, contentType)
+        }
+    }
 
     /** 未读 tab + 组合筛选：文章总数。 */
-    suspend fun countUnreadFiltered(group: String?, contentType: Int?): Int =
-        articleDao.countUnreadWithFeedFiltered(group, group == DEFAULT_GROUP, contentType)
+    suspend fun countUnreadFiltered(group: String?, contentType: Int?, valueMode: FeedValueMode = FeedValueMode.OFF): Int =
+        // 只有「只看值得读」需要换分母；未读/收藏/稍后读没有「不过滤」那一档。
+        if (valueMode.minValue != null) articleDao.countUnreadWithFeedFilteredByValue(group, group == DEFAULT_GROUP, contentType, valueMode.minValue)
+        else articleDao.countUnreadWithFeedFiltered(group, group == DEFAULT_GROUP, contentType)
 
     /** 收藏 tab + 组合筛选：文章总数。 */
-    suspend fun countStarredFiltered(group: String?, contentType: Int?): Int =
-        articleDao.countStarredWithFeedFiltered(group, group == DEFAULT_GROUP, contentType)
+    suspend fun countStarredFiltered(group: String?, contentType: Int?, valueMode: FeedValueMode = FeedValueMode.OFF): Int =
+        // 只有「只看值得读」需要换分母；未读/收藏/稍后读没有「不过滤」那一档。
+        if (valueMode.minValue != null) articleDao.countStarredWithFeedFilteredByValue(group, group == DEFAULT_GROUP, contentType, valueMode.minValue)
+        else articleDao.countStarredWithFeedFiltered(group, group == DEFAULT_GROUP, contentType)
 
     /** 稍后读 tab + 组合筛选：文章总数。 */
-    suspend fun countBookmarkedFiltered(group: String?, contentType: Int?): Int =
-        articleDao.countBookmarkedWithFeedFiltered(group, group == DEFAULT_GROUP, contentType)
+    suspend fun countBookmarkedFiltered(group: String?, contentType: Int?, valueMode: FeedValueMode = FeedValueMode.OFF): Int =
+        // 只有「只看值得读」需要换分母；未读/收藏/稍后读没有「不过滤」那一档。
+        if (valueMode.minValue != null) articleDao.countBookmarkedWithFeedFilteredByValue(group, group == DEFAULT_GROUP, contentType, valueMode.minValue)
+        else articleDao.countBookmarkedWithFeedFiltered(group, group == DEFAULT_GROUP, contentType)
 
     /** 空分区空态判定（issue #75）：是否有任何该内容类型的订阅源。 */
     suspend fun hasFeedsOfType(contentType: Int): Boolean =
@@ -253,7 +274,7 @@ class FeedRepository(
     suspend fun setSyncEnabled(feedId: Long, enabled: Boolean) =
         feedDao.updateSyncEnabled(feedId, enabled)
 
-    /** 更新单源的内容类型（ADR-0014）：只影响列表浏览形态，不影响数据。 */
+    /** 更新单源的内容类型：只影响列表浏览形态，不影响数据。 */
     suspend fun setContentType(feedId: Long, contentType: Int) =
         feedDao.updateContentType(feedId, contentType)
 
@@ -286,7 +307,7 @@ class FeedRepository(
     suspend fun markRead(id: Long) = articleDao.markRead(id)
 
     /**
-     * 记录一次打开（ADR-0013）：推荐画像的唯一采集信号，每次打开详情页都更新。
+     * 记录一次打开：推荐画像的唯一采集信号，每次打开详情页都更新。
      * 只写 lastOpenedAt 一列，不碰已读/收藏/稍后读等用户状态。
      */
     suspend fun markOpened(id: Long) = articleDao.markOpened(id, System.currentTimeMillis())
@@ -415,7 +436,7 @@ class FeedRepository(
      * 把 AI 提取出的正文回填到文章（AI 智能功能模块 · 自动提取全文）。
      *
      * 刻意复用抓取端的同一张口 [ArticleDao.updateFetchedContent]：
-     * 内容来源、阅读时长、不完整标记的处理与 ADR-0012 的按需抓取完全一致，
+     * 内容来源、阅读时长、不完整标记的处理与按需抓取完全一致，
      * 阅读页不需要为"这段正文是 AI 提取的"单独开一条渲染分支——
      * 提取成功就是一段完整正文，与抓来的一样显示。
      *

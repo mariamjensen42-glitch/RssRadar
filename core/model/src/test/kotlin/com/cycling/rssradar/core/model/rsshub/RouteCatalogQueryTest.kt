@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 目录检索规则（ADR-0010）：排序、分类筛选、结果上限。 */
+/** 目录检索规则：排序、分类筛选、结果上限。 */
 class RouteCatalogQueryTest {
 
     private fun route(

@@ -7,7 +7,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
 /**
- * 自动同步唯一用例（issue #57/#58，ADR-0008）：CONTEXT.md「自动同步」「归档」的代码承载。
+ * 自动同步唯一用例（issue #57/#58）：CONTEXT.md「自动同步」「归档」的代码承载。
  * 周期任务（SyncWorker）与启动同步（SyncScheduler.onAppStart）共用，保证
  * lastAutoSyncAt 时间戳与清理行为在两条入口完全一致。
  *

@@ -4,6 +4,12 @@
     <string name="add_subtitle">Paste a link, or build from an RSSHub route</string>
     <string name="add_field_url">Feed URL</string>
     <string name="add_discovering">Detecting feeds…</string>
+    <string name="add_suggest_title">Suggested for you</string>
+    <string name="add_suggest_desc">Based on the feeds you follow and how you read them. Tap one to continue.</string>
+    <string name="add_suggest_via_route">Fill parameters</string>
+    <string name="add_suggest_via_url">Add directly</string>
+    <string name="add_suggest_via_search">Search catalog</string>
+    <string name="add_suggest_searched">Searched the route catalog for \"%1$s\"</string>
     <string name="add_or_from_route">Or build from an RSSHub route</string>
     <string name="add_catalog_loading">Loading route catalog…</string>
     <string name="add_catalog_empty">No matching routes</string>

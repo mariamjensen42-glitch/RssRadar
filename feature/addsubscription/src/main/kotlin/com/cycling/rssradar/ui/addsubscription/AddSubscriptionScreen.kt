@@ -37,7 +37,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.text.resolve
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /** RSSHub 品牌橙，只用在「这是 RSSHub 能力」的标识上，与紫色主色区分开。 */
 internal val RssHubOrange = Color(0xFFFF6B00)
@@ -125,7 +124,7 @@ internal fun AddSubscriptionScaffold(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(radarColors().bgRoot)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         // 系统栏 inset 收在这里统一处理，而不是各步自己加：两步（目录 / 填参）各自的头部
         // 都要贴住状态栏，分散处理必漏一处——真机上「填参页顶到状态栏」就是这么来的。
         // 原先是 ModalBottomSheet 自带的 inset 在兜底，改成整页后这份兜底没了。
@@ -164,15 +163,15 @@ internal fun PrimaryButton(
             .height(52.dp),
         shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = radarColors().accent,
-            contentColor = radarColors().onAccent,
-            disabledContainerColor = radarColors().accent.copy(alpha = 0.4f),
-            disabledContentColor = radarColors().onAccent,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+            disabledContentColor = MaterialTheme.colorScheme.onPrimary,
         ),
     ) {
         if (loading) {
             CircularProgressIndicator(
-                color = radarColors().onAccent,
+                color = MaterialTheme.colorScheme.onPrimary,
                 strokeWidth = 2.dp,
                 modifier = Modifier.size(20.dp),
             )

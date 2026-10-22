@@ -25,7 +25,7 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
-    /** 抓取告警出口（ADR-0012）：正文不完整/放弃抓取都会落到 logcat 的 RssRadar/Fetch。 */
+    /** 抓取告警出口：正文不完整/放弃抓取都会落到 logcat 的 RssRadar/Fetch。 */
     @Provides
     @Singleton
     fun provideFetchLogger(): FetchLogger = AndroidFetchLogger()

@@ -44,6 +44,7 @@
     <string name="feed_refreshed">已更新 %1$s 个订阅源</string>
     <string name="filter_all">全部</string>
     <string name="group_filter">分组筛选</string>
+    <string name="feed_value_only_good_hint">隐藏价值分低于 40 的；还没评估过的保留</string>
     <string name="group_filter_active">分组筛选 · 已启用</string>
     <string name="group_title">分组</string>
     <string name="mark_cond_1d">1 天前</string>

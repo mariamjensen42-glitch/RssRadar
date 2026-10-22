@@ -3,12 +3,12 @@ package com.cycling.rssradar.core.navigation
 import kotlinx.serialization.Serializable
 
 /**
- * 导航路由：类型安全的目的地标识（ADR-0002）。
+ * 导航路由：类型安全的目的地标识。
  *
  * 4 个主屏（Feed / Subscriptions / Search / Me）为顶层 composable 目的地；
  * [ArticleDetailRoute] 为独立 composable 目的地（带 articleId）；
  * [FeedArticlesRoute] 为订阅源文章列表（从订阅源清单进入，单源浏览）。
- * Feed 操作底栏曾是 composable + ModalBottomSheet 目的地（ADR-0002 #31），
+ * Feed 操作底栏曾是 composable + ModalBottomSheet 目的地（已废弃），
  * 已废弃：整页导航只为弹 sheet 没有必要，收回 SubscriptionsScreen 内联承载。
  * Group 对话框是纯弹层，不入路由。
  * 加订阅（[AddSubscriptionRoute]）2026-10-05 由 ModalBottomSheet 改回独立页面：
@@ -37,10 +37,10 @@ import kotlinx.serialization.Serializable
 /** 订阅源文章列表（CONTEXT.md「Feed article list」）：单源浏览，单列表不分 tab。 */
 @Serializable data class FeedArticlesRoute(val feedId: Long)
 
-/** 全文抓取诊断（ADR-0012）：抓不到/抓不全的记录清单与按站点归因。 */
+/** 全文抓取诊断：抓不到/抓不全的记录清单与按站点归因。 */
 @Serializable data object FetchDiagnosticsRoute
 
-/** 兴趣画像（ADR-0013）：推荐流的画像只读展示，回答"为什么推荐这些"。 */
+/** 兴趣画像：推荐流的画像只读展示，回答"为什么推荐这些"。 */
 @Serializable data object InterestProfileRoute
 
 /** 崩溃日志（issue #61）：最近 5 次崩溃的清单与全文导出。 */
@@ -63,7 +63,7 @@ import kotlinx.serialization.Serializable
 /** AI 与诊断：DeepSeek Key、AI 功能开关、用量、全文抓取诊断、崩溃日志。 */
 @Serializable data object SettingsAiDiagRoute
 
-/** AI 功能总览（AI 智能功能模块）：35 项独立开关、用量看板、任务队列、预算设置。 */
+/** AI 功能总览（AI 智能功能模块）：16 项独立开关、用量看板、任务队列、预算设置。 */
 @Serializable data object AiFeaturesRoute
 
 /** 提示词模板管理（AiFeature.PROMPT_TEMPLATE）：内置模板预览 + 各订阅源摘要提示词覆盖的集中管理。 */
@@ -72,7 +72,7 @@ import kotlinx.serialization.Serializable
 /**
  * AI 产物中心（AI 智能功能模块）：按功能摊开 `ai_artifacts` 里的全部产物。
  *
- * 它是 35 项功能的**通用出口**——只有一部分功能有专属展示位，
+ * 它是 16 项功能的**通用出口**——只有一部分功能有专属展示位，
  * 其余功能的产物至少要有地方能看见，否则"跑成功了但看不到结果"无从自查。
  */
 @Serializable data class AiArtifactsRoute(

@@ -30,3 +30,4 @@ prototype/.compose-symbols.txt
 
 # local agent working state (issue tracker)
 .scratch/
+.pi/

@@ -38,7 +38,7 @@ data class AiFeaturesUiState(
 )
 
 
-/** AI 功能总览页的意图（ADR-0003 MVI 契约）。 */
+/** AI 功能总览页的意图（MVI 契约）。 */
 sealed interface AiFeaturesIntent {
     data class Toggle(val feature: AiFeature) : AiFeaturesIntent
     data class SetCategory(val category: AiCategory, val enabled: Boolean) : AiFeaturesIntent

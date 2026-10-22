@@ -18,7 +18,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.SheetValue
@@ -46,12 +45,11 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Trash2
 import com.cycling.rssradar.core.data.ai.AiPrompts
-import com.cycling.rssradar.core.ui.theme.radarColors
+import com.cycling.rssradar.core.ui.components.SettingSwitchRow
 import com.cycling.rssradar.core.ui.theme.radarOutlinedTextFieldColors
-import com.cycling.rssradar.core.ui.theme.radarSwitchColors
 
 /**
- * 订阅源操作（重命名 / 移动分组 / 删除）的内联底部弹层（ADR-0002 #31 目的地形态已废弃：
+ * 订阅源操作（重命名 / 移动分组 / 删除）的内联底部弹层（该目的地形态已废弃：
  * 整页导航只为弹个 sheet 没有必要，收回 [SubscriptionsScreen] 内，与 [GroupActionSheet] 同形态）。
  * feed 与 groupOptions 由传入的 SubscriptionsViewModel 解析，重命名子对话框自包含，
  * 关闭统一走 onDismiss。
@@ -69,12 +67,13 @@ fun FeedActionDestination(
     val feed by remember(feedId) { viewModel.getFeed(feedId) }.collectAsStateWithLifecycle()
     val groupOptions by remember { viewModel.groupsList }.collectAsStateWithLifecycle()
     val aiProfile by remember(feedId) { viewModel.observeFeedAiProfile(feedId) }.collectAsStateWithLifecycle()
+    val aiFlags by remember(feedId) { viewModel.observeFeedAiFlags(feedId) }.collectAsStateWithLifecycle()
     FeedActionScreen(
         feedId = feedId,
         feed = feed,
         groupOptions = groupOptions,
-        // 未单独配置时跟随全局开关（全局默认开摘要），与 FeedAiProfile.resolve 的三态语义一致
-        autoSummary = aiProfile?.autoSummary ?: true,
+        // 生效值由 VM 解析（per-feed 优先、否则跟随全局），与 FeedAiProfile 的三态语义一致
+        aiFlags = aiFlags,
         aiProfile = aiProfile,
         onDismiss = onDismiss,
         onIntent = viewModel::onIntent,
@@ -87,7 +86,7 @@ fun FeedActionScreen(
     feedId: Long,
     feed: FeedEntity?,
     groupOptions: List<String>,
-    autoSummary: Boolean,
+    aiFlags: FeedAiFlags = FeedAiFlags(),
     aiProfile: com.cycling.rssradar.core.data.db.FeedAiProfileEntity? = null,
     onDismiss: () -> Unit,
     onIntent: (SubscriptionsIntent) -> Unit,
@@ -100,7 +99,7 @@ fun FeedActionScreen(
     feed?.let { f ->
         ModalBottomSheet(
             onDismissRequest = onDismiss,
-            containerColor = radarColors().surface1,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
             // 单锚点：内容较高时默认的双锚点（半开/全开）拖动过渡会反复重算高度造成抖动，
             // skipPartiallyExpanded 直接全开，拖拽只做关闭手势
             sheetState =
@@ -119,7 +118,7 @@ fun FeedActionScreen(
             ) {
                 Text(
                     text = f.title,
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -128,7 +127,7 @@ fun FeedActionScreen(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = f.url.removePrefix("https://").removePrefix("http://"),
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -136,7 +135,7 @@ fun FeedActionScreen(
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = "移动到分组",
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -147,14 +146,14 @@ fun FeedActionScreen(
                                 val selected = group == f.groupName.ifBlank { DEFAULT_GROUP }
                                 Surface(
                                     shape = RoundedCornerShape(50),
-                                    color = if (selected) radarColors().accent else radarColors().surface2,
+                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer,
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(50))
                                         .clickable { onIntent(SubscriptionsIntent.MoveFeed(f.id, group)); onDismiss() },
                                 ) {
                                     Text(
                                         text = group,
-                                        color = if (selected) radarColors().onAccent else radarColors().textPrimary,
+                                        color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                                         style = MaterialTheme.typography.labelMedium,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                     )
@@ -166,44 +165,44 @@ fun FeedActionScreen(
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = "同步与预设",
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                 )
                 Spacer(Modifier.height(8.dp))
                 // 自动同步开关（issue #58）：屏蔽后不参与后台自动同步，手动刷新照常
-                SwitchRow(
-                    title = "参与自动同步",
+                SettingSwitchRow(
+                    label = "参与自动同步",
                     subtitle = "关闭后此订阅源不再后台自动刷新",
                     checked = f.syncEnabled,
-                    onCheckedChange = { v ->
+                    onChange = { v ->
                         onIntent(SubscriptionsIntent.SetSyncEnabled(f.id, v))
                     },
                 )
                 Spacer(Modifier.height(4.dp))
                 // 全文抓取开关（issue #9）：关闭后详情页不再自动抓原网页正文
-                SwitchRow(
-                    title = "自动抓取全文",
+                SettingSwitchRow(
+                    label = "自动抓取全文",
                     subtitle = "关闭后详情页只显示订阅源自带内容",
                     checked = f.fullContentEnabled,
-                    onCheckedChange = { v ->
+                    onChange = { v ->
                         onIntent(SubscriptionsIntent.SetFullContentEnabled(f.id, v))
                     },
                 )
                 Spacer(Modifier.height(4.dp))
                 // 通知开关（#31）：Feed 级第二道闸；全局通知开关关时一律不发
-                SwitchRow(
-                    title = "新文章通知",
+                SettingSwitchRow(
+                    label = "新文章通知",
                     subtitle = "关闭后此订阅源的新文章不进系统通知",
                     checked = f.notificationsEnabled,
-                    onCheckedChange = { v ->
+                    onChange = { v ->
                         onIntent(SubscriptionsIntent.SetNotificationsEnabled(f.id, v))
                     },
                 )
                 Spacer(Modifier.height(12.dp))
-                // 内容类型（ADR-0014）：决定列表浏览形态（图片画廊/视频音频卡），订阅时已按信号预判
+                // 内容类型：决定列表浏览形态（图片画廊/视频音频卡），订阅时已按信号预判
                 Text(
                     text = "内容类型",
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -217,7 +216,7 @@ fun FeedActionScreen(
                         val selected = f.contentType == type
                         Surface(
                             shape = RoundedCornerShape(50),
-                            color = if (selected) radarColors().accent else radarColors().surface2,
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
                                 .clickable {
@@ -226,7 +225,7 @@ fun FeedActionScreen(
                         ) {
                             Text(
                                 text = label,
-                                color = if (selected) radarColors().onAccent else radarColors().textPrimary,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             )
@@ -237,13 +236,13 @@ fun FeedActionScreen(
                 // AI 摘要提示词（AI 智能功能模块）：订阅源级覆盖，留空则跟随内置模板
                 Text(
                     text = "AI",
-                    color = radarColors().textTertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                 )
                 Spacer(Modifier.height(8.dp))
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = radarColors().surface2,
+                    color = MaterialTheme.colorScheme.surfaceContainer,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
@@ -254,29 +253,42 @@ fun FeedActionScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("摘要提示词", color = radarColors().textPrimary, style = MaterialTheme.typography.bodyMedium)
+                            Text("摘要提示词", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
                             Text(
                                 text = if (aiProfile?.summaryPrompt.isNullOrBlank()) "使用内置模板" else "已自定义",
-                                color = radarColors().textTertiary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
-                        Text("编辑", color = radarColors().accent, style = MaterialTheme.typography.bodyMedium)
+                        Text("编辑", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
                 Spacer(Modifier.height(4.dp))
-                SwitchRow(
-                    title = "刷新后自动生成摘要",
-                    subtitle = "关闭后此订阅源的新文章不自动跑 AI 摘要",
-                    checked = autoSummary,
-                    onCheckedChange = { v ->
-                        onIntent(SubscriptionsIntent.SetFeedAutoSummary(f.id, v))
-                    },
-                )
+                // 三条同组：间距交给组，不在行之间手写 Spacer（SettingSwitchRow 自带无外部间距）
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AiSwitchRow(
+                        title = "刷新后自动生成摘要",
+                        subtitle = "关闭后此源的新文章不自动跑 AI 摘要",
+                        state = aiFlags.summary,
+                        onCheckedChange = { onIntent(SubscriptionsIntent.SetFeedAutoSummary(f.id, it)) },
+                    )
+                    AiSwitchRow(
+                        title = "自动评分",
+                        subtitle = "质量与降噪评分，列表可据此按信息价值排序",
+                        state = aiFlags.score,
+                        onCheckedChange = { onIntent(SubscriptionsIntent.SetFeedAiFlag(f.id, FeedAiFlag.SCORE, it)) },
+                    )
+                    AiSwitchRow(
+                        title = "健康监控",
+                        subtitle = "诊断这个源是否失效、降频或内容质量下滑",
+                        state = aiFlags.health,
+                        onCheckedChange = { onIntent(SubscriptionsIntent.SetFeedAiFlag(f.id, FeedAiFlag.HEALTH, it)) },
+                    )
+                }
                 Spacer(Modifier.height(16.dp))
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = radarColors().surface2,
+                    color = MaterialTheme.colorScheme.surfaceContainer,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
@@ -286,16 +298,16 @@ fun FeedActionScreen(
                         Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Lucide.Pencil, contentDescription = null, tint = radarColors().textSecondary, modifier = Modifier.size(18.dp))
+                        Icon(Lucide.Pencil, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("重命名", color = radarColors().textPrimary, style = MaterialTheme.typography.bodyMedium)
+                        Text("重命名", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
                 // 清空文章（issue #8）：只删文章保留订阅源，与「删除订阅（含其文章）」区分
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = radarColors().surface2,
+                    color = MaterialTheme.colorScheme.surfaceContainer,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
@@ -305,9 +317,9 @@ fun FeedActionScreen(
                         Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Lucide.Eraser, contentDescription = null, tint = radarColors().textSecondary, modifier = Modifier.size(18.dp))
+                        Icon(Lucide.Eraser, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("清空文章（保留订阅）", color = radarColors().textPrimary, style = MaterialTheme.typography.bodyMedium)
+                        Text("清空文章（保留订阅）", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -337,9 +349,9 @@ fun FeedActionScreen(
         var value by remember { mutableStateOf(initial) }
         AlertDialog(
             onDismissRequest = { renameTarget = null },
-            containerColor = radarColors().surface1,
-            titleContentColor = radarColors().textPrimary,
-            textContentColor = radarColors().textSecondary,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             title = { Text("重命名订阅", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
             text = {
                 OutlinedTextField(
@@ -351,12 +363,12 @@ fun FeedActionScreen(
             },
             confirmButton = {
                 TextButton(onClick = { onIntent(SubscriptionsIntent.RenameFeed(feedId, value)); renameTarget = null; onDismiss() }) {
-                    Text("保存", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                    Text("保存", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { renameTarget = null }) {
-                    Text("取消", color = radarColors().textTertiary)
+                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
         )
@@ -367,9 +379,9 @@ fun FeedActionScreen(
         var value by remember { mutableStateOf(aiProfile?.summaryPrompt.orEmpty()) }
         AlertDialog(
             onDismissRequest = { aiPromptTarget = false },
-            containerColor = radarColors().surface1,
-            titleContentColor = radarColors().textPrimary,
-            textContentColor = radarColors().textSecondary,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             title = {
                 Text("摘要提示词", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             },
@@ -378,7 +390,7 @@ fun FeedActionScreen(
                     Text(
                         text = "只影响这个订阅源。留空则使用内置模板。" +
                             "可用变量：" + AiPrompts.summaryVariableHelp(),
-                        color = radarColors().textTertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Spacer(Modifier.height(10.dp))
@@ -390,7 +402,7 @@ fun FeedActionScreen(
                         placeholder = {
                             Text(
                                 "例如：用一句话说清这条快讯发生了什么",
-                                color = radarColors().textTertiary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         },
@@ -405,12 +417,12 @@ fun FeedActionScreen(
                         aiPromptTarget = false
                     },
                 ) {
-                    Text("保存", color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                    Text("保存", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { aiPromptTarget = false }) {
-                    Text("取消", color = radarColors().textTertiary)
+                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
         )
@@ -421,9 +433,9 @@ fun FeedActionScreen(
         val title = feed?.title.orEmpty()
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            containerColor = radarColors().surface1,
-            titleContentColor = radarColors().textPrimary,
-            textContentColor = radarColors().textSecondary,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             title = { Text("清空文章", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
             text = {
                 Text(
@@ -443,7 +455,7 @@ fun FeedActionScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text("取消", color = radarColors().textTertiary) }
+                TextButton(onClick = { confirmClear = false }) { Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             },
         )
     }
@@ -453,9 +465,9 @@ fun FeedActionScreen(
         val title = feed?.title.orEmpty()
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            containerColor = radarColors().surface1,
-            titleContentColor = radarColors().textPrimary,
-            textContentColor = radarColors().textSecondary,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             title = { Text("删除订阅", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
             text = {
                 Text(
@@ -475,32 +487,29 @@ fun FeedActionScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) { Text("取消", color = radarColors().textTertiary) }
+                TextButton(onClick = { confirmDelete = false }) { Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             },
         )
     }
 }
 
-/** 带副标题的开关行：Feed 级预设统一形态（issue #9）。 */
+/**
+ * 单源 AI 开关行。
+ *
+ * 副标题会追加来源标注：未单独配置时说「跟随全局」，配置过说「已单独设置」——
+ * 否则用户分不清这一项是自己设的还是跟着全局变的（这正是这四个字段被埋住的后果）。
+ */
 @Composable
-private fun SwitchRow(
+private fun AiSwitchRow(
     title: String,
     subtitle: String,
-    checked: Boolean,
+    state: FeedAiSwitch,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, color = radarColors().textPrimary, style = MaterialTheme.typography.bodyMedium)
-            Text(subtitle, color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
-        }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = radarSwitchColors(),
-        )
-    }
+    SettingSwitchRow(
+        label = title,
+        checked = state.enabled,
+        onChange = onCheckedChange,
+        subtitle = subtitle + if (state.overridden) "（已单独设置）" else "（跟随全局）",
+    )
 }

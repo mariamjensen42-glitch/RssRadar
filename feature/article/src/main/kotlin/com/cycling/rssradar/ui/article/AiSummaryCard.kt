@@ -30,7 +30,6 @@ import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronUp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
-import com.cycling.rssradar.core.ui.theme.radarColors
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
@@ -55,7 +54,7 @@ internal fun AiSummaryCard(
     val collapsible = summary != null && summary.length > SUMMARY_COLLAPSE_CHARS
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = radarColors().surface1,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
@@ -76,17 +75,17 @@ internal fun AiSummaryCard(
                         },
                     ),
             ) {
-                Icon(Lucide.Sparkles, contentDescription = null, tint = radarColors().accent, modifier = Modifier.size(16.dp))
+                Icon(Lucide.Sparkles, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = stringResource(R.string.ai_summary),
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
                 if (state is AiSummaryState.Generating) {
-                    CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
                 }
                 if (collapsible) {
                     Spacer(Modifier.width(4.dp))
@@ -95,7 +94,7 @@ internal fun AiSummaryCard(
                         contentDescription = stringResource(
                             if (expanded) R.string.collapse else R.string.expand_full,
                         ),
-                        tint = radarColors().accent,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -103,21 +102,21 @@ internal fun AiSummaryCard(
             when {
                 state is AiSummaryState.Generating -> {
                     Spacer(Modifier.height(8.dp))
-                    Text(stringResource(R.string.generating_summary), color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.generating_summary), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
                 state is AiSummaryState.Failed -> {
                     Spacer(Modifier.height(8.dp))
-                    Text(state.message, color = radarColors().textTertiary, style = MaterialTheme.typography.bodySmall)
+                    Text(state.message, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(6.dp))
                     TextButton(onClick = onGenerate) {
-                        Text(if (summary == null) stringResource(R.string.retry) else stringResource(R.string.regenerate), color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                        Text(if (summary == null) stringResource(R.string.retry) else stringResource(R.string.regenerate), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 summary != null -> {
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = summary,
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyMedium,
                         // 折叠态 3 行截断；展开后全文。切换入口在标题行，不再压在正文末尾
                         maxLines = if (expanded) Int.MAX_VALUE else 3,
@@ -127,7 +126,7 @@ internal fun AiSummaryCard(
                 else -> {
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = onGenerate) {
-                        Text(stringResource(R.string.ai_gen_summary), color = radarColors().accent, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.ai_gen_summary), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }

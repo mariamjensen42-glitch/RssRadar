@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * 推荐流开关（ADR-0013）：关闭后信息流不显示「推荐」tab。
+ * 推荐流开关：关闭后信息流不显示「推荐」tab。
  *
  * 默认**开**：冷启动退化排序（按源轮转的最近未读）本身就有用，
  * 「没数据就隐藏」是功能没人发现的经典陷阱。开关有真实读取方——

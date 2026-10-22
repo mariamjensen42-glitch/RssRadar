@@ -22,7 +22,6 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.RefreshCw
 import com.cycling.rssradar.core.model.rsshub.CatalogSource
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /** 目录状态：条数 + 数据时间 + 更新入口。让用户知道目录是活的可更新，而不是死的 14 条。 */
 @Composable
@@ -41,13 +40,13 @@ internal fun CatalogStatusBar(
     ) {
         Text(
             text = catalogStatusText(routeCount, generatedAtMillis, source),
-            color = radarColors().textTertiary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.weight(1f),
         )
         Surface(
             shape = RoundedCornerShape(50),
-            color = radarColors().surface2,
+            color = MaterialTheme.colorScheme.surfaceContainer,
             modifier = Modifier
                 .clip(RoundedCornerShape(50))
                 .clickable(enabled = !refreshing, onClick = onRefresh),
@@ -57,12 +56,12 @@ internal fun CatalogStatusBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (refreshing) {
-                    CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(12.dp))
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp, modifier = Modifier.size(12.dp))
                 } else {
                     Icon(
                         imageVector = Lucide.RefreshCw,
                         contentDescription = stringResource(R.string.add_catalog_refresh_cd),
-                        tint = radarColors().textSecondary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(12.dp),
                     )
                 }
@@ -71,7 +70,7 @@ internal fun CatalogStatusBar(
                     text = stringResource(
                         if (refreshing) R.string.add_catalog_refreshing else R.string.add_catalog_refresh,
                     ),
-                    color = radarColors().textSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                 )
             }

@@ -2,6 +2,7 @@ package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
 import com.cycling.rssradar.core.model.LibraryState
+import com.cycling.rssradar.core.model.enumValueOrNull
 import com.cycling.rssradar.core.model.library.LibraryRange
 import com.cycling.rssradar.core.model.library.LibrarySort
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,8 +22,8 @@ class LibraryStore(private val prefs: SharedPreferences) {
 
     private fun read(): LibraryState = LibraryState(
         showBookmarked = prefs.getBoolean(KEY_BOOKMARKED, false),
-        sort = LibrarySort.fromNameOrNull(prefs.getString(KEY_SORT, null)) ?: LibrarySort.STARRED_AT,
-        range = LibraryRange.fromNameOrNull(prefs.getString(KEY_RANGE, null)) ?: LibraryRange.ALL,
+        sort = enumValueOrNull<LibrarySort>(prefs.getString(KEY_SORT, null)) ?: LibrarySort.STARRED_AT,
+        range = enumValueOrNull<LibraryRange>(prefs.getString(KEY_RANGE, null)) ?: LibraryRange.ALL,
     )
 
     private fun write(state: LibraryState) {

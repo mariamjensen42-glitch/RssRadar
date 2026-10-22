@@ -1,9 +1,11 @@
 package com.cycling.rssradar.core.data.store.prefs
 
 import android.content.SharedPreferences
+import com.cycling.rssradar.core.model.FeedValueMode
 import com.cycling.rssradar.core.model.ListDescMode
 import com.cycling.rssradar.core.model.ListDisplayState
 import com.cycling.rssradar.core.model.ListViewMode
+import com.cycling.rssradar.core.model.enumValueOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +31,7 @@ class ListDisplayStore(private val prefs: SharedPreferences) {
             .putBoolean(KEY_DIM_READ, next.dimRead)
             .putBoolean(KEY_MARK_READ_ON_SCROLL, next.markReadOnScroll)
             .putString(KEY_VIEW_MODE, next.viewMode.name)
+            .putString(KEY_VALUE_MODE, next.valueMode.name)
             .apply()
         _state.value = next
     }
@@ -38,16 +41,25 @@ class ListDisplayStore(private val prefs: SharedPreferences) {
         showFeedName = prefs.getBoolean(KEY_FEED_NAME, true),
         showDate = prefs.getBoolean(KEY_DATE, true),
         showThumbnail = prefs.getBoolean(KEY_THUMBNAIL, true),
-        descMode = prefs.getString(KEY_DESC_MODE, null)
-            ?.let { name -> runCatching { ListDescMode.valueOf(name) }.getOrNull() }
+        descMode = enumValueOrNull<ListDescMode>(prefs.getString(KEY_DESC_MODE, null))
             ?: ListDescMode.SHORT,
         stickyDateHeader = prefs.getBoolean(KEY_STICKY_DATE, true),
         dimRead = prefs.getBoolean(KEY_DIM_READ, false),
         markReadOnScroll = prefs.getBoolean(KEY_MARK_READ_ON_SCROLL, false),
-        viewMode = prefs.getString(KEY_VIEW_MODE, null)
-            ?.let { name -> runCatching { ListViewMode.valueOf(name) }.getOrNull() }
+        viewMode = enumValueOrNull<ListViewMode>(prefs.getString(KEY_VIEW_MODE, null))
             ?: ListViewMode.CARD,
+        valueMode = readValueMode(prefs),
     )
+
+    /**
+     * 读档位。上一版存的是布尔 `list_sort_by_value`，读到 true 就升成「按信息价值」——
+     * 不读它等于把用户刚设过的偏好悄悄抹掉。
+     */
+    private fun readValueMode(prefs: SharedPreferences): FeedValueMode {
+        enumValueOrNull<FeedValueMode>(prefs.getString(KEY_VALUE_MODE, null))
+            ?.let { return it }
+        return if (prefs.getBoolean(KEY_SORT_BY_VALUE, false)) FeedValueMode.BY_VALUE else FeedValueMode.OFF
+    }
 
     companion object {
         private const val KEY_FEED_ICON = "list_show_feed_icon"
@@ -59,5 +71,9 @@ class ListDisplayStore(private val prefs: SharedPreferences) {
         private const val KEY_DIM_READ = "list_dim_read"
         private const val KEY_MARK_READ_ON_SCROLL = "list_mark_read_on_scroll"
         private const val KEY_VIEW_MODE = "list_view_mode"
+        private const val KEY_VALUE_MODE = "list_value_mode"
+
+        /** 上一版的布尔键：只在迁移时读一次。 */
+        private const val KEY_SORT_BY_VALUE = "list_sort_by_value"
     }
 }

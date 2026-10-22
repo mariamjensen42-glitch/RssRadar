@@ -8,14 +8,13 @@ package com.cycling.rssradar.core.model
  * 免得无日期的文章永远标不掉。
  */
 enum class MarkAsReadCondition(
-    val label: String,
     /** 距今多少天；null = 不限时间（全部）。 */
     val days: Int?,
 ) {
-    ONE_DAY("1 天前", 1),
-    THREE_DAYS("3 天前", 3),
-    SEVEN_DAYS("7 天前", 7),
-    ALL("全部", null),
+    ONE_DAY(1),
+    THREE_DAYS(3),
+    SEVEN_DAYS(7),
+    ALL(null),
     ;
 
     /** 早于该时间戳的文章要被标记；ALL 返回 null（调用方走「全部已读」）。 */

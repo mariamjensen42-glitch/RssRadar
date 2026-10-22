@@ -277,7 +277,7 @@ internal fun ReadingBody(
     if (viewport) {
         Column(modifier = modifier.padding(vertical = 8.dp)) {
             // 视口模式的"随滚"体验（与整页模式对齐）：WebView 内部滚动量驱动头部向上折叠。
-            // 只动布局高度不改渲染模式——不触碰 ADR-0007 的视口渲染与内存约束。
+            // 只动布局高度不改渲染模式——不触碰视口渲染与内存约束。
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

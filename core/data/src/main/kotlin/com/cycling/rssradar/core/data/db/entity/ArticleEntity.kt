@@ -53,20 +53,20 @@ data class ArticleEntity(
     /** 封面图 URL。 */
     val coverUrl: String? = null,
     /**
-     * 正文被判定为「不完整」的标记（ADR-0012）：抓取成功但正文过短 / 无段落 /
+     * 正文被判定为「不完整」的标记：抓取成功但正文过短 / 无段落 /
      * 疑似 JS 渲染 / 疑似付费墙时置 1。数据仍然写入（比空白页好），但 UI 必须如实告知用户。
      */
     @ColumnInfo(defaultValue = "0") val contentIncomplete: Boolean = false,
-    /** AI 摘要：LLM 基于正文生成的内容概括。生成物语义同用户状态——刷新永不覆盖。见 ADR-0005。 */
+    /** AI 摘要：LLM 基于正文生成的内容概括。生成物语义同用户状态——刷新永不覆盖。 */
     val aiSummary: String? = null,
     /**
-     * 最近一次打开详情页的时间（推荐流画像的唯一采集信号，ADR-0013）。
+     * 最近一次打开详情页的时间（推荐流画像的唯一采集信号）。
      * 每次打开都更新——只记首开时间就无法区分"最近常看"和"三个月前看过一次"，
      * 源亲和度的时间衰减也就无从算起。null = 从未打开过。
      */
     val lastOpenedAt: Long? = null,
     /**
-     * 条目级媒体种类（ADR-0014）：enclosure 是 video/audio 时覆盖 feed 的内容类型——
+     * 条目级媒体种类：enclosure 是 video/audio 时覆盖 feed 的内容类型——
      * 图文源里偶尔夹一条播客或视频，feed 级分类解释不了它。null/0=跟随 feed。
      */
     @ColumnInfo(defaultValue = "0") val mediaKind: Int = MEDIA_KIND_NONE,

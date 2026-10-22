@@ -21,7 +21,7 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
 
 /**
  * v2 → v3：文章增加正文列（content/contentText/author/contentSource）。
- * 依据 ADR-0001：正文与摘要分离，summary 回归"短摘要"语义。
+ * 正文与摘要分离，summary 回归"短摘要"语义。
  */
 val MIGRATION_2_3 = object : Migration(2, 3) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -42,7 +42,7 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
 }
 
 /**
- * v4 → v5：articles 增加 AI 摘要列（aiSummary）。见 ADR-0005。
+ * v4 → v5：articles 增加 AI 摘要列（aiSummary）。
  */
 val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -70,7 +70,7 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
 
 /**
  * v7 → v8：正文抓取可观测性。
- * - articles.contentIncomplete：正文被判定为「不完整」的标记（ADR-0012）。
+ * - articles.contentIncomplete：正文被判定为「不完整」的标记。
  * - content_fetch_log：每次按需抓取留一条记录（链接/站点/状态码/重试次数/页数/原因），
  *   诊断页与"哪些站点抓不到正文"的归因都依赖它。
  */
@@ -129,7 +129,7 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
 }
 
 /**
- * v10 → v11：推荐流（ADR-0013）。
+ * v10 → v11：推荐流。
  * - articles.lastOpenedAt：最近一次打开详情页的时间，画像的唯一采集信号。
  * - recommendation_feedback：一个订阅源一行的降权系数（「减少此类」的负反馈，可撤销）。
  */
@@ -167,7 +167,7 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
 }
 
 /**
- * v12 → v13（ADR-0014 内容分类）：feeds.contentType + articles.mediaKind。
+ * v12 → v13（内容分类）：feeds.contentType + articles.mediaKind。
  * 都是带默认值的 int 新列，存量行用默认值（文章类/跟随 feed），无需重写。
  *
  * contentType 对存量 feed 做一次 SQL 回填：类型预判原本只在订阅时跑，老源
@@ -198,6 +198,23 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
                 "url LIKE '%xiaoyuzhoufm.com%' OR " +
                 "url LIKE '%podcast%')",
         )
+    }
+}
+
+/**
+ * v17 → v18：ai_artifacts 加可排序列 score（信息价值 / 质量总分的 0~100 数值）。
+ *
+ * 作用是把"每天跑出来的批处理结论"接进文章列表的排序：列表按主键位置 LEFT JOIN
+ * 一次即可拿到分数，不必在热查询里解析 payload 的 JSON。
+ *
+ * **不写 DEFAULT**：实体上是 `val score: Int? = null`（没有 `@ColumnInfo(defaultValue=)`），
+ * Room 生成的建表语句也就没有 DEFAULT，迁移里多写一个 DEFAULT 会让 `onValidateSchema`
+ * 判定不符、老用户升级后一开 App 就崩（v13→v14 与 v16→v17 都踩过这一条）。
+ * 存量行取 null = 还没有分数，列表排序时天然沉底。
+ */
+val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE ai_artifacts ADD COLUMN score INTEGER")
     }
 }
 

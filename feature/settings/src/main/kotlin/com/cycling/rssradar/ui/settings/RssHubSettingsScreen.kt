@@ -54,7 +54,6 @@ import com.cycling.rssradar.core.model.ThemeMode
 import com.cycling.rssradar.core.ui.R as UiR
 import com.cycling.rssradar.core.ui.components.tabBarBottomClearance
 import com.cycling.rssradar.core.ui.theme.RssRadarTheme
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 @Composable
 private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
@@ -115,17 +114,17 @@ fun RssHubSettingsScreen(
     onOpenLibrary: () -> Unit = {},
 ) {
     Scaffold(
-        containerColor = radarColors().bgRoot,
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         text = stringResource(R.string.me_title),
-                        color = radarColors().textPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
                     )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = radarColors().bgRoot),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
     ) { padding ->
@@ -185,7 +184,13 @@ fun RssHubSettingsScreen(
             SettingsEntryCard(
                 icon = Lucide.Bot,
                 title = stringResource(R.string.settings_ai),
-                summary = if (state.aiKeyConfigured) stringResource(R.string.ai_configured) else stringResource(R.string.ai_not_configured),
+                // 摘要只放得下 ~10 个中文字（无宽度约束，超出会压扁标题而不是省略），
+                // 所以这里只说"配好了 + 开了几项"，用量进页面看。
+                summary = if (state.aiKeyConfigured) {
+                    stringResource(R.string.ai_card_summary, state.aiEnabledCount)
+                } else {
+                    stringResource(R.string.ai_not_configured)
+                },
                 onClick = onOpenAiDiag,
             )
             Spacer(Modifier.height(10.dp))
@@ -234,7 +239,7 @@ fun RssHubSettingsScreen(
             }
             Text(
                 text = "RssRadar v$versionName",
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                 textAlign = TextAlign.Center,
@@ -248,19 +253,19 @@ fun RssHubSettingsScreen(
 private fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = radarColors().surface1,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = modifier,
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
             Text(
                 text = value,
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 text = label,
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelMedium,
             )
         }
@@ -277,7 +282,7 @@ internal fun SettingsEntryCard(
 ) {
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = radarColors().surface1,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
@@ -287,18 +292,18 @@ internal fun SettingsEntryCard(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, contentDescription = null, tint = radarColors().textSecondary, modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
             Text(
                 text = title,
-                color = radarColors().textPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 text = summary,
-                color = radarColors().textTertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
             )
@@ -306,7 +311,7 @@ internal fun SettingsEntryCard(
             Icon(
                 imageVector = Lucide.ChevronRight,
                 contentDescription = stringResource(UiR.string.enter),
-                tint = radarColors().textTertiary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
         }

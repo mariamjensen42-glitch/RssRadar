@@ -118,6 +118,23 @@ object RoutePath {
         return values
     }
 
+    /**
+     * path 的**字面骨架**：去掉全部参数段，只留字面段，不带首尾斜杠。
+     *
+     * 用途是把「别人口述的路由」与目录里的真实路由对上（见 [RouteSuggestion]）：
+     * 那条真实路由是 `/bilibili/user/video/:uid/:embed?`，而人（或模型）说得出的是
+     * `/bilibili/user/video`——两者必须是同一副骨架才算命中。
+     *
+     * 全是参数、没有字面段时返回空串（调用方据此判定"匹配不了任何东西"，
+     * 而不是让它去匹配同样为空的所有路径）。
+     */
+    fun base(path: String): String =
+        segments(path)
+            .filterIsInstance<Segment.Literal>()
+            .map { it.value }
+            .filter { it.isNotEmpty() }
+            .joinToString("/")
+
     /* ------------------------------ 内部 ------------------------------ */
 
     private sealed interface Segment {

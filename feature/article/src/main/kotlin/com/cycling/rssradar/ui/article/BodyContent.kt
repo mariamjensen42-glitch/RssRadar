@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.sp
 import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
 import com.cycling.rssradar.core.model.ExtractionIssue
 import com.cycling.rssradar.core.model.FetchFailure
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.data.platform.openUrl
 import com.cycling.rssradar.core.ui.theme.LocalReadingPrefs
 
@@ -75,7 +74,7 @@ internal fun BodyContent(
             onFindCount = onFindCount,
             modifier = modifier.fillMaxWidth(),
         )
-        // 原生渲染器（ADR-0009）：中间树非空才走到这个模式
+        // 原生渲染器：中间树非空才走到这个模式
         BodyMode.NATIVE -> CompositionLocalProvider(LocalFindHighlight provides find.highlight) {
             ArticleNativeReader(
                 nodes = plan.nativeNodes,
@@ -112,7 +111,7 @@ internal fun BodyParagraph(text: String) {
     val style = LocalReadingPrefs.current.style
     Text(
         text = text,
-        color = radarColors().textPrimary,
+        color = MaterialTheme.colorScheme.onSurface,
         style = MaterialTheme.typography.bodyLarge.copy(
             fontSize = style.fontSize.sp,
             lineHeight = (style.fontSize * style.lineHeight).sp,

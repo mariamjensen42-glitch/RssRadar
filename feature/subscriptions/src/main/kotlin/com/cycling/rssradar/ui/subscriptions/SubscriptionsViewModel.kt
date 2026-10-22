@@ -5,28 +5,38 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cycling.rssradar.core.data.db.DEFAULT_GROUP
+import com.cycling.rssradar.core.data.ai.AiArtifactRepository
+import com.cycling.rssradar.core.data.ai.AiParsers
 import com.cycling.rssradar.core.data.db.entity.FeedEntity
+import com.cycling.rssradar.core.data.db.FeedAiProfileEntity
 import com.cycling.rssradar.core.data.maintenance.ClearArticlesResult
 import com.cycling.rssradar.core.data.repository.FeedRepository
 import com.cycling.rssradar.core.data.service.SubscriptionFlow
+import com.cycling.rssradar.core.model.AiFeature
+import com.cycling.rssradar.core.model.AiFeatureSettings
 import com.cycling.rssradar.core.model.GROUP_DESIGN
 import com.cycling.rssradar.core.model.GROUP_DEV
 import com.cycling.rssradar.core.model.GROUP_TECH
 import com.cycling.rssradar.core.model.FeedSortMode
+import com.cycling.rssradar.core.data.store.prefs.AiFeatureStore
 import com.cycling.rssradar.core.data.store.prefs.FeedSortStore
 import com.cycling.rssradar.core.data.store.prefs.GroupStore
+import com.cycling.rssradar.core.domain.ai.FeedHealthDigest
 import com.cycling.rssradar.core.domain.rss.FeedFailureCategory
 import com.cycling.rssradar.core.domain.rss.FeedHealth
 import com.cycling.rssradar.core.ui.mvi.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -37,6 +47,23 @@ data class FeedWithUnread(
     val feed: FeedEntity,
     val unreadCount: Int,
     val failure: FeedFailureCategory? = null,
+)
+
+/**
+ * 「AI 源健康」区的一行。
+ *
+ * 与 [FeedWithUnread] 并列、刻意不复用它的 [FeedWithUnread.failure]：那边是**本地**抓取
+ * 失败分类（DNS / 4xx / 超时），这边是**模型**的语义判定（降频 / 内容腐坏）。
+ * 两者的文案与可执行动作都不同，塞进同一个字段迟早会出现
+ * "显示着 AI 的问题、点进去给的却是本地失败的处置"。
+ */
+data class FeedAiHealthUi(
+    val feedId: Long,
+    val feedTitle: String,
+    val status: FeedHealthDigest.Status,
+    val reason: String,
+    val advice: String,
+    val createdAt: Long,
 )
 
 /** 一个分组下的所有订阅。 */
@@ -55,6 +82,8 @@ data class SubscriptionsUiState(
     val unhealthyOnly: Boolean = false,
     val unhealthyCount: Int = 0,
     val unhealthyFeeds: List<FeedWithUnread> = emptyList(),
+    /** AI 源健康：模型判定为「降频 / 失效」且仍在监控中的源（见 [FeedAiHealthUi]）。 */
+    val aiHealthIssues: List<FeedAiHealthUi> = emptyList(),
     val selectionMode: Boolean = false,
     val selectedIds: Set<Long> = emptySet(),
     val message: String? = null,
@@ -76,7 +105,27 @@ private data class FeedInputs(
  */
 private fun groupOfFeed(feed: FeedEntity): String = feed.groupName.ifBlank { DEFAULT_GROUP }
 
-/** 订阅页事件（候选 A，ADR-0003）。 */
+/**
+ * 单源 AI 自动化开关。
+ *
+ * 这两项在 `FeedAiProfile` 里一直存在，批处理也真的按它们逐源过滤（见 `AiArtifactRepository`
+ * 对 `autoScore`/`watchHealth` 的三态解析），但 UI 只暴露过 autoSummary
+ * ——三项有效字段里只交了摘要这一项（autoTags / autoClassify 已是死列）。
+ * 这里把其余两项一并露出来。
+ */
+enum class FeedAiFlag { SCORE, HEALTH }
+
+/** 单源 AI 开关的一项：值是**生效值**（per-feed 优先、未配置则跟随全局），[overridden] 用来区分来源。 */
+data class FeedAiSwitch(val enabled: Boolean, val overridden: Boolean)
+
+/** 单源 AI 开关的整组生效值。 */
+data class FeedAiFlags(
+    val summary: FeedAiSwitch = FeedAiSwitch(true, false),
+    val score: FeedAiSwitch = FeedAiSwitch(false, false),
+    val health: FeedAiSwitch = FeedAiSwitch(false, false),
+)
+
+/** 订阅页事件（候选 A）。 */
 sealed interface SubscriptionsIntent {
     data class ToggleGroup(val group: String) : SubscriptionsIntent
     data object MarkAllRead : SubscriptionsIntent
@@ -116,7 +165,7 @@ sealed interface SubscriptionsIntent {
     /** Feed 级通知开关（#31）。 */
     data class SetNotificationsEnabled(val feedId: Long, val enabled: Boolean) : SubscriptionsIntent
 
-    /** 内容类型（ADR-0014）：改的是列表浏览形态，不动数据。 */
+    /** 内容类型：改的是列表浏览形态，不动数据。 */
     data class SetContentType(val feedId: Long, val contentType: Int) : SubscriptionsIntent
 
     /**
@@ -127,6 +176,9 @@ sealed interface SubscriptionsIntent {
 
     /** 订阅源级「刷新后自动生成摘要」开关。null 语义由仓储层解释为"跟随全局"。 */
     data class SetFeedAutoSummary(val feedId: Long, val enabled: Boolean) : SubscriptionsIntent
+
+    /** 订阅源级 AI 自动化开关（评分 / 健康监控）。摘要另有一个专用意图（历史原因）。 */
+    data class SetFeedAiFlag(val feedId: Long, val flag: FeedAiFlag, val enabled: Boolean) : SubscriptionsIntent
 
     /** 只看失效源（#82）：订阅列表在「全部」与「仅失效」之间切换。 */
     data object ToggleUnhealthyFilter : SubscriptionsIntent
@@ -144,6 +196,10 @@ class SubscriptionsViewModel @Inject constructor(
     @param:ApplicationContext private val appContext: Context,
     /** AI 智能功能模块：订阅源级 AI 配置（摘要提示词覆盖与自动化开关）。 */
     private val feedAiProfileDao: com.cycling.rssradar.core.data.db.FeedAiProfileDao,
+    /** 单源开关未显式配置时用全局开关兜底（与 FeedAiProfile 的三态语义一致）。 */
+    private val aiFeatureStore: AiFeatureStore,
+    /** AI 源健康判定的读取出口（产物表里 kind = FEED_HEALTH 的行）。 */
+    private val artifacts: AiArtifactRepository,
 ) : ViewModel(), MviViewModel<SubscriptionsIntent> {
 
     private val _expandedIds = MutableStateFlow(setOf(GROUP_TECH, GROUP_DEV, GROUP_DESIGN))
@@ -220,8 +276,55 @@ class SubscriptionsViewModel @Inject constructor(
     private val _uiMessage = MutableStateFlow<String?>(null)
     val uiMessage: StateFlow<String?> = _uiMessage.asStateFlow()
 
+    private val aiHealthVerdicts: Flow<List<FeedHealthDigest.Verdict>> = flow {
+        emit(loadAiHealthVerdicts())
+    }
+
     /**
-     * 订阅页的单一状态快照：11 条流合成一份，UI 侧只订阅这一条。
+     * 「AI 源健康」区（[AiFeature.FEED_HEALTH] 在订阅页的展示落点）。
+     *
+     * 只用 `flow { }` 一次性读产物，不做 Room 订阅：判定只在每日批处理跑完后变化，
+     * 而 `WhileSubscribed` 会在每次重新进入页面时重放这条流——"进页面就重读一次"
+     * 正是需要的频率（一天最多变一次），又不必让用户手动刷新。
+     *
+     * 两处过滤都是"宁可少显示也不要误导"：
+     * - 已关掉监控的源不显示（见 [resolveSwitch]）——监控关了就不会再有新判定，
+     *   继续展示一条永不更新的旧结论，用户会以为它还在被盯着。
+     * - 源已被删除时不显示：产物成了孤儿（每日任务末段才清），
+     *   展示出来就是一个点不进去、也删不掉的行。
+     *
+     * 已判 OK 与 UNKNOWN 的也不显示，理由见 [FeedHealthDigest.actionable]。
+     */
+    private val aiHealthIssues: Flow<List<FeedAiHealthUi>> =
+        combine(
+            repository.observeFeeds(),
+            feedAiProfileDao.observeAll(),
+            aiFeatureStore.state,
+            aiHealthVerdicts,
+        ) { feeds, profiles, settings, verdicts ->
+            val titles = feeds.associate { it.id to it.title }
+            val configured = profiles.associateBy { it.feedId }
+            FeedHealthDigest.actionable(verdicts).mapNotNull { verdict ->
+                val title = titles[verdict.feedId] ?: return@mapNotNull null
+                val monitored = resolveSwitch(
+                    configured[verdict.feedId]?.watchHealth,
+                    settings,
+                    AiFeature.FEED_HEALTH,
+                ).enabled
+                if (!monitored) return@mapNotNull null
+                FeedAiHealthUi(
+                    feedId = verdict.feedId,
+                    feedTitle = title,
+                    status = verdict.status,
+                    reason = verdict.reason,
+                    advice = verdict.advice,
+                    createdAt = verdict.createdAt,
+                )
+            }
+        }
+
+    /**
+     * 订阅页的单一状态快照：12 条流合成一份，UI 侧只订阅这一条。
      *
      * 分组 combine 是因为 Flow 的 combine 最多接 5 个流，分组只影响构造、不改对外语义。
      */
@@ -229,7 +332,8 @@ class SubscriptionsViewModel @Inject constructor(
         combine(groups, expandedGroupIds, totalUnread, groupsList, sortMode, ::CoreInputs),
         combine(unhealthyOnly, unhealthyCount, unhealthyFeeds, ::HealthInputs),
         combine(selectionMode, selectedFeedIds, uiMessage, ::SelectionInputs),
-    ) { core, health, sel ->
+        aiHealthIssues,
+    ) { core, health, sel, aiIssues ->
         SubscriptionsUiState(
             groups = core.groups,
             expandedIds = core.expandedIds,
@@ -239,6 +343,7 @@ class SubscriptionsViewModel @Inject constructor(
             unhealthyOnly = health.unhealthyOnly,
             unhealthyCount = health.unhealthyCount,
             unhealthyFeeds = health.unhealthyFeeds,
+            aiHealthIssues = aiIssues,
             selectionMode = sel.selectionMode,
             selectedIds = sel.selectedIds,
             message = sel.message,
@@ -292,6 +397,7 @@ class SubscriptionsViewModel @Inject constructor(
             is SubscriptionsIntent.SetContentType -> setContentType(intent.feedId, intent.contentType)
             is SubscriptionsIntent.SetFeedSummaryPrompt -> setFeedSummaryPrompt(intent.feedId, intent.prompt)
             is SubscriptionsIntent.SetFeedAutoSummary -> setFeedAutoSummary(intent.feedId, intent.enabled)
+            is SubscriptionsIntent.SetFeedAiFlag -> setFeedAiFlag(intent.feedId, intent.flag, intent.enabled)
             SubscriptionsIntent.ToggleUnhealthyFilter -> _unhealthyOnly.value = !_unhealthyOnly.value
             SubscriptionsIntent.DeleteUnhealthyFeeds -> deleteUnhealthyFeeds()
         }
@@ -342,17 +448,74 @@ class SubscriptionsViewModel @Inject constructor(
         }
     }
 
-    private fun setFeedAutoSummary(feedId: Long, enabled: Boolean) {
+
+    /** 读产物表里全部源健康判定。payload 由 [AiParsers.feedHealth] 归一化，未知档位退 UNKNOWN。 */
+    private suspend fun loadAiHealthVerdicts(): List<FeedHealthDigest.Verdict> = try {
+        artifacts.browse(kind = AiFeature.FEED_HEALTH.dbValue, limit = AI_HEALTH_LIMIT)
+            .map { item ->
+                val parsed = AiParsers.feedHealth(item.payload)
+                FeedHealthDigest.Verdict(
+                    feedId = item.subjectId,
+                    status = FeedHealthDigest.Status.of(parsed.status),
+                    reason = parsed.reason,
+                    advice = parsed.advice,
+                    createdAt = item.createdAt,
+                )
+            }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        // 读失败按"没有判定"处理：这是一页附加信息，不该让订阅页跟着报错。
+        emptyList()
+    }
+
+    /**
+     * 单源 AI 开关的生效值：per-feed 显式配置优先，未配置则跟随全局。
+     *
+     * 抽成方法是因为它有**两个消费者**——源操作页的三个开关，与「AI 源健康」区的过滤。
+     * 两边各写一遍的话，一旦走偏就会出现「监控已关、源健康区还在报这个源」这类
+     * 不会报错的静默错误（与"界面开关位置和实际批处理行为脱钩"是同一类问题）。
+     */
+    private fun resolveSwitch(
+        value: Boolean?,
+        settings: AiFeatureSettings,
+        vararg fallback: AiFeature,
+    ): FeedAiSwitch = FeedAiSwitch(
+        enabled = value ?: fallback.any { it in settings.enabled },
+        overridden = value != null,
+    )
+
+    /**
+     * 与 [com.cycling.rssradar.core.data.db.FeedAiProfile] 的解析同源——界面显示的开关位置
+     * 必须与实际批处理行为一致，否则用户会看到"开关是开的但没跑"。
+     */
+    fun observeFeedAiFlags(feedId: Long): StateFlow<FeedAiFlags> =
+        combine(feedAiProfileDao.observe(feedId), aiFeatureStore.state) { profile, settings ->
+            FeedAiFlags(
+                summary = resolveSwitch(profile?.autoSummary, settings, AiFeature.SUMMARY),
+                score = resolveSwitch(profile?.autoScore, settings, AiFeature.NOISE),
+                health = resolveSwitch(profile?.watchHealth, settings, AiFeature.FEED_HEALTH),
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FeedAiFlags())
+
+    private fun updateFeedAiProfile(feedId: Long, transform: (FeedAiProfileEntity) -> FeedAiProfileEntity) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            val current = feedAiProfileDao.get(feedId)
-            val base = current ?: com.cycling.rssradar.core.data.db.FeedAiProfileEntity(
-                feedId = feedId,
-                updatedAt = now,
-            )
-            feedAiProfileDao.upsert(base.copy(autoSummary = enabled, updatedAt = now))
+            val base = feedAiProfileDao.get(feedId) ?: FeedAiProfileEntity(feedId = feedId, updatedAt = now)
+            feedAiProfileDao.upsert(transform(base).copy(updatedAt = now))
         }
     }
+
+    private fun setFeedAiFlag(feedId: Long, flag: FeedAiFlag, enabled: Boolean) =
+        updateFeedAiProfile(feedId) { base ->
+            when (flag) {
+                FeedAiFlag.SCORE -> base.copy(autoScore = enabled)
+                FeedAiFlag.HEALTH -> base.copy(watchHealth = enabled)
+            }
+        }
+
+    private fun setFeedAutoSummary(feedId: Long, enabled: Boolean) =
+        updateFeedAiProfile(feedId) { it.copy(autoSummary = enabled) }
 
     private fun toggleGroup(group: String) {
         _expandedIds.value = _expandedIds.value.toMutableSet().also { set ->
@@ -541,7 +704,7 @@ class SubscriptionsViewModel @Inject constructor(
     }
 
     /**
-     * OPML 盲导（ADR-0004）：解析入库 → 注册新分组 → 立即报结果 →
+     * OPML 盲导：解析入库 → 注册新分组 → 立即报结果 →
      * 后台对新导入的源定向刷新补文章（静默失败，语义同全量刷新）。
      */
     private fun importOpml(uri: Uri) {
@@ -644,3 +807,12 @@ class SubscriptionsViewModel @Inject constructor(
         }
     }
 }
+
+/**
+ * 一次最多读多少条源健康判定。
+ *
+ * 刻意比产物中心的 `BROWSE_LIMIT`（300）宽得多：那边"看结果"够用就行，这边要覆盖
+ * **全部被监控的源**。千源账号下 300 会把排在末尾的行直接截掉，而产物按 createdAt 排序
+ * ——被截掉的恰好是最久没更新、最可能是失效的那一批，也就是最需要看到的那一批。
+ */
+private const val AI_HEALTH_LIMIT = 2_000

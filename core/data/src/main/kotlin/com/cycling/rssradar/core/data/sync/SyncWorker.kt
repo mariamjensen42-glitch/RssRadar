@@ -7,7 +7,7 @@ import com.cycling.rssradar.core.data.di.AppEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 
 /**
- * 自动同步周期任务（issue #58，ADR-0008）。
+ * 自动同步周期任务（issue #58）。
  * 经 EntryPoint 取 [AutoSync]，避免引入 hilt-work（HiltWorker）的额外注解处理器。
  */
 class SyncWorker(

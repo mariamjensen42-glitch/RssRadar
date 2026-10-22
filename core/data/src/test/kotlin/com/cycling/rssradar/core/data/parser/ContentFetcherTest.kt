@@ -127,7 +127,6 @@ class ContentFetcherTest {
         assertTrue(success.content.isComplete)
         assertEquals(200, success.report.statusCode)
         assertEquals(1, success.report.attempts)
-        assertEquals(1, success.report.pages)
         assertTrue(success.content.contentText.contains("中文正文"))
         assertFalse("页脚不该进正文", success.content.contentText.contains("版权所有"))
         assertEquals("127.0.0.1", success.report.host)
@@ -135,77 +134,7 @@ class ContentFetcherTest {
     }
 
     // ———————————————————————————————————————————————
-    // 2. 分页文章
-    // ———————————————————————————————————————————————
-
-    @Test
-    fun `paginated article is concatenated`() {
-        route("/paged") {
-            respond(
-                it,
-                200,
-                """
-                <html><body><article>
-                  <h1>分页文章</h1><p>第一页 ${paragraph()}</p>
-                </article>
-                <link rel="next" href="/paged2">
-                </body></html>
-                """.trimIndent(),
-            )
-        }
-        route("/paged2") {
-            respond(
-                it,
-                200,
-                """<html><body><article><p>第二页 ${paragraph()}</p></article></body></html>""",
-            )
-        }
-
-        val outcome = fetch("$baseUrl/paged")
-
-        assertTrue(outcome is FetchOutcome.Success)
-        val success = outcome as FetchOutcome.Success
-        assertEquals(2, success.report.pages)
-        assertTrue("应含第一页内容", success.content.contentText.contains("第一页"))
-        assertTrue("应含第二页内容", success.content.contentText.contains("第二页"))
-        assertEquals(1, hitsOf("/paged"))
-        assertEquals(1, hitsOf("/paged2"))
-    }
-
-    @Test
-    fun `next page link is recognised in all three shapes`() {
-        val fetcher = fetcher()
-
-        val byRel = fetcher.nextPageUrl(
-            """<html><head><link rel="next" href="/p/2"></head><body></body></html>""",
-            "$baseUrl/p/1",
-        )
-        assertEquals("$baseUrl/p/2", byRel)
-
-        val byText = fetcher.nextPageUrl(
-            """<html><body><a href="/p/2">下一页</a></body></html>""",
-            "$baseUrl/p/1",
-        )
-        assertEquals("$baseUrl/p/2", byText)
-
-        val byParam = fetcher.nextPageUrl(
-            """<html><body><article><p>${paragraph()}</p></article></body></html>""",
-            "$baseUrl/list?page=1",
-        )
-        assertEquals("$baseUrl/list?page=2", byParam)
-
-        // 跨域的「下一页」不能跟：那是外链不是分页
-        assertEquals(
-            null,
-            fetcher.nextPageUrl(
-                """<html><body><a href="https://other.example.com/p/2">下一页</a></body></html>""",
-                "$baseUrl/p/1",
-            ),
-        )
-    }
-
-    // ———————————————————————————————————————————————
-    // 3. 动态加载
+    // 2. 动态加载
     // ———————————————————————————————————————————————
 
     @Test
@@ -236,7 +165,7 @@ class ContentFetcherTest {
     }
 
     // ———————————————————————————————————————————————
-    // 4. 限流 / 反爬 / 付费墙
+    // 3. 限流 / 反爬 / 付费墙
     // ———————————————————————————————————————————————
 
     @Test

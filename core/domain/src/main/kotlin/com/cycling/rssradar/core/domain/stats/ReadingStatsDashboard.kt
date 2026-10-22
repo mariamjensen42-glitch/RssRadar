@@ -1,13 +1,11 @@
 package com.cycling.rssradar.core.domain.stats
 
-import com.cycling.rssradar.core.domain.ai.AiReadingStats
-
 /**
  * 统计仪表盘的**口径唯一落点**（#83）。
  *
  * 之前近 7 天窗口、epoch day 手写除法、集中度口径散在 ReadingStatsViewModel 的 init 里，
- * 只能真机看；AI 报告那一侧（[AiReadingStats]）却有纯函数与测试。现在仪表盘与 AI 报告
- * 共享同一套算法，仪表盘的装配本身也成了 JVM 可断言的纯函数：
+ * 只能真机看；现在算法抽成 [ReadingStatsCalc] 的纯函数，
+ * 仪表盘的装配本身也成了 JVM 可断言的纯函数：
  * DAO 负责取数（输入参数），这里负责口径（全部数字来自 DB 真实计算，一个都不许编）。
  */
 object ReadingStatsDashboard {
@@ -42,7 +40,7 @@ object ReadingStatsDashboard {
     fun assemble(inputs: Inputs): Summary {
         val since = inputs.now - WINDOW_DAYS * DAY_MS
         // 活跃时段只要近 7 天的样本；streak 要全部历史（断一天就断）
-        val hours = AiReadingStats.activeHours(inputs.allOpened.filter { it >= since }, inputs.zoneOffsetMillis)
+        val hours = ReadingStatsCalc.activeHours(inputs.allOpened.filter { it >= since }, inputs.zoneOffsetMillis)
         // epoch day 手写除法（floorDiv 在 check-kotlin 下解析不到）：时间戳恒正，普通除法等价
         val dayKeys = inputs.allOpened.map { (it + inputs.zoneOffsetMillis) / DAY_MS }.toSet()
         val todayDay = (inputs.now + inputs.zoneOffsetMillis) / DAY_MS
@@ -50,8 +48,8 @@ object ReadingStatsDashboard {
             weekOpens = inputs.windowCnt,
             weekMinutes = inputs.windowMinutes ?: 0L,
             activeHours = hours,
-            concentration = AiReadingStats.concentration(inputs.openedCountsByFeed),
-            streakDays = AiReadingStats.streakDays(dayKeys, todayDay),
+            concentration = ReadingStatsCalc.concentration(inputs.openedCountsByFeed),
+            streakDays = ReadingStatsCalc.streakDays(dayKeys, todayDay),
         )
     }
 }

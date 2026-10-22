@@ -37,12 +37,12 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.RotateCw
 import com.composables.icons.lucide.Sparkles
 import com.cycling.rssradar.core.data.ai.AiArtifactItem
+import com.cycling.rssradar.core.data.ai.AiParsers
 import com.cycling.rssradar.core.data.ai.AiPayloadText
 import com.cycling.rssradar.core.model.AiScope
 import com.cycling.rssradar.core.ui.components.AppSnackbarHost
 import com.cycling.rssradar.core.ui.components.EmptyState
 import com.cycling.rssradar.core.ui.components.rememberSlowLoad
-import com.cycling.rssradar.core.ui.theme.radarColors
 import com.cycling.rssradar.core.ui.text.resolve
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -52,7 +52,7 @@ import java.util.Locale
 /**
  * AI 产物中心：把 `ai_artifacts` 里的全部产物按功能摊开，随手可查。
  *
- * 为什么要有这一页：35 项 AI 功能里只有一部分有专属展示位，其余的执行器照常跑、
+ * 为什么要有这一页：16 项 AI 功能里只有一部分有专属展示位，其余的执行器照常跑、
  * 产物照常落库，但 App 里没有任何地方能看到它们，用户只觉得"跑成功了，结果呢？"。
  * 这一页不认识任何 payload 的具体类型（渲染交给 [AiPayloadText]），
  * 因此新增功能**零成本**自动纳入，不需要为每项功能再写一个页面。
@@ -127,7 +127,7 @@ fun AiArtifactsScreen(
     }
 
     Scaffold(
-        containerColor = radarColors().bgRoot,
+        containerColor = MaterialTheme.colorScheme.surface,
         snackbarHost = { AppSnackbarHost(snackbar) },
         topBar = {
             Row(
@@ -141,13 +141,13 @@ fun AiArtifactsScreen(
                     Icon(
                         imageVector = Lucide.ArrowLeft,
                         contentDescription = stringResource(UiR.string.back),
-                        tint = radarColors().textPrimary,
+                        tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
                 Text(
                     text = stringResource(R.string.ai_results_title),
                     style = MaterialTheme.typography.titleMedium,
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
@@ -155,14 +155,14 @@ fun AiArtifactsScreen(
                     if (state.refreshing) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
-                            color = radarColors().textSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             strokeWidth = 2.dp,
                         )
                     } else {
                         Icon(
                             imageVector = Lucide.RotateCw,
                             contentDescription = stringResource(R.string.refresh),
-                            tint = radarColors().textSecondary,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -193,7 +193,7 @@ fun AiArtifactsScreen(
 
             when {
                 state.loading && slowLoad -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = radarColors().accent)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
 
                 state.loading -> Spacer(Modifier.weight(1f))

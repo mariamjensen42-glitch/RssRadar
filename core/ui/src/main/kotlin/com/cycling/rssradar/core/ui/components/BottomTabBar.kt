@@ -10,6 +10,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -21,7 +22,6 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Rss
 import com.composables.icons.lucide.User
 import com.cycling.rssradar.core.ui.R
-import com.cycling.rssradar.core.ui.theme.radarColors
 
 /** 底部 TabBar 的主屏条目，与 Nav 路由一一对应（key 用于选中态判定）。 */
 private data class TabDef(val key: String, @StringRes val titleRes: Int, val icon: ImageVector)
@@ -39,9 +39,6 @@ private val TOP_LEVEL_TABS = listOf(
  * 升级 material3 时若默认高度变了，回来核对这个数（编译期不会报错）。
  */
 val TabBarClearance = 80.dp
-
-/** FAB 等悬浮件完整让开导航栏的底部抬升：让位高 + 呼吸空间。 */
-val TabBarFabOffset = 104.dp
 
 /**
  * 滚动内容底部应预留的让位（导航栏总占位 + 系统导航栏 inset）。
@@ -74,7 +71,7 @@ fun FloatingBottomBar(
     modifier: Modifier = Modifier,
 ) {
     NavigationBar(
-        containerColor = radarColors().surface2,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         modifier = modifier.fillMaxWidth(),
     ) {
         TOP_LEVEL_TABS.forEach { tab ->
@@ -85,11 +82,11 @@ fun FloatingBottomBar(
                 label = { Text(stringResource(tab.titleRes)) },
                 alwaysShowLabel = true,
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = radarColors().onAccent,
-                    selectedTextColor = radarColors().textPrimary,
-                    indicatorColor = radarColors().accent,
-                    unselectedIconColor = radarColors().textTertiary,
-                    unselectedTextColor = radarColors().textSecondary,
+                    selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                    indicatorColor = MaterialTheme.colorScheme.primary,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 ),
             )
         }

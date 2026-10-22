@@ -31,7 +31,6 @@ import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.Share2
 import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Type
-import com.cycling.rssradar.core.ui.theme.radarColors
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
@@ -62,14 +61,14 @@ internal fun ArticleDetailTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onBack) {
-            Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.nav_back), tint = radarColors().textPrimary)
+            Icon(Lucide.ArrowLeft, contentDescription = stringResource(R.string.nav_back), tint = MaterialTheme.colorScheme.onSurface)
         }
         // 标题滚出视口后顶栏补位显示（用户反馈）；阅读中隐藏，不占阅读注意力
         Box(modifier = Modifier.weight(1f)) {
             if (showTitle && title != null) {
                 Text(
                     text = title,
-                    color = radarColors().textPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -85,13 +84,13 @@ internal fun ArticleDetailTopBar(
             aiSummary == null
         ) {
             if (aiSummaryState is AiSummaryState.Generating) {
-                CircularProgressIndicator(color = radarColors().accent, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
             } else {
                 IconButton(onClick = onGenerateSummary) {
                     Icon(
                         Lucide.Sparkles,
                         contentDescription = stringResource(R.string.ai_gen_summary),
-                        tint = if (aiSummaryState is AiSummaryState.Failed) radarColors().accent else radarColors().textPrimary,
+                        tint = if (aiSummaryState is AiSummaryState.Failed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }
@@ -101,14 +100,14 @@ internal fun ArticleDetailTopBar(
             Icon(
                 Lucide.Languages,
                 contentDescription = if (isShowingTranslation) stringResource(R.string.ai_back_to_original) else stringResource(R.string.ai_translate),
-                tint = if (isShowingTranslation || isGeneratingTranslation) radarColors().accent else radarColors().textPrimary,
+                tint = if (isShowingTranslation || isGeneratingTranslation) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             )
         }
         // 分享与排版设置是低频操作：收进溢出菜单，顶栏图标从 4-5 个降到 2-3 个
         Box {
             var menuExpanded by remember { mutableStateOf(false) }
             IconButton(onClick = { menuExpanded = true }) {
-                Icon(Lucide.EllipsisVertical, contentDescription = stringResource(R.string.more_actions), tint = radarColors().textPrimary)
+                Icon(Lucide.EllipsisVertical, contentDescription = stringResource(R.string.more_actions), tint = MaterialTheme.colorScheme.onSurface)
             }
             DropdownMenu(
                 expanded = menuExpanded,
