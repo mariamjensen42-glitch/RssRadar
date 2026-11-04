@@ -293,7 +293,9 @@ _Avoid_: 事件、action、动作、命令、command
 _Avoid_: 事件、SideEffect
 
 **界面状态（UiState）**:
-驱动界面渲染的不可变快照。当前仅 AddSubscription / Search 已聚合为单一 `UiState`；其余 VM 仍是碎片 `StateFlow`，由候选 C 统一。
+驱动界面渲染的不可变快照，每个 ViewModel 只有一个，由 `MviStateViewModel.uiState` 暴露。
+变更一律走 `MutableStateFlow.update`；不再另开并行 `StateFlow` 供 UI 订阅——
+同一份数据两条出口时，哪条是准的没人说得清。
 _Avoid_: state、视图状态
 
 ## Performance

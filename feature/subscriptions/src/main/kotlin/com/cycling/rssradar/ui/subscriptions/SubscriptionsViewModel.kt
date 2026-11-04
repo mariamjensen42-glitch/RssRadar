@@ -24,7 +24,7 @@ import com.cycling.rssradar.core.data.store.prefs.GroupStore
 import com.cycling.rssradar.core.domain.ai.FeedHealthDigest
 import com.cycling.rssradar.core.domain.rss.FeedFailureCategory
 import com.cycling.rssradar.core.domain.rss.FeedHealth
-import com.cycling.rssradar.core.ui.mvi.MviViewModel
+import com.cycling.rssradar.core.ui.mvi.MviStateViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -33,12 +33,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 
@@ -200,31 +200,22 @@ class SubscriptionsViewModel @Inject constructor(
     private val aiFeatureStore: AiFeatureStore,
     /** AI 源健康判定的读取出口（产物表里 kind = FEED_HEALTH 的行）。 */
     private val artifacts: AiArtifactRepository,
-) : ViewModel(), MviViewModel<SubscriptionsIntent> {
+) : ViewModel(), MviStateViewModel<SubscriptionsIntent, SubscriptionsUiState> {
 
-    private val _expandedIds = MutableStateFlow(setOf(GROUP_TECH, GROUP_DEV, GROUP_DESIGN))
-    val expandedGroupIds: StateFlow<Set<String>> = _expandedIds.asStateFlow()
-
-    /** 只看失效源（#82）。 */
-    private val _unhealthyOnly = MutableStateFlow(false)
-    val unhealthyOnly: StateFlow<Boolean> = _unhealthyOnly.asStateFlow()
+    /** 本地可写状态（展开项 / 筛选 / 多选 / 提示），唯一容器；其余字段由 DB 与 Store 流折叠进来。 */
+    private val _uiState = MutableStateFlow(
+        SubscriptionsUiState(expandedIds = setOf(GROUP_TECH, GROUP_DEV, GROUP_DESIGN)),
+    )
 
     /** 当前失效源数量（筛选入口的角标数字，来自 DB 字段推导，不估算）。 */
-    val unhealthyCount: StateFlow<Int> = repository.observeFeeds()
+    private val unhealthyCount: StateFlow<Int> = repository.observeFeeds()
         .map { feeds -> feeds.count { FeedHealth.isUnhealthy(it.consecutiveFailures, it.failureReason) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
-
-    /** 批量移动的多选模式（issue #7）：开启后列表行变勾选行，整行点击 = 勾选而非进文章列表。 */
-    private val _selectionMode = MutableStateFlow(false)
-    val selectionMode: StateFlow<Boolean> = _selectionMode.asStateFlow()
-
-    private val _selectedFeedIds = MutableStateFlow(emptySet<Long>())
-    val selectedFeedIds: StateFlow<Set<Long>> = _selectedFeedIds.asStateFlow()
 
     /** 分组注册表：保证空分组也显示。直连 GroupStore 的流，不再自持一份需要手动刷新的副本。 */
     val groupsList: StateFlow<List<String>> = groupStore.state
 
-    val groups: StateFlow<List<GroupSectionUi>> =
+    private val groups: StateFlow<List<GroupSectionUi>> =
         combine(
             repository.observeFeeds(),
             repository.observeFeedUnreadCounts(),
@@ -236,10 +227,7 @@ class SubscriptionsViewModel @Inject constructor(
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** 当前订阅列表排序方式（持久化，重启后保持）。 */
-    val sortMode: StateFlow<FeedSortMode> = feedSortStore.state
-
-    val totalUnread: StateFlow<Int> = repository.observeUnreadCount()
+    private val totalUnread: StateFlow<Int> = repository.observeUnreadCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     /** 按 id 取单条订阅（#31 FeedAction 目的地解析 feed 用）。保持 fun：状态 producer，非事件。 */
@@ -252,7 +240,7 @@ class SubscriptionsViewModel @Inject constructor(
      * 失效源拍平列表（#82「只看失效源」）：绕过分组结构直达，
      * 与搜索命中同一展示形态。failure 分类已推导好，UI 不再判阈值。
      */
-    val unhealthyFeeds: StateFlow<List<FeedWithUnread>> =
+    private val unhealthyFeeds: StateFlow<List<FeedWithUnread>> =
         combine(repository.observeFeeds(), repository.observeFeedUnreadCounts()) { feeds, unread ->
             feeds.asSequence()
                 .map { feed -> withFailure(feed, unread[feed.id] ?: 0) }
@@ -272,9 +260,6 @@ class SubscriptionsViewModel @Inject constructor(
     fun observeFeedAiProfile(feedId: Long): StateFlow<com.cycling.rssradar.core.data.db.FeedAiProfileEntity?> =
         feedAiProfileDao.observe(feedId)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    private val _uiMessage = MutableStateFlow<String?>(null)
-    val uiMessage: StateFlow<String?> = _uiMessage.asStateFlow()
 
     private val aiHealthVerdicts: Flow<List<FeedHealthDigest.Verdict>> = flow {
         emit(loadAiHealthVerdicts())
@@ -323,51 +308,41 @@ class SubscriptionsViewModel @Inject constructor(
             }
         }
 
+    private val coreInputs: Flow<CoreInputs> = combine(groups, totalUnread, groupsList, feedSortStore.state, ::CoreInputs)
+
+    private val healthInputs: Flow<HealthInputs> = combine(unhealthyCount, unhealthyFeeds, ::HealthInputs)
+
     /**
-     * 订阅页的单一状态快照：12 条流合成一份，UI 侧只订阅这一条。
-     *
+     * 订阅页的单一状态快照：本地状态 + DB/Store 派生流在这里合成一份，UI 侧只订阅这一条。
      * 分组 combine 是因为 Flow 的 combine 最多接 5 个流，分组只影响构造、不改对外语义。
      */
-    val uiState: StateFlow<SubscriptionsUiState> = combine(
-        combine(groups, expandedGroupIds, totalUnread, groupsList, sortMode, ::CoreInputs),
-        combine(unhealthyOnly, unhealthyCount, unhealthyFeeds, ::HealthInputs),
-        combine(selectionMode, selectedFeedIds, uiMessage, ::SelectionInputs),
+    override val uiState: StateFlow<SubscriptionsUiState> = combine(
+        _uiState,
+        coreInputs,
+        healthInputs,
         aiHealthIssues,
-    ) { core, health, sel, aiIssues ->
-        SubscriptionsUiState(
+    ) { local, core, health, aiIssues ->
+        local.copy(
             groups = core.groups,
-            expandedIds = core.expandedIds,
             totalUnread = core.totalUnread,
             groupOptions = core.groupOptions,
             sortMode = core.sortMode,
-            unhealthyOnly = health.unhealthyOnly,
             unhealthyCount = health.unhealthyCount,
             unhealthyFeeds = health.unhealthyFeeds,
             aiHealthIssues = aiIssues,
-            selectionMode = sel.selectionMode,
-            selectedIds = sel.selectedIds,
-            message = sel.message,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SubscriptionsUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), _uiState.value)
 
     private data class CoreInputs(
         val groups: List<GroupSectionUi>,
-        val expandedIds: Set<String>,
         val totalUnread: Int,
         val groupOptions: List<String>,
         val sortMode: FeedSortMode,
     )
 
     private data class HealthInputs(
-        val unhealthyOnly: Boolean,
         val unhealthyCount: Int,
         val unhealthyFeeds: List<FeedWithUnread>,
-    )
-
-    private data class SelectionInputs(
-        val selectionMode: Boolean,
-        val selectedIds: Set<Long>,
-        val message: String?,
     )
 
     override fun onIntent(intent: SubscriptionsIntent) {
@@ -375,7 +350,7 @@ class SubscriptionsViewModel @Inject constructor(
             is SubscriptionsIntent.ToggleGroup -> toggleGroup(intent.group)
             SubscriptionsIntent.MarkAllRead -> markAllRead()
             is SubscriptionsIntent.SelectSort -> selectSort(intent.mode)
-            SubscriptionsIntent.ConsumeMessage -> _uiMessage.value = null
+            SubscriptionsIntent.ConsumeMessage -> _uiState.update { it.copy(message = null) }
             is SubscriptionsIntent.CreateGroup -> createGroup(intent.name)
             is SubscriptionsIntent.RenameGroup -> renameGroup(intent.oldName, intent.newName)
             is SubscriptionsIntent.DeleteGroup -> deleteGroup(intent.name)
@@ -398,7 +373,7 @@ class SubscriptionsViewModel @Inject constructor(
             is SubscriptionsIntent.SetFeedSummaryPrompt -> setFeedSummaryPrompt(intent.feedId, intent.prompt)
             is SubscriptionsIntent.SetFeedAutoSummary -> setFeedAutoSummary(intent.feedId, intent.enabled)
             is SubscriptionsIntent.SetFeedAiFlag -> setFeedAiFlag(intent.feedId, intent.flag, intent.enabled)
-            SubscriptionsIntent.ToggleUnhealthyFilter -> _unhealthyOnly.value = !_unhealthyOnly.value
+            SubscriptionsIntent.ToggleUnhealthyFilter -> _uiState.update { it.copy(unhealthyOnly = !it.unhealthyOnly) }
             SubscriptionsIntent.DeleteUnhealthyFeeds -> deleteUnhealthyFeeds()
         }
     }
@@ -413,11 +388,11 @@ class SubscriptionsViewModel @Inject constructor(
             val targets = repository.observeFeeds().first()
                 .filter { FeedHealth.isUnhealthy(it.consecutiveFailures, it.failureReason) }
             if (targets.isEmpty()) {
-                _uiMessage.value = "没有失效的订阅源"
+                _uiState.update { it.copy(message = "没有失效的订阅源") }
                 return@launch
             }
             repository.deleteFeeds(targets.map { it.id })
-            _uiMessage.value = "已删除 ${targets.size} 个失效订阅源（含其文章）"
+            _uiState.update { it.copy(message = "已删除 ${targets.size} 个失效订阅源（含其文章）") }
         }
     }
 
@@ -444,7 +419,9 @@ class SubscriptionsViewModel @Inject constructor(
             }
             // 刻意**不**清除已生成的摘要：旧摘要是按旧提示词写的，但内容依然忠实于原文，
             // 清掉等于逼用户重新花钱生成一遍。用户在阅读页点"重新生成"即可套用新提示词。
-            _uiMessage.value = if (normalized == null) "已改用内置摘要提示词" else "已保存该订阅源的摘要提示词"
+            _uiState.update {
+                it.copy(message = if (normalized == null) "已改用内置摘要提示词" else "已保存该订阅源的摘要提示词")
+            }
         }
     }
 
@@ -518,15 +495,19 @@ class SubscriptionsViewModel @Inject constructor(
         updateFeedAiProfile(feedId) { it.copy(autoSummary = enabled) }
 
     private fun toggleGroup(group: String) {
-        _expandedIds.value = _expandedIds.value.toMutableSet().also { set ->
-            if (!set.add(group)) set.remove(group)
+        _uiState.update { state ->
+            state.copy(
+                expandedIds = state.expandedIds.toMutableSet().also { set ->
+                    if (!set.add(group)) set.remove(group)
+                },
+            )
         }
     }
 
     private fun markAllRead() {
         viewModelScope.launch {
             repository.markAllRead()
-            _uiMessage.value = "已全部标记为已读"
+            _uiState.update { it.copy(message = "已全部标记为已读") }
         }
     }
 
@@ -539,32 +520,32 @@ class SubscriptionsViewModel @Inject constructor(
     /** 新建分组：仅注册表加名；已有同名返回 false。 */
     private fun createGroup(name: String) {
         val ok = groupStore.addGroup(name)
-        _uiMessage.value = if (ok) "已创建分组「${name.trim()}」" else "分组已存在或名称为空"
+        _uiState.update { it.copy(message = if (ok) "已创建分组「${name.trim()}」" else "分组已存在或名称为空") }
     }
 
     /** 重命名分组：注册表改名 + feeds.groupName 批量改。 */
     private fun renameGroup(oldName: String, newName: String) {
         val ok = groupStore.renameGroup(oldName, newName)
         if (!ok) {
-            _uiMessage.value = "新名称无效或已存在"
+            _uiState.update { it.copy(message = "新名称无效或已存在") }
             return
         }
         viewModelScope.launch {
             repository.renameGroup(oldName, newName.trim())
-            _uiMessage.value = "已重命名为「${newName.trim()}」"
+            _uiState.update { it.copy(message = "已重命名为「${newName.trim()}」") }
         }
     }
 
     /** 删除分组：注册表删名 + 该组 feed 移回默认组。 */
     private fun deleteGroup(name: String) {
         if (name == DEFAULT_GROUP) {
-            _uiMessage.value = "默认分组不可删除"
+            _uiState.update { it.copy(message = "默认分组不可删除") }
             return
         }
         groupStore.removeGroup(name)
         viewModelScope.launch {
             repository.deleteGroup(name)
-            _uiMessage.value = "已删除分组「$name」，其中的订阅移入默认分组"
+            _uiState.update { it.copy(message = "已删除分组「$name」，其中的订阅移入默认分组") }
         }
     }
 
@@ -572,7 +553,7 @@ class SubscriptionsViewModel @Inject constructor(
     private fun moveFeed(feedId: Long, targetGroup: String) {
         viewModelScope.launch {
             repository.moveFeed(feedId, targetGroup)
-            _uiMessage.value = "已移动订阅"
+            _uiState.update { it.copy(message = "已移动订阅") }
         }
     }
 
@@ -580,39 +561,43 @@ class SubscriptionsViewModel @Inject constructor(
 
     /** 进出多选模式；退出即清空勾选，不留残留状态。 */
     private fun toggleSelectionMode() {
-        _selectionMode.value = !_selectionMode.value
-        if (!_selectionMode.value) _selectedFeedIds.value = emptySet()
+        _uiState.update { state ->
+            val on = !state.selectionMode
+            state.copy(selectionMode = on, selectedIds = if (on) state.selectedIds else emptySet())
+        }
     }
 
     private fun toggleFeedSelected(feedId: Long) {
-        _selectedFeedIds.value = _selectedFeedIds.value.toMutableSet().also { set ->
-            if (!set.add(feedId)) set.remove(feedId)
+        _uiState.update { state ->
+            state.copy(
+                selectedIds = state.selectedIds.toMutableSet().also { set ->
+                    if (!set.add(feedId)) set.remove(feedId)
+                },
+            )
         }
     }
 
     /** 执行批量移动：目标分组不在注册表时顺带注册（分组是注册表 + 字符串，见 GroupStore）。 */
     private fun moveSelectedFeeds(targetGroup: String) {
-        val ids = _selectedFeedIds.value.toList()
+        val ids = _uiState.value.selectedIds.toList()
         val group = targetGroup.trim().ifBlank { DEFAULT_GROUP }
-        _selectionMode.value = false
-        _selectedFeedIds.value = emptySet()
+        _uiState.update { it.copy(selectionMode = false, selectedIds = emptySet()) }
         if (ids.isEmpty()) return
         if (group !in groupStore.getGroups()) groupStore.addGroup(group)
         viewModelScope.launch {
             repository.moveFeedsToGroup(ids, group)
-            _uiMessage.value = "已移动 ${ids.size} 个订阅到「$group」"
+            _uiState.update { it.copy(message = "已移动 ${ids.size} 个订阅到「$group」") }
         }
     }
 
     /** 执行批量删除：勾选集合即删除清单，退出多选并如实报数。 */
     private fun deleteSelectedFeeds() {
-        val ids = _selectedFeedIds.value.toList()
-        _selectionMode.value = false
-        _selectedFeedIds.value = emptySet()
+        val ids = _uiState.value.selectedIds.toList()
+        _uiState.update { it.copy(selectionMode = false, selectedIds = emptySet()) }
         if (ids.isEmpty()) return
         viewModelScope.launch {
             repository.deleteFeeds(ids)
-            _uiMessage.value = "已删除 ${ids.size} 个订阅源（含其文章）"
+            _uiState.update { it.copy(message = "已删除 ${ids.size} 个订阅源（含其文章）") }
         }
     }
 
@@ -620,13 +605,15 @@ class SubscriptionsViewModel @Inject constructor(
 
     private fun clearFeedArticles(feedId: Long, feedTitle: String) {
         viewModelScope.launch {
-            _uiMessage.value = clearMessage(repository.clearFeedArticles(feedId), "「$feedTitle」")
+            val text = clearMessage(repository.clearFeedArticles(feedId), "「$feedTitle」")
+            _uiState.update { it.copy(message = text) }
         }
     }
 
     private fun clearGroupArticles(group: String) {
         viewModelScope.launch {
-            _uiMessage.value = clearMessage(repository.clearGroupArticles(group), "「$group」")
+            val text = clearMessage(repository.clearGroupArticles(group), "「$group」")
+            _uiState.update { it.copy(message = text) }
         }
     }
 
@@ -643,11 +630,11 @@ class SubscriptionsViewModel @Inject constructor(
             val targets = repository.observeFeeds().first()
                 .filter { groupOfFeed(it) == group }
             if (targets.isEmpty()) {
-                _uiMessage.value = "「$group」里没有订阅源"
+                _uiState.update { it.copy(message = "「$group」里没有订阅源") }
                 return@launch
             }
             repository.deleteFeeds(targets.map { it.id })
-            _uiMessage.value = "已删除「$group」的 ${targets.size} 个订阅源（含其文章）"
+            _uiState.update { it.copy(message = "已删除「$group」的 ${targets.size} 个订阅源（含其文章）") }
         }
     }
 
@@ -667,23 +654,24 @@ class SubscriptionsViewModel @Inject constructor(
     private fun setFullContentEnabled(feedId: Long, enabled: Boolean) {
         viewModelScope.launch {
             repository.setFullContentEnabled(feedId, enabled)
-            _uiMessage.value = if (enabled) {
+            val text = if (enabled) {
                 "已开启全文抓取，详情页会自动抓原网页正文"
             } else {
                 "已关闭全文抓取，详情页只显示订阅源自带内容"
             }
+            _uiState.update { it.copy(message = text) }
         }
     }
 
     /** 重命名订阅源标题。 */
     private fun renameFeed(feedId: Long, title: String) {
         if (title.isBlank()) {
-            _uiMessage.value = "标题不能为空"
+            _uiState.update { it.copy(message = "标题不能为空") }
             return
         }
         viewModelScope.launch {
             repository.renameFeed(feedId, title.trim())
-            _uiMessage.value = "已重命名"
+            _uiState.update { it.copy(message = "已重命名") }
         }
     }
 
@@ -691,7 +679,7 @@ class SubscriptionsViewModel @Inject constructor(
     private fun deleteFeed(feedId: Long, feedTitle: String) {
         viewModelScope.launch {
             repository.deleteFeed(feedId)
-            _uiMessage.value = "已删除「$feedTitle」"
+            _uiState.update { it.copy(message = "已删除「$feedTitle」") }
         }
     }
 
@@ -699,7 +687,8 @@ class SubscriptionsViewModel @Inject constructor(
     private fun setSyncEnabled(feedId: Long, enabled: Boolean) {
         viewModelScope.launch {
             repository.setSyncEnabled(feedId, enabled)
-            _uiMessage.value = if (enabled) "已参与自动同步" else "已屏蔽自动同步（手动刷新不受影响）"
+            val text = if (enabled) "已参与自动同步" else "已屏蔽自动同步（手动刷新不受影响）"
+            _uiState.update { it.copy(message = text) }
         }
     }
 
@@ -712,23 +701,24 @@ class SubscriptionsViewModel @Inject constructor(
             val result = try {
                 val stream = appContext.contentResolver.openInputStream(uri)
                     ?: run {
-                        _uiMessage.value = "无法读取所选文件"
+                        _uiState.update { it.copy(message = "无法读取所选文件") }
                         return@launch
                     }
                 stream.use { subscriptionFlow.importOpml(it) }
             } catch (_: IllegalArgumentException) {
-                _uiMessage.value = "不是有效的 OPML 文件"
+                _uiState.update { it.copy(message = "不是有效的 OPML 文件") }
                 return@launch
             } catch (_: Exception) {
-                _uiMessage.value = "导入失败，请重试"
+                _uiState.update { it.copy(message = "导入失败，请重试") }
                 return@launch
             }
             result.groups.forEach { groupStore.addGroup(it) }
-                _uiMessage.value = if (result.skipped > 0) {
+            val text = if (result.skipped > 0) {
                 "已导入 ${result.imported} 个订阅源，跳过 ${result.skipped} 个重复"
             } else {
                 "已导入 ${result.imported} 个订阅源"
             }
+            _uiState.update { it.copy(message = text) }
             // 后台补文章：只刷新新导入的源，不阻塞导入结果提示
             viewModelScope.launch {
                 repository.refreshFeeds(result.newFeedIds)
@@ -740,14 +730,15 @@ class SubscriptionsViewModel @Inject constructor(
     private fun setNotificationsEnabled(feedId: Long, enabled: Boolean) {
         viewModelScope.launch {
             repository.setNotificationsEnabled(feedId, enabled)
-            _uiMessage.value = if (enabled) "已开启此源的通知" else "已关闭此源的通知"
+            val text = if (enabled) "已开启此源的通知" else "已关闭此源的通知"
+            _uiState.update { it.copy(message = text) }
         }
     }
 
     private fun setContentType(feedId: Long, contentType: Int) {
         viewModelScope.launch {
             repository.setContentType(feedId, contentType)
-            _uiMessage.value = "内容类型已更新"
+            _uiState.update { it.copy(message = "内容类型已更新") }
         }
     }
 
@@ -764,7 +755,7 @@ class SubscriptionsViewModel @Inject constructor(
                     true
                 } ?: false
             }.getOrDefault(false)
-            _uiMessage.value = if (written) "已导出 OPML" else "导出失败，请重试"
+            _uiState.update { it.copy(message = if (written) "已导出 OPML" else "导出失败，请重试") }
         }
     }
 

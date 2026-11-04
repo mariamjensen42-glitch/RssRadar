@@ -1,28 +1,25 @@
 package com.cycling.rssradar.ui.feed
 
-import com.cycling.rssradar.core.ui.text.UiText
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cycling.rssradar.core.data.db.entity.ArticleEntity
-import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
-import com.cycling.rssradar.core.data.db.entity.FeedEntity
-import com.cycling.rssradar.core.data.repository.FeedRepository
 import com.cycling.rssradar.core.data.ai.AiRepository
-import com.cycling.rssradar.core.ui.mvi.MviViewModel
+import com.cycling.rssradar.core.data.db.entity.ArticleEntity
+import com.cycling.rssradar.core.data.db.entity.FeedEntity
+import com.cycling.rssradar.core.data.db.projection.ArticleWithFeed
+import com.cycling.rssradar.core.data.repository.FeedRepository
+import com.cycling.rssradar.core.ui.mvi.MviStateViewModel
+import com.cycling.rssradar.core.ui.text.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** 订阅源文章列表事件（候选 A）。 */
+/** 订阅源文章列表事件。 */
 sealed interface FeedArticlesIntent {
     data object Refresh : FeedArticlesIntent
     data object LoadMore : FeedArticlesIntent
@@ -35,12 +32,8 @@ sealed interface FeedArticlesIntent {
 }
 
 /**
- * 订阅源文章列表（CONTEXT.md「Feed article list」，issue #51）。
- * 单源全部文章的分页快照，管线与信息流完全一致：
- * LIMIT/OFFSET 每页 30 条、滚动到底预加载、卡片状态 mutateLocal 原地更新。
- */
-/**
  * 订阅源文章列表的渲染输入快照，唯一产出点是 [FeedArticlesViewModel.uiState]。
+ * `hasMore` 是分页内部判据，Screen 不消费，故不进快照。
  */
 data class FeedArticlesUiState(
     val feed: FeedEntity? = null,
@@ -50,62 +43,32 @@ data class FeedArticlesUiState(
     val uiMessage: UiText? = null,
 )
 
+/**
+ * 订阅源文章列表（CONTEXT.md「Feed article list」，issue #51）。
+ * 单源全部文章的分页快照，管线与信息流完全一致：
+ * LIMIT/OFFSET 每页 30 条、滚动到底预加载、卡片状态 mutateLocal 原地更新。
+ */
 @HiltViewModel
 class FeedArticlesViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: FeedRepository,
     private val aiRepository: AiRepository,
-) : ViewModel(), MviViewModel<FeedArticlesIntent> {
+) : ViewModel(), MviStateViewModel<FeedArticlesIntent, FeedArticlesUiState> {
 
     /** nav args 在 SavedStateHandle 里的键，与 FeedArticlesRoute 的参数名一致。 */
     private val feedId: Long = savedStateHandle.get<Long>(KEY_FEED_ID)
         ?: savedStateHandle.get<String>(KEY_FEED_ID)?.toLongOrNull()
         ?: -1L
 
-    var feed by mutableStateOf<FeedEntity?>(null)
-        private set
+    private val _uiState = MutableStateFlow(FeedArticlesUiState())
+    override val uiState: StateFlow<FeedArticlesUiState> = _uiState.asStateFlow()
 
-    var articles by mutableStateOf<List<ArticleWithFeed>>(emptyList())
-        private set
-
-    var hasMore by mutableStateOf(false)
-        private set
-
-    var isLoadingMore by mutableStateOf(false)
-        private set
-
-    var isRefreshing by mutableStateOf(false)
-        private set
-
-    var uiMessage by mutableStateOf<UiText?>(null)
-        private set
-
-    /** 最近删除的文章（与信息流一致的撤销语义）。 */
-    var pendingUndoDelete by mutableStateOf<ArticleEntity?>(null)
-        private set
-
+    private var hasMore = false
     private var loadMoreJob: Job? = null
-
-    /**
-     * 订阅源文章列表的渲染输入快照，UI 只订阅这一条。
-     *
-     * 本 VM 的状态是 Compose `mutableStateOf`（快照感知），用 [snapshotFlow] 把它们桥接成
-     * 一条 StateFlow：既保留「赋值即触发」的写法，又满足「UI 从 StateFlow 收集状态」的契约。
-     * `hasMore` 是分页内部判据，Screen 不消费，故不进快照。
-     */
-    val uiState: StateFlow<FeedArticlesUiState> = snapshotFlow {
-        FeedArticlesUiState(
-            feed = feed,
-            articles = articles,
-            isLoadingMore = isLoadingMore,
-            isRefreshing = isRefreshing,
-            uiMessage = uiMessage,
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FeedArticlesUiState())
 
     init {
         viewModelScope.launch {
-            feed = repository.getFeed(feedId)
+            _uiState.update { it.copy(feed = repository.getFeed(feedId)) }
             loadFirstPage()
         }
     }
@@ -119,47 +82,51 @@ class FeedArticlesViewModel @Inject constructor(
             is FeedArticlesIntent.SetRead -> setRead(intent.articleId, intent.read)
             is FeedArticlesIntent.MarkRead -> markRead(intent.articleId)
             is FeedArticlesIntent.DeleteArticle -> deleteArticle(intent.articleId)
-            FeedArticlesIntent.ConsumeMessage -> uiMessage = null
+            FeedArticlesIntent.ConsumeMessage -> _uiState.update { it.copy(uiMessage = null) }
         }
     }
 
     /** 下拉刷新：仅刷新当前源（秒级），完成后重载首页。 */
     private fun refresh() {
-        if (isRefreshing) return
+        if (_uiState.value.isRefreshing) return
         viewModelScope.launch {
-            isRefreshing = true
+            _uiState.update { it.copy(isRefreshing = true) }
             val ok = repository.refreshSingleFeed(feedId)
             loadFirstPage()
-            isRefreshing = false
-            if (!ok) uiMessage = UiText.res(R.string.feed_refresh_failed)
+            _uiState.update {
+                if (ok) {
+                    it.copy(isRefreshing = false)
+                } else {
+                    it.copy(isRefreshing = false, uiMessage = UiText.res(R.string.feed_refresh_failed))
+                }
+            }
         }
     }
 
     private fun loadMore() {
-        if (isLoadingMore || !hasMore) return
+        if (_uiState.value.isLoadingMore || !hasMore) return
         if (loadMoreJob?.isActive == true) return
         loadMoreJob = viewModelScope.launch {
-            isLoadingMore = true
-            val current = articles
+            _uiState.update { it.copy(isLoadingMore = true) }
+            val current = _uiState.value.articles
             val page = repository.loadFeedPage(feedId, PAGE_SIZE, current.size)
             // 去重保护（同 FeedListViewModel）：DB 删除使 OFFSET 位移后，
             // 下一页可能与快照尾部重叠，重复 id 会让 LazyColumn key 冲突崩溃。
             val loadedIds = current.mapTo(HashSet()) { it.article.id }
             val fresh = page.filterNot { it.article.id in loadedIds }
-            articles = current + fresh
             hasMore = page.size == PAGE_SIZE
-            isLoadingMore = false
+            _uiState.update { it.copy(articles = current + fresh, isLoadingMore = false) }
         }
     }
 
     private suspend fun loadFirstPage() {
         val page = repository.loadFeedPage(feedId, PAGE_SIZE, 0)
-        articles = page
         hasMore = page.size == PAGE_SIZE
+        _uiState.update { it.copy(articles = page) }
     }
 
     private fun toggleStarred(articleId: Long) {
-        val current = articles.firstOrNull { it.article.id == articleId }?.article?.isStarred ?: false
+        val current = _uiState.value.articles.firstOrNull { it.article.id == articleId }?.article?.isStarred ?: false
         viewModelScope.launch {
             repository.setStarred(articleId, !current)
             mutateLocal(articleId) { it.copy(isStarred = !current) }
@@ -167,7 +134,7 @@ class FeedArticlesViewModel @Inject constructor(
     }
 
     private fun toggleBookmarked(articleId: Long) {
-        val current = articles.firstOrNull { it.article.id == articleId }?.article?.isBookmarked ?: false
+        val current = _uiState.value.articles.firstOrNull { it.article.id == articleId }?.article?.isBookmarked ?: false
         viewModelScope.launch {
             repository.setBookmarked(articleId, !current)
             mutateLocal(articleId) { it.copy(isBookmarked = !current) }
@@ -190,17 +157,22 @@ class FeedArticlesViewModel @Inject constructor(
 
     private fun deleteArticle(articleId: Long) {
         viewModelScope.launch {
-            val deleted = repository.deleteArticle(articleId) ?: return@launch
+            repository.deleteArticle(articleId) ?: return@launch
             aiRepository.clearTranslationCache(articleId)
-            pendingUndoDelete = deleted
-            articles = articles.filterNot { it.article.id == articleId }
+            _uiState.update { state ->
+                state.copy(articles = state.articles.filterNot { it.article.id == articleId })
+            }
         }
     }
 
     /** 分页快照原地更新单篇卡片状态，免去整表重查。 */
     private fun mutateLocal(articleId: Long, transform: (ArticleEntity) -> ArticleEntity) {
-        articles = articles.map {
-            if (it.article.id == articleId) it.copy(article = transform(it.article)) else it
+        _uiState.update { state ->
+            state.copy(
+                articles = state.articles.map {
+                    if (it.article.id == articleId) it.copy(article = transform(it.article)) else it
+                },
+            )
         }
     }
 
